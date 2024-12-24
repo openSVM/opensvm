@@ -1,0 +1,52 @@
+.card {
+  background: var(--theme-background-modal);
+  width: 100%;
+  margin-bottom: 8px;
+}
+
+.action {
+  width: 100%;
+  min-height: 32px;
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  background: var(--theme-background-input);
+}
+
+.title {
+  flex-shrink: 0;
+  color: var(--theme-text);
+  font-family: var(--font-family-mono);
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0.2px;
+  text-transform: uppercase;
+  padding: 8px 24px 8px 24px;
+  margin: 0;
+}
+
+.left {
+  width: 24px;
+  border-right: 1px solid var(--theme-border);
+}
+
+.leftCorner {
+  width: 24px;
+  border-right: 1px solid var(--theme-border);
+  border-bottom: 1px solid var(--theme-border);
+}
+
+.right {
+  width: 24px;
+  border-left: 1px solid var(--theme-border);
+}
+
+.rightCorner {
+  width: 24px;
+  border-left: 1px solid var(--theme-border);
+  border-bottom: 1px solid var(--theme-border);
+}
+
+.children {
+  padding: 24px;
+}

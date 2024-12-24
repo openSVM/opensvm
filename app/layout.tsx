@@ -5,12 +5,12 @@ import "./globals.css";
 
 const inter = Lexend({ subsets: ["latin"] });
 
-let title = "Turbo Seek – AI Search Engine";
+let title = "OpenSVM - Solana Explorer";
 let description =
-  "Search smarter and faster with our open source AI search engine";
-let url = "https://turboseek.io/";
-let ogimage = "https://turboseek.io/og-image.png";
-let sitename = "TurboSeek.io";
+  "Advanced Solana blockchain explorer with search capabilities";
+let url = "https://opensvm.io/";
+let ogimage = "https://opensvm.io/og-image.png";
+let sitename = "OpenSVM";
 
 export const metadata: Metadata = {
   metadataBase: new URL(url),

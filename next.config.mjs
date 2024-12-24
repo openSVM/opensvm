@@ -9,7 +9,17 @@ const nextConfig = {
   },
   env: {
     PROJECT_NAME: 'opensvm'
-  }
+  },
+  sassOptions: {
+    includePaths: ['./styles', '../www-sacred/components'],
+  },
+  webpack: (config) => {
+    config.module.rules.push({
+      test: /\.scss$/,
+      use: ['style-loader', 'css-loader', 'sass-loader'],
+    });
+    return config;
+  },
 };
 
 export default nextConfig;

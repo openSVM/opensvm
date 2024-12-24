@@ -1,0 +1,25 @@
+.root {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-family-mono);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.cell {
+  padding: 8px;
+  color: var(--theme-text);
+  text-align: left;
+  border-bottom: 1px solid var(--theme-border);
+}
+
+.header {
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.2px;
+  background: var(--theme-background-input);
+}
+
+.row:hover {
+  background: var(--theme-background-input);
+}

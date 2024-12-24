@@ -1,0 +1,42 @@
+.root {
+  -webkit-font-smoothing: antialiased;
+  box-sizing: border-box;
+  text-transform: uppercase;
+  border-radius: 0px;
+  outline: 0;
+  border: 0;
+  min-height: 32px;
+  padding: 4px 24px 4px 24px;
+  font-family: var(--font-family-mono);
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0.2px;
+  line-height: 1.5;
+  transition: 200ms ease all;
+  cursor: pointer;
+}
+
+.primary {
+  color: var(--theme-button-text);
+  background: var(--theme-button);
+}
+
+.primary:hover {
+  background: var(--theme-button-foreground);
+}
+
+.secondary {
+  color: var(--theme-text);
+  background: var(--theme-button-background);
+}
+
+.secondary:hover {
+  background: var(--theme-button-foreground);
+}
+
+.disabled {
+  cursor: not-allowed;
+  background: var(--theme-button-background);
+  color: var(--theme-text);
+  opacity: 0.5;
+}

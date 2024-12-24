@@ -1,0 +1,87 @@
+.root {
+  position: relative;
+  width: 100%;
+}
+
+.label {
+  display: block;
+  margin-bottom: 8px;
+  font-family: var(--font-family-mono);
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0.2px;
+  text-transform: uppercase;
+  color: var(--theme-text);
+}
+
+.inputContainer {
+  position: relative;
+  width: 100%;
+  min-height: 32px;
+  background: var(--theme-background-input);
+}
+
+.displayed {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 8px;
+  font-family: var(--font-family-mono);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--theme-text);
+  white-space: pre;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.placeholder {
+  opacity: 0.5;
+}
+
+.block {
+  display: inline-block;
+  width: 8px;
+  height: 14px;
+  margin: 0 -1px;
+  background-color: var(--theme-text);
+  vertical-align: text-bottom;
+}
+
+.blink {
+  animation: blink 1s step-end infinite;
+}
+
+.hidden {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  padding: 8px;
+  font-family: var(--font-family-mono);
+  font-size: 12px;
+  line-height: 1.5;
+  color: transparent;
+  background: transparent;
+  border: none;
+  outline: none;
+  resize: none;
+  overflow: hidden;
+}
+
+.focused {
+  outline: 1px solid var(--theme-text);
+}
+
+@keyframes blink {
+  from,
+  to {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
