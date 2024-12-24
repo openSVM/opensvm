@@ -26,12 +26,18 @@
     "@types/node": "^20",
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",
+    "autoprefixer": "^10.4.20",
+    "css-loader": "^7.1.2",
     "eslint": "^8",
     "eslint-config-next": "14.2.3",
-    "postcss": "^8",
+    "postcss": "^8.4.49",
+    "postcss-loader": "^8.1.1",
     "prettier": "^3.2.5",
     "prettier-plugin-tailwindcss": "^0.6.0",
-    "tailwindcss": "^3.4.1",
+    "sass": "^1.83.0",
+    "sass-loader": "^16.0.4",
+    "style-loader": "^4.0.0",
+    "tailwindcss": "^3.4.17",
     "typescript": "^5.7.2"
   }
 }
