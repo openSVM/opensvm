@@ -7,6 +7,9 @@ const nextConfig = {
       },
     ],
   },
+  env: {
+    PROJECT_NAME: 'opensvm'
+  }
 };
 
 export default nextConfig;
