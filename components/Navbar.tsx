@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
 
 export default function Navbar() {
   const [solPrice] = useState('$103.45');
@@ -45,7 +46,7 @@ export default function Navbar() {
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2 text-[13px]">
               <div className="flex items-center space-x-1">
-                <img src="/images/sol-logo.svg" alt="SOL" className="h-5 w-5" />
+                <Image src="/images/sol-logo.svg" alt="SOL" width={20} height={20} />
                 <span className="font-medium text-gray-900">{solPrice}</span>
                 <span className="text-green-500">{priceChange}</span>
               </div>

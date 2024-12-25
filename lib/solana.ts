@@ -8,6 +8,8 @@ const connection = new Connection(SOLANA_RPC_URL, {
   commitment: 'confirmed'
 });
 
+export { connection };
+
 export async function getAccountInfo(address: string) {
   try {
     const publicKey = new PublicKey(address);

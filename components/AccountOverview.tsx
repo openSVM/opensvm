@@ -1,3 +1,5 @@
+import Image from 'next/image';
+
 interface TokenAccount {
   mint: string;
   amount: number;
@@ -46,7 +48,7 @@ export default function AccountOverview({
               <div className="border rounded p-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center">
-                    <img src="/images/token-default.png" alt="" className="w-5 h-5 mr-2" />
+                    <Image src="/images/token-default.png" alt="Token icon" width={20} height={20} className="mr-2" />
                     <span className="text-[13px] text-[#333]">
                       {tokenAccounts[0].amount.toLocaleString()} {tokenAccounts[0].symbol}
                     </span>
