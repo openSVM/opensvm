@@ -1,0 +1,15 @@
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  
+  th, td {
+    padding: var(--sacred-spacing-2);
+    text-align: left;
+    border-bottom: 1px solid var(--sacred-color-border);
+  }
+
+  th {
+    font-weight: 600;
+    background: var(--sacred-color-background-alt);
+  }
+}

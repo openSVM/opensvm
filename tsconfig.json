@@ -18,9 +18,22 @@
       }
     ],
     "paths": {
-      "@/*": ["./*"]
-    }
+      "@/*": ["./*"],
+      "@sacred/*": ["../www-sacred/components/*"],
+      "@components/*": ["./app/styles/*"],
+      "@common/*": ["../www-sacred/common/*"]
+    },
+    "baseUrl": ".",
+    "types": ["react", "react-dom"]
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts",
+    "../www-sacred/components/**/*.ts",
+    "../www-sacred/components/**/*.tsx",
+    "../www-sacred/common/**/*.ts"
+  ],
   "exclude": ["node_modules"]
 }

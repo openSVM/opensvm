@@ -1,0 +1,11 @@
+.text {
+  color: var(--sacred-color-text);
+  margin: 0;
+  padding: 0;
+  
+  &.heading {
+    font-size: var(--sacred-font-size-lg);
+    font-weight: 600;
+    margin-bottom: var(--sacred-spacing-2);
+  }
+}
