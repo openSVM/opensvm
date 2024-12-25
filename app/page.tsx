@@ -1,187 +1,113 @@
 "use client";
 
-import Answer from "@/components/Answer";
-import Footer from "@/components/Footer";
-import Header from "@/components/Header";
-import Hero from "@/components/Hero";
-import InputArea from "@/components/InputArea";
-import SimilarTopics from "@/components/SimilarTopics";
-import Sources from "@/components/Sources";
-import Image from "next/image";
-import { useRef, useState } from "react";
-import {
-  createParser,
-  ParsedEvent,
-  ReconnectInterval,
-} from "eventsource-parser";
+import { useState } from 'react';
+import { getAccountInfo, getTransactionHistory } from '@/lib/solana';
+import Navbar from '@/components/Navbar';
+import AccountOverview from '@/components/AccountOverview';
+import TransactionsTable from '@/components/TransactionsTable';
+
+interface AccountData {
+  lamports: number;
+  tokenAccounts?: any[];
+  isSystemProgram: boolean;
+}
 
 export default function Home() {
-  const [promptValue, setPromptValue] = useState("");
-  const [question, setQuestion] = useState("");
-  const [showResult, setShowResult] = useState(false);
-  const [sources, setSources] = useState<{ name: string; url: string }[]>([]);
-  const [isLoadingSources, setIsLoadingSources] = useState(false);
-  const [answer, setAnswer] = useState("");
-  const [similarQuestions, setSimilarQuestions] = useState<string[]>([]);
-  const [loading, setLoading] = useState(false);
-  const chatContainerRef = useRef<HTMLDivElement>(null);
+  const [address, setAddress] = useState('');
+  const [accountData, setAccountData] = useState<AccountData | null>(null);
+  const [transactions, setTransactions] = useState([]);
+  const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleDisplayResult = async (newQuestion?: string) => {
-    newQuestion = newQuestion || promptValue;
+  const handleSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!address) return;
 
-    setShowResult(true);
-    setLoading(true);
-    setQuestion(newQuestion);
-    setPromptValue("");
+    setIsLoading(true);
+    setError('');
 
-    await Promise.all([
-      handleSourcesAndAnswer(newQuestion),
-      handleSimilarQuestions(newQuestion),
-    ]);
+    try {
+      const [account, txs] = await Promise.all([
+        getAccountInfo(address),
+        getTransactionHistory(address)
+      ]);
 
-    setLoading(false);
-  };
-
-  async function handleSourcesAndAnswer(question: string) {
-    setIsLoadingSources(true);
-    let sourcesResponse = await fetch("/api/getSources", {
-      method: "POST",
-      body: JSON.stringify({ question }),
-    });
-    if (sourcesResponse.ok) {
-      let sources = await sourcesResponse.json();
-
-      setSources(sources);
-    } else {
-      setSources([]);
+      setAccountData(account);
+      setTransactions(txs);
+    } catch (err) {
+      setError('Failed to fetch account data. Please check the address and try again.');
+      setAccountData(null);
+      setTransactions([]);
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoadingSources(false);
-
-    const response = await fetch("/api/getAnswer", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ question, sources }),
-    });
-
-    if (!response.ok) {
-      throw new Error(response.statusText);
-    }
-
-    if (response.status === 202) {
-      const fullAnswer = await response.text();
-      setAnswer(fullAnswer);
-      return;
-    }
-
-    // This data is a ReadableStream
-    const data = response.body;
-    if (!data) {
-      return;
-    }
-
-    const onParse = (event: ParsedEvent | ReconnectInterval) => {
-      if (event.type === "event") {
-        const data = event.data;
-        try {
-          const text = JSON.parse(data).text ?? "";
-          setAnswer((prev) => prev + text);
-        } catch (e) {
-          console.error(e);
-        }
-      }
-    };
-
-    // https://web.dev/streams/#the-getreader-and-read-methods
-    const reader = data.getReader();
-    const decoder = new TextDecoder();
-    const parser = createParser(onParse);
-    let done = false;
-    while (!done) {
-      const { value, done: doneReading } = await reader.read();
-      done = doneReading;
-      const chunkValue = decoder.decode(value);
-      parser.feed(chunkValue);
-    }
-  }
-
-  async function handleSimilarQuestions(question: string) {
-    let res = await fetch("/api/getSimilarQuestions", {
-      method: "POST",
-      body: JSON.stringify({ question }),
-    });
-    let questions = await res.json();
-    setSimilarQuestions(questions);
-  }
-
-  const reset = () => {
-    setShowResult(false);
-    setPromptValue("");
-    setQuestion("");
-    setAnswer("");
-    setSources([]);
-    setSimilarQuestions([]);
   };
 
   return (
-    <>
-      <Header />
-      <main className="h-full px-4 pb-4">
-        {!showResult && (
-          <Hero
-            promptValue={promptValue}
-            setPromptValue={setPromptValue}
-            handleDisplayResult={handleDisplayResult}
-          />
-        )}
-
-        {showResult && (
-          <div className="flex h-full min-h-[68vh] w-full grow flex-col justify-between">
-            <div className="container w-full space-y-2">
-              <div className="container space-y-2">
-                <div className="container flex w-full items-start gap-3 px-5 pt-2 lg:px-10">
-                  <div className="flex w-fit items-center gap-4">
-                    <Image
-                      unoptimized
-                      src={"/img/message-question-circle.svg"}
-                      alt="message"
-                      width={30}
-                      height={30}
-                      className="size-[24px]"
-                    />
-                    <p className="pr-5 font-bold uppercase leading-[152%] text-black">
-                      Question:
-                    </p>
-                  </div>
-                  <div className="grow">&quot;{question}&quot;</div>
+    <div className="min-h-screen bg-gray-50">
+      <Navbar />
+      
+      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <div className="mb-8">
+          <form onSubmit={handleSearch} className="flex flex-col space-y-4 sm:flex-row sm:space-x-4 sm:space-y-0">
+            <div className="flex-1">
+              <label htmlFor="search" className="sr-only">
+                Search by Address / Txn Hash / Block / Token
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  name="search"
+                  id="search"
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  className="block w-full rounded-lg border border-gray-300 bg-white py-2.5 pl-4 pr-10 text-[13px] placeholder-gray-500 focus:border-[#00ffbd] focus:outline-none focus:ring-1 focus:ring-[#00ffbd]"
+                  placeholder="Search by Address / Txn Hash / Block / Token"
+                />
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
+                  </svg>
                 </div>
-                <>
-                  <Sources sources={sources} isLoading={isLoadingSources} />
-                  <Answer answer={answer} />
-                  <SimilarTopics
-                    similarQuestions={similarQuestions}
-                    handleDisplayResult={handleDisplayResult}
-                    reset={reset}
-                  />
-                </>
               </div>
-
-              <div className="pt-1 sm:pt-2" ref={chatContainerRef}></div>
             </div>
-            <div className="container px-4 lg:px-0">
-              <InputArea
-                promptValue={promptValue}
-                setPromptValue={setPromptValue}
-                handleDisplayResult={handleDisplayResult}
-                disabled={loading}
-                reset={reset}
-              />
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="inline-flex items-center justify-center rounded-lg bg-[#00ffbd] px-6 py-2.5 text-[13px] font-medium text-black hover:bg-[#00e6aa] focus:outline-none focus:ring-2 focus:ring-[#00ffbd] focus:ring-offset-2 disabled:opacity-50"
+            >
+              {isLoading ? 'Searching...' : 'Search'}
+            </button>
+          </form>
+        </div>
+
+        {error && (
+          <div className="mb-8 rounded-lg bg-red-50 p-4">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <p className="text-[13px] text-red-700">{error}</p>
+              </div>
             </div>
           </div>
         )}
+
+        {accountData && (
+          <>
+            <AccountOverview
+              address={address}
+              solBalance={accountData.lamports / 1e9}
+              tokenAccounts={accountData.tokenAccounts || []}
+              isSystemProgram={accountData.isSystemProgram}
+            />
+            <TransactionsTable transactions={transactions} />
+          </>
+        )}
       </main>
-      <Footer />
-    </>
+    </div>
   );
 }

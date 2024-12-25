@@ -1,6 +1,10 @@
 {
   "compilerOptions": {
-    "lib": ["dom", "dom.iterable", "esnext"],
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
     "allowJs": true,
     "skipLibCheck": true,
     "strict": true,
@@ -18,22 +22,19 @@
       }
     ],
     "paths": {
-      "@/*": ["./*"],
-      "@sacred/*": ["../www-sacred/components/*"],
-      "@components/*": ["./app/styles/*"],
-      "@common/*": ["../www-sacred/common/*"]
+      "@/*": [
+        "./*"
+      ]
     },
-    "baseUrl": ".",
-    "types": ["react", "react-dom"]
+    "target": "ES2017"
   },
   "include": [
     "next-env.d.ts",
     "**/*.ts",
     "**/*.tsx",
-    ".next/types/**/*.ts",
-    "../www-sacred/components/**/*.ts",
-    "../www-sacred/components/**/*.tsx",
-    "../www-sacred/common/**/*.ts"
+    ".next/types/**/*.ts"
   ],
-  "exclude": ["node_modules"]
+  "exclude": [
+    "node_modules"
+  ]
 }
