@@ -3,12 +3,6 @@
 import { useEffect, useState } from "react";
 import { Connection } from "@solana/web3.js";
 
-// Sacred UI components
-import { Card } from "@sacred/Card";
-import { Grid } from "@sacred/Grid";
-import { DataTable } from "@sacred/DataTable";
-import { Text } from "@sacred/Text";
-
 const HELIUS_RPC = "https://mainnet.helius-rpc.com/?api-key=2eb1ae21-40d0-4b6d-adde-ccb3d56ad570";
 
 export default function SolanaExplorer() {
@@ -84,54 +78,67 @@ export default function SolanaExplorer() {
 
   if (error) {
     return (
-      <Card>
-        <Text>{error}</Text>
-      </Card>
+      <div className="p-4 bg-white rounded-lg shadow">
+        <p className="text-red-500">{error}</p>
+      </div>
     );
   }
 
   return (
-    <Grid>
-      <Card>
-        <Text>SOL Supply Stats</Text>
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4">
+      <div className="p-4 bg-white rounded-lg shadow">
+        <h2 className="text-lg font-semibold mb-4">SOL Supply Stats</h2>
         {loading ? (
-          <Text>Loading...</Text>
+          <p>Loading...</p>
         ) : (
           <>
-            <Text>Circulating Supply: {supplyStats?.circulating.toFixed(2)} SOL</Text>
-            <Text>Non-circulating Supply: {supplyStats?.nonCirculating.toFixed(2)} SOL</Text>
+            <p>Circulating Supply: {supplyStats?.circulating.toFixed(2)} SOL</p>
+            <p>Non-circulating Supply: {supplyStats?.nonCirculating.toFixed(2)} SOL</p>
           </>
         )}
-      </Card>
+      </div>
 
-      <Card>
-        <Text>Network Stats</Text>
+      <div className="p-4 bg-white rounded-lg shadow">
+        <h2 className="text-lg font-semibold mb-4">Network Stats</h2>
         {loading ? (
-          <Text>Loading...</Text>
+          <p>Loading...</p>
         ) : (
           <>
-            <Text>Current TPS: {networkStats?.tps}</Text>
-            <Text>Block Height: {networkStats?.blockHeight}</Text>
+            <p>Current TPS: {networkStats?.tps}</p>
+            <p>Block Height: {networkStats?.blockHeight}</p>
           </>
         )}
-      </Card>
+      </div>
 
-      <Card>
-        <Text>Latest Transactions</Text>
+      <div className="p-4 bg-white rounded-lg shadow col-span-full">
+        <h2 className="text-lg font-semibold mb-4">Latest Transactions</h2>
         {loading ? (
-          <Text>Loading...</Text>
+          <p>Loading...</p>
         ) : (
-          <DataTable
-            data={transactions}
-            columns={[
-              { header: "Signature", accessor: "signature" },
-              { header: "Timestamp", accessor: "timestamp" },
-              { header: "Block", accessor: "block" },
-              { header: "Type", accessor: "type" },
-            ]}
-          />
+          <div className="overflow-x-auto">
+            <table className="min-w-full">
+              <thead>
+                <tr>
+                  <th className="px-4 py-2">Signature</th>
+                  <th className="px-4 py-2">Timestamp</th>
+                  <th className="px-4 py-2">Block</th>
+                  <th className="px-4 py-2">Type</th>
+                </tr>
+              </thead>
+              <tbody>
+                {transactions.map((tx, index) => (
+                  <tr key={index}>
+                    <td className="border px-4 py-2">{tx.signature}</td>
+                    <td className="border px-4 py-2">{tx.timestamp}</td>
+                    <td className="border px-4 py-2">{tx.block}</td>
+                    <td className="border px-4 py-2">{tx.type}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
-      </Card>
-    </Grid>
+      </div>
+    </div>
   );
 }
