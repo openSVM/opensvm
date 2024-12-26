@@ -42,9 +42,9 @@ export default function Home() {
             placeholder="Search transactions, blocks, programs and tokens"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="flex-1"
+            className="flex-1 bg-secondary/50"
           />
-          <Button type="submit">Search</Button>
+          <Button type="submit" className="bg-[#00DC82] hover:bg-[#00DC82]/80">Search</Button>
         </form>
       </div>
 

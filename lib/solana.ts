@@ -1,7 +1,13 @@
 import { Connection, PublicKey, SystemProgram, VersionedMessage, MessageV0, Message, MessageCompiledInstruction, CompiledInstruction } from '@solana/web3.js';
 import { TOKEN_PROGRAM_ID, getAccount, getMint } from '@solana/spl-token';
 
-export const connection = new Connection(process.env.NEXT_PUBLIC_RPC_URL || 'https://api.mainnet-beta.solana.com');
+const RPC_URL = 'https://solana-mainnet.core.chainstack.com/263c9f53f4e4cdb897c0edc4a64cd007';
+const WS_URL = 'wss://solana-mainnet.core.chainstack.com/263c9f53f4e4cdb897c0edc4a64cd007';
+
+export const connection = new Connection(RPC_URL, {
+  wsEndpoint: WS_URL,
+  commitment: 'confirmed'
+});
 
 const METADATA_PROGRAM_ID = new PublicKey('metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s');
 
@@ -415,5 +421,93 @@ export function subscribeToTransactions(callback: (tx: TransactionInfo) => void)
 
   return () => {
     connection.removeOnLogsListener(id);
+  };
+}
+
+export interface BlockInfo {
+  slot: number;
+  blockhash: string;
+  parentSlot: number;
+  timestamp: string;
+}
+
+export async function getInitialBlocks(limit: number = 6): Promise<BlockInfo[]> {
+  try {
+    const slot = await connection.getSlot();
+    const blocks: BlockInfo[] = [];
+
+    for (let i = 0; i < limit; i++) {
+      const currentSlot = slot - i;
+      try {
+        const [blockInfo, timestamp] = await Promise.all([
+          connection.getBlock(currentSlot, { maxSupportedTransactionVersion: 0 }),
+          connection.getBlockTime(currentSlot),
+        ]);
+
+        if (blockInfo && timestamp) {
+          blocks.push({
+            slot: currentSlot,
+            blockhash: blockInfo.blockhash,
+            parentSlot: blockInfo.parentSlot,
+            timestamp: new Date(timestamp * 1000).toLocaleTimeString(),
+          });
+        }
+      } catch (e) {
+        console.log(`Block not available for slot ${currentSlot}, skipping...`);
+        continue;
+      }
+    }
+
+    return blocks;
+  } catch (error) {
+    console.error('Error fetching initial blocks:', error);
+    return [];
+  }
+}
+
+export function subscribeToBlocks(callback: (block: BlockInfo) => void): () => void {
+  const id = connection.onSlotChange(async ({ slot, root }) => {
+    try {
+      // Wait a bit for the block to be available
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      try {
+        const [blockInfo, timestamp] = await Promise.all([
+          connection.getBlock(slot, { maxSupportedTransactionVersion: 0 }),
+          connection.getBlockTime(slot),
+        ]);
+
+        if (blockInfo && timestamp) {
+          callback({
+            slot,
+            blockhash: blockInfo.blockhash,
+            parentSlot: blockInfo.parentSlot,
+            timestamp: new Date(timestamp * 1000).toLocaleTimeString(),
+          });
+        }
+      } catch (e) {
+        // Block not available yet, try with the previous slot
+        const previousSlot = slot - 1;
+        const [blockInfo, timestamp] = await Promise.all([
+          connection.getBlock(previousSlot, { maxSupportedTransactionVersion: 0 }),
+          connection.getBlockTime(previousSlot),
+        ]);
+
+        if (blockInfo && timestamp) {
+          callback({
+            slot: previousSlot,
+            blockhash: blockInfo.blockhash,
+            parentSlot: blockInfo.parentSlot,
+            timestamp: new Date(timestamp * 1000).toLocaleTimeString(),
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error in block subscription:', error);
+    }
+  });
+
+  return () => {
+    connection.removeSlotChangeListener(id);
   };
 } 
