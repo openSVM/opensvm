@@ -13,6 +13,7 @@
     "@solana/spl-token": "^0.4.9",
     "@solana/web3.js": "^1.98.0",
     "@swc/helpers": "^0.5.15",
+    "@vercel/og": "^0.6.4",
     "date-fns": "^4.1.0",
     "encoding": "^0.1.13",
     "eventsource-parser": "^1.1.2",
