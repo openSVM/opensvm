@@ -44,40 +44,50 @@ export async function getTransactionDetails(signature: string): Promise<Detailed
       return null;
     }
 
-    const accountKeys = tx.transaction.message.accountKeys || [];
+    // Handle both legacy and versioned transactions
+    const message = tx.transaction.message;
+    const accountKeys = 'accountKeys' in message 
+      ? message.accountKeys 
+      : message.staticAccountKeys;
+    
+    if (!accountKeys || accountKeys.length === 0) {
+      console.error('No account keys found in transaction');
+      return null;
+    }
+
     const preBalances = tx.meta?.preBalances || [];
     const postBalances = tx.meta?.postBalances || [];
-    const instructions = tx.transaction.message.instructions || [];
+    
+    // Handle instructions for both legacy and versioned messages
+    const instructions = 'instructions' in message
+      ? message.instructions
+      : message.compiledInstructions;
 
     // Calculate amount by finding the largest balance change
     let amount = 0;
-    let from = 'Unknown';
+    let from = accountKeys[0].toBase58();
     let to = 'Unknown';
 
-    if (accountKeys.length > 0) {
-      from = accountKeys[0].toBase58();
-      
-      // Find the largest balance decrease (sender)
-      for (let i = 0; i < preBalances.length; i++) {
-        const balanceChange = (postBalances[i] || 0) - (preBalances[i] || 0);
-        if (balanceChange < 0 && Math.abs(balanceChange) > Math.abs(amount)) {
-          amount = balanceChange;
-          from = accountKeys[i]?.toBase58() || 'Unknown';
-        }
+    // Find the largest balance decrease (sender)
+    for (let i = 0; i < preBalances.length; i++) {
+      const balanceChange = (postBalances[i] || 0) - (preBalances[i] || 0);
+      if (balanceChange < 0 && Math.abs(balanceChange) > Math.abs(amount)) {
+        amount = balanceChange;
+        from = accountKeys[i]?.toBase58() || 'Unknown';
       }
+    }
 
-      // Find the largest balance increase (receiver)
-      for (let i = 0; i < postBalances.length; i++) {
-        const balanceChange = (postBalances[i] || 0) - (preBalances[i] || 0);
-        if (balanceChange > 0 && balanceChange > Math.abs(amount)) {
-          to = accountKeys[i]?.toBase58() || 'Unknown';
-        }
+    // Find the largest balance increase (receiver)
+    for (let i = 0; i < postBalances.length; i++) {
+      const balanceChange = (postBalances[i] || 0) - (preBalances[i] || 0);
+      if (balanceChange > 0 && balanceChange > Math.abs(amount)) {
+        to = accountKeys[i]?.toBase58() || 'Unknown';
       }
+    }
 
-      // If no receiver found, use the first non-sender account
-      if (to === 'Unknown' && accountKeys.length > 1) {
-        to = accountKeys.find(key => key?.toBase58() !== from)?.toBase58() || 'Unknown';
-      }
+    // If no receiver found, use the first non-sender account
+    if (to === 'Unknown' && accountKeys.length > 1) {
+      to = accountKeys.find(key => key?.toBase58() !== from)?.toBase58() || 'Unknown';
     }
 
     // Convert lamports to SOL
@@ -97,7 +107,7 @@ export async function getTransactionDetails(signature: string): Promise<Detailed
       recentBlockhash: tx.transaction.message.recentBlockhash || '',
       instructions: instructions.map(ix => ({
         programId: accountKeys[ix.programIdIndex]?.toBase58() || 'Unknown',
-        data: ix.data || '',
+        data: ix.data?.toString() || '',
       })),
       logs: tx.meta?.logMessages || [],
       computeUnits: tx.meta?.computeUnitsConsumed || 0,
@@ -110,12 +120,25 @@ export async function getTransactionDetails(signature: string): Promise<Detailed
 
 function determineTransactionType(tx: any): string {
   try {
-    if (!tx?.transaction?.message?.instructions?.[0]) {
+    const message = tx.transaction.message;
+    if (!message) return 'Unknown';
+
+    // Handle instructions for both legacy and versioned messages
+    const instructions = 'instructions' in message
+      ? message.instructions
+      : message.compiledInstructions;
+
+    if (!instructions?.[0]) return 'Unknown';
+
+    const accountKeys = 'accountKeys' in message 
+      ? message.accountKeys 
+      : message.staticAccountKeys;
+
+    if (!accountKeys || accountKeys.length === 0) {
       return 'Unknown';
     }
 
-    const instruction = tx.transaction.message.instructions[0];
-    const accountKeys = tx.transaction.message.accountKeys || [];
+    const instruction = instructions[0];
     const programId = accountKeys[instruction.programIdIndex]?.toBase58();
     
     if (!programId) {
@@ -149,31 +172,43 @@ function determineTransactionType(tx: any): string {
 }
 
 export async function subscribeToTransactions(callback: (transaction: TransactionInfo) => void) {
-  const subscriptionId = connection.onLogs(
-    'all',
-    (logs) => {
-      try {
-        const transaction: TransactionInfo = {
-          signature: logs.signature,
-          timestamp: new Date(),
-          status: logs.err ? 'Failed' : 'Success',
-          fee: 0.000005,
-          type: 'Transfer',
-          from: 'Unknown',
-          to: 'Unknown',
-          amount: 0,
-        };
+  try {
+    const subscriptionId = connection.onLogs(
+      'all',
+      async (logs) => {
+        try {
+          // Get full transaction details
+          const tx = await getTransactionDetails(logs.signature);
+          
+          if (tx) {
+            callback(tx);
+          } else {
+            // Fallback to basic info if detailed fetch fails
+            callback({
+              signature: logs.signature,
+              timestamp: new Date(),
+              status: logs.err ? 'Failed' : 'Success',
+              fee: 0.000005,
+              type: 'Unknown',
+              from: 'Unknown',
+              to: 'Unknown',
+              amount: 0,
+            });
+          }
+        } catch (error) {
+          console.error('Error processing transaction logs:', error);
+        }
+      },
+      'confirmed'
+    );
 
-        callback(transaction);
-      } catch (error) {
-        console.error('Error processing transaction:', error);
-      }
-    }
-  );
-
-  return () => {
-    connection.removeOnLogsListener(subscriptionId);
-  };
+    return () => {
+      connection.removeOnLogsListener(subscriptionId);
+    };
+  } catch (error) {
+    console.error('Error setting up transaction subscription:', error);
+    return () => {};
+  }
 }
 
 export async function getInitialTransactions(): Promise<TransactionInfo[]> {
@@ -183,18 +218,81 @@ export async function getInitialTransactions(): Promise<TransactionInfo[]> {
       { limit: 10 }
     );
 
-    return signatures.map(sig => ({
-      signature: sig.signature,
-      timestamp: sig.blockTime ? new Date(sig.blockTime * 1000) : new Date(),
-      status: sig.err ? 'Failed' : 'Success',
-      fee: 0.000005,
-      type: 'Transfer',
-      from: 'Unknown',
-      to: 'Unknown',
-      amount: 0
-    }));
+    const transactions = await Promise.all(
+      signatures.map(async (sig) => {
+        try {
+          const tx = await getTransactionDetails(sig.signature);
+          return tx || {
+            signature: sig.signature,
+            timestamp: sig.blockTime ? new Date(sig.blockTime * 1000) : new Date(),
+            status: sig.err ? 'Failed' : 'Success',
+            fee: 0.000005,
+            type: 'Unknown',
+            from: 'Unknown',
+            to: 'Unknown',
+            amount: 0
+          };
+        } catch (error) {
+          console.error('Error fetching transaction details:', error);
+          return null;
+        }
+      })
+    );
+
+    return transactions.filter((tx): tx is TransactionInfo => tx !== null);
   } catch (error) {
     console.error('Error fetching initial transactions:', error);
+    return [];
+  }
+}
+
+export async function getAccountInfo(address: string) {
+  try {
+    const pubkey = new PublicKey(address);
+    const account = await connection.getAccountInfo(pubkey);
+    const balance = await connection.getBalance(pubkey);
+
+    return {
+      address,
+      balance: balance / 1e9, // Convert lamports to SOL
+      executable: account?.executable || false,
+      owner: account?.owner?.toBase58() || 'Unknown',
+    };
+  } catch (error) {
+    console.error('Error fetching account info:', error);
+    return null;
+  }
+}
+
+export async function getTransactionHistory(address: string, limit = 10): Promise<TransactionInfo[]> {
+  try {
+    const pubkey = new PublicKey(address);
+    const signatures = await connection.getSignaturesForAddress(pubkey, { limit });
+    
+    const transactions = await Promise.all(
+      signatures.map(async (sig) => {
+        try {
+          const tx = await getTransactionDetails(sig.signature);
+          return tx || {
+            signature: sig.signature,
+            timestamp: sig.blockTime ? new Date(sig.blockTime * 1000) : null,
+            status: sig.err ? 'Failed' : 'Success',
+            fee: 0.000005,
+            type: 'Unknown',
+            from: address,
+            to: 'Unknown',
+            amount: 0
+          };
+        } catch (error) {
+          console.error('Error fetching transaction details:', error);
+          return null;
+        }
+      })
+    );
+
+    return transactions.filter((tx): tx is TransactionInfo => tx !== null);
+  } catch (error) {
+    console.error('Error fetching transaction history:', error);
     return [];
   }
 } 
