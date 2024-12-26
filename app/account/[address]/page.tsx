@@ -8,9 +8,11 @@ import type { TransactionInfo } from '@/lib/solana';
 
 interface AccountInfo {
   address: string;
-  balance: number;
-  executable: boolean;
+  lamports: number;
   owner: string;
+  executable: boolean;
+  rentEpoch: number;
+  data: Buffer;
 }
 
 export default function AccountPage() {
@@ -88,7 +90,7 @@ export default function AccountPage() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Text variant="label" className="text-sm text-gray-500">Balance</Text>
-                <Text variant="default">{accountInfo.balance.toFixed(9)} SOL</Text>
+                <Text variant="default">{(accountInfo.lamports / 1e9).toFixed(9)} SOL</Text>
               </div>
               
               <div>
@@ -117,8 +119,8 @@ export default function AccountPage() {
                       <Text variant="default" className="font-mono text-sm">{tx.signature}</Text>
                     </div>
                     <div className="text-right">
-                      <Text variant="label" className="text-xs text-gray-500">Amount</Text>
-                      <Text variant="default">{tx.amount.toFixed(9)} SOL</Text>
+                      <Text variant="label" className="text-xs text-gray-500">Fee</Text>
+                      <Text variant="default">{tx.fee.toFixed(9)} SOL</Text>
                     </div>
                   </div>
                 </div>

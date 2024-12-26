@@ -1,37 +1,225 @@
-import { Connection, PublicKey } from '@solana/web3.js';
+import { Connection, PublicKey, SystemProgram, VersionedMessage, MessageV0, Message, MessageCompiledInstruction, CompiledInstruction } from '@solana/web3.js';
+import { TOKEN_PROGRAM_ID, getAccount, getMint } from '@solana/spl-token';
 
-const SOLANA_RPC_URL = 'https://solana-mainnet.core.chainstack.com/263c9f53f4e4cdb897c0edc4a64cd007';
-const SOLANA_WS_URL = 'wss://solana-mainnet.core.chainstack.com/263c9f53f4e4cdb897c0edc4a64cd007';
+export const connection = new Connection(process.env.NEXT_PUBLIC_RPC_URL || 'https://api.mainnet-beta.solana.com');
 
-const connection = new Connection(SOLANA_RPC_URL, {
-  wsEndpoint: SOLANA_WS_URL,
-  commitment: 'confirmed',
-});
+const METADATA_PROGRAM_ID = new PublicKey('metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s');
 
-export { connection };
+function getInstructions(message: VersionedMessage | Message) {
+  if ('compiledInstructions' in message) {
+    return (message as MessageV0).compiledInstructions;
+  }
+  return (message as Message).instructions;
+}
 
-export type TransactionInfo = {
+function getProgramId(instruction: MessageCompiledInstruction | CompiledInstruction): number {
+  if ('programIdIndex' in instruction && typeof instruction.programIdIndex === 'number') {
+    return instruction.programIdIndex;
+  }
+  throw new Error('Invalid instruction type');
+}
+
+function getAccounts(instruction: MessageCompiledInstruction | CompiledInstruction) {
+  if ('accountKeyIndexes' in instruction) {
+    return instruction.accountKeyIndexes;
+  }
+  return instruction.accounts;
+}
+
+export async function getTokenInfo(mintAddress: string) {
+  try {
+    const mintPublicKey = new PublicKey(mintAddress);
+    const [mint, tokenAccounts] = await Promise.all([
+      getMint(connection, mintPublicKey),
+      connection.getProgramAccounts(TOKEN_PROGRAM_ID, {
+        filters: [
+          {
+            memcmp: {
+              offset: 0,
+              bytes: mintPublicKey.toBase58(),
+            },
+          },
+        ],
+      }),
+    ]);
+
+    // Get metadata
+    const [metadataPda] = PublicKey.findProgramAddressSync(
+      [
+        Buffer.from('metadata'),
+        METADATA_PROGRAM_ID.toBuffer(),
+        mintPublicKey.toBuffer(),
+      ],
+      METADATA_PROGRAM_ID
+    );
+
+    let metadata: any = null;
+    try {
+      const metadataAccount = await connection.getAccountInfo(metadataPda);
+      if (metadataAccount) {
+        // Parse metadata manually since we don't have access to the full Metaplex SDK
+        const name = metadataAccount.data.slice(1, 33).toString().replace(/\0/g, '');
+        const symbol = metadataAccount.data.slice(33, 65).toString().replace(/\0/g, '');
+        const uri = metadataAccount.data.slice(65, 200).toString().replace(/\0/g, '');
+        metadata = { name, symbol, uri };
+      }
+    } catch (e) {
+      console.error('Failed to fetch metadata:', e);
+    }
+
+    // Calculate total supply and holders
+    let totalSupply = 0n;
+    const holders = new Set<string>();
+
+    for (const { account, pubkey } of tokenAccounts) {
+      const tokenAccount = await getAccount(connection, pubkey);
+      totalSupply += tokenAccount.amount;
+      if (tokenAccount.amount > 0n) {
+        holders.add(tokenAccount.owner.toBase58());
+      }
+    }
+
+    return {
+      decimals: mint.decimals,
+      supply: Number(totalSupply),
+      holders: holders.size,
+      metadata: metadata ? {
+        name: metadata.name,
+        symbol: metadata.symbol,
+        uri: metadata.uri,
+        description: '',
+        sellerFeeBasisPoints: 0,
+        creators: null,
+        collection: null,
+        uses: null,
+      } : null,
+    };
+  } catch (error) {
+    console.error('Error fetching token info:', error);
+    return null;
+  }
+}
+
+export interface TransactionInfo {
   signature: string;
-  timestamp: Date | null;
-  status: 'Success' | 'Failed';
-  fee: number;
+  slot: number;
+  timestamp: number;
+  status: 'success' | 'error';
   type: string;
+  fee: number;
+  signer: string;
   from: string;
   to: string;
   amount: number;
-};
+}
 
-export type DetailedTransactionInfo = TransactionInfo & {
+export async function getAccountInfo(address: string) {
+  try {
+    const publicKey = new PublicKey(address);
+    const accountInfo = await connection.getAccountInfo(publicKey);
+    
+    if (!accountInfo) {
+      return null;
+    }
+
+    return {
+      address,
+      lamports: accountInfo.lamports,
+      owner: accountInfo.owner.toBase58(),
+      executable: accountInfo.executable,
+      rentEpoch: accountInfo.rentEpoch,
+      data: accountInfo.data,
+    };
+  } catch (error) {
+    console.error('Error fetching account info:', error);
+    return null;
+  }
+}
+
+export async function getTransactionHistory(address: string, limit = 10) {
+  try {
+    const publicKey = new PublicKey(address);
+    const signatures = await connection.getSignaturesForAddress(publicKey, { limit });
+    
+    const transactions: TransactionInfo[] = await Promise.all(
+      signatures.map(async (sig) => {
+        const tx = await connection.getTransaction(sig.signature, {
+          maxSupportedTransactionVersion: 0,
+        });
+        
+        if (!tx) return null;
+
+        // Extract from and to addresses from the first transfer instruction
+        const accountKeys = tx.transaction.message.getAccountKeys();
+        let from = accountKeys.get(0)!.toBase58();
+        let to = from;
+        let amount = 0;
+        let type = 'Unknown';
+
+        // Try to determine transaction type and extract transfer details
+        const instructions = getInstructions(tx.transaction.message);
+
+        if (tx.meta && instructions.length > 0) {
+          const instruction = instructions[0];
+          const program = accountKeys.get(getProgramId(instruction));
+          
+          if (program?.equals(SystemProgram.programId)) {
+            type = 'System Transfer';
+            if (instruction.data.length >= 8) {
+              // Convert data to Buffer if it's a string
+              const dataBuffer = Buffer.from(instruction.data);
+              // Assuming it's a transfer instruction
+              amount = Number(dataBuffer.readBigInt64LE(8)) / 1e9;
+              const accounts = getAccounts(instruction);
+              from = accountKeys.get(accounts[0])!.toBase58();
+              to = accountKeys.get(accounts[1])!.toBase58();
+            }
+          } else if (program?.equals(TOKEN_PROGRAM_ID)) {
+            type = 'Token Transfer';
+            // Add token transfer parsing logic here if needed
+          }
+        }
+
+        return {
+          signature: sig.signature,
+          slot: sig.slot,
+          timestamp: sig.blockTime || 0,
+          status: sig.err ? 'error' : 'success',
+          type,
+          fee: (tx.meta?.fee || 0) / 1e9,
+          signer: accountKeys.get(0)!.toBase58(),
+          from,
+          to,
+          amount,
+        };
+      })
+    );
+
+    return transactions.filter((tx): tx is TransactionInfo => tx !== null);
+  } catch (error) {
+    console.error('Error fetching transaction history:', error);
+    return [];
+  }
+}
+
+export interface DetailedTransactionInfo {
+  signature: string;
   slot: number;
-  blockTime: Date | null;
-  recentBlockhash: string;
+  blockTime: number | null;
+  status: 'success' | 'error';
+  fee: number;
+  from: string;
+  to: string;
+  amount: number;
+  type: string;
+  computeUnits: number;
+  accounts: string[];
   instructions: {
     programId: string;
     data: string;
   }[];
   logs: string[];
-  computeUnits: number;
-};
+}
 
 export async function getTransactionDetails(signature: string): Promise<DetailedTransactionInfo | null> {
   try {
@@ -39,78 +227,58 @@ export async function getTransactionDetails(signature: string): Promise<Detailed
       maxSupportedTransactionVersion: 0,
     });
 
-    if (!tx || !tx.transaction || !tx.transaction.message) {
-      console.error('Transaction data is incomplete');
+    if (!tx) {
       return null;
     }
 
-    // Handle both legacy and versioned transactions
-    const message = tx.transaction.message;
-    const accountKeys = 'accountKeys' in message 
-      ? message.accountKeys 
-      : message.staticAccountKeys;
-    
-    if (!accountKeys || accountKeys.length === 0) {
-      console.error('No account keys found in transaction');
-      return null;
-    }
-
-    const preBalances = tx.meta?.preBalances || [];
-    const postBalances = tx.meta?.postBalances || [];
-    
-    // Handle instructions for both legacy and versioned messages
-    const instructions = 'instructions' in message
-      ? message.instructions
-      : message.compiledInstructions;
-
-    // Calculate amount by finding the largest balance change
+    // Extract from and to addresses from the first transfer instruction
+    const accountKeys = tx.transaction.message.getAccountKeys();
+    let from = accountKeys.get(0)!.toBase58();
+    let to = from;
     let amount = 0;
-    let from = accountKeys[0].toBase58();
-    let to = 'Unknown';
+    let type = 'Unknown';
 
-    // Find the largest balance decrease (sender)
-    for (let i = 0; i < preBalances.length; i++) {
-      const balanceChange = (postBalances[i] || 0) - (preBalances[i] || 0);
-      if (balanceChange < 0 && Math.abs(balanceChange) > Math.abs(amount)) {
-        amount = balanceChange;
-        from = accountKeys[i]?.toBase58() || 'Unknown';
+    // Try to determine transaction type and extract transfer details
+    const instructions = getInstructions(tx.transaction.message);
+
+    if (tx.meta && instructions.length > 0) {
+      const instruction = instructions[0];
+      const program = accountKeys.get(getProgramId(instruction));
+      
+      if (program?.equals(SystemProgram.programId)) {
+        type = 'System Transfer';
+        if (instruction.data.length >= 8) {
+          // Convert data to Buffer if it's a string
+          const dataBuffer = Buffer.from(instruction.data);
+          // Assuming it's a transfer instruction
+          amount = Number(dataBuffer.readBigInt64LE(8)) / 1e9;
+          const accounts = getAccounts(instruction);
+          from = accountKeys.get(accounts[0])!.toBase58();
+          to = accountKeys.get(accounts[1])!.toBase58();
+        }
+      } else if (program?.equals(TOKEN_PROGRAM_ID)) {
+        type = 'Token Transfer';
+        // Add token transfer parsing logic here if needed
       }
     }
-
-    // Find the largest balance increase (receiver)
-    for (let i = 0; i < postBalances.length; i++) {
-      const balanceChange = (postBalances[i] || 0) - (preBalances[i] || 0);
-      if (balanceChange > 0 && balanceChange > Math.abs(amount)) {
-        to = accountKeys[i]?.toBase58() || 'Unknown';
-      }
-    }
-
-    // If no receiver found, use the first non-sender account
-    if (to === 'Unknown' && accountKeys.length > 1) {
-      to = accountKeys.find(key => key?.toBase58() !== from)?.toBase58() || 'Unknown';
-    }
-
-    // Convert lamports to SOL
-    amount = Math.abs(amount) / 1e9;
 
     return {
       signature,
-      timestamp: tx.blockTime ? new Date(tx.blockTime * 1000) : null,
-      status: tx.meta?.err ? 'Failed' : 'Success',
+      slot: tx.slot,
+      blockTime: tx.blockTime,
+      status: tx.meta?.err ? 'error' : 'success',
       fee: (tx.meta?.fee || 0) / 1e9,
-      type: determineTransactionType(tx),
       from,
       to,
       amount,
-      slot: tx.slot || 0,
-      blockTime: tx.blockTime ? new Date(tx.blockTime * 1000) : null,
-      recentBlockhash: tx.transaction.message.recentBlockhash || '',
+      type,
+      computeUnits: tx.meta?.computeUnitsConsumed || 0,
+      accounts: accountKeys.staticAccountKeys.map(key => key.toBase58()),
       instructions: instructions.map(ix => ({
-        programId: accountKeys[ix.programIdIndex]?.toBase58() || 'Unknown',
-        data: ix.data?.toString() || '',
+        programId: accountKeys.get(getProgramId(ix))!.toBase58(),
+        data: ix.data.toString('base64'),
       })),
       logs: tx.meta?.logMessages || [],
-      computeUnits: tx.meta?.computeUnitsConsumed || 0,
     };
   } catch (error) {
     console.error('Error fetching transaction details:', error);
@@ -118,124 +286,61 @@ export async function getTransactionDetails(signature: string): Promise<Detailed
   }
 }
 
-function determineTransactionType(tx: any): string {
+export async function getInitialTransactions(limit = 10): Promise<TransactionInfo[]> {
   try {
-    const message = tx.transaction.message;
-    if (!message) return 'Unknown';
-
-    // Handle instructions for both legacy and versioned messages
-    const instructions = 'instructions' in message
-      ? message.instructions
-      : message.compiledInstructions;
-
-    if (!instructions?.[0]) return 'Unknown';
-
-    const accountKeys = 'accountKeys' in message 
-      ? message.accountKeys 
-      : message.staticAccountKeys;
-
-    if (!accountKeys || accountKeys.length === 0) {
-      return 'Unknown';
-    }
-
-    const instruction = instructions[0];
-    const programId = accountKeys[instruction.programIdIndex]?.toBase58();
+    const signatures = await connection.getSignaturesForAddress(SystemProgram.programId, { limit });
     
-    if (!programId) {
-      return 'Unknown';
-    }
-
-    // Common program IDs
-    const SYSTEM_PROGRAM = '11111111111111111111111111111111';
-    const TOKEN_PROGRAM = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA';
-    const ASSOCIATED_TOKEN = 'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL';
-    const METADATA_PROGRAM = 'metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s';
-    const MEMO_PROGRAM = 'MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr';
-    
-    switch (programId) {
-      case SYSTEM_PROGRAM:
-        return 'System Transfer';
-      case TOKEN_PROGRAM:
-        return 'Token Transfer';
-      case ASSOCIATED_TOKEN:
-        return 'Token Account';
-      case METADATA_PROGRAM:
-        return 'NFT';
-      case MEMO_PROGRAM:
-        return 'Memo';
-      default:
-        return 'Program Call';
-    }
-  } catch (error) {
-    return 'Unknown';
-  }
-}
-
-export async function subscribeToTransactions(callback: (transaction: TransactionInfo) => void) {
-  try {
-    const subscriptionId = connection.onLogs(
-      'all',
-      async (logs) => {
-        try {
-          // Get full transaction details
-          const tx = await getTransactionDetails(logs.signature);
-          
-          if (tx) {
-            callback(tx);
-          } else {
-            // Fallback to basic info if detailed fetch fails
-            callback({
-              signature: logs.signature,
-              timestamp: new Date(),
-              status: logs.err ? 'Failed' : 'Success',
-              fee: 0.000005,
-              type: 'Unknown',
-              from: 'Unknown',
-              to: 'Unknown',
-              amount: 0,
-            });
-          }
-        } catch (error) {
-          console.error('Error processing transaction logs:', error);
-        }
-      },
-      'confirmed'
-    );
-
-    return () => {
-      connection.removeOnLogsListener(subscriptionId);
-    };
-  } catch (error) {
-    console.error('Error setting up transaction subscription:', error);
-    return () => {};
-  }
-}
-
-export async function getInitialTransactions(): Promise<TransactionInfo[]> {
-  try {
-    const signatures = await connection.getSignaturesForAddress(
-      new PublicKey('11111111111111111111111111111111'),
-      { limit: 10 }
-    );
-
-    const transactions = await Promise.all(
+    const transactions: TransactionInfo[] = await Promise.all(
       signatures.map(async (sig) => {
-        try {
-          const tx = await getTransactionDetails(sig.signature);
-          return tx || {
-            signature: sig.signature,
-            timestamp: sig.blockTime ? new Date(sig.blockTime * 1000) : new Date(),
-            status: sig.err ? 'Failed' : 'Success',
-            fee: 0.000005,
-            type: 'Unknown',
-            from: 'Unknown',
-            to: 'Unknown',
-            amount: 0
-          };
-        } catch (error) {
-          console.error('Error fetching transaction details:', error);
-          return null;
+        const tx = await connection.getTransaction(sig.signature, {
+          maxSupportedTransactionVersion: 0,
+        });
+        
+        if (!tx) return null;
+
+        // Extract from and to addresses from the first transfer instruction
+        const accountKeys = tx.transaction.message.getAccountKeys();
+        let from = accountKeys.get(0)!.toBase58();
+        let to = from;
+        let amount = 0;
+        let type = 'Unknown';
+
+        // Try to determine transaction type and extract transfer details
+        const instructions = getInstructions(tx.transaction.message);
+
+        if (tx.meta && instructions.length > 0) {
+          const instruction = instructions[0];
+          const program = accountKeys.get(getProgramId(instruction));
+          
+          if (program?.equals(SystemProgram.programId)) {
+            type = 'System Transfer';
+            if (instruction.data.length >= 8) {
+              // Convert data to Buffer if it's a string
+              const dataBuffer = Buffer.from(instruction.data);
+              // Assuming it's a transfer instruction
+              amount = Number(dataBuffer.readBigInt64LE(8)) / 1e9;
+              const accounts = getAccounts(instruction);
+              from = accountKeys.get(accounts[0])!.toBase58();
+              to = accountKeys.get(accounts[1])!.toBase58();
+            }
+          } else if (program?.equals(TOKEN_PROGRAM_ID)) {
+            type = 'Token Transfer';
+            // Add token transfer parsing logic here if needed
+          }
         }
+
+        return {
+          signature: sig.signature,
+          slot: sig.slot,
+          timestamp: sig.blockTime || 0,
+          status: sig.err ? 'error' : 'success',
+          type,
+          fee: (tx.meta?.fee || 0) / 1e9,
+          signer: accountKeys.get(0)!.toBase58(),
+          from,
+          to,
+          amount,
+        };
       })
     );
 
@@ -246,53 +351,69 @@ export async function getInitialTransactions(): Promise<TransactionInfo[]> {
   }
 }
 
-export async function getAccountInfo(address: string) {
-  try {
-    const pubkey = new PublicKey(address);
-    const account = await connection.getAccountInfo(pubkey);
-    const balance = await connection.getBalance(pubkey);
+export function subscribeToTransactions(callback: (tx: TransactionInfo) => void): () => void {
+  const id = connection.onLogs(SystemProgram.programId, async (logs) => {
+    if (!logs.err) {
+      try {
+        const signature = logs.signature;
+        const tx = await connection.getTransaction(signature, {
+          maxSupportedTransactionVersion: 0,
+        });
+        
+        if (tx) {
+          // Extract from and to addresses from the first transfer instruction
+          const accountKeys = tx.transaction.message.getAccountKeys();
+          let from = accountKeys.get(0)!.toBase58();
+          let to = from;
+          let amount = 0;
+          let type = 'Unknown';
 
-    return {
-      address,
-      balance: balance / 1e9, // Convert lamports to SOL
-      executable: account?.executable || false,
-      owner: account?.owner?.toBase58() || 'Unknown',
-    };
-  } catch (error) {
-    console.error('Error fetching account info:', error);
-    return null;
-  }
-}
+          // Try to determine transaction type and extract transfer details
+          const instructions = getInstructions(tx.transaction.message);
 
-export async function getTransactionHistory(address: string, limit = 10): Promise<TransactionInfo[]> {
-  try {
-    const pubkey = new PublicKey(address);
-    const signatures = await connection.getSignaturesForAddress(pubkey, { limit });
-    
-    const transactions = await Promise.all(
-      signatures.map(async (sig) => {
-        try {
-          const tx = await getTransactionDetails(sig.signature);
-          return tx || {
-            signature: sig.signature,
-            timestamp: sig.blockTime ? new Date(sig.blockTime * 1000) : null,
-            status: sig.err ? 'Failed' : 'Success',
-            fee: 0.000005,
-            type: 'Unknown',
-            from: address,
-            to: 'Unknown',
-            amount: 0
+          if (tx.meta && instructions.length > 0) {
+            const instruction = instructions[0];
+            const program = accountKeys.get(getProgramId(instruction));
+            
+            if (program?.equals(SystemProgram.programId)) {
+              type = 'System Transfer';
+              if (instruction.data.length >= 8) {
+                // Convert data to Buffer if it's a string
+                const dataBuffer = Buffer.from(instruction.data);
+                // Assuming it's a transfer instruction
+                amount = Number(dataBuffer.readBigInt64LE(8)) / 1e9;
+                const accounts = getAccounts(instruction);
+                from = accountKeys.get(accounts[0])!.toBase58();
+                to = accountKeys.get(accounts[1])!.toBase58();
+              }
+            } else if (program?.equals(TOKEN_PROGRAM_ID)) {
+              type = 'Token Transfer';
+              // Add token transfer parsing logic here if needed
+            }
+          }
+
+          const transactionInfo: TransactionInfo = {
+            signature,
+            slot: tx.slot,
+            timestamp: tx.blockTime || 0,
+            status: 'success',
+            type,
+            fee: (tx.meta?.fee || 0) / 1e9,
+            signer: accountKeys.get(0)!.toBase58(),
+            from,
+            to,
+            amount,
           };
-        } catch (error) {
-          console.error('Error fetching transaction details:', error);
-          return null;
+          
+          callback(transactionInfo);
         }
-      })
-    );
+      } catch (error) {
+        console.error('Error processing transaction:', error);
+      }
+    }
+  });
 
-    return transactions.filter((tx): tx is TransactionInfo => tx !== null);
-  } catch (error) {
-    console.error('Error fetching transaction history:', error);
-    return [];
-  }
+  return () => {
+    connection.removeOnLogsListener(id);
+  };
 } 

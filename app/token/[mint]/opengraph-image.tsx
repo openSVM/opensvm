@@ -1,22 +1,21 @@
 import { ImageResponse } from '@vercel/og';
-import { getAccountInfo } from '@/lib/solana';
+import { getTokenInfo } from '@/lib/solana';
+import { formatNumber } from '@/lib/utils';
 
 export const runtime = 'edge';
-export const alt = 'Account Details';
+export const alt = 'Token Details';
 export const size = {
   width: 1200,
   height: 630,
 };
 export const contentType = 'image/png';
 
-export default async function Image({ params }: { params: { address: string } }) {
+export default async function Image({ params }: { params: { mint: string } }) {
   try {
-    const account = await getAccountInfo(params.address);
+    const token = await getTokenInfo(params.mint);
     
-    const title = 'Account Overview';
-    const description = account 
-      ? `Balance: ${(account.lamports / 1e9).toFixed(4)} SOL`
-      : 'Solana Account Explorer';
+    const title = token?.metadata?.name || 'Token Overview';
+    const description = token?.metadata?.description || 'Solana Token Explorer';
 
     return new ImageResponse(
       (
@@ -97,7 +96,7 @@ export default async function Image({ params }: { params: { address: string } })
             >
               {title}
             </div>
-            {account && (
+            {token && (
               <div
                 style={{
                   fontSize: '24px',
@@ -106,7 +105,7 @@ export default async function Image({ params }: { params: { address: string } })
                   textAlign: 'center',
                 }}
               >
-                {account.executable ? 'Program Account' : 'User Account'}
+                Supply: {formatNumber(token.supply)} • Holders: {formatNumber(token.holders)}
               </div>
             )}
             <div
@@ -119,7 +118,7 @@ export default async function Image({ params }: { params: { address: string } })
             >
               {description}
             </div>
-            {account && (
+            {token && (
               <div
                 style={{
                   fontSize: '16px',
@@ -128,7 +127,7 @@ export default async function Image({ params }: { params: { address: string } })
                   textAlign: 'center',
                 }}
               >
-                {params.address.slice(0, 20)}...{params.address.slice(-20)}
+                {params.mint.slice(0, 20)}...{params.mint.slice(-20)}
               </div>
             )}
           </div>

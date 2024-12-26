@@ -174,7 +174,7 @@ export default function TransactionPage() {
                 <div>
                   <Text variant="label" className="text-sm text-gray-500">Status</Text>
                   <div className="flex items-center space-x-2">
-                    <div className={`w-2 h-2 rounded-full ${transaction.status === 'Success' ? 'bg-green-400' : 'bg-red-400'}`} />
+                    <div className={`w-2 h-2 rounded-full ${transaction.status === 'success' ? 'bg-green-400' : 'bg-red-400'}`} />
                     <Text variant="default">{transaction.status}</Text>
                   </div>
                 </div>

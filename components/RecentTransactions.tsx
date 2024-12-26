@@ -92,7 +92,7 @@ export default function RecentTransactions() {
                 </Link>
                 <div className="flex flex-col">
                   <div className="flex items-center space-x-2">
-                    <div className={`w-2 h-2 rounded-full ${tx.status === 'Success' ? 'bg-green-400' : 'bg-red-400'}`} />
+                    <div className={`w-2 h-2 rounded-full ${tx.status === 'success' ? 'bg-green-400' : 'bg-red-400'}`} />
                     <Text variant="default" className="font-medium">
                       {tx.type}
                     </Text>

@@ -1,22 +1,28 @@
-import { ImageResponse } from '@vercel/og';
-import { getAccountInfo } from '@/lib/solana';
+import { ImageResponse } from 'next/og';
+import { connection } from '@/lib/solana';
+import { formatNumber } from '@/lib/utils';
 
 export const runtime = 'edge';
-export const alt = 'Account Details';
+export const alt = 'Block Details';
 export const size = {
   width: 1200,
   height: 630,
 };
 export const contentType = 'image/png';
 
-export default async function Image({ params }: { params: { address: string } }) {
+export default async function Image({ params }: { params: { slot: string } }) {
   try {
-    const account = await getAccountInfo(params.address);
-    
-    const title = 'Account Overview';
-    const description = account 
-      ? `Balance: ${(account.lamports / 1e9).toFixed(4)} SOL`
-      : 'Solana Account Explorer';
+    const slotNumber = parseInt(params.slot);
+    const [block, blockTime] = await Promise.all([
+      connection.getBlock(slotNumber, { maxSupportedTransactionVersion: 0 }),
+      connection.getBlockTime(slotNumber),
+    ]);
+
+    if (!block) {
+      throw new Error('Block not found');
+    }
+
+    const totalRewards = block.rewards.reduce((acc, r) => acc + r.lamports, 0) / 1e9;
 
     return new ImageResponse(
       (
@@ -95,20 +101,18 @@ export default async function Image({ params }: { params: { address: string } })
                 textAlign: 'center',
               }}
             >
-              {title}
+              Block #{formatNumber(slotNumber)}
             </div>
-            {account && (
-              <div
-                style={{
-                  fontSize: '24px',
-                  color: '#00ffbd',
-                  marginBottom: '20px',
-                  textAlign: 'center',
-                }}
-              >
-                {account.executable ? 'Program Account' : 'User Account'}
-              </div>
-            )}
+            <div
+              style={{
+                fontSize: '24px',
+                color: '#00ffbd',
+                marginBottom: '20px',
+                textAlign: 'center',
+              }}
+            >
+              {blockTime ? new Date(blockTime * 1000).toLocaleString() : 'Unknown time'}
+            </div>
             <div
               style={{
                 fontSize: '20px',
@@ -117,20 +121,18 @@ export default async function Image({ params }: { params: { address: string } })
                 maxWidth: '600px',
               }}
             >
-              {description}
+              {formatNumber(block.transactions.length)} Transactions • {formatNumber(totalRewards)} SOL in Rewards
             </div>
-            {account && (
-              <div
-                style={{
-                  fontSize: '16px',
-                  color: '#666',
-                  marginTop: '20px',
-                  textAlign: 'center',
-                }}
-              >
-                {params.address.slice(0, 20)}...{params.address.slice(-20)}
-              </div>
-            )}
+            <div
+              style={{
+                fontSize: '16px',
+                color: '#666',
+                marginTop: '20px',
+                textAlign: 'center',
+              }}
+            >
+              Parent Slot: {formatNumber(block.parentSlot)}
+            </div>
           </div>
 
           {/* Footer */}

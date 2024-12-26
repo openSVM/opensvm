@@ -1,0 +1,5 @@
+{
+    "editor.lightbulb.enabled": "onCode",
+    "editor.experimental.treeSitterTelemetry": false,
+    "editor.experimentalInlineEdit.enabled": true
+}
