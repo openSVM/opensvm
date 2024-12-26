@@ -5,54 +5,69 @@ const SOLANA_WS_URL = 'wss://solana-mainnet.core.chainstack.com/263c9f53f4e4cdb8
 
 const connection = new Connection(SOLANA_RPC_URL, {
   wsEndpoint: SOLANA_WS_URL,
-  commitment: 'confirmed'
+  commitment: 'confirmed',
 });
 
 export { connection };
 
-export async function getAccountInfo(address: string) {
-  try {
-    const publicKey = new PublicKey(address);
-    const accountInfo = await connection.getAccountInfo(publicKey);
+export type TransactionInfo = {
+  signature: string;
+  timestamp: Date | null;
+  status: 'Success' | 'Failed';
+  fee: number;
+  type: string;
+  from: string;
+  to: string;
+  amount: number;
+};
 
-    if (!accountInfo) {
-      throw new Error('Account not found');
+export async function subscribeToTransactions(callback: (transaction: TransactionInfo) => void) {
+  const subscriptionId = connection.onLogs(
+    'all',
+    (logs) => {
+      try {
+        const transaction: TransactionInfo = {
+          signature: logs.signature,
+          timestamp: new Date(),
+          status: logs.err ? 'Failed' : 'Success',
+          fee: 0.000005,
+          type: 'Transfer',
+          from: 'Unknown',
+          to: 'Unknown',
+          amount: 0,
+        };
+
+        callback(transaction);
+      } catch (error) {
+        console.error('Error processing transaction:', error);
+      }
     }
+  );
 
-    return {
-      lamports: accountInfo.lamports,
-      isSystemProgram: accountInfo.owner.equals(PublicKey.default),
-    };
-  } catch (error) {
-    console.error('Error fetching account info:', error);
-    throw error;
-  }
+  return () => {
+    connection.removeOnLogsListener(subscriptionId);
+  };
 }
 
-export async function getTransactionHistory(address: string) {
+export async function getInitialTransactions(): Promise<TransactionInfo[]> {
   try {
-    const publicKey = new PublicKey(address);
-    const signatures = await connection.getSignaturesForAddress(publicKey, {
-      limit: 20,
-    });
-
-    const transactions = await Promise.all(
-      signatures.map(async (sig) => {
-        const tx = await connection.getTransaction(sig.signature, {
-          maxSupportedTransactionVersion: 0,
-        });
-        return {
-          signature: sig.signature,
-          timestamp: sig.blockTime ? new Date(sig.blockTime * 1000) : null,
-          status: sig.err ? 'Failed' : 'Success',
-          fee: tx?.meta?.fee || 0,
-        };
-      })
+    const signatures = await connection.getSignaturesForAddress(
+      new PublicKey('11111111111111111111111111111111'),
+      { limit: 10 }
     );
 
-    return transactions;
+    return signatures.map(sig => ({
+      signature: sig.signature,
+      timestamp: sig.blockTime ? new Date(sig.blockTime * 1000) : new Date(),
+      status: sig.err ? 'Failed' : 'Success',
+      fee: 0.000005,
+      type: 'Transfer',
+      from: 'Unknown',
+      to: 'Unknown',
+      amount: 0
+    }));
   } catch (error) {
-    console.error('Error fetching transaction history:', error);
-    throw error;
+    console.error('Error fetching initial transactions:', error);
+    return [];
   }
 } 

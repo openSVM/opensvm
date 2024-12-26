@@ -1,71 +1,85 @@
-// @ts-nocheck
+'use client';
 
-"use client";
-
-import SearchBar from '@/components/SearchBar';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
+import { Text, Button } from 'rinlab';
+import RecentTransactions from '@/components/RecentTransactions';
 
-export default function Home() {
+export default function HomePage() {
+  const [searchQuery, setSearchQuery] = useState('');
   const router = useRouter();
 
-  const handleSearch = (address: string) => {
-    if (address) {
-      router.push(`/account/${address}`);
+  const handleSearch = () => {
+    if (searchQuery) {
+      router.push(`/account/${searchQuery}`);
+    }
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleSearch();
     }
   };
 
   return (
-    <main className="min-h-screen bg-[#f8f9fa]">
-      <header className="border-b border-gray-200 bg-white">
-        <div className="mx-auto max-w-7xl px-4">
-          <div className="flex h-16 items-center justify-between">
+    <div className="min-h-screen bg-[#f8f9fa]">
+      <header className="bg-white border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex h-16 justify-between items-center">
             <div className="flex items-center">
-              <Link href="/" className="text-xl font-bold text-[#333]">
-                OPENSVM
-              </Link>
+              <span className="text-[18px] font-semibold text-black">OPENSVM</span>
               <div className="ml-4 flex items-center text-sm text-[#666]">
                 <span className="text-[#00ffbd]">$198.35</span>
                 <span className="ml-1 text-[#22c55e]">+3.15%</span>
                 <span className="ml-4">Avg Fee: 0.00001304</span>
               </div>
               <nav className="ml-10 flex space-x-4">
-                <Link href="/" className="text-[#333] hover:text-[#00ffbd]">
-                  Home
-                </Link>
-                <Link href="/tokens" className="text-[#666] hover:text-[#333]">
-                  Tokens
-                </Link>
-                <Link href="/nfts" className="text-[#666] hover:text-[#333]">
-                  NFTs
-                </Link>
-                <Link href="/analytics" className="text-[#666] hover:text-[#333]">
-                  Analytics
-                </Link>
+                <a href="/" className="text-[#333] hover:text-[#00ffbd]">Home</a>
+                <a href="/tokens" className="text-[#666] hover:text-[#333]">Tokens</a>
+                <a href="/nfts" className="text-[#666] hover:text-[#333]">NFTs</a>
+                <a href="/analytics" className="text-[#666] hover:text-[#333]">Analytics</a>
               </nav>
             </div>
-            <div className="flex items-center space-x-4">
-              <button className="rounded-lg bg-[#00ffbd] px-4 py-2 text-sm font-medium text-black hover:bg-[#00e6aa]">
-                Connect Wallet
-              </button>
-            </div>
+            <Button variant="default" className="bg-[#00ffbd] hover:bg-[#00e6aa] text-black">
+              Connect Wallet
+            </Button>
           </div>
         </div>
       </header>
 
-      <div className="mx-auto max-w-7xl px-4 py-8">
-        <div className="mb-8 text-center">
-          <h1 className="mb-4 text-4xl font-bold text-[#333]">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+        <div className="text-center mb-16">
+          <Text variant="heading" className="text-4xl font-bold mb-4">
             Solana Block Explorer
-          </h1>
-          <p className="text-lg text-[#666]">
+          </Text>
+          <Text variant="label" className="text-lg mb-8">
             Search for any Solana address, transaction, token, or NFT
-          </p>
+          </Text>
+          <div className="max-w-3xl mx-auto">
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyPress={handleKeyPress}
+                placeholder="Search transactions, blocks, programs and tokens"
+                className="flex-1 px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#00ffbd] focus:border-transparent"
+              />
+              <Button 
+                variant="default" 
+                onClick={handleSearch}
+                className="bg-[#00ffbd] hover:bg-[#00e6aa] text-black px-8"
+              >
+                Search
+              </Button>
+            </div>
+          </div>
         </div>
-        <div className="max-w-3xl mx-auto">
-          <SearchBar onSearch={handleSearch} />
+
+        <div className="max-w-4xl mx-auto">
+          <RecentTransactions />
         </div>
-      </div>
-    </main>
+      </main>
+    </div>
   );
 }

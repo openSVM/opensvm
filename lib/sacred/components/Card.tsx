@@ -1,7 +1,5 @@
-import styles from '@components/Card.module.scss';
-
 import * as React from 'react';
-import * as Utilities from '../common/utilities';
+import { Card as RinCard, CardHeader, CardContent } from 'rinlab';
 
 interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
   children?: React.ReactNode;
@@ -10,39 +8,17 @@ interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
 }
 
 const Card: React.FC<CardProps> = ({ children, mode, title, ...rest }) => {
-  let titleElement = (
-    <header className={styles.action}>
-      <div className={styles.left} aria-hidden="true"></div>
-      <h2 className={styles.title}>{title}</h2>
-      <div className={styles.right} aria-hidden="true"></div>
-    </header>
-  );
-
-  if (mode === 'left') {
-    titleElement = (
-      <header className={styles.action}>
-        <div className={styles.leftCorner} aria-hidden="true"></div>
-        <h2 className={styles.title}>{title}</h2>
-        <div className={styles.right} aria-hidden="true"></div>
-      </header>
-    );
-  }
-
-  if (mode === 'right') {
-    titleElement = (
-      <header className={styles.action}>
-        <div className={styles.left} aria-hidden="true"></div>
-        <h2 className={styles.title}>{title}</h2>
-        <div className={styles.rightCorner} aria-hidden="true"></div>
-      </header>
-    );
-  }
-
   return (
-    <article className={styles.card}>
-      {titleElement}
-      <section className={styles.children}>{children}</section>
-    </article>
+    <RinCard {...rest}>
+      {title && (
+        <CardHeader>
+          <h2>{title}</h2>
+        </CardHeader>
+      )}
+      <CardContent>
+        {children}
+      </CardContent>
+    </RinCard>
   );
 };
 
