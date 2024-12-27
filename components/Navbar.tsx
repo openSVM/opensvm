@@ -1,34 +1,37 @@
 'use client';
 
 import Link from 'next/link';
-import { Button } from '@/components/ui/button';
+import { AIAssistant } from './AIAssistant';
 
-export default function Navbar() {
+export function Navbar() {
   return (
-    <div className="border-b border-gray-200 bg-white/50 backdrop-blur-xl">
-      <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-6">
-          <div className="text-gray-900">
-            <span className="text-lg font-medium">OPENSVM</span>
-          </div>
-          <div className="text-gray-600">
-            $198.35
-            <span className="ml-2 text-[#00DC82]">+3.15%</span>
-          </div>
-          <div className="text-gray-500 text-sm">
-            Avg Fee: 9e-7
-          </div>
-          <div className="text-gray-500 text-sm">
-            plz donate som for RPC and servers: openNjUKc3Z3AQfacwYLNizMiTi488kLhA3EDTBqn2d
+    <div className="flex items-center justify-between p-4 border-b border-gray-200">
+      <div className="flex items-center space-x-4">
+        <div className="flex items-center space-x-2">
+          <Link href="/" className="text-xl font-bold">
+            OPENSVM
+          </Link>
+          <AIAssistant />
+          <span className="text-xl">$198.35</span>
+          <span className="text-green-500">+3.15%</span>
+        </div>
+        <div className="flex items-center space-x-2">
+          <span className="text-sm text-gray-500">Avg Fee: 9e-7</span>
+          <div className="text-sm text-gray-500">
+            plz donate som for RPC and servers:
+            <span className="ml-1">openNjUKc3Z3AQfacwYLNiZMiTi488kLhA3EDTBqn2d</span>
           </div>
         </div>
-        <div className="flex items-center gap-6">
-          <Link href="/" className="text-gray-600 hover:text-gray-900">Home</Link>
-          <Link href="/tokens" className="text-gray-600 hover:text-gray-900">Tokens</Link>
-          <Link href="/nfts" className="text-gray-600 hover:text-gray-900">NFTs</Link>
-          <Link href="/analytics" className="text-gray-600 hover:text-gray-900">Analytics</Link>
-          <Button className="bg-[#00DC82] hover:bg-[#00DC82]/90 text-black">Connect Wallet</Button>
-        </div>
+      </div>
+
+      <div className="flex items-center space-x-4">
+        <Link href="/" className="text-sm">Home</Link>
+        <Link href="/tokens" className="text-sm">Tokens</Link>
+        <Link href="/nfts" className="text-sm">NFTs</Link>
+        <Link href="/analytics" className="text-sm">Analytics</Link>
+        <button className="px-4 py-2 text-sm bg-green-500 text-white rounded-lg">
+          Connect Wallet
+        </button>
       </div>
     </div>
   );

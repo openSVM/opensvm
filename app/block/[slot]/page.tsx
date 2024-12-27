@@ -1,23 +1,17 @@
-import { Metadata } from 'next';
-import BlockDetailsView from '@/components/BlockDetailsView';
+'use client';
 
-interface PageProps {
-  params: Promise<{ slot: string }>;
-}
+import { useParams } from 'next/navigation';
 
-export async function generateMetadata({
-  params,
-}: PageProps): Promise<Metadata> {
-  const resolvedParams = await params;
-  return {
-    title: `Block #${resolvedParams.slot} | OPENSVM`,
-    description: `View details of Solana block #${resolvedParams.slot} on OPENSVM`,
-  };
-}
+export default function BlockPage() {
+  const params = useParams();
+  const slot = params?.slot as string;
 
-export default async function BlockPage({
-  params,
-}: PageProps) {
-  const resolvedParams = await params;
-  return <BlockDetailsView slot={resolvedParams.slot} />;
+  return (
+    <div className="container mx-auto p-6">
+      <h1 className="text-2xl font-bold mb-6">Block Details</h1>
+      <div className="grid gap-6">
+        <p className="text-gray-400">Loading block {slot}...</p>
+      </div>
+    </div>
+  );
 } 

@@ -103,3 +103,32 @@
 body {
   margin: 0px !important;
 }
+
+@keyframes scanline {
+  0% {
+    transform: translateY(-100%);
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 0.3;
+  }
+  100% {
+    transform: translateY(100%);
+    opacity: 0.5;
+  }
+}
+
+.animate-scanline {
+  animation: scanline 2s linear infinite;
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    rgba(68, 204, 255, 0.1) 10%,
+    rgba(68, 204, 255, 0.2) 50%,
+    rgba(68, 204, 255, 0.1) 90%,
+    transparent 100%
+  );
+  height: 20px;
+  opacity: 0;
+  pointer-events: none;
+}
