@@ -40,11 +40,11 @@ export function RecentBlocks() {
 
   if (isLoading) {
     return (
-      <div className="rounded-lg bg-black/20 backdrop-blur-sm p-6 animate-pulse">
-        <h2 className="text-xl font-semibold mb-4">Recent Blocks</h2>
+      <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 animate-pulse">
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Latest Blocks</h2>
         <div className="space-y-4">
           {[...Array(5)].map((_, i) => (
-            <div key={i} className="h-12 bg-gray-700/50 rounded"></div>
+            <div key={i} className="h-12 bg-gray-200 rounded"></div>
           ))}
         </div>
       </div>
@@ -52,25 +52,25 @@ export function RecentBlocks() {
   }
 
   return (
-    <div className="rounded-lg bg-black/20 backdrop-blur-sm p-6">
-      <h2 className="text-xl font-semibold mb-4">Recent Blocks</h2>
+    <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
+      <h2 className="text-xl font-semibold text-gray-900 mb-4">Latest Blocks</h2>
       <div className="space-y-4">
         {blocks.map((block) => (
           <Link
             key={block.slot}
             href={`/block/${block.slot}`}
-            className="flex items-center justify-between p-3 rounded-lg bg-black/30 hover:bg-black/40 transition-colors"
+            className="flex items-center justify-between p-3 rounded-lg bg-white border border-gray-200 hover:bg-gray-50 transition-colors"
           >
             <div className="flex items-center space-x-4">
               <div className="text-sm font-mono">
-                <div className="text-gray-300">Slot {block.slot}</div>
+                <div className="text-gray-900">Slot {block.slot}</div>
                 <div className="text-gray-500 text-xs truncate w-32">
                   {block.blockhash.slice(0, 16)}...
                 </div>
               </div>
             </div>
             <div className="text-right">
-              <div className="text-gray-400 text-sm">
+              <div className="text-gray-500 text-sm">
                 {block.blockTime
                   ? formatDistanceToNow(block.blockTime * 1000, { addSuffix: true })
                   : 'Processing...'}
