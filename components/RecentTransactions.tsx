@@ -1,74 +1,105 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { Connection, PublicKey, ParsedTransactionWithMeta } from '@solana/web3.js';
+import { formatDistanceToNow } from 'date-fns';
 import Link from 'next/link';
-import { getInitialTransactions, subscribeToTransactions, type TransactionInfo } from '@/lib/solana';
 
-export default function RecentTransactions() {
-  const [transactions, setTransactions] = useState<TransactionInfo[]>([]);
+interface Transaction {
+  signature: string;
+  slot: number;
+  blockTime: number | null;
+  success: boolean;
+  programId: string;
+}
+
+export function RecentTransactions() {
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    let mounted = true;
+    const connection = new Connection('https://api.mainnet-beta.solana.com', 'confirmed');
 
-    async function init() {
-      // Get initial transactions
-      const initialTransactions = await getInitialTransactions(10);
-      if (mounted) {
-        setTransactions(initialTransactions);
+    async function fetchTransactions() {
+      try {
+        const signatures = await connection.getSignaturesForAddress(
+          new PublicKey('11111111111111111111111111111111'), // System Program
+          { limit: 10 }
+        );
+
+        const txs = await Promise.all(
+          signatures.map(async (sig) => {
+            const tx = await connection.getParsedTransaction(sig.signature, {
+              maxSupportedTransactionVersion: 0,
+            });
+            return {
+              signature: sig.signature,
+              slot: sig.slot,
+              blockTime: sig.blockTime,
+              success: sig.err === null,
+              programId: tx?.transaction.message.instructions[0]?.programId.toString() || 'Unknown',
+            };
+          })
+        );
+
+        setTransactions(txs);
+      } catch (error) {
+        console.error('Error fetching transactions:', error);
+      } finally {
+        setIsLoading(false);
       }
-
-      // Subscribe to new transactions
-      const unsubscribe = subscribeToTransactions((tx) => {
-        if (mounted) {
-          setTransactions(prev => [tx, ...prev].slice(0, 10));
-        }
-      });
-
-      return () => {
-        mounted = false;
-        unsubscribe();
-      };
     }
 
-    init();
+    fetchTransactions();
+    const interval = setInterval(fetchTransactions, 10000); // Refresh every 10 seconds
+    return () => clearInterval(interval);
   }, []);
 
-  return (
-    <div className="rounded-lg border bg-card">
-      <div className="flex items-center justify-between p-6">
-        <h2 className="text-lg font-semibold">Recent Transactions</h2>
-        <Link href="/transactions" className="text-sm text-[#00DC82]">View all</Link>
+  if (isLoading) {
+    return (
+      <div className="rounded-lg bg-black/20 backdrop-blur-sm p-6 animate-pulse">
+        <h2 className="text-xl font-semibold mb-4">Recent Transactions</h2>
+        <div className="space-y-4">
+          {[...Array(5)].map((_, i) => (
+            <div key={i} className="h-12 bg-gray-700/50 rounded"></div>
+          ))}
+        </div>
       </div>
+    );
+  }
 
-      <div className="space-y-4 p-6 pt-0">
+  return (
+    <div className="rounded-lg bg-black/20 backdrop-blur-sm p-6">
+      <h2 className="text-xl font-semibold mb-4">Recent Transactions</h2>
+      <div className="space-y-4">
         {transactions.map((tx) => (
           <Link
             key={tx.signature}
             href={`/tx/${tx.signature}`}
-            className="flex items-center justify-between p-4 rounded-lg bg-secondary/50 hover:bg-secondary/80 transition-colors"
+            className="flex items-center justify-between p-3 rounded-lg bg-black/30 hover:bg-black/40 transition-colors"
           >
-            <div className="flex items-center gap-3">
-              <div className={`w-2 h-2 rounded-full ${tx.status === 'success' ? 'bg-[#00DC82]' : 'bg-red-500'}`} />
-              <div>
-                <div className="text-sm font-medium">{tx.type}</div>
-                <div className="text-xs text-muted-foreground mt-1">
-                  {tx.from.slice(0, 4)}...{tx.from.slice(-4)} → {tx.to.slice(0, 4)}...{tx.to.slice(-4)}
+            <div className="flex items-center space-x-4">
+              <div className="text-sm font-mono">
+                <div className="text-gray-300">
+                  {tx.signature.slice(0, 8)}...{tx.signature.slice(-8)}
+                </div>
+                <div className="text-gray-500 text-xs">
+                  Program: {tx.programId.slice(0, 8)}...
                 </div>
               </div>
             </div>
-
             <div className="text-right">
-              <div className="text-sm font-medium">{tx.amount.toFixed(4)} SOL</div>
-              <div className="text-xs text-muted-foreground mt-1">Fee: {tx.fee.toFixed(6)} SOL</div>
+              <div className={`text-sm ${tx.success ? 'text-green-400' : 'text-red-400'}`}>
+                {tx.success ? 'Success' : 'Failed'}
+              </div>
+              <div className="text-gray-400 text-xs">
+                {tx.blockTime
+                  ? formatDistanceToNow(tx.blockTime * 1000, { addSuffix: true })
+                  : 'Processing...'}
+              </div>
             </div>
           </Link>
         ))}
-
-        {transactions.length === 0 && (
-          <div className="text-center text-sm text-muted-foreground py-8">
-            Loading transactions...
-          </div>
-        )}
       </div>
     </div>
   );
