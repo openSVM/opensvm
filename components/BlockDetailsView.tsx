@@ -12,7 +12,7 @@ interface BlockDetails {
   previousBlockhash: string;
 }
 
-export default function BlockDetails({ slot }: { slot: string }) {
+export default function BlockDetailsView({ slot }: { slot: string }) {
   const [block, setBlock] = useState<BlockDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -96,4 +96,4 @@ export default function BlockDetails({ slot }: { slot: string }) {
       </div>
     </main>
   );
-}
+} 

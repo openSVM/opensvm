@@ -1,111 +1,74 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import Link from 'next/link';
-import { getInitialBlocks, subscribeToBlocks, type BlockInfo } from '@/lib/solana';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { getInitialBlocks } from '@/lib/solana';
+import type { Block } from '@/lib/solana';
 
 export default function RecentBlocks() {
-  const [blocks, setBlocks] = useState<BlockInfo[]>([]);
-  const [selectedBlock, setSelectedBlock] = useState<BlockInfo | null>(null);
+  const [blocks, setBlocks] = useState<Block[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const router = useRouter();
 
   useEffect(() => {
-    let mounted = true;
-
-    async function init() {
-      // Get initial blocks
-      const initialBlocks = await getInitialBlocks(6);
-      if (mounted) {
+    getInitialBlocks()
+      .then(initialBlocks => {
         setBlocks(initialBlocks);
-      }
-
-      // Subscribe to new blocks
-      const unsubscribe = subscribeToBlocks((block) => {
-        if (mounted) {
-          setBlocks(prev => [block, ...prev].slice(0, 6));
-        }
+        setIsLoading(false);
+      })
+      .catch(error => {
+        console.error('Error loading blocks:', error);
+        setIsLoading(false);
       });
-
-      return () => {
-        mounted = false;
-        unsubscribe();
-      };
-    }
-
-    init();
   }, []);
 
-  return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-      <div className="rounded-lg border bg-card p-6">
-        <h2 className="text-lg font-mono mb-6 flex items-center gap-2">
-          <span className="inline-block w-4 border-t border-[#00DC82]/40"></span>
-          RECENT BLOCKS
-          <span className="inline-block w-4 border-t border-[#00DC82]/40"></span>
-        </h2>
+  const handleBlockClick = (slot: number) => {
+    router.push(`/block/${slot}`);
+  };
 
-        <div className="space-y-4">
-          {blocks.map((block) => (
-            <button
-              key={block.slot}
-              onClick={() => setSelectedBlock(block)}
-              className="w-full text-left p-4 rounded bg-secondary/50 hover:bg-secondary/80 border transition-colors group"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-6 h-6 text-[#00DC82]">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M20 7L12 3L4 7M20 7L12 11M20 7V17L12 21M12 11L4 7M12 11V21M4 7V17L12 21" />
-                  </svg>
-                </div>
-                <div>
-                  <div className="font-mono text-sm group-hover:text-[#00DC82] transition-colors">Block {block.slot}</div>
-                  <div className="font-mono text-xs text-muted-foreground mt-1">{block.timestamp}</div>
-                </div>
-              </div>
-              <div className="mt-2 font-mono text-xs text-muted-foreground truncate">
-                {block.blockhash}
-              </div>
-            </button>
-          ))}
-
-          {blocks.length === 0 && (
-            <div className="text-center text-sm text-muted-foreground py-8">
-              Loading blocks...
-            </div>
-          )}
+  if (isLoading) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-lg">
+        <div className="p-4 border-b border-gray-200">
+          <h2 className="font-medium text-gray-900">Latest Blocks</h2>
+        </div>
+        <div className="p-6">
+          <div className="text-center text-gray-500 animate-pulse">
+            Loading blocks...
+          </div>
         </div>
       </div>
+    );
+  }
 
-      <div className="rounded-lg border bg-card p-6">
-        <h2 className="text-lg font-mono mb-6 flex items-center gap-2">
-          <span className="inline-block w-4 border-t border-[#00DC82]/40"></span>
-          BLOCK DETAILS
-          <span className="inline-block w-4 border-t border-[#00DC82]/40"></span>
-        </h2>
-
-        {selectedBlock ? (
-          <div className="space-y-4">
-            <div className="p-4 rounded bg-secondary/50 border">
-              <div className="text-sm text-muted-foreground">Slot</div>
-              <div className="font-mono mt-1">{selectedBlock.slot}</div>
+  return (
+    <div className="bg-gray-50 border border-gray-200 rounded-lg">
+      <div className="p-4 border-b border-gray-200">
+        <h2 className="font-medium text-gray-900">Latest Blocks</h2>
+      </div>
+      <div className="p-6">
+        <div className="grid grid-cols-2 gap-4 text-sm text-gray-500 mb-4">
+          <div>Block Number</div>
+          <div>Timestamp</div>
+        </div>
+        <div className="space-y-2">
+          {blocks.map((block) => (
+            <div
+              key={`block-${block.slot}`}
+              onClick={() => handleBlockClick(block.slot)}
+              className="grid grid-cols-2 gap-4 text-sm p-3 rounded bg-white hover:bg-gray-100 transition-colors cursor-pointer border border-gray-100"
+            >
+              <div className="font-medium text-gray-900">
+                #{block.slot.toLocaleString()}
+              </div>
+              <div className="text-gray-600">
+                {block.timestamp
+                  ? new Date(block.timestamp * 1000).toLocaleString()
+                  : 'Loading...'}
+              </div>
             </div>
-            <div className="p-4 rounded bg-secondary/50 border">
-              <div className="text-sm text-muted-foreground">Blockhash</div>
-              <div className="font-mono mt-1 break-all">{selectedBlock.blockhash}</div>
-            </div>
-            <div className="p-4 rounded bg-secondary/50 border">
-              <div className="text-sm text-muted-foreground">Parent Slot</div>
-              <div className="font-mono mt-1">{selectedBlock.parentSlot}</div>
-            </div>
-            <div className="p-4 rounded bg-secondary/50 border">
-              <div className="text-sm text-muted-foreground">Timestamp</div>
-              <div className="font-mono mt-1">{selectedBlock.timestamp}</div>
-            </div>
-          </div>
-        ) : (
-          <div className="text-center text-muted-foreground py-12">
-            Select a block to view details
-          </div>
-        )}
+          ))}
+        </div>
       </div>
     </div>
   );

@@ -5,51 +5,122 @@ import { useRouter } from 'next/navigation';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import RecentBlocks from '@/components/RecentBlocks';
+import TopPrograms from '@/components/TopPrograms';
+import TrendingMemecoins from '@/components/TrendingMemecoins';
+import TrendingNFTs from '@/components/TrendingNFTs';
+
+interface NetworkStats {
+  solPrice: number;
+  priceChange: number;
+  avgFee: number;
+  epoch: number;
+  epochProgress: number;
+  blockHeight: number;
+  totalTransactions: string;
+  currentStake: string;
+}
+
+const EXAMPLE_STATS: NetworkStats = {
+  solPrice: 198.35,
+  priceChange: 3.15,
+  avgFee: 9e-7,
+  epoch: 717,
+  epochProgress: 75.74,
+  blockHeight: 288406300,
+  totalTransactions: "353,060,842,003",
+  currentStake: "389,287,378.76"
+};
+
+const STATS_ITEMS = [
+  { label: 'Blocks Processed', value: '288,406,300' },
+  { label: 'Active Validators', value: '1,967' },
+  { label: 'TPS', value: '4,819' },
+  { label: 'Success Rate', value: '99.98%' },
+];
 
 export default function Home() {
   const [searchQuery, setSearchQuery] = useState('');
+  const [stats, setStats] = useState<NetworkStats>(EXAMPLE_STATS);
   const router = useRouter();
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (!searchQuery) return;
 
-    // Determine the type of search query and redirect accordingly
     if (searchQuery.length === 88 || searchQuery.length === 87) {
-      // Signature (transaction)
       router.push(`/tx/${searchQuery}`);
     } else if (searchQuery.length === 32 || searchQuery.length === 44) {
-      // Public key (account/program)
       router.push(`/address/${searchQuery}`);
     } else if (!isNaN(Number(searchQuery))) {
-      // Block number
       router.push(`/block/${searchQuery}`);
     } else {
-      // Default to address search
       router.push(`/address/${searchQuery}`);
     }
   };
 
   return (
-    <main className="container mx-auto p-4">
-      <div className="flex flex-col items-center justify-center min-h-[40vh] text-center">
-        <h1 className="text-4xl font-bold mb-4">Solana Block Explorer</h1>
-        <p className="text-lg mb-8">Search for any Solana address, transaction, token, or NFT</p>
-        
-        <form onSubmit={handleSearch} className="w-full max-w-3xl flex gap-2">
-          <Input
-            type="text"
-            placeholder="Search transactions, blocks, programs and tokens"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="flex-1 bg-secondary/50"
-          />
-          <Button type="submit" className="bg-[#00DC82] hover:bg-[#00DC82]/80">Search</Button>
-        </form>
-      </div>
+    <main className="min-h-screen bg-white">
+      <div className="container mx-auto px-4 py-8">
+        {/* Search Section */}
+        <div className="max-w-3xl mx-auto mb-12">
+          <form onSubmit={handleSearch} className="relative">
+            <Input
+              type="text"
+              placeholder="Search transactions, blocks, programs and tokens..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-gray-50 border border-gray-200 text-gray-900 placeholder:text-gray-400 h-12 pl-4 pr-24 rounded-lg"
+            />
+            <Button 
+              type="submit" 
+              className="absolute right-2 top-2 bg-gray-900 hover:bg-gray-800 text-white h-8 px-4 rounded-md"
+            >
+              Search
+            </Button>
+          </form>
+        </div>
 
-      <div className="mt-8">
-        <RecentBlocks />
+        {/* Stats Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-12">
+          {STATS_ITEMS.map((stat) => (
+            <div key={stat.label} className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+              <div className="text-2xl font-medium text-gray-900 mb-1">{stat.value}</div>
+              <div className="text-gray-500 text-sm">{stat.label}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Network Stats */}
+        <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 mb-12">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div>
+              <div className="text-sm text-gray-500 mb-1">Current Epoch</div>
+              <div className="text-xl text-gray-900">{stats.epoch}</div>
+              <div className="w-full bg-gray-200 h-1 mt-2">
+                <div 
+                  className="bg-gray-900 h-1" 
+                  style={{ width: `${stats.epochProgress}%` }}
+                />
+              </div>
+            </div>
+            <div>
+              <div className="text-sm text-gray-500 mb-1">Network Load</div>
+              <div className="text-xl text-gray-900">{stats.epochProgress}%</div>
+            </div>
+            <div>
+              <div className="text-sm text-gray-500 mb-1">Block Height</div>
+              <div className="text-xl text-gray-900">{stats.blockHeight.toLocaleString()}</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Main Content */}
+        <div className="grid grid-cols-1 gap-8">
+          <RecentBlocks />
+          <TopPrograms />
+          <TrendingMemecoins />
+          <TrendingNFTs />
+        </div>
       </div>
     </main>
   );

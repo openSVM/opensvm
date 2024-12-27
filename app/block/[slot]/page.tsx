@@ -1,5 +1,5 @@
 import { Metadata } from 'next';
-import BlockDetails from '@/components/BlockDetails';
+import BlockDetailsView from '@/components/BlockDetailsView';
 
 interface PageProps {
   params: Promise<{ slot: string }>;
@@ -19,5 +19,5 @@ export default async function BlockPage({
   params,
 }: PageProps) {
   const resolvedParams = await params;
-  return <BlockDetails slot={resolvedParams.slot} />;
+  return <BlockDetailsView slot={resolvedParams.slot} />;
 } 
