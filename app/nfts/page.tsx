@@ -2,44 +2,102 @@
 
 import { useState } from 'react';
 import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
+
+interface NFTCollection {
+  name: string;
+  floorPrice: number;
+  volume24h: number;
+  listings: number;
+  sales24h: number;
+  holders: number;
+}
+
+const EXAMPLE_COLLECTIONS: NFTCollection[] = [
+  {
+    name: 'DeGods',
+    floorPrice: 343.5,
+    volume24h: 12567.89,
+    listings: 154,
+    sales24h: 23,
+    holders: 7890
+  },
+  {
+    name: 'Okay Bears',
+    floorPrice: 89.2,
+    volume24h: 5678.12,
+    listings: 234,
+    sales24h: 15,
+    holders: 5432
+  },
+  {
+    name: 'Mad Lads',
+    floorPrice: 145.7,
+    volume24h: 8901.34,
+    listings: 187,
+    sales24h: 19,
+    holders: 6543
+  },
+  // Add more example collections as needed
+];
 
 export default function NFTsPage() {
   const [searchQuery, setSearchQuery] = useState('');
 
   return (
-    <main className="container mx-auto p-4">
-      <div className="flex flex-col gap-8">
-        <div>
-          <h1 className="text-2xl font-bold mb-2">NFTs</h1>
-          <p className="text-muted-foreground">Explore Solana NFT collections</p>
-        </div>
-
-        <div className="flex gap-4">
+    <main className="min-h-screen bg-white">
+      <div className="container mx-auto px-4 py-8">
+        {/* Search Section */}
+        <div className="max-w-3xl mx-auto mb-12">
           <Input
             type="text"
-            placeholder="Search by collection name or NFT address"
+            placeholder="Search NFT collections..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="max-w-xl bg-secondary/50"
+            className="w-full bg-gray-50 border border-gray-200 text-gray-900 placeholder:text-gray-400 h-12 px-4 rounded-lg"
           />
-          <Button className="bg-[#00DC82] hover:bg-[#00DC82]/80">Search</Button>
         </div>
 
-        <div className="rounded-lg border bg-card">
-          <div className="p-6 border-b">
-            <h2 className="font-semibold">Top Collections</h2>
-          </div>
-          <div className="p-6">
-            <div className="grid grid-cols-4 gap-4 font-medium text-sm text-muted-foreground mb-4">
-              <div>Collection</div>
-              <div>Floor Price</div>
-              <div>Volume 24h</div>
-              <div>Total Volume</div>
-            </div>
-            <div className="text-center py-8 text-muted-foreground">
-              Collection list coming soon...
-            </div>
+        {/* NFT Collections Table */}
+        <div className="bg-gray-50 border border-gray-200 rounded-lg overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="bg-gray-100">
+                  <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">Collection</th>
+                  <th className="px-6 py-3 text-right text-sm font-medium text-gray-500">Floor Price</th>
+                  <th className="px-6 py-3 text-right text-sm font-medium text-gray-500">24h Volume</th>
+                  <th className="px-6 py-3 text-right text-sm font-medium text-gray-500">Listings</th>
+                  <th className="px-6 py-3 text-right text-sm font-medium text-gray-500">24h Sales</th>
+                  <th className="px-6 py-3 text-right text-sm font-medium text-gray-500">Holders</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {EXAMPLE_COLLECTIONS.map((collection) => (
+                  <tr key={collection.name} className="hover:bg-gray-50">
+                    <td className="px-6 py-4">
+                      <div className="flex items-center">
+                        <div className="font-medium text-gray-900">{collection.name}</div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-right text-sm text-gray-900">
+                      ◎{collection.floorPrice.toLocaleString()}
+                    </td>
+                    <td className="px-6 py-4 text-right text-sm text-gray-900">
+                      ◎{collection.volume24h.toLocaleString()}
+                    </td>
+                    <td className="px-6 py-4 text-right text-sm text-gray-900">
+                      {collection.listings.toLocaleString()}
+                    </td>
+                    <td className="px-6 py-4 text-right text-sm text-gray-900">
+                      {collection.sales24h.toLocaleString()}
+                    </td>
+                    <td className="px-6 py-4 text-right text-sm text-gray-900">
+                      {collection.holders.toLocaleString()}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
