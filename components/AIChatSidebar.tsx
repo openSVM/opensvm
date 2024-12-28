@@ -150,9 +150,9 @@ export function AIChatSidebar({ isOpen, onClose }: AIChatSidebarProps) {
     switch (activeTab) {
       case 'agent':
         return (
-          <div className="flex flex-col h-[calc(100%-48px)]">
+          <div className="flex flex-col h-full">
             <div className="flex-1 overflow-y-auto">
-              <div className="h-full p-4 space-y-4">
+              <div className="p-4 space-y-4">
                 {messages.map((message, i) => (
                   <div
                     key={i}
@@ -259,7 +259,7 @@ export function AIChatSidebar({ isOpen, onClose }: AIChatSidebarProps) {
       style={{ width: isMaximized ? '100vw' : `${width}px` }}
       className={`flex flex-col bg-[#000000] text-[#FFFFFF] border-l border-[#FFFFFF] relative ${
         isMaximized 
-          ? 'fixed inset-0 h-screen' 
+          ? 'fixed inset-0' 
           : 'h-[calc(100vh-57px)]'
       }`}
     >
