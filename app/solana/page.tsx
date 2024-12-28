@@ -3,7 +3,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Connection } from "@solana/web3.js";
+import { Connection, SystemProgram } from "@solana/web3.js";
 
 const HELIUS_RPC = "https://mainnet.helius-rpc.com/?api-key=2eb1ae21-40d0-4b6d-adde-ccb3d56ad570";
 
@@ -50,7 +50,7 @@ export default function SolanaExplorer() {
 
         // Fetch recent transactions
         const signatures = await connection.getSignaturesForAddress(
-          connection.getParsedProgramAccounts.address,
+          SystemProgram.programId,
           { limit: 5 }
         );
 
@@ -83,53 +83,53 @@ export default function SolanaExplorer() {
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4">
-      <div className="p-4 bg-white rounded-lg shadow">
-        <h2 className="text-lg font-semibold mb-4">SOL Supply Stats</h2>
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 p-2">
+      <div className="p-3 bg-white rounded-md shadow">
+        <h2 className="text-lg font-semibold mb-2">SOL Supply Stats</h2>
         {loading ? (
           <p>Loading...</p>
         ) : (
-          <>
+          <div className="space-y-1">
             <p>Circulating Supply: {supplyStats?.circulating.toFixed(2)} SOL</p>
             <p>Non-circulating Supply: {supplyStats?.nonCirculating.toFixed(2)} SOL</p>
-          </>
+          </div>
         )}
       </div>
 
-      <div className="p-4 bg-white rounded-lg shadow">
-        <h2 className="text-lg font-semibold mb-4">Network Stats</h2>
+      <div className="p-3 bg-white rounded-md shadow">
+        <h2 className="text-lg font-semibold mb-2">Network Stats</h2>
         {loading ? (
           <p>Loading...</p>
         ) : (
-          <>
+          <div className="space-y-1">
             <p>Current TPS: {networkStats?.tps}</p>
             <p>Block Height: {networkStats?.blockHeight}</p>
-          </>
+          </div>
         )}
       </div>
 
-      <div className="p-4 bg-white rounded-lg shadow col-span-full">
-        <h2 className="text-lg font-semibold mb-4">Latest Transactions</h2>
+      <div className="p-3 bg-white rounded-md shadow col-span-full mt-2">
+        <h2 className="text-lg font-semibold mb-2">Latest Transactions</h2>
         {loading ? (
           <p>Loading...</p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-full">
+            <table className="min-w-full border-collapse">
               <thead>
                 <tr>
-                  <th className="px-4 py-2">Signature</th>
-                  <th className="px-4 py-2">Timestamp</th>
-                  <th className="px-4 py-2">Block</th>
-                  <th className="px-4 py-2">Type</th>
+                  <th className="px-3 py-1 border text-left">Signature</th>
+                  <th className="px-3 py-1 border text-left">Timestamp</th>
+                  <th className="px-3 py-1 border text-left">Block</th>
+                  <th className="px-3 py-1 border text-left">Type</th>
                 </tr>
               </thead>
               <tbody>
                 {transactions.map((tx, index) => (
-                  <tr key={index}>
-                    <td className="border px-4 py-2">{tx.signature}</td>
-                    <td className="border px-4 py-2">{tx.timestamp}</td>
-                    <td className="border px-4 py-2">{tx.block}</td>
-                    <td className="border px-4 py-2">{tx.type}</td>
+                  <tr key={index} className="hover:bg-gray-50">
+                    <td className="px-3 py-1 border">{tx.signature}</td>
+                    <td className="px-3 py-1 border">{tx.timestamp}</td>
+                    <td className="px-3 py-1 border">{tx.block}</td>
+                    <td className="px-3 py-1 border">{tx.type}</td>
                   </tr>
                 ))}
               </tbody>
