@@ -23,13 +23,20 @@ interface AIChatSidebarProps {
 }
 
 export function AIChatSidebar({ isOpen, onClose }: AIChatSidebarProps) {
-  const [messages, setMessages] = useState<Message[]>([
+  const [agentMessages, setAgentMessages] = useState<Message[]>([
     {
       role: 'assistant',
-      content: 'Hello! How can I help you analyze Solana transactions today?'
+      content: 'Hello! I am an autonomous agent that can help analyze Solana transactions and perform actions on the website to achieve your goals. I can navigate, search, and execute operations until the required result is achieved. What would you like me to do?'
     }
   ]);
-  const [input, setInput] = useState('');
+  const [assistantMessages, setAssistantMessages] = useState<Message[]>([
+    {
+      role: 'assistant',
+      content: 'Hi! I am an AI assistant focused on Solana and blockchain. I can help with explanations and analysis using my knowledge, agent\'s insights, shared notes, and API data. I\'ll ask for your confirmation before taking any actions. How can I assist you?'
+    }
+  ]);
+  const [agentInput, setAgentInput] = useState('');
+  const [assistantInput, setAssistantInput] = useState('');
   const [activeTab, setActiveTab] = useState('agent');
   const [notes, setNotes] = useState<Note[]>([]);
   const [noteInput, setNoteInput] = useState('');
@@ -62,11 +69,19 @@ export function AIChatSidebar({ isOpen, onClose }: AIChatSidebarProps) {
   };
 
   const handleRefresh = () => {
-    setMessages([{
-      role: 'assistant',
-      content: 'Hello! How can I help you analyze Solana transactions today?'
-    }]);
-    setInput('');
+    if (activeTab === 'agent') {
+      setAgentMessages([{
+        role: 'assistant',
+        content: 'Hello! I am an autonomous agent that can help analyze Solana transactions and perform actions on the website to achieve your goals. I can navigate, search, and execute operations until the required result is achieved. What would you like me to do?'
+      }]);
+      setAgentInput('');
+    } else if (activeTab === 'assistant') {
+      setAssistantMessages([{
+        role: 'assistant',
+        content: 'Hi! I am an AI assistant focused on Solana and blockchain. I can help with explanations and analysis using my knowledge, agent\'s insights, shared notes, and API data. I\'ll ask for your confirmation before taking any actions. How can I assist you?'
+      }]);
+      setAssistantInput('');
+    }
   };
 
   const handleNewChat = () => {
@@ -116,21 +131,21 @@ export function AIChatSidebar({ isOpen, onClose }: AIChatSidebarProps) {
     addNote(noteInput, 'user');
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleAgentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim()) return;
+    if (!agentInput.trim()) return;
 
-    const userMessage = { role: 'user' as const, content: input };
-    setMessages(prev => [...prev, userMessage]);
-    setInput('');
+    const userMessage = { role: 'user' as const, content: agentInput };
+    setAgentMessages(prev => [...prev, userMessage]);
+    setAgentInput('');
 
     try {
-      const response = await sendMessageToAnthropic([...messages, userMessage]);
+      const response = await sendMessageToAnthropic([...agentMessages, userMessage]);
       const assistantMessage = { 
         role: 'assistant' as const, 
         content: response
       };
-      setMessages(prev => [...prev, assistantMessage]);
+      setAgentMessages(prev => [...prev, assistantMessage]);
       
       if (response.includes("[NOTE]")) {
         const noteContent = response.split("[NOTE]")[1].split("[/NOTE]")[0].trim();
@@ -142,7 +157,37 @@ export function AIChatSidebar({ isOpen, onClose }: AIChatSidebarProps) {
         role: 'assistant' as const, 
         content: 'Sorry, I encountered an error processing your request. Please try again.' 
       };
-      setMessages(prev => [...prev, errorMessage]);
+      setAgentMessages(prev => [...prev, errorMessage]);
+    }
+  };
+
+  const handleAssistantSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!assistantInput.trim()) return;
+
+    const userMessage = { role: 'user' as const, content: assistantInput };
+    setAssistantMessages(prev => [...prev, userMessage]);
+    setAssistantInput('');
+
+    try {
+      const response = await sendMessageToAnthropic([...assistantMessages, userMessage]);
+      const assistantMessage = { 
+        role: 'assistant' as const, 
+        content: response
+      };
+      setAssistantMessages(prev => [...prev, assistantMessage]);
+      
+      if (response.includes("[NOTE]")) {
+        const noteContent = response.split("[NOTE]")[1].split("[/NOTE]")[0].trim();
+        addNote(noteContent, 'assistant');
+      }
+    } catch (error) {
+      console.error('Error getting AI response:', error);
+      const errorMessage = { 
+        role: 'assistant' as const, 
+        content: 'Sorry, I encountered an error processing your request. Please try again.' 
+      };
+      setAssistantMessages(prev => [...prev, errorMessage]);
     }
   };
 
@@ -153,7 +198,7 @@ export function AIChatSidebar({ isOpen, onClose }: AIChatSidebarProps) {
           <div className="flex flex-col h-full">
             <div className="flex-1 overflow-y-auto">
               <div className="p-4 space-y-4">
-                {messages.map((message, i) => (
+                {agentMessages.map((message, i) => (
                   <div
                     key={i}
                     className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
@@ -175,10 +220,10 @@ export function AIChatSidebar({ isOpen, onClose }: AIChatSidebarProps) {
               </div>
             </div>
             <div className="flex-shrink-0 p-4">
-              <form onSubmit={handleSubmit} className="relative">
+              <form onSubmit={handleAgentSubmit} className="relative">
                 <input
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
+                  value={agentInput}
+                  onChange={(e) => setAgentInput(e.target.value)}
                   placeholder="Ask a question..."
                   className="w-full bg-[#1E1E1E] text-[#FFFFFF] px-4 py-3 rounded-lg placeholder:text-gray-400 focus:outline-none"
                 />
@@ -196,16 +241,47 @@ export function AIChatSidebar({ isOpen, onClose }: AIChatSidebarProps) {
         );
       case 'assistant':
         return (
-          <div className="p-4">
-            <div className="bg-[#2D2D2D] p-4 rounded text-[#FFFFFF]">
-              <h3 className="text-lg mb-2">Assistant Information</h3>
-              <p className="mb-2">This AI assistant is specialized in:</p>
-              <ul className="list-disc pl-4 space-y-1">
-                <li>Analyzing Solana transactions</li>
-                <li>Explaining blockchain concepts</li>
-                <li>Providing crypto market insights</li>
-                <li>Debugging Solana smart contracts</li>
-              </ul>
+          <div className="flex flex-col h-full">
+            <div className="flex-1 overflow-y-auto">
+              <div className="p-4 space-y-4">
+                {assistantMessages.map((message, i) => (
+                  <div
+                    key={i}
+                    className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                  >
+                    <div
+                      className={`relative px-4 py-2 max-w-[80%] ${
+                        message.role === 'user'
+                          ? 'bg-[#D85B00] text-[#FFFFFF]'
+                          : 'bg-[#2D2D2D] text-[#FFFFFF]'
+                      }`}
+                      style={{
+                        filter: 'drop-shadow(2px 4px 3px rgba(0, 0, 0, 0.5))'
+                      }}
+                    >
+                      <div className="relative z-10">{message.content}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="flex-shrink-0 p-4">
+              <form onSubmit={handleAssistantSubmit} className="relative">
+                <input
+                  value={assistantInput}
+                  onChange={(e) => setAssistantInput(e.target.value)}
+                  placeholder="Ask a question..."
+                  className="w-full bg-[#1E1E1E] text-[#FFFFFF] px-4 py-3 rounded-lg placeholder:text-gray-400 focus:outline-none"
+                />
+                <button
+                  type="submit"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"
+                >
+                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M18 2L2 18M18 2H2M18 2V18" stroke="currentColor" strokeWidth="2"/>
+                  </svg>
+                </button>
+              </form>
             </div>
           </div>
         );
