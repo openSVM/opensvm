@@ -150,9 +150,9 @@ export function AIChatSidebar({ isOpen, onClose }: AIChatSidebarProps) {
     switch (activeTab) {
       case 'agent':
         return (
-          <>
-            <div className="flex-1 min-h-0">
-              <div className="h-full overflow-y-auto p-4 space-y-4">
+          <div className="flex flex-col h-[calc(100%-48px)]">
+            <div className="flex-1 overflow-y-auto">
+              <div className="h-full p-4 space-y-4">
                 {messages.map((message, i) => (
                   <div
                     key={i}
@@ -174,7 +174,7 @@ export function AIChatSidebar({ isOpen, onClose }: AIChatSidebarProps) {
                 ))}
               </div>
             </div>
-            <div className="p-4">
+            <div className="flex-shrink-0 p-4">
               <form onSubmit={handleSubmit} className="relative">
                 <input
                   value={input}
@@ -192,7 +192,7 @@ export function AIChatSidebar({ isOpen, onClose }: AIChatSidebarProps) {
                 </button>
               </form>
             </div>
-          </>
+          </div>
         );
       case 'assistant':
         return (
