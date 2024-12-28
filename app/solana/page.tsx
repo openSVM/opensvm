@@ -27,7 +27,6 @@ export default function SolanaExplorer() {
 
   useEffect(() => {
     const connection = new Connection(HELIUS_RPC);
-    let interval: NodeJS.Timeout;
 
     const fetchData = async () => {
       try {
@@ -67,16 +66,13 @@ export default function SolanaExplorer() {
         setError(null);
       } catch (err) {
         console.error("Error fetching data:", err);
-        setError("Failed to fetch blockchain data. Retrying...");
+        setError("Failed to fetch blockchain data.");
         setLoading(false);
       }
     };
 
     fetchData();
-    interval = setInterval(fetchData, 30000);
-
-    return () => clearInterval(interval);
-  }, []);
+  }, []); // Only fetch once on mount
 
   if (error) {
     return (

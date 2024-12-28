@@ -132,3 +132,35 @@ body {
   opacity: 0;
   pointer-events: none;
 }
+
+@keyframes color-shift {
+  0% {
+    background: #44ccff;
+    box-shadow: 0 0 25px rgba(68, 204, 255, 0.9);
+  }
+  33% {
+    background: #44ffcc;
+    box-shadow: 0 0 40px rgba(68, 255, 204, 0.9), 0 0 60px rgba(68, 255, 204, 0.7);
+  }
+  66% {
+    background: #cc44ff;
+    box-shadow: 0 0 40px rgba(204, 68, 255, 0.9), 0 0 60px rgba(204, 68, 255, 0.7);
+  }
+  100% {
+    background: #44ccff;
+    box-shadow: 0 0 25px rgba(68, 204, 255, 0.9);
+  }
+}
+
+.glow-button {
+  animation: color-shift 8s infinite;
+  font-weight: 700;
+  transition: all 0.3s ease;
+}
+
+.glow-button:hover {
+  animation: none;
+  background: #44ccff;
+  box-shadow: 0 0 40px rgba(68, 204, 255, 1), 0 0 70px rgba(68, 204, 255, 0.8);
+  transform: scale(1.05);
+}

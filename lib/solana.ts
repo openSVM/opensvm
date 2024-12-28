@@ -1,8 +1,11 @@
 import { Connection, PublicKey, clusterApiUrl, ParsedTransactionWithMeta, BlockResponse, GetProgramAccountsFilter, SystemProgram } from '@solana/web3.js';
 import { TOKEN_PROGRAM_ID, getMint } from '@solana/spl-token';
 
-// Initialize connection to mainnet
-export const connection = new Connection(clusterApiUrl('mainnet-beta'), 'confirmed');
+// Initialize connection to Chainstack RPC
+export const connection = new Connection('https://solana-mainnet.core.chainstack.com/263c9f53f4e4cdb897c0edc4a64cd007', {
+  commitment: 'confirmed',
+  wsEndpoint: 'wss://solana-mainnet.core.chainstack.com/263c9f53f4e4cdb897c0edc4a64cd007',
+});
 
 // Fetch recent blocks
 export async function getRecentBlocks(limit: number = 10): Promise<BlockResponse[]> {
@@ -10,7 +13,9 @@ export async function getRecentBlocks(limit: number = 10): Promise<BlockResponse
     const slot = await connection.getSlot();
     const blocks = await Promise.all(
       Array.from({ length: limit }, (_, i) => 
-        connection.getBlock(slot - i)
+        connection.getBlock(slot - i, {
+          maxSupportedTransactionVersion: 0
+        })
       )
     );
     return blocks.filter((block): block is BlockResponse => block !== null);
