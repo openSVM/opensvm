@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Input } from '@/components/ui/input';
+import { X } from 'lucide-react';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -34,30 +35,47 @@ export function AIChatDialog({ isOpen, onClose, initialContext }: AIChatDialogPr
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="w-full max-w-2xl rounded-lg bg-black/90 p-6 shadow-xl">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-white">AI Assistant</h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-white text-2xl font-light leading-none"
-          >
-            ×
-          </button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#000000]">
+      <div className="w-full max-w-2xl bg-[#000000]">
+        <div className="flex h-[40px] bg-[#000000]">
+          <div className="flex items-center px-4 border-b border-[#FFFFFF] h-full">
+            <h2 className="text-base text-[#FFFFFF]">AGENT</h2>
+          </div>
+          <div className="flex items-center px-4 h-full">
+            <h2 className="text-base text-[#FFFFFF]">ASSISTANT</h2>
+          </div>
+          <div className="flex items-center px-4 h-full">
+            <h2 className="text-base text-[#FFFFFF]">NOTES</h2>
+          </div>
+          <div className="ml-auto flex items-center gap-4 px-4">
+            <button className="text-[#FFFFFF]">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M2 2L14 14M2 14L14 2" stroke="white" strokeWidth="1.5"/>
+              </svg>
+            </button>
+            <button className="text-[#FFFFFF]">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M8 2V14M2 8H14" stroke="white" strokeWidth="1.5"/>
+              </svg>
+            </button>
+            <button className="text-[#FFFFFF]">⋯</button>
+            <button
+              onClick={onClose}
+              className="text-[#FFFFFF]"
+            >
+              <X size={16} />
+            </button>
+          </div>
         </div>
 
-        <div className="h-[400px] overflow-y-auto mb-4 space-y-4">
+        <div className="h-[400px] overflow-y-auto py-4 space-y-4">
           {messages.map((message, index) => (
             <div
               key={index}
               className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
             >
               <div
-                className={`max-w-[80%] rounded-lg px-4 py-2 ${
-                  message.role === 'user'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-800 text-gray-100'
-                }`}
+                className={`px-4 py-3 mx-4 max-w-[80%] bg-[#000000] text-[#FFFFFF] border border-[#FFFFFF]`}
               >
                 {message.content}
               </div>
@@ -65,20 +83,27 @@ export function AIChatDialog({ isOpen, onClose, initialContext }: AIChatDialogPr
           ))}
         </div>
 
-        <form onSubmit={handleSubmit} className="flex gap-2">
-          <Input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Type your message..."
-            className="flex-1 bg-gray-800 border-gray-700 text-white placeholder:text-gray-400"
-          />
-          <button
-            type="submit"
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md"
-          >
-            Send
+        <div className="p-4 space-y-4">
+          <button className="w-full py-3 border border-[#FFFFFF] text-[#FFFFFF] text-sm">
+            + New Chat
           </button>
-        </form>
+          <div className="relative">
+            <Input
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Ask a question..."
+              className="w-full bg-[#000000] text-[#FFFFFF] px-4 py-3 border border-[#FFFFFF] focus:outline-none placeholder-[#FFFFFF]"
+            />
+            <button
+              type="submit"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-[#FFFFFF]"
+            >
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M14 2L2 14M14 2L2 2M14 2L14 14" stroke="white" strokeWidth="1.5"/>
+              </svg>
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

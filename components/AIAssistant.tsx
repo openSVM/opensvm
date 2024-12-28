@@ -50,29 +50,46 @@ export function AIAssistant() {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed bottom-4 right-4 w-[440px] h-[600px] bg-black rounded-lg shadow-lg flex flex-col">
-      <div className="flex items-center justify-between p-4 border-b border-gray-800">
-        <h2 className="text-xl font-semibold text-white">AI Assistant</h2>
-        <button
-          onClick={() => setIsOpen(false)}
-          className="text-gray-400 hover:text-white transition-colors"
-        >
-          <X size={24} />
-        </button>
+    <div className="fixed bottom-4 right-4 w-[440px] h-[600px] bg-[#000000] flex flex-col">
+      <div className="flex h-[40px] bg-[#000000]">
+        <div className="flex items-center px-4 border-b border-[#FFFFFF] h-full">
+          <h2 className="text-base text-[#FFFFFF]">AGENT</h2>
+        </div>
+        <div className="flex items-center px-4 h-full">
+          <h2 className="text-base text-[#FFFFFF]">ASSISTANT</h2>
+        </div>
+        <div className="flex items-center px-4 h-full">
+          <h2 className="text-base text-[#FFFFFF]">NOTES</h2>
+        </div>
+        <div className="ml-auto flex items-center gap-4 px-4">
+          <button className="text-[#FFFFFF]">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M2 2L14 14M2 14L14 2" stroke="white" strokeWidth="1.5"/>
+            </svg>
+          </button>
+          <button className="text-[#FFFFFF]">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M8 2V14M2 8H14" stroke="white" strokeWidth="1.5"/>
+            </svg>
+          </button>
+          <button className="text-[#FFFFFF]">⋯</button>
+          <button 
+            onClick={() => setIsOpen(false)}
+            className="text-[#FFFFFF]"
+          >
+            <X size={16} />
+          </button>
+        </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 overflow-y-auto py-4 space-y-4">
         {messages.map((message, i) => (
           <div
             key={i}
             className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
           >
             <div
-              className={`rounded-lg px-4 py-2 max-w-[80%] ${
-                message.role === 'user'
-                  ? 'bg-[#4169E1] text-white'
-                  : 'bg-[#1e2126] text-white'
-              }`}
+              className={`px-4 py-3 mx-4 max-w-[80%] bg-[#000000] text-[#FFFFFF] border border-[#FFFFFF]`}
             >
               {message.content}
             </div>
@@ -80,23 +97,28 @@ export function AIAssistant() {
         ))}
       </div>
 
-      <form onSubmit={handleSubmit} className="p-4 border-t border-gray-800">
+      <div className="p-4 space-y-4">
+        <button className="w-full py-3 border border-[#FFFFFF] text-[#FFFFFF] text-sm">
+          + New Chat
+        </button>
         <div className="relative">
           <input
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Type your message..."
-            className="w-full bg-[#1e2126] text-white rounded-lg pl-4 pr-20 py-3 focus:outline-none focus:ring-1 focus:ring-[#44ccff] border border-[#44ccff]/20"
+            placeholder="Ask a question..."
+            className="w-full bg-[#000000] text-[#FFFFFF] px-4 py-3 border border-[#FFFFFF] focus:outline-none placeholder-[#FFFFFF]"
           />
           <button
             type="submit"
-            className="absolute right-2 top-1/2 -translate-y-1/2 bg-[#4169E1] text-white px-4 py-1.5 rounded-lg hover:bg-[#4169E1]/90 transition-colors"
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-[#FFFFFF]"
           >
-            Send
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M14 2L2 14M14 2L2 2M14 2L14 14" stroke="white" strokeWidth="1.5"/>
+            </svg>
           </button>
         </div>
-      </form>
+      </div>
     </div>
   );
 } 
