@@ -597,7 +597,9 @@ export interface BlockDetails {
 
 export async function getBlockDetails(slot: number): Promise<BlockDetails | null> {
   try {
-    const block = await connection.getBlock(slot);
+    const block = await connection.getBlock(slot, {
+      maxSupportedTransactionVersion: 0
+    });
 
     if (!block) {
       return null;

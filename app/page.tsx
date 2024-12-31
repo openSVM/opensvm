@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { RecentBlocks } from '@/components/RecentBlocks';
-import { TransactionsInBlock } from '@/components/RecentTransactions';
+import { TransactionsInBlock } from '@/components/TransactionsInBlock';
 import { NetworkResponseChart } from '@/components/NetworkResponseChart';
 import { connection } from '@/lib/solana';
 import { SystemProgram } from '@solana/web3.js';
@@ -20,10 +20,20 @@ interface NetworkStats {
   successRate: number;
 }
 
+interface Block {
+  slot: number;
+  transactions?: {
+    signature: string;
+    type: string;
+    timestamp: number | null;
+  }[];
+}
+
 export default function HomePage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [stats, setStats] = useState<NetworkStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedBlock, setSelectedBlock] = useState<Block | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -160,11 +170,10 @@ export default function HomePage() {
           <div className="space-y-6">
             <div className="bg-white border border-gray-200 rounded-lg p-6">
               <h2 className="text-lg font-semibold mb-4">Recent Blocks</h2>
-              <RecentBlocks />
+              <RecentBlocks onBlockSelect={setSelectedBlock} />
             </div>
             <div className="bg-white border border-gray-200 rounded-lg p-6">
-              <h2 className="text-lg font-semibold mb-4">Recent Transactions</h2>
-              <TransactionsInBlock />
+              <TransactionsInBlock block={selectedBlock} />
             </div>
           </div>
         </div>
@@ -243,12 +252,10 @@ export default function HomePage() {
           {/* Main Content */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
-              <h2 className="text-lg font-semibold mb-4">Recent Blocks</h2>
-              <RecentBlocks />
+              <RecentBlocks onBlockSelect={setSelectedBlock} />
             </div>
             <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
-              <h2 className="text-lg font-semibold mb-4">Recent Transactions</h2>
-              <TransactionsInBlock />
+              <TransactionsInBlock block={selectedBlock} />
             </div>
           </div>
 
