@@ -435,10 +435,14 @@ export async function getMultipleTransactionDetails(signatures: string[]): Promi
         // Try to determine transaction type and extract transfer details
         if (tx.meta && tx.transaction.message.instructions.length > 0) {
           // Calculate total value transferred
-          tx.meta.postTokenBalances?.forEach((postBalance, index) => {
+          tx.meta.postTokenBalances?.forEach((postBalance: any, index: number) => {
             const preBalance = tx.meta?.preTokenBalances?.[index];
-            if (preBalance && postBalance.uiTokenAmount.uiAmount !== preBalance.uiTokenAmount.uiAmount) {
-              value += Math.abs((postBalance.uiTokenAmount.uiAmount || 0) - (preBalance.uiTokenAmount.uiAmount || 0));
+            if (preBalance && postBalance.uiTokenAmount && preBalance.uiTokenAmount) {
+              const postAmount = postBalance.uiTokenAmount.uiAmount || 0;
+              const preAmount = preBalance.uiTokenAmount.uiAmount || 0;
+              if (postAmount !== preAmount) {
+                value += Math.abs(postAmount - preAmount);
+              }
             }
           });
 
@@ -454,7 +458,7 @@ export async function getMultipleTransactionDetails(signatures: string[]): Promi
           }
 
           // Get all unique programs used
-          tx.transaction.message.instructions.forEach(ix => {
+          tx.transaction.message.instructions.forEach((ix: any) => {
             if ('program' in ix) {
               programs.add(ix.program);
             } else if ('programId' in ix) {
@@ -464,10 +468,10 @@ export async function getMultipleTransactionDetails(signatures: string[]): Promi
 
           // Determine primary type from first instruction
           const instruction = tx.transaction.message.instructions[0];
-          if ('program' in instruction) {
+          if ('program' in instruction && 'parsed' in instruction) {
             if (instruction.program === 'system') {
               type = 'System Transfer';
-              if (instruction.parsed.type === 'transfer') {
+              if (instruction.parsed.type === 'transfer' && 'info' in instruction.parsed) {
                 from = instruction.parsed.info.source;
                 to = instruction.parsed.info.destination;
               }
@@ -497,7 +501,7 @@ export async function getMultipleTransactionDetails(signatures: string[]): Promi
           computeUnits: tx.meta?.computeUnitsConsumed || 0,
           accounts: accountKeys.map(key => key.pubkey.toBase58()),
           programs: Array.from(programs),
-          instructions: tx.transaction.message.instructions.map(ix => ({
+          instructions: tx.transaction.message.instructions.map((ix: any) => ({
             programId: 'program' in ix ? ix.program : ix.programId.toString(),
             data: 'data' in ix ? ix.data : '',
           })),
