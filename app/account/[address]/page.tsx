@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { Card, CardHeader, CardContent, Text, Stack, Button } from 'rinlab';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
-import { getTokenAccounts, getTransactionHistory, unsubscribeFromTransactions, type TransactionInfo, type AccountData } from '@/lib/solana';
+import { getTokenAccounts, getTransactionHistory, unsubscribeFromTransactions, type TransactionInfo, type AccountData, type DetailedTransactionInfo } from '@/lib/solana';
 import AccountOverview from '@/components/AccountOverview';
 import Link from 'next/link';
 import { format } from 'date-fns';
@@ -30,7 +30,7 @@ export default function AccountPage() {
   const itemsPerPage = 50;
 
   // Handle new transactions from WebSocket
-  const handleNewTransaction = useCallback((newTx: TransactionInfo) => {
+  const handleNewTransaction = useCallback((newTx: DetailedTransactionInfo) => {
     setTransactions(prev => {
       const updated = [newTx, ...prev];
       return updated.slice(0, 100);

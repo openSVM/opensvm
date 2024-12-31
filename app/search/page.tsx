@@ -1,12 +1,16 @@
 // @ts-nocheck
 import { Suspense } from 'react';
 import { Card, CardHeader, CardContent } from 'rinlab';
+import { SearchParams } from 'next/navigation';
+
+type Props = {
+  searchParams: Promise<any>;
+  params: Promise<any>;
+};
 
 export default async function SearchPage({
   searchParams,
-}: {
-  searchParams: { q?: string }
-}) {
+}: Props) {
   const query = searchParams.q || '';
 
   return (
