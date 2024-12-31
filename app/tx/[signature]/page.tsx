@@ -14,7 +14,6 @@ export default function TransactionPage() {
   const [transaction, setTransaction] = useState<DetailedTransactionInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysis, setAnalysis] = useState('');
 
@@ -31,18 +30,6 @@ export default function TransactionPage() {
       });
   }, [signature]);
 
-  const handleSearch = () => {
-    if (searchQuery) {
-      router.push(`/tx/${searchQuery}`);
-    }
-  };
-
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handleSearch();
-    }
-  };
-
   const analyzeTransaction = async () => {
     if (!transaction) return;
     
@@ -57,7 +44,7 @@ export default function TransactionPage() {
           logs: transaction.logs,
           type: transaction.type,
           status: transaction.status,
-          amount: transaction.amount,
+          amount: transaction.value,
           from: transaction.from,
           to: transaction.to,
         }),
@@ -76,29 +63,8 @@ export default function TransactionPage() {
   };
 
   const PageWrapper = ({ children }: { children: React.ReactNode }) => (
-    <div className="min-h-screen bg-[#f8f9fa]">
-      <header className="bg-white border-b border-gray-200 mb-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex h-16 justify-between items-center">
-            <div className="flex items-center gap-8">
-              <Link href="/" className="text-[18px] font-semibold text-black hover:text-[#00ffbd]">
-                OPENSVM
-              </Link>
-              <div className="w-96">
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  placeholder="Search by transaction signature"
-                  className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#00ffbd] focus:border-transparent"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-      </header>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-background">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8">
         {children}
       </div>
     </div>
@@ -142,7 +108,7 @@ export default function TransactionPage() {
             <Text variant="heading">Transaction Details</Text>
             <Button
               variant="default"
-              className="bg-[#00ffbd] hover:bg-[#00e6aa] text-black flex items-center gap-2"
+              className="flex items-center gap-2"
               onClick={analyzeTransaction}
               disabled={isAnalyzing}
             >
@@ -158,21 +124,21 @@ export default function TransactionPage() {
         <CardContent>
           <Stack gap={6}>
             {analysis && (
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <Text variant="label" className="text-sm text-gray-500 mb-2">GPT Analysis</Text>
+              <div className="bg-muted p-4 rounded-lg">
+                <Text variant="label" className="text-sm text-muted-foreground mb-2">GPT Analysis</Text>
                 <Text variant="default">{analysis}</Text>
               </div>
             )}
 
             <div className="space-y-4">
               <div>
-                <Text variant="label" className="text-sm text-gray-500">Signature</Text>
+                <Text variant="label" className="text-sm text-muted-foreground">Signature</Text>
                 <Text variant="default" className="font-mono break-all">{transaction.signature}</Text>
               </div>
               
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Text variant="label" className="text-sm text-gray-500">Status</Text>
+                  <Text variant="label" className="text-sm text-muted-foreground">Status</Text>
                   <div className="flex items-center space-x-2">
                     <div className={`w-2 h-2 rounded-full ${transaction.status === 'success' ? 'bg-green-400' : 'bg-red-400'}`} />
                     <Text variant="default">{transaction.status}</Text>
@@ -180,44 +146,44 @@ export default function TransactionPage() {
                 </div>
                 
                 <div>
-                  <Text variant="label" className="text-sm text-gray-500">Block Time</Text>
+                  <Text variant="label" className="text-sm text-muted-foreground">Block Time</Text>
                   <Text variant="default">
-                    {transaction.blockTime ? format(transaction.blockTime, 'PPpp') : 'Pending'}
+                    {transaction.blockTime ? format(new Date(transaction.blockTime * 1000), 'MMM dd, yyyy HH:mm:ss') : 'Pending'}
                   </Text>
                 </div>
 
                 <div>
-                  <Text variant="label" className="text-sm text-gray-500">Slot</Text>
+                  <Text variant="label" className="text-sm text-muted-foreground">Slot</Text>
                   <Text variant="default">{transaction.slot.toLocaleString()}</Text>
                 </div>
 
                 <div>
-                  <Text variant="label" className="text-sm text-gray-500">Compute Units</Text>
+                  <Text variant="label" className="text-sm text-muted-foreground">Compute Units</Text>
                   <Text variant="default">{transaction.computeUnits.toLocaleString()}</Text>
                 </div>
               </div>
             </div>
 
             <div className="space-y-2">
-              <Text variant="label" className="text-sm text-gray-500">Transaction</Text>
-              <div className="bg-gray-50 p-4 rounded-lg space-y-2">
+              <Text variant="label" className="text-sm text-muted-foreground">Transaction</Text>
+              <div className="bg-muted p-4 rounded-lg space-y-2">
                 <div className="flex justify-between items-center">
                   <div>
-                    <Text variant="label" className="text-xs text-gray-500">From</Text>
+                    <Text variant="label" className="text-xs text-muted-foreground">From</Text>
                     <Text variant="default" className="font-mono">{transaction.from}</Text>
                   </div>
                   <div className="text-right">
-                    <Text variant="label" className="text-xs text-gray-500">To</Text>
+                    <Text variant="label" className="text-xs text-muted-foreground">To</Text>
                     <Text variant="default" className="font-mono">{transaction.to}</Text>
                   </div>
                 </div>
                 <div className="flex justify-between items-center">
                   <div>
-                    <Text variant="label" className="text-xs text-gray-500">Amount</Text>
-                    <Text variant="default">{transaction.amount.toFixed(9)} SOL</Text>
+                    <Text variant="label" className="text-xs text-muted-foreground">Amount</Text>
+                    <Text variant="default">{transaction.value.toFixed(9)} SOL</Text>
                   </div>
                   <div className="text-right">
-                    <Text variant="label" className="text-xs text-gray-500">Fee</Text>
+                    <Text variant="label" className="text-xs text-muted-foreground">Fee</Text>
                     <Text variant="default">{transaction.fee.toFixed(6)} SOL</Text>
                   </div>
                 </div>
@@ -225,19 +191,19 @@ export default function TransactionPage() {
             </div>
 
             <div className="space-y-2">
-              <Text variant="label" className="text-sm text-gray-500">Instructions</Text>
-              <div className="bg-gray-50 p-4 rounded-lg space-y-2">
+              <Text variant="label" className="text-sm text-muted-foreground">Instructions</Text>
+              <div className="bg-muted p-4 rounded-lg space-y-2">
                 {transaction.instructions
                   .filter((ix, index, self) => 
                     index === self.findIndex(t => t.programId === ix.programId && t.data === ix.data)
                   )
                   .map((ix, index) => (
                     <div key={index} className="space-y-1">
-                      <Text variant="label" className="text-xs text-gray-500">Program {index + 1}</Text>
+                      <Text variant="label" className="text-xs text-muted-foreground">Program {index + 1}</Text>
                       <Text variant="default" className="font-mono break-all">{ix.programId}</Text>
                       {ix.data && (
                         <>
-                          <Text variant="label" className="text-xs text-gray-500 mt-2">Data</Text>
+                          <Text variant="label" className="text-xs text-muted-foreground mt-2">Data</Text>
                           <Text variant="default" className="font-mono break-all text-xs">{ix.data}</Text>
                         </>
                       )}
@@ -247,8 +213,8 @@ export default function TransactionPage() {
             </div>
 
             <div className="space-y-2">
-              <Text variant="label" className="text-sm text-gray-500">Logs</Text>
-              <div className="bg-gray-50 p-4 rounded-lg">
+              <Text variant="label" className="text-sm text-muted-foreground">Logs</Text>
+              <div className="bg-muted p-4 rounded-lg">
                 <pre className="text-xs font-mono whitespace-pre-wrap">
                   {transaction.logs.join('\n')}
                 </pre>
