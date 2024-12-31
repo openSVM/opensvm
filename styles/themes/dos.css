@@ -1,0 +1,109 @@
+.theme-dos {
+  /* Typography */
+  font-family: "Berkeley Mono", "DOS", "Courier New", monospace;
+  --font-mono: "Berkeley Mono", "DOS", "Courier New", monospace;
+  font-weight: normal;
+  
+  /* Custom Properties */
+  --terminal-glow: none;
+  --scanline: rgba(255, 255, 255, 0.03);
+  
+  /* Borders and Effects */
+  --border-style: solid;
+  --border-width: 2px;
+  
+  /* UI Elements - using theme variables */
+  --card-shadow: none;
+}
+
+/* Search input styles for DOS theme */
+.theme-dos input[type="text"] {
+  padding-left: 3rem !important;
+}
+
+/* Custom scrollbar for DOS theme */
+.theme-dos *::-webkit-scrollbar {
+  width: 16px;
+  height: 16px;
+}
+
+.theme-dos *::-webkit-scrollbar-track {
+  background: hsl(var(--background));
+  border: 1px solid hsl(var(--border));
+}
+
+.theme-dos *::-webkit-scrollbar-thumb {
+  background: hsl(var(--foreground));
+  border: 1px solid hsl(var(--border));
+}
+
+/* Button styles */
+.theme-dos button {
+  border: var(--border-width) var(--border-style) hsl(var(--border));
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  text-transform: uppercase;
+  padding: 0.5em 1em;
+  transition: none;
+}
+
+.theme-dos button:hover {
+  background: hsl(var(--foreground));
+  color: hsl(var(--background));
+}
+
+/* Card styles */
+.theme-dos .card {
+  background: hsl(var(--card));
+  border: var(--border-width) var(--border-style) hsl(var(--border));
+  box-shadow: none;
+  padding: 1rem;
+}
+
+/* Table styles */
+.theme-dos table th {
+  background: hsl(var(--foreground));
+  color: hsl(var(--background));
+  text-transform: uppercase;
+  font-weight: normal;
+}
+
+.theme-dos table tr:hover {
+  background: color-mix(in srgb, hsl(var(--foreground)) 10%, transparent);
+}
+
+/* Text effects */
+.theme-dos h1, .theme-dos h2, .theme-dos h3 {
+  text-transform: uppercase;
+  color: hsl(var(--foreground));
+  font-weight: normal;
+}
+
+/* Links */
+.theme-dos a {
+  color: hsl(var(--primary));
+  text-decoration: none;
+  transition: none;
+}
+
+.theme-dos a:hover {
+  color: hsl(var(--foreground));
+}
+
+/* Input fields */
+.theme-dos input {
+  background: hsl(var(--input));
+  color: hsl(var(--foreground));
+  border: var(--border-width) var(--border-style) hsl(var(--border));
+  padding: 0.5em;
+}
+
+/* Search box specific styles */
+.theme-dos input[type="search"] {
+  background: hsl(var(--input));
+  color: hsl(var(--foreground));
+  border: var(--border-width) var(--border-style) hsl(var(--border));
+  width: 100%;
+  padding: 0.5em;
+  font-family: var(--font-mono);
+} 

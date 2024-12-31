@@ -22,10 +22,10 @@ export function TransactionsInBlock({ block }: Props) {
   if (!block || !block.transactions) {
     return (
       <div>
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">
+        <h2 className="text-xl font-semibold text-foreground mb-4">
           Transactions in Block
         </h2>
-        <div className="text-gray-500 text-center py-8">
+        <div className="text-muted-foreground text-center py-8">
           Select a block to view its transactions
         </div>
       </div>
@@ -35,12 +35,12 @@ export function TransactionsInBlock({ block }: Props) {
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-semibold text-gray-900">
+        <h2 className="text-xl font-semibold text-foreground">
           Transactions in Block
         </h2>
         <Link
           href={`/block/${block.slot}`}
-          className="text-sm text-gray-500 hover:text-gray-700"
+          className="text-sm text-muted-foreground hover:text-foreground"
         >
           View Block Details →
         </Link>
@@ -50,17 +50,17 @@ export function TransactionsInBlock({ block }: Props) {
           <Link
             key={tx.signature}
             href={`/tx/${tx.signature}`}
-            className="flex items-center justify-between p-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+            className="flex items-center justify-between p-3 rounded-lg border border-border hover:bg-accent/10 transition-colors"
           >
             <div className="flex flex-col">
-              <div className="text-sm font-mono text-gray-900 truncate max-w-[200px]">
+              <div className="text-sm font-mono text-foreground truncate max-w-[200px]">
                 {tx.signature}
               </div>
-              <div className="text-xs text-gray-500">
+              <div className="text-xs text-muted-foreground">
                 {tx.type}
               </div>
             </div>
-            <div className="text-xs text-gray-500">
+            <div className="text-xs text-muted-foreground">
               {tx.timestamp ? new Date(tx.timestamp * 1000).toLocaleString() : 'Pending'}
             </div>
           </Link>

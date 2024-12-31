@@ -1,5 +1,5 @@
 import { ImageResponse } from 'next/og';
-import { connection } from '@/lib/solana';
+import { getConnection } from '@/lib/solana';
 import { formatNumber } from '@/lib/utils';
 
 export const runtime = 'edge';
@@ -12,10 +12,11 @@ export const contentType = 'image/png';
 
 export default async function Image({ params }: { params: { slot: string } }) {
   try {
+    const conn = await getConnection();
     const slotNumber = parseInt(params.slot);
     const [block, blockTime] = await Promise.all([
-      connection.getBlock(slotNumber, { maxSupportedTransactionVersion: 0 }),
-      connection.getBlockTime(slotNumber),
+      conn.getBlock(slotNumber, { maxSupportedTransactionVersion: 0 }),
+      conn.getBlockTime(slotNumber),
     ]);
 
     if (!block) {

@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
-import { connection } from '@/lib/solana';
+import { getConnection } from '@/lib/solana';
 
-export async function GET(request: Request) {
+export async function GET(request: Request, { params }: { params: { slot: string } }) {
   try {
+    const conn = await getConnection();
     const slot = request.url.split('/').pop();
     if (!slot) {
       return NextResponse.json(
@@ -20,8 +21,8 @@ export async function GET(request: Request) {
     }
 
     const [block, blockTime] = await Promise.all([
-      connection.getBlock(slotNumber, { maxSupportedTransactionVersion: 0 }),
-      connection.getBlockTime(slotNumber),
+      conn.getBlock(slotNumber, { maxSupportedTransactionVersion: 0 }),
+      conn.getBlockTime(slotNumber),
     ]);
 
     if (!block) {

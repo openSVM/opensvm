@@ -1,15 +1,213 @@
 import { Connection, PublicKey, clusterApiUrl, ParsedTransactionWithMeta, BlockResponse, GetProgramAccountsFilter, SystemProgram, MessageAccountKeys } from '@solana/web3.js';
 import { TOKEN_PROGRAM_ID, getMint } from '@solana/spl-token';
 
-// Initialize connection to Chainstack RPC
-export const connection = new Connection('https://solana-mainnet.core.chainstack.com/263c9f53f4e4cdb897c0edc4a64cd007', {
-  commitment: 'confirmed',
-  wsEndpoint: 'wss://solana-mainnet.core.chainstack.com/263c9f53f4e4cdb897c0edc4a64cd007',
-});
+const RPC_ENDPOINTS = [
+  'https://solana-mainnet.core.chainstack.com/263c9f53f4e4cdb897c0edc4a64cd007',
+  'https://api.mainnet-beta.solana.com',
+  'https://solana-api.projectserum.com',
+];
+
+// Cache the validated connection
+let cachedConnection: Connection | null = null;
+
+async function validateConnection(endpoint: string): Promise<boolean> {
+  try {
+    const testConnection = new Connection(endpoint, {
+      commitment: 'confirmed',
+      wsEndpoint: endpoint.startsWith('https') ? endpoint.replace('https', 'wss') : undefined,
+    });
+    
+    // Test the connection with a light RPC call
+    await testConnection.getLatestBlockhash();
+    return true;
+  } catch (error) {
+    console.warn(`Endpoint ${endpoint} failed health check:`, error);
+    return false;
+  }
+}
+
+async function createConnection(): Promise<Connection> {
+  // Return cached connection if available
+  if (cachedConnection) {
+    try {
+      await cachedConnection.getLatestBlockhash();
+      return cachedConnection;
+    } catch (error) {
+      console.warn('Cached connection failed, refreshing...');
+      cachedConnection = null;
+    }
+  }
+
+  // Try each endpoint until we find a working one
+  for (const endpoint of RPC_ENDPOINTS) {
+    const isValid = await validateConnection(endpoint);
+    if (isValid) {
+      cachedConnection = new Connection(endpoint, {
+        commitment: 'confirmed',
+        wsEndpoint: endpoint.startsWith('https') ? endpoint.replace('https', 'wss') : undefined,
+      });
+      return cachedConnection;
+    }
+  }
+
+  // If all endpoints fail, use fallback public RPC
+  console.error('All RPC endpoints failed, using fallback public RPC');
+  const fallbackEndpoint = clusterApiUrl('mainnet-beta');
+  cachedConnection = new Connection(fallbackEndpoint, { commitment: 'confirmed' });
+  return cachedConnection;
+}
+
+// Initialize connection to RPC - now returns a Promise
+export const initializeConnection = createConnection();
+
+// Export a function to get the current connection or create a new one if needed
+export async function getConnection(): Promise<Connection> {
+  return cachedConnection || createConnection();
+}
+
+// Cache for network stats
+interface NetworkStatsCache {
+  epoch: number;
+  epochProgress: number;
+  blockHeight: number;
+  activeValidators: number | null;
+  tps: number;
+  successRate: number;
+  lastUpdate: number;
+}
+
+let networkStatsCache: NetworkStatsCache | null = null;
+let slotSubscription: number | null = null;
+const VALIDATOR_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+let lastValidatorUpdate = 0;
+let validatorCount: number | null = null;
+
+// Add subscription management
+const networkStatsSubscribers = new Set<(stats: NetworkStatsCache) => void>();
+let networkStatsSubscriptionId: number | null = null;
+
+// Initialize WebSocket subscriptions for network stats
+export async function initializeNetworkStatsSubscription(onUpdate?: (stats: NetworkStatsCache) => void) {
+  if (!onUpdate) return () => {};
+
+  // Add new subscriber
+  networkStatsSubscribers.add(onUpdate);
+
+  // Only create WebSocket connection if it doesn't exist
+  if (!networkStatsSubscriptionId) {
+    try {
+      const connection = await getConnection();
+      networkStatsSubscriptionId = connection.onSlotChange(async (slotInfo) => {
+        try {
+          const now = Date.now();
+          const connection = await getConnection();
+          const epochInfo = await connection.getEpochInfo().catch(() => null);
+          
+          if (!epochInfo) {
+            console.warn('Failed to fetch epoch info');
+            return;
+          }
+
+          // Only fetch validator count if cache expired
+          if (!validatorCount || now - lastValidatorUpdate > VALIDATOR_CACHE_TTL) {
+            try {
+              const validators = await connection.getVoteAccounts();
+              validatorCount = validators.current.length + validators.delinquent.length;
+              lastValidatorUpdate = now;
+            } catch (error) {
+              console.warn('Failed to fetch validator count');
+            }
+          }
+
+          // Get performance samples for TPS calculation
+          const perfSamples = await connection.getRecentPerformanceSamples(1).catch(() => []);
+          const recentSample = perfSamples[0];
+          const tps = recentSample ? Math.round(recentSample.numTransactions / recentSample.samplePeriodSecs) : 0;
+
+          // Calculate success rate from recent transactions
+          let successRate = 100;
+          try {
+            const signatures = await connection.getSignaturesForAddress(
+              SystemProgram.programId,
+              { limit: 100 }
+            );
+            if (signatures.length > 0) {
+              successRate = (signatures.filter(sig => !sig.err).length / signatures.length) * 100;
+            }
+          } catch (error) {
+            console.warn('Failed to fetch transaction success rate');
+          }
+
+          networkStatsCache = {
+            epoch: epochInfo.epoch,
+            epochProgress: (epochInfo.slotIndex / epochInfo.slotsInEpoch) * 100,
+            blockHeight: epochInfo.absoluteSlot,
+            activeValidators: validatorCount,
+            tps,
+            successRate,
+            lastUpdate: now
+          };
+
+          // Notify all subscribers
+          networkStatsSubscribers.forEach(subscriber => {
+            try {
+              subscriber(networkStatsCache);
+            } catch (error) {
+              console.error('Error in network stats subscriber:', error);
+            }
+          });
+        } catch (error) {
+          console.error('Error updating network stats:', error);
+        }
+      });
+    } catch (error) {
+      console.error('Failed to initialize slot subscription:', error);
+    }
+  }
+
+  // Return cleanup function
+  return async () => {
+    networkStatsSubscribers.delete(onUpdate);
+
+    // If no more subscribers, remove the WebSocket subscription
+    if (networkStatsSubscribers.size === 0 && networkStatsSubscriptionId !== null) {
+      const connection = await getConnection();
+      connection.removeSlotChangeListener(networkStatsSubscriptionId);
+      networkStatsSubscriptionId = null;
+    }
+  };
+}
+
+// Get network stats with caching
+export async function getNetworkStats(): Promise<NetworkStatsCache | null> {
+  if (!networkStatsCache) {
+    try {
+      const connection = await getConnection();
+      const epochInfo = await connection.getEpochInfo();
+      const validators = await connection.getVoteAccounts();
+      const perfSamples = await connection.getRecentPerformanceSamples(1);
+      
+      networkStatsCache = {
+        epoch: epochInfo.epoch,
+        epochProgress: (epochInfo.slotIndex / epochInfo.slotsInEpoch) * 100,
+        blockHeight: epochInfo.absoluteSlot,
+        activeValidators: validators.current.length + validators.delinquent.length,
+        tps: perfSamples[0] ? Math.round(perfSamples[0].numTransactions / perfSamples[0].samplePeriodSecs) : 0,
+        successRate: 100,
+        lastUpdate: Date.now()
+      };
+    } catch (error) {
+      console.error('Error fetching initial network stats:', error);
+      return null;
+    }
+  }
+  return networkStatsCache;
+}
 
 // Fetch recent blocks
 export async function getRecentBlocks(limit: number = 10): Promise<BlockResponse[]> {
   try {
+    const connection = await getConnection();
     const slot = await connection.getSlot();
     const blocks = await Promise.all(
       Array.from({ length: limit }, (_, i) => 
@@ -28,6 +226,7 @@ export async function getRecentBlocks(limit: number = 10): Promise<BlockResponse
 // Fetch top programs by transaction count
 export async function getTopPrograms(limit: number = 10): Promise<{ address: string; txCount: number }[]> {
   try {
+    const connection = await getConnection();
     const slot = await connection.getSlot();
     const blocks = await Promise.all(
       Array.from({ length: 100 }, (_, i) => 
@@ -45,6 +244,7 @@ export async function getTopPrograms(limit: number = 10): Promise<{ address: str
           tx.meta.logMessages
             .filter(log => log.includes('Program ') && log.includes(' invoke [1]'))
             .map(log => log.split(' ')[1])
+            .filter((id): id is string => typeof id === 'string') // Type guard for string
         );
         programIds.forEach(programId => {
           programCounts.set(programId, (programCounts.get(programId) || 0) + 1);
@@ -111,33 +311,11 @@ export async function getTrendingTokens(limit: number = 10): Promise<{
   }
 }
 
-// Fetch network stats
-export async function getNetworkStats() {
-  try {
-    const [slot, blockTime, supply, epochInfo] = await Promise.all([
-      connection.getSlot(),
-      connection.getBlockTime(await connection.getSlot()),
-      connection.getSupply(),
-      connection.getEpochInfo(),
-    ]);
-
-    return {
-      currentSlot: slot,
-      blockTime,
-      totalSupply: supply.value.total,
-      epochProgress: (epochInfo.slotIndex / epochInfo.slotsInEpoch) * 100,
-      currentEpoch: epochInfo.epoch,
-    };
-  } catch (error) {
-    console.error('Error fetching network stats:', error);
-    return null;
-  }
-}
-
 // Get RPC latency
 export async function getRPCLatency(): Promise<number> {
   const start = performance.now();
   try {
+    const connection = await getConnection();
     await connection.getLatestBlockhash();
     return Math.round(performance.now() - start);
   } catch (error) {
@@ -174,9 +352,10 @@ export async function getAccountInfo(
 // Batch fetch account info for multiple addresses
 export async function getMultipleAccounts(addresses: string[]) {
   try {
+    const connection = await getConnection();
     const now = Date.now();
-    const result = new Map();
-    const addressesToFetch = [];
+    const result = new Map<string, any>();
+    const addressesToFetch: string[] = [];
 
     // Check cache first
     for (const address of addresses) {
@@ -233,9 +412,10 @@ export async function getMultipleAccounts(addresses: string[]) {
 }
 
 // Cleanup function to remove account subscriptions
-export function unsubscribeFromAccount(address: string) {
+export async function unsubscribeFromAccount(address: string) {
   const cached = accountInfoCache.get(address);
   if (cached?.subscription) {
+    const connection = await getConnection();
     connection.removeAccountChangeListener(cached.subscription);
     const { subscription, ...rest } = cached;
     accountInfoCache.set(address, rest);
@@ -283,6 +463,7 @@ export async function getTransactionHistory(
   onUpdate?: (transaction: DetailedTransactionInfo) => void
 ): Promise<DetailedTransactionInfo[]> {
   try {
+    const connection = await getConnection();
     const publicKey = new PublicKey(address);
     const { limit = 50, before, until, type = 'all' } = options;
     const now = Date.now();
@@ -343,9 +524,10 @@ export async function getTransactionHistory(
 }
 
 // Cleanup function to remove subscriptions
-export function unsubscribeFromTransactions(address: string) {
+export async function unsubscribeFromTransactions(address: string) {
   const subId = activeSubscriptions.get(address);
   if (subId !== undefined) {
+    const connection = await getConnection();
     connection.removeOnLogsListener(subId);
     activeSubscriptions.delete(address);
   }
@@ -386,11 +568,13 @@ export interface DetailedTransactionInfo {
 }
 
 export async function getTransactionDetails(signature: string): Promise<DetailedTransactionInfo | null> {
-  return (await getMultipleTransactionDetails([signature]))[0] || null;
+  const results = await getMultipleTransactionDetails([signature]);
+  return results[0] || null;
 }
 
 export async function getMultipleTransactionDetails(signatures: string[]): Promise<(DetailedTransactionInfo | null)[]> {
   try {
+    const connection = await getConnection();
     const now = Date.now();
     const result: (DetailedTransactionInfo | null)[] = [];
     const sigsToFetch: string[] = [];
@@ -424,29 +608,28 @@ export async function getMultipleTransactionDetails(signatures: string[]): Promi
         const signature = batch[index];
         const resultIndex = signatures.indexOf(signature);
 
-        // Extract from and to addresses from the first transfer instruction
+        // Extract transaction data with proper type safety
         const accountKeys = tx.transaction.message.accountKeys;
-        let from = accountKeys[0].pubkey.toBase58();
-        let to = from;
+        let fromAddress = accountKeys[0].pubkey.toBase58();
+        let toAddress = fromAddress;
         let value = 0;
         let type = 'Unknown';
         const programs = new Set<string>();
 
-        // Try to determine transaction type and extract transfer details
         if (tx.meta && tx.transaction.message.instructions.length > 0) {
-          // Calculate total value transferred
+          // Process token balances
           tx.meta.postTokenBalances?.forEach((postBalance: any, index: number) => {
             const preBalance = tx.meta?.preTokenBalances?.[index];
             if (preBalance && postBalance.uiTokenAmount && preBalance.uiTokenAmount) {
-              const postAmount = postBalance.uiTokenAmount.uiAmount || 0;
-              const preAmount = preBalance.uiTokenAmount.uiAmount || 0;
+              const postAmount = Number(postBalance.uiTokenAmount.uiAmount || 0);
+              const preAmount = Number(preBalance.uiTokenAmount.uiAmount || 0);
               if (postAmount !== preAmount) {
                 value += Math.abs(postAmount - preAmount);
               }
             }
           });
 
-          // If no token transfers, check for SOL transfers
+          // Check for SOL transfers if no token transfers found
           if (value === 0 && tx.meta.preBalances && tx.meta.postBalances) {
             for (let i = 0; i < tx.meta.preBalances.length; i++) {
               const diff = (tx.meta.postBalances[i] - tx.meta.preBalances[i]) / 1e9;
@@ -459,21 +642,22 @@ export async function getMultipleTransactionDetails(signatures: string[]): Promi
 
           // Get all unique programs used
           tx.transaction.message.instructions.forEach((ix: any) => {
-            if ('program' in ix) {
+            if ('program' in ix && typeof ix.program === 'string') {
               programs.add(ix.program);
             } else if ('programId' in ix) {
               programs.add(ix.programId.toString());
             }
           });
 
-          // Determine primary type from first instruction
+          // Determine transaction type from first instruction
           const instruction = tx.transaction.message.instructions[0];
           if ('program' in instruction && 'parsed' in instruction) {
             if (instruction.program === 'system') {
               type = 'System Transfer';
               if (instruction.parsed.type === 'transfer' && 'info' in instruction.parsed) {
-                from = instruction.parsed.info.source;
-                to = instruction.parsed.info.destination;
+                const info = instruction.parsed.info as { source: string; destination: string };
+                fromAddress = info.source;
+                toAddress = info.destination;
               }
             } else if (instruction.program === 'spl-token') {
               type = 'Token Transfer';
@@ -494,8 +678,8 @@ export async function getMultipleTransactionDetails(signatures: string[]): Promi
           blockTime: tx.blockTime,
           status: tx.meta?.err ? 'error' : 'success',
           fee: (tx.meta?.fee || 0) / 1e9,
-          from,
-          to,
+          from: fromAddress,
+          to: toAddress,
           value,
           type,
           computeUnits: tx.meta?.computeUnitsConsumed || 0,
@@ -528,6 +712,7 @@ export async function getMultipleTransactionDetails(signatures: string[]): Promi
 // Get token info
 export async function getTokenInfo(mintAddress: string) {
   try {
+    const connection = await getConnection();
     const mintPublicKey = new PublicKey(mintAddress);
     const [mint, tokenAccounts, priceData] = await Promise.all([
       getMint(connection, mintPublicKey),
@@ -597,6 +782,7 @@ export interface BlockDetails {
 
 export async function getBlockDetails(slot: number): Promise<BlockDetails | null> {
   try {
+    const connection = await getConnection();
     const block = await connection.getBlock(slot, {
       maxSupportedTransactionVersion: 0
     });
@@ -664,6 +850,7 @@ const CACHE_DURATION = 30 * 1000; // 30 seconds cache
 
 export async function getTokenAccounts(address: string): Promise<AccountData> {
   try {
+    const connection = await getConnection();
     const publicKey = new PublicKey(address);
     const now = Date.now();
     
@@ -864,8 +1051,24 @@ interface MintInfo {
   decimals: number;
 }
 
-async function getMintInfo(mintAddress: string): Promise<MintInfo | null> {
+// Add type for token metadata
+interface TokenMetadata {
+  symbol: string;
+  decimals: number;
+  name?: string;
+}
+
+// Add type for token price data
+interface TokenPriceData {
+  priceUsd: number | null;
+  priceChange24h: number | null;
+  volume24h: number | null;
+}
+
+// Update the functions with proper type annotations
+async function getMintInfo(mintAddress: string): Promise<TokenMetadata | null> {
   try {
+    const connection = await getConnection();
     const mintPublicKey = new PublicKey(mintAddress);
     const metadataAddress = await getMetadataAddress(mintPublicKey);
     
@@ -874,19 +1077,28 @@ async function getMintInfo(mintAddress: string): Promise<MintInfo | null> {
     const mintAccountInfo = accounts.get(mintAddress);
     const metadataAccountInfo = accounts.get(metadataAddress.toBase58());
 
-    if (!mintAccountInfo?.data || !('parsed' in mintAccountInfo.data)) {
+    if (!mintAccountInfo?.data) {
       return null;
     }
 
-    const { decimals } = mintAccountInfo.data.parsed.info;
+    // Ensure data is a Buffer
+    const mintData = Buffer.isBuffer(mintAccountInfo.data) ? 
+      mintAccountInfo.data : 
+      Buffer.from(mintAccountInfo.data as any, 'base64');
+
+    const decimals = mintData[44]; // Decimals is at offset 44 in mint account data
 
     // Try to get metadata if it exists
     if (metadataAccountInfo?.data) {
       try {
-        const metadata = decodeMetadata(metadataAccountInfo.data);
+        const metadata = decodeMetadata(
+          Buffer.isBuffer(metadataAccountInfo.data) ? 
+            metadataAccountInfo.data : 
+            Buffer.from(metadataAccountInfo.data as any, 'base64')
+        );
         return {
-          symbol: metadata.data.symbol || undefined,
-          name: metadata.data.name || undefined,
+          symbol: metadata.data.symbol || 'Unknown',
+          name: metadata.data.name,
           decimals
         };
       } catch (error) {
@@ -896,6 +1108,7 @@ async function getMintInfo(mintAddress: string): Promise<MintInfo | null> {
 
     // Return basic info if metadata is not available
     return { 
+      symbol: `Token-${mintAddress.slice(0, 4)}`,
       decimals,
       name: `SPL Token (${mintAddress.slice(0, 4)}...${mintAddress.slice(-4)})`
     };
@@ -1034,99 +1247,13 @@ function decodeMetadata(buffer: Buffer): Metadata {
   }
 }
 
-// Cache for token prices with 5 minute expiry
-const tokenPriceCache = new Map<string, {
-  data: {
-    priceUsd: number | null;
-    priceChange24h: number | null;
-    volume24h: number | null;
-  };
-  timestamp: number;
-}>();
-
-const PRICE_CACHE_EXPIRY = 5 * 60 * 1000; // 5 minutes
-
-// Batch fetch token prices
-export async function batchGetTokenPrices(tokenAddresses: string[]): Promise<Map<string, {
-  priceUsd: number | null;
-  priceChange24h: number | null;
-  volume24h: number | null;
-}>> {
-  const now = Date.now();
-  const result = new Map();
-  const addressesToFetch = [];
-
-  // Check cache first
-  for (const address of tokenAddresses) {
-    const cached = tokenPriceCache.get(address);
-    if (cached && (now - cached.timestamp) < PRICE_CACHE_EXPIRY) {
-      result.set(address, cached.data);
-    } else {
-      addressesToFetch.push(address);
-    }
-  }
-
-  if (addressesToFetch.length === 0) {
-    return result;
-  }
-
-  // Batch fetch prices for uncached tokens
-  try {
-    const responses = await Promise.all(
-      addressesToFetch.map(address =>
-        fetch(`https://api.dexscreener.com/latest/dex/tokens/${address}`)
-          .then(res => res.json())
-          .catch(() => null)
-      )
-    );
-
-    responses.forEach((data, index) => {
-      const address = addressesToFetch[index];
-      let priceData = {
-        priceUsd: null,
-        priceChange24h: null,
-        volume24h: null,
-      };
-
-      if (data?.pairs && data.pairs.length > 0) {
-        const mostLiquidPair = data.pairs.reduce((prev: any, current: any) => {
-          return (prev.liquidity?.usd || 0) > (current.liquidity?.usd || 0) ? prev : current;
-        });
-
-        priceData = {
-          priceUsd: mostLiquidPair.priceUsd ? parseFloat(mostLiquidPair.priceUsd) : null,
-          priceChange24h: mostLiquidPair.priceChange?.h24 ? parseFloat(mostLiquidPair.priceChange.h24) : null,
-          volume24h: mostLiquidPair.volume?.h24 || null,
-        };
-      }
-
-      // Update cache
-      tokenPriceCache.set(address, {
-        data: priceData,
-        timestamp: now
-      });
-      
-      result.set(address, priceData);
-    });
-
-    return result;
-  } catch (error) {
-    console.error('Error batch fetching token prices:', error);
-    return result;
-  }
-}
-
-// Fetch token price from DexScreener
-export async function getTokenPrice(tokenAddress: string): Promise<{
-  priceUsd: number | null;
-  priceChange24h: number | null;
-  volume24h: number | null;
-}> {
+// Update getTokenPrice with proper type annotations
+export async function getTokenPrice(tokenAddress: string): Promise<TokenPriceData> {
   try {
     const response = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${tokenAddress}`);
-    const data = await response.json();
+    const data = await response.json() as any;
 
-    if (data.pairs && data.pairs.length > 0) {
+    if (data.pairs && Array.isArray(data.pairs) && data.pairs.length > 0) {
       // Get the most liquid pair
       const mostLiquidPair = data.pairs.reduce((prev: any, current: any) => {
         return (prev.liquidity?.usd || 0) > (current.liquidity?.usd || 0) ? prev : current;
@@ -1152,4 +1279,14 @@ export async function getTokenPrice(tokenAddress: string): Promise<{
       volume24h: null,
     };
   }
-} 
+}
+
+// Export the connection getter for direct access
+export const connection = {
+  get current() {
+    if (!cachedConnection) {
+      throw new Error('Connection not initialized. Call getConnection() first.');
+    }
+    return cachedConnection;
+  }
+}; 

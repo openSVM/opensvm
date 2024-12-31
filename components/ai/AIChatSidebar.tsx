@@ -1,7 +1,9 @@
 'use client';
 
+import { useEffect, useRef, useState, useCallback, memo } from 'react';
+import { X } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { Chat } from './Chat';
-import { useState, useCallback, memo } from 'react';
 import { useAIChatTabs } from '@/lib/ai/hooks/useAIChatTabs';
 import { createSolanaAgent } from '@/lib/ai/core/factory';
 import { Connection } from '@solana/web3.js';
@@ -12,13 +14,13 @@ const connection = new Connection(
   process.env.NEXT_PUBLIC_RPC_URL || 'https://api.mainnet-beta.solana.com'
 );
 
-interface AIChatSidebarProps {
+interface Props {
   isOpen: boolean;
   onClose: () => void;
-  onWidthChange?: (width: number) => void;
-  onResizeStart?: () => void;
-  onResizeEnd?: () => void;
-  initialWidth?: number;
+  onWidthChange: (width: number) => void;
+  onResizeStart: () => void;
+  onResizeEnd: () => void;
+  initialWidth: number;
 }
 
 export const AIChatSidebar = memo(function AIChatSidebar({ 
@@ -28,9 +30,12 @@ export const AIChatSidebar = memo(function AIChatSidebar({
   onResizeStart,
   onResizeEnd,
   initialWidth = 400 
-}: AIChatSidebarProps) {
-  const [width, setWidth] = useState(initialWidth);
+}: Props) {
+  const sidebarRef = useRef<HTMLDivElement>(null);
+  const [isResizing, setIsResizing] = useState(false);
+  const [sidebarWidth, setSidebarWidth] = useState(initialWidth);
   const agent = createSolanaAgent(connection);
+  
   const {
     activeTab,
     setActiveTab,
@@ -49,8 +54,8 @@ export const AIChatSidebar = memo(function AIChatSidebar({
   } = useAIChatTabs({ agent });
 
   const handleWidthChange = useCallback((newWidth: number) => {
-    setWidth(newWidth);
-    onWidthChange?.(newWidth);
+    setSidebarWidth(newWidth);
+    onWidthChange(newWidth);
   }, [onWidthChange]);
 
   const handleReset = useCallback(() => {
@@ -186,10 +191,34 @@ To get started, just ask me anything about Solana blockchain data or PumpFun tra
     setAgentMessages(prev => [...prev, helpMessage]);
   }, [setAgentMessages]);
 
-  const handleExpand = useCallback(() => {
-    // Toggle between sidebar and full-screen mode
-    console.log('Toggle expand');
-  }, []);
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isResizing) return;
+      
+      const newWidth = window.innerWidth - e.clientX;
+      if (newWidth > 300 && newWidth < 800) {
+        setSidebarWidth(newWidth);
+        onWidthChange(newWidth);
+      }
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+      onResizeEnd();
+    };
+
+    if (isResizing) {
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+    }
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isResizing, onWidthChange, onResizeEnd]);
+
+  if (!isOpen) return null;
 
   return (
     <Chat 
@@ -216,7 +245,6 @@ To get started, just ask me anything about Solana blockchain data or PumpFun tra
       onShare={handleShare}
       onSettings={handleSettings}
       onHelp={handleHelp}
-      onExpand={handleExpand}
       className="transition-transform duration-200"
     />
   );
