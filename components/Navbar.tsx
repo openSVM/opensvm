@@ -41,7 +41,7 @@ export function Navbar({ children }: NavbarProps) {
           <div className="max-w-7xl mx-auto">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Link href="/" className="text-xl font-bold flex items-center">
+                <Link href="/" className="text-xl font-bold flex items-center text-black">
                   OPENSVM
                   <button
                     onClick={() => setIsAIChatOpen(true)}

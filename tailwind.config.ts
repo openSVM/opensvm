@@ -15,6 +15,10 @@ const config: Config = {
       },
     },
     extend: {
+      fontFamily: {
+        sans: ['Berkeley Mono', 'monospace'],
+        mono: ['Berkeley Mono', 'monospace'],
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",

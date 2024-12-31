@@ -1,13 +1,15 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { getTrendingTokens } from '@/lib/solana';
+import { getTrendingTokens, getTokenPrice, getTokenInfo } from '@/lib/solana';
 
 interface Token {
   address: string;
   volume24h: number;
   price: number;
+  priceUsd: number | null;
   change24h: number;
+  decimals: number;
 }
 
 export function TrendingTokens() {
@@ -18,7 +20,22 @@ export function TrendingTokens() {
     async function fetchTokens() {
       try {
         const fetchedTokens = await getTrendingTokens(10);
-        setTokens(fetchedTokens);
+        // Fetch USD prices for each token
+        const tokensWithPrices = await Promise.all(
+          fetchedTokens.map(async (token) => {
+            const priceData = await getTokenPrice(token.address);
+            // Get token info to get decimals
+            const tokenInfo = await getTokenInfo(token.address);
+            return {
+              ...token,
+              decimals: tokenInfo?.decimals || 9, // Default to 9 decimals if not found
+              priceUsd: priceData.priceUsd,
+              change24h: priceData.priceChange24h || token.change24h,
+              volume24h: priceData.volume24h || token.volume24h,
+            };
+          })
+        );
+        setTokens(tokensWithPrices);
       } catch (error) {
         console.error('Error fetching tokens:', error);
       } finally {
@@ -59,7 +76,10 @@ export function TrendingTokens() {
                   {token.address}
                 </div>
                 <div className="text-gray-500 text-xs">
-                  ◎{token.price.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                  ${token.priceUsd?.toLocaleString(undefined, {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 8
+                  }) || (token.price / Math.pow(10, token.decimals)).toFixed(8)}
                 </div>
               </div>
             </div>
@@ -68,7 +88,7 @@ export function TrendingTokens() {
                 {token.change24h >= 0 ? '+' : ''}{token.change24h.toFixed(2)}%
               </div>
               <div className="text-gray-500 text-xs">
-                ◎{token.volume24h.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                ${token.volume24h.toLocaleString(undefined, { maximumFractionDigits: 0 })}
               </div>
             </div>
           </div>

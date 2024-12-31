@@ -2,7 +2,25 @@
 @tailwind components;
 @tailwind utilities;
 
+@font-face {
+  font-family: 'Berkeley Mono';
+  src: url('/fonts/BerkeleyMono-Regular.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Berkeley Mono';
+  src: url('/fonts/BerkeleyMono-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+}
+
 @layer base {
+  html {
+    font-family: 'Berkeley Mono', monospace;
+    font-weight: 500;
+  }
   :root {
     --background: 0 0% 100%;
     --foreground: 240 10% 3.9%;

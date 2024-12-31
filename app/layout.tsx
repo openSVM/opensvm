@@ -1,9 +1,7 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
 import "./globals.css";
 import { Navbar } from "@/components/Navbar";
-
-const inter = Inter({ subsets: ["latin"] });
+import { Providers } from './providers';
 
 export const metadata: Metadata = {
   title: "OpenSVM - Solana Virtual Machine Explorer",
@@ -16,11 +14,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body className={inter.className}>
-        <Navbar>
-          {children}
-        </Navbar>
+    <html lang="en" suppressHydrationWarning>
+      <body>
+        <Providers>
+          <Navbar>
+            {children}
+          </Navbar>
+        </Providers>
       </body>
     </html>
   );

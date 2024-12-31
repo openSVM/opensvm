@@ -150,19 +150,21 @@ export async function getRPCLatency(): Promise<number> {
 export async function getAccountInfo(address: string) {
   try {
     const publicKey = new PublicKey(address);
-    const accountInfo = await connection.getAccountInfo(publicKey);
+    const accountInfo = await connection.getParsedAccountInfo(publicKey, {
+      commitment: 'finalized'
+    });
     
-    if (!accountInfo) {
+    if (!accountInfo.value) {
       return null;
     }
 
     return {
       address,
-      lamports: accountInfo.lamports,
-      owner: accountInfo.owner.toBase58(),
-      executable: accountInfo.executable,
-      rentEpoch: accountInfo.rentEpoch,
-      data: accountInfo.data,
+      lamports: accountInfo.value.lamports,
+      owner: accountInfo.value.owner.toBase58(),
+      executable: accountInfo.value.executable,
+      rentEpoch: accountInfo.value.rentEpoch,
+      data: accountInfo.value.data
     };
   } catch (error) {
     console.error('Error fetching account info:', error);
@@ -171,76 +173,113 @@ export async function getAccountInfo(address: string) {
 }
 
 // Get transaction history
+export interface TransactionHistoryOptions {
+  limit?: number;
+  before?: string;
+  until?: string;
+  type?: 'all' | 'sol' | 'token' | 'nft';
+  sortBy?: 'time' | 'slot';
+}
+
 export interface TransactionInfo {
   signature: string;
   slot: number;
-  timestamp: number;
+  blockTime: number;
   status: 'success' | 'error';
-  type: string;
   fee: number;
-  signer: string;
+  value: number;
   from: string;
-  to: string;
-  amount: number;
+  instructions: Array<{
+    program: string;
+    data: string;
+  }>;
+  programs: string[];
 }
 
-export async function getTransactionHistory(address: string, limit = 10): Promise<TransactionInfo[]> {
+export async function getTransactionHistory(
+  address: string, 
+  options: TransactionHistoryOptions = {}
+): Promise<TransactionInfo[]> {
   try {
     const publicKey = new PublicKey(address);
-    const signatures = await connection.getSignaturesForAddress(publicKey, { limit });
+    const { limit = 10, before, until, type = 'all' } = options;
+
+    const signatures = await connection.getSignaturesForAddress(
+      publicKey,
+      { 
+        limit,
+        before: before ? before : undefined, // Keep as string since that's what the API expects
+        until: until ? until : undefined,
+      }
+    );
 
     const transactions = await Promise.all(
       signatures.map(async (sig) => {
-        const tx = await connection.getParsedTransaction(sig.signature, {
-          maxSupportedTransactionVersion: 0,
-        });
+        try {
+          const tx = await connection.getParsedTransaction(sig.signature, {
+            maxSupportedTransactionVersion: 0,
+          });
 
-        if (!tx) return null;
+          if (!tx || !tx.meta) return null;
 
-        // Extract from and to addresses from the first transfer instruction
-        const accountKeys = tx.transaction.message.accountKeys;
-        let from = accountKeys[0].pubkey.toBase58();
-        let to = from;
-        let amount = 0;
-        let type = 'Unknown';
+          const blockTime = tx.blockTime || 0;
+          const slot = tx.slot;
+          const fee = tx.meta.fee / 1e9;
+          const status = tx.meta.err ? 'error' : 'success';
 
-        // Try to determine transaction type and extract transfer details
-        if (tx.meta && tx.transaction.message.instructions.length > 0) {
-          const instruction = tx.transaction.message.instructions[0];
-          
-          if ('program' in instruction) {
-            if (instruction.program === 'system') {
-              type = 'System Transfer';
-              if (instruction.parsed.type === 'transfer') {
-                amount = instruction.parsed.info.lamports / 1e9;
-                from = instruction.parsed.info.source;
-                to = instruction.parsed.info.destination;
+          // Get the first signer as the 'from' address
+          const from = tx.transaction.message.accountKeys.find(key => key.signer)?.pubkey.toBase58() || '';
+
+          // Initialize transaction info
+          const txInfo: TransactionInfo = {
+            signature: sig.signature,
+            slot,
+            blockTime,
+            status,
+            fee,
+            value: 0,
+            from,
+            instructions: [],
+            programs: []
+          };
+
+          // Process instructions
+          if (tx.transaction.message.instructions) {
+            tx.transaction.message.instructions.forEach((inst: any) => {
+              if (!inst) return;
+
+              let programId = '';
+              if ('programId' in inst) {
+                programId = inst.programId.toBase58();
+              } else if ('program' in inst) {
+                programId = inst.program;
               }
-            } else if (instruction.program === 'spl-token') {
-              type = 'Token Transfer';
-            }
-          } else if ('programId' in instruction) {
-            const programId = instruction.programId.toString();
-            if (programId === SystemProgram.programId.toString()) {
-              type = 'System Transfer';
-            } else if (programId === TOKEN_PROGRAM_ID.toString()) {
-              type = 'Token Transfer';
-            }
-          }
-        }
 
-        return {
-          signature: sig.signature,
-          slot: sig.slot,
-          timestamp: sig.blockTime || 0,
-          status: sig.err ? 'error' : 'success',
-          type,
-          fee: (tx.meta?.fee || 0) / 1e9,
-          signer: accountKeys[0].pubkey.toBase58(),
-          from,
-          to,
-          amount,
-        };
+              if (!programId) return;
+
+              // Add program to the list if not already included
+              if (!txInfo.programs.includes(programId)) {
+                txInfo.programs.push(programId);
+              }
+
+              // Add instruction info
+              txInfo.instructions.push({
+                program: programId,
+                data: inst.data || ''
+              });
+
+              // Handle SOL transfers
+              if (inst.program === 'system' && inst.parsed?.type === 'transfer') {
+                txInfo.value = (inst.parsed.info.lamports || 0) / 1e9;
+              }
+            });
+          }
+
+          return txInfo;
+        } catch (err) {
+          console.error(`Error processing transaction ${sig.signature}:`, err);
+          return null;
+        }
       })
     );
 
@@ -249,6 +288,18 @@ export async function getTransactionHistory(address: string, limit = 10): Promis
     console.error('Error fetching transaction history:', error);
     return [];
   }
+}
+
+async function getTokenSymbol(mint: string): Promise<string | undefined> {
+  try {
+    const tokenInfo = await connection.getParsedAccountInfo(new PublicKey(mint));
+    if (tokenInfo.value?.data && 'parsed' in tokenInfo.value.data) {
+      return tokenInfo.value.data.parsed.info.symbol;
+    }
+  } catch (error) {
+    console.error('Error fetching token symbol:', error);
+  }
+  return undefined;
 }
 
 // Get transaction details
@@ -341,7 +392,7 @@ export async function getTransactionDetails(signature: string): Promise<Detailed
 export async function getTokenInfo(mintAddress: string) {
   try {
     const mintPublicKey = new PublicKey(mintAddress);
-    const [mint, tokenAccounts] = await Promise.all([
+    const [mint, tokenAccounts, priceData] = await Promise.all([
       getMint(connection, mintPublicKey),
       connection.getProgramAccounts(TOKEN_PROGRAM_ID, {
         filters: [
@@ -353,6 +404,7 @@ export async function getTokenInfo(mintAddress: string) {
           },
         ],
       }),
+      getTokenPrice(mintAddress),
     ]);
 
     // Calculate total supply and holders
@@ -378,11 +430,17 @@ export async function getTokenInfo(mintAddress: string) {
       }
     });
 
+    const supply = Number(totalSupply) / Math.pow(10, mint.decimals);
+
     return {
       decimals: mint.decimals,
-      supply: Number(totalSupply),
+      supply,
       holders: holders.size,
       metadata: null, // You can add metadata fetching if needed
+      price: priceData.priceUsd,
+      priceChange24h: priceData.priceChange24h,
+      volume24h: priceData.volume24h,
+      marketCap: priceData.priceUsd ? priceData.priceUsd * supply : null,
     };
   } catch (error) {
     console.error('Error fetching token info:', error);
@@ -419,5 +477,268 @@ export async function getBlockDetails(slot: number): Promise<BlockDetails | null
   } catch (error) {
     console.error('Error fetching block details:', error);
     return null;
+  }
+}
+
+export interface TokenAccountInfo {
+  mint: string;
+  symbol: string;
+  decimals: number;
+  uiAmount: number;
+  icon?: string;
+  owner: string;
+  address: string;  // Token account address
+  usdValue: number; // Added USD value field
+}
+
+export async function getTokenAccounts(address: string): Promise<TokenAccountInfo[]> {
+  try {
+    const publicKey = new PublicKey(address);
+    const tokenAccounts = await connection.getParsedTokenAccountsByOwner(publicKey, {
+      programId: TOKEN_PROGRAM_ID,
+    });
+
+    const accountsWithMetadata = await Promise.all(
+      tokenAccounts.value.map(async (account) => {
+        const parsedInfo = account.account.data.parsed.info;
+        const mintInfo = await getMintInfo(parsedInfo.mint);
+        const uiAmount = parsedInfo.tokenAmount.uiAmount || 0;
+        const priceData = await getTokenPrice(parsedInfo.mint);
+
+        const result: TokenAccountInfo = {
+          mint: parsedInfo.mint,
+          symbol: mintInfo?.symbol || '',
+          decimals: parsedInfo.tokenAmount.decimals,
+          uiAmount,
+          owner: parsedInfo.owner,
+          address: account.pubkey.toBase58(),
+          usdValue: priceData.priceUsd ? priceData.priceUsd * uiAmount : 0
+        };
+
+        return result;
+      })
+    );
+
+    // Filter out accounts with 0 balance and sort by USD value
+    return accountsWithMetadata
+      .filter(account => account.uiAmount > 0)
+      .sort((a, b) => (b.usdValue || 0) - (a.usdValue || 0));
+  } catch (error) {
+    console.error('Error fetching token accounts:', error);
+    throw error;
+  }
+}
+
+interface MintInfo {
+  symbol?: string;
+  name?: string;
+  decimals: number;
+}
+
+async function getMintInfo(mintAddress: string): Promise<MintInfo | null> {
+  try {
+    const mintPublicKey = new PublicKey(mintAddress);
+    const mintAccountInfo = await connection.getParsedAccountInfo(mintPublicKey);
+
+    if (!mintAccountInfo.value?.data || !('parsed' in mintAccountInfo.value.data)) {
+      return null;
+    }
+
+    const { decimals } = mintAccountInfo.value.data.parsed.info;
+
+    // Try to get metadata if it exists
+    try {
+      const metadataAddress = await getMetadataAddress(mintPublicKey);
+      const metadataAccountInfo = await connection.getAccountInfo(metadataAddress);
+      
+      if (metadataAccountInfo && metadataAccountInfo.data) {
+        const metadata = decodeMetadata(metadataAccountInfo.data);
+        return {
+          symbol: metadata.data.symbol || undefined,
+          name: metadata.data.name || undefined,
+          decimals
+        };
+      }
+    } catch (error) {
+      console.error('Error fetching metadata:', error);
+      // Continue without metadata
+    }
+
+    // Return basic info if metadata is not available
+    return { 
+      decimals,
+      symbol: `SPL Token`,
+      name: `SPL Token (${mintAddress.slice(0, 4)}...${mintAddress.slice(-4)})`
+    };
+  } catch (error) {
+    console.error('Error fetching mint info:', error);
+    return null;
+  }
+}
+
+async function getMetadataAddress(mint: PublicKey): Promise<PublicKey> {
+  const METADATA_PROGRAM_ID = new PublicKey('metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s');
+  
+  const [address] = await PublicKey.findProgramAddress(
+    [
+      Buffer.from('metadata'),
+      METADATA_PROGRAM_ID.toBuffer(),
+      mint.toBuffer(),
+    ],
+    METADATA_PROGRAM_ID
+  );
+  
+  return address;
+}
+
+interface MetadataData {
+  name: string;
+  symbol: string;
+  uri: string;
+  sellerFeeBasisPoints: number;
+  creators: Array<{
+    address: string;
+    verified: boolean;
+    share: number;
+  }> | null;
+}
+
+interface Metadata {
+  key: number;
+  updateAuthority: string;
+  mint: string;
+  data: MetadataData;
+  primarySaleHappened: boolean;
+  isMutable: boolean;
+  editionNonce: number | null;
+}
+
+function decodeMetadata(buffer: Buffer): Metadata {
+  try {
+    // Check if buffer is long enough for basic metadata
+    if (buffer.length < 1) {
+      throw new Error('Buffer too short for metadata');
+    }
+
+    const metadata: any = {
+      key: buffer[0],
+      updateAuthority: '',
+      mint: '',
+      data: {
+        name: '',
+        symbol: '',
+        uri: '',
+        sellerFeeBasisPoints: 0,
+        creators: null
+      },
+      primarySaleHappened: false,
+      isMutable: true,
+      editionNonce: null
+    };
+
+    let offset = 1;
+
+    // Read update authority - 32 bytes
+    if (buffer.length >= offset + 32) {
+      metadata.updateAuthority = buffer.slice(offset, offset + 32).toString('hex');
+      offset += 32;
+    }
+
+    // Read mint address - 32 bytes
+    if (buffer.length >= offset + 32) {
+      metadata.mint = buffer.slice(offset, offset + 32).toString('hex');
+      offset += 32;
+    }
+
+    // Read name
+    if (buffer.length >= offset + 4) {
+      const nameLength = buffer.readUInt32LE(offset);
+      offset += 4;
+      
+      if (buffer.length >= offset + nameLength) {
+        metadata.data.name = buffer.slice(offset, offset + nameLength).toString('utf8').replace(/\0/g, '');
+        offset += nameLength;
+      }
+    }
+
+    // Read symbol
+    if (buffer.length >= offset + 4) {
+      const symbolLength = buffer.readUInt32LE(offset);
+      offset += 4;
+      
+      if (buffer.length >= offset + symbolLength) {
+        metadata.data.symbol = buffer.slice(offset, offset + symbolLength).toString('utf8').replace(/\0/g, '');
+        offset += symbolLength;
+      }
+    }
+
+    // Read uri
+    if (buffer.length >= offset + 4) {
+      const uriLength = buffer.readUInt32LE(offset);
+      offset += 4;
+      
+      if (buffer.length >= offset + uriLength) {
+        metadata.data.uri = buffer.slice(offset, offset + uriLength).toString('utf8').replace(/\0/g, '');
+        offset += uriLength;
+      }
+    }
+
+    return metadata as Metadata;
+  } catch (error) {
+    console.error('Error decoding metadata:', error);
+    // Return a default metadata object if decoding fails
+    return {
+      key: 0,
+      updateAuthority: '',
+      mint: '',
+      data: {
+        name: 'Unknown Token',
+        symbol: 'UNKNOWN',
+        uri: '',
+        sellerFeeBasisPoints: 0,
+        creators: null
+      },
+      primarySaleHappened: false,
+      isMutable: true,
+      editionNonce: null
+    };
+  }
+}
+
+// Fetch token price from DexScreener
+export async function getTokenPrice(tokenAddress: string): Promise<{
+  priceUsd: number | null;
+  priceChange24h: number | null;
+  volume24h: number | null;
+}> {
+  try {
+    const response = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${tokenAddress}`);
+    const data = await response.json();
+
+    if (data.pairs && data.pairs.length > 0) {
+      // Get the most liquid pair
+      const mostLiquidPair = data.pairs.reduce((prev: any, current: any) => {
+        return (prev.liquidity?.usd || 0) > (current.liquidity?.usd || 0) ? prev : current;
+      });
+
+      return {
+        priceUsd: mostLiquidPair.priceUsd ? parseFloat(mostLiquidPair.priceUsd) : null,
+        priceChange24h: mostLiquidPair.priceChange?.h24 ? parseFloat(mostLiquidPair.priceChange.h24) : null,
+        volume24h: mostLiquidPair.volume?.h24 || null,
+      };
+    }
+
+    return {
+      priceUsd: null,
+      priceChange24h: null,
+      volume24h: null,
+    };
+  } catch (error) {
+    console.error('Error fetching token price:', error);
+    return {
+      priceUsd: null,
+      priceChange24h: null,
+      volume24h: null,
+    };
   }
 } 

@@ -20,6 +20,7 @@ interface TokenData {
     }>;
   };
   price?: number;
+  priceChange24h?: number;
   marketCap?: number;
   supply?: number;
   holders?: number;
@@ -89,7 +90,12 @@ export default function TokenDetails({ mint }: Props) {
             <Stack>
               <div className="text-sm text-muted-foreground">Price</div>
               <div className="text-xl font-semibold">
-                ${data.price?.toFixed(4) || 'N/A'}
+                ${data.price?.toFixed(6) || 'N/A'}
+                {data.priceChange24h && (
+                  <span className={`ml-2 text-sm ${data.priceChange24h >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                    {data.priceChange24h >= 0 ? '+' : ''}{data.priceChange24h.toFixed(2)}%
+                  </span>
+                )}
               </div>
             </Stack>
             <Stack>

@@ -1,10 +1,15 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { Card, CardHeader, CardContent, Text, Stack } from 'rinlab';
-import { useParams } from 'next/navigation';
-import { getAccountInfo, getTransactionHistory } from '@/lib/solana';
-import type { TransactionInfo } from '@/lib/solana';
+import { useEffect, useState, useCallback } from 'react';
+import { Card, CardHeader, CardContent, Text, Stack, Button } from 'rinlab';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { useParams, useSearchParams, useRouter } from 'next/navigation';
+import { getAccountInfo, getTransactionHistory, getTokenAccounts, type TransactionInfo, type TokenAccountInfo } from '@/lib/solana';
+import AccountOverview from '@/components/AccountOverview';
+import Link from 'next/link';
+import { format } from 'date-fns';
+import Image from 'next/image';
+import TransactionTable from '@/components/TransactionTable';
 
 interface AccountInfo {
   address: string;
@@ -12,23 +17,65 @@ interface AccountInfo {
   owner: string;
   executable: boolean;
   rentEpoch: number;
-  data: Buffer;
+  data: {
+    parsed?: {
+      info?: {
+        owner: string;
+      };
+    };
+    program?: string;
+    space?: number;
+  } | Buffer;
 }
 
 export default function AccountPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const address = params.address as string;
+  
   const [accountInfo, setAccountInfo] = useState<AccountInfo | null>(null);
   const [transactions, setTransactions] = useState<TransactionInfo[]>([]);
+  const [tokenAccounts, setTokenAccounts] = useState<TokenAccountInfo[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  
+  // Pagination and filtering state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [transactionType, setTransactionType] = useState(searchParams.get('type') || 'all');
+  const [activeTab, setActiveTab] = useState('overview');
+  const itemsPerPage = 25;
+
+  const loadTransactions = useCallback(async (page = 1, type = transactionType) => {
+    try {
+      const before = page > 1 ? transactions[transactions.length - 1]?.signature : undefined;
+      const txHistory = await getTransactionHistory(address, {
+        limit: itemsPerPage,
+        before,
+        type: type as 'all' | 'sol' | 'token' | 'nft'
+      });
+
+      if (page === 1) {
+        setTransactions(txHistory);
+      } else {
+        setTransactions(prev => [...prev, ...txHistory]);
+      }
+
+      setHasMore(txHistory.length === itemsPerPage);
+      setCurrentPage(page);
+    } catch (err) {
+      console.error('Error loading transactions:', err);
+      setError('Failed to load transactions');
+    }
+  }, [address, transactions, transactionType]);
 
   useEffect(() => {
     async function loadAccountData() {
       try {
-        const [info, txHistory] = await Promise.all([
+        const [info, tokens] = await Promise.all([
           getAccountInfo(address),
-          getTransactionHistory(address)
+          getTokenAccounts(address)
         ]);
 
         if (!info) {
@@ -36,17 +83,30 @@ export default function AccountPage() {
         }
 
         setAccountInfo(info);
-        setTransactions(txHistory);
-        setIsLoading(false);
+        setTokenAccounts(tokens);
+        await loadTransactions();
       } catch (err) {
         setError('Failed to load account details');
         console.error('Error loading account:', err);
+      } finally {
         setIsLoading(false);
       }
     }
 
     loadAccountData();
-  }, [address]);
+  }, [address, loadTransactions]);
+
+  const handleTypeChange = (newType: string) => {
+    setTransactionType(newType);
+    router.push(`/account/${address}?type=${newType}`);
+    loadTransactions(1, newType);
+  };
+
+  const handleLoadMore = () => {
+    if (hasMore) {
+      loadTransactions(currentPage + 1);
+    }
+  };
 
   if (error) {
     return (
@@ -74,61 +134,121 @@ export default function AccountPage() {
     );
   }
 
+  const fungibleTokens = tokenAccounts;
+  const nftTokens = [];
+
   return (
-    <Stack gap={6}>
-      <Card>
-        <CardHeader>
-          <Text variant="heading">Account Overview</Text>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div>
-              <Text variant="label" className="text-sm text-gray-500">Address</Text>
-              <Text variant="default" className="font-mono break-all">{accountInfo.address}</Text>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Text variant="label" className="text-sm text-gray-500">Balance</Text>
-                <Text variant="default">{(accountInfo.lamports / 1e9).toFixed(9)} SOL</Text>
-              </div>
-              
-              <div>
-                <Text variant="label" className="text-sm text-gray-500">Owner</Text>
-                <Text variant="default" className="font-mono">{accountInfo.owner}</Text>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+    <div className="container mx-auto py-6 space-y-6">
+      <AccountOverview 
+        address={address}
+        solBalance={accountInfo ? accountInfo.lamports / 1e9 : 0}
+        tokenAccounts={tokenAccounts.slice(0, 4)}
+        isSystemProgram={accountInfo?.owner === '11111111111111111111111111111111'}
+        parsedOwner={
+          accountInfo?.owner === '11111111111111111111111111111111' ? 'System Program' : 
+          (accountInfo?.owner === 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA' || 
+           accountInfo?.owner === 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb') 
+            ? (!Buffer.isBuffer(accountInfo.data) 
+                ? accountInfo.data.parsed?.info?.owner 
+                : address)
+            : address
+        }
+      />
 
       <Card>
-        <CardHeader>
-          <Text variant="heading">Recent Transactions</Text>
-        </CardHeader>
-        <CardContent>
-          {transactions.length === 0 ? (
-            <Text variant="default" className="text-center">No transactions found</Text>
-          ) : (
-            <div className="space-y-4">
-              {transactions.map((tx) => (
-                <div key={tx.signature} className="p-4 bg-gray-50 rounded-lg">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <Text variant="label" className="text-xs text-gray-500">Signature</Text>
-                      <Text variant="default" className="font-mono text-sm">{tx.signature}</Text>
-                    </div>
-                    <div className="text-right">
-                      <Text variant="label" className="text-xs text-gray-500">Fee</Text>
-                      <Text variant="default">{tx.fee.toFixed(9)} SOL</Text>
-                    </div>
-                  </div>
+        <CardContent className="p-0">
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList>
+              <TabsTrigger value="overview">Overview</TabsTrigger>
+              <TabsTrigger value="tokens">Tokens</TabsTrigger>
+              <TabsTrigger value="nfts">NFTs</TabsTrigger>
+              <TabsTrigger value="transactions">Transactions</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="overview">
+              <div className="p-6 space-y-4">
+                <div>
+                  <Text variant="label">Address</Text>
+                  <Text variant="default" className="font-mono">{address}</Text>
                 </div>
-              ))}
-            </div>
-          )}
+                {accountInfo && (
+                  <>
+                    <div>
+                      <Text variant="label">Owner</Text>
+                      <Text variant="default" className="font-mono">{accountInfo.owner}</Text>
+                    </div>
+                    <div>
+                      <Text variant="label">Executable</Text>
+                      <Text variant="default">{accountInfo.executable ? 'Yes' : 'No'}</Text>
+                    </div>
+                  </>
+                )}
+              </div>
+            </TabsContent>
+
+            <TabsContent value="tokens">
+              <div className="p-6">
+                {tokenAccounts.length > 0 ? (
+                  <div className="space-y-4">
+                    {tokenAccounts.map((token, index) => (
+                      <div key={index} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50">
+                        <div className="flex items-center space-x-4">
+                          {token.icon ? (
+                            <Image 
+                              src={token.icon} 
+                              alt={`${token.symbol} icon`} 
+                              width={32} 
+                              height={32}
+                              className="rounded-full"
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement;
+                                target.src = "/images/token-default.png";
+                              }}
+                            />
+                          ) : (
+                            <div className="w-8 h-8 flex items-center justify-center bg-gray-100 rounded-full">
+                              <span className="text-lg">*</span>
+                            </div>
+                          )}
+                          <div>
+                            <Text variant="default" className="font-medium">{token.symbol || 'Unknown Token'}</Text>
+                            <Text variant="label">{token.mint}</Text>
+                          </div>
+                        </div>
+                        <Text variant="default">
+                          {Number(token.uiAmount).toLocaleString(undefined, {
+                            minimumFractionDigits: 0,
+                            maximumFractionDigits: token.decimals
+                          })}
+                        </Text>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <Text variant="default" className="text-center py-8">No tokens found</Text>
+                )}
+              </div>
+            </TabsContent>
+
+            <TabsContent value="nfts">
+              <div className="p-6">
+                <Text variant="default" className="text-center py-8">No NFTs found</Text>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="transactions">
+              <div className="p-6">
+                <TransactionTable 
+                  transactions={transactions}
+                  isLoading={isLoading}
+                  onLoadMore={handleLoadMore}
+                  hasMore={hasMore}
+                />
+              </div>
+            </TabsContent>
+          </Tabs>
         </CardContent>
       </Card>
-    </Stack>
+    </div>
   );
 } 
