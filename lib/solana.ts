@@ -373,10 +373,11 @@ export interface DetailedTransactionInfo {
   fee: number;
   from: string;
   to: string;
-  amount: number;
+  value: number;
   type: string;
   computeUnits: number;
   accounts: string[];
+  programs: string[];
   instructions: {
     programId: string;
     data: string;
@@ -427,18 +428,46 @@ export async function getMultipleTransactionDetails(signatures: string[]): Promi
         const accountKeys = tx.transaction.message.accountKeys;
         let from = accountKeys[0].pubkey.toBase58();
         let to = from;
-        let amount = 0;
+        let value = 0;
         let type = 'Unknown';
+        const programs = new Set<string>();
 
         // Try to determine transaction type and extract transfer details
         if (tx.meta && tx.transaction.message.instructions.length > 0) {
+          // Calculate total value transferred
+          tx.meta.postTokenBalances?.forEach((postBalance, index) => {
+            const preBalance = tx.meta?.preTokenBalances?.[index];
+            if (preBalance && postBalance.uiTokenAmount.uiAmount !== preBalance.uiTokenAmount.uiAmount) {
+              value += Math.abs((postBalance.uiTokenAmount.uiAmount || 0) - (preBalance.uiTokenAmount.uiAmount || 0));
+            }
+          });
+
+          // If no token transfers, check for SOL transfers
+          if (value === 0 && tx.meta.preBalances && tx.meta.postBalances) {
+            for (let i = 0; i < tx.meta.preBalances.length; i++) {
+              const diff = (tx.meta.postBalances[i] - tx.meta.preBalances[i]) / 1e9;
+              if (diff < 0 && Math.abs(diff) > (tx.meta.fee || 0) / 1e9) {
+                value = Math.abs(diff);
+                break;
+              }
+            }
+          }
+
+          // Get all unique programs used
+          tx.transaction.message.instructions.forEach(ix => {
+            if ('program' in ix) {
+              programs.add(ix.program);
+            } else if ('programId' in ix) {
+              programs.add(ix.programId.toString());
+            }
+          });
+
+          // Determine primary type from first instruction
           const instruction = tx.transaction.message.instructions[0];
-          
           if ('program' in instruction) {
             if (instruction.program === 'system') {
               type = 'System Transfer';
               if (instruction.parsed.type === 'transfer') {
-                amount = instruction.parsed.info.lamports / 1e9;
                 from = instruction.parsed.info.source;
                 to = instruction.parsed.info.destination;
               }
@@ -463,10 +492,11 @@ export async function getMultipleTransactionDetails(signatures: string[]): Promi
           fee: (tx.meta?.fee || 0) / 1e9,
           from,
           to,
-          amount,
+          value,
           type,
           computeUnits: tx.meta?.computeUnitsConsumed || 0,
           accounts: accountKeys.map(key => key.pubkey.toBase58()),
+          programs: Array.from(programs),
           instructions: tx.transaction.message.instructions.map(ix => ({
             programId: 'program' in ix ? ix.program : ix.programId.toString(),
             data: 'data' in ix ? ix.data : '',
