@@ -1,12 +1,7 @@
 import Image from 'next/image';
 import { Card, CardHeader, CardContent, Grid, Text, Button } from 'rinlab';
-import { TokenAccountInfo, getTokenPrice } from '@/lib/solana';
+import { TokenAccountInfo } from '@/lib/solana';
 import { useEffect, useState } from 'react';
-
-interface TokenWithPrice extends TokenAccountInfo {
-  priceUsd: number | null;
-  address: string;
-}
 
 interface AccountOverviewProps {
   address: string;
@@ -23,37 +18,15 @@ export default function AccountOverview({
   isSystemProgram = false,
   parsedOwner
 }: AccountOverviewProps) {
-  const [tokensWithPrices, setTokensWithPrices] = useState<TokenWithPrice[]>([]);
   const [totalValueUsd, setTotalValueUsd] = useState<number>(0);
 
   useEffect(() => {
-    async function fetchPrices() {
-      const updatedTokens = await Promise.all(
-        tokenAccounts.map(async (token) => {
-          const priceData = await getTokenPrice(token.mint);
-          return {
-            ...token,
-            priceUsd: priceData.priceUsd,
-            address: token.address
-          };
-        })
-      );
+    // Calculate total USD value from token accounts
+    const total = tokenAccounts.reduce((acc, token) => {
+      return acc + token.usdValue;
+    }, 0);
 
-      setTokensWithPrices(updatedTokens);
-
-      // Calculate total USD value
-      const total = updatedTokens.reduce((acc, token) => {
-        if (token.priceUsd) {
-          const adjustedAmount = token.uiAmount;
-          return acc + (adjustedAmount * token.priceUsd);
-        }
-        return acc;
-      }, 0);
-
-      setTotalValueUsd(total);
-    }
-
-    fetchPrices();
+    setTotalValueUsd(total);
   }, [tokenAccounts]);
 
   const handleTokenClick = (tokenAccount: string) => {
@@ -85,62 +58,58 @@ export default function AccountOverview({
                   <Text variant="label" className="text-gray-600">Token Balance</Text>
                   <div className="flex items-center gap-2">
                     <Text variant="default" className="text-gray-900">
-                      {tokensWithPrices.length} Tokens
+                      {tokenAccounts.length} Tokens
                     </Text>
                     <Text variant="label" className="text-gray-600">
                       (${totalValueUsd.toFixed(2)})
                     </Text>
                   </div>
                 </div>
-                {tokensWithPrices.length > 0 && (
+                {tokenAccounts.length > 0 && (
                   <div className="border rounded-lg bg-white">
-                    {tokensWithPrices.map((token, index) => {
-                      const adjustedAmount = token.uiAmount;
-                      const usdValue = token.priceUsd ? (adjustedAmount * token.priceUsd) : 0;
-                      return (
-                        <div 
-                          key={index} 
-                          className="flex items-center justify-between px-2 hover:bg-gray-50 cursor-pointer border-b last:border-b-0"
-                          onClick={() => handleTokenClick(token.address)}
-                        >
-                          <div className="flex items-center flex-1">
-                            {token.icon ? (
-                              <Image 
-                                src={token.icon} 
-                                alt={`${token.symbol} icon`} 
-                                width={20} 
-                                height={20} 
-                                className="mr-2"
-                                onError={(e) => {
-                                  const target = e.target as HTMLImageElement;
-                                  target.src = "/images/token-default.png";
-                                }}
-                              />
-                            ) : (
-                              <div className="w-5 h-5 mr-2 flex items-center justify-center bg-gray-100 rounded-full">
-                                <span className="text-xs">*</span>
-                              </div>
-                            )}
-                            <div className="flex items-center space-x-2">
-                              <Text variant="default" className="text-gray-900">
-                                {Number(adjustedAmount || 0).toLocaleString(undefined, {
-                                  minimumFractionDigits: 0,
-                                  maximumFractionDigits: token.decimals
-                                })} {token.symbol}
-                              </Text>
-                              {token.priceUsd && (
-                                <Text variant="label" className="text-gray-600">
-                                  (${usdValue.toFixed(2)})
-                                </Text>
-                              )}
+                    {tokenAccounts.map((token, index) => (
+                      <div 
+                        key={index} 
+                        className="flex items-center justify-between px-2 hover:bg-gray-50 cursor-pointer border-b last:border-b-0"
+                        onClick={() => handleTokenClick(token.address)}
+                      >
+                        <div className="flex items-center flex-1">
+                          {token.icon ? (
+                            <Image 
+                              src={token.icon} 
+                              alt={`${token.symbol} icon`} 
+                              width={20} 
+                              height={20} 
+                              className="mr-2"
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement;
+                                target.src = "/images/token-default.png";
+                              }}
+                            />
+                          ) : (
+                            <div className="w-5 h-5 mr-2 flex items-center justify-center bg-gray-100 rounded-full">
+                              <span className="text-xs">*</span>
                             </div>
-                          </div>
-                          <div className="text-gray-400 hover:text-gray-600">
-                            &gt;
+                          )}
+                          <div className="flex items-center space-x-2">
+                            <Text variant="default" className="text-gray-900">
+                              {Number(token.uiAmount || 0).toLocaleString(undefined, {
+                                minimumFractionDigits: 0,
+                                maximumFractionDigits: token.decimals
+                              })} {token.symbol}
+                            </Text>
+                            {token.usdValue > 0 && (
+                              <Text variant="label" className="text-gray-600">
+                                (${token.usdValue.toFixed(2)})
+                              </Text>
+                            )}
                           </div>
                         </div>
-                      );
-                    })}
+                        <div className="text-gray-400 hover:text-gray-600">
+                          &gt;
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>

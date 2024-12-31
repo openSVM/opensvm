@@ -498,31 +498,43 @@ export async function getTokenAccounts(address: string): Promise<TokenAccountInf
       programId: TOKEN_PROGRAM_ID,
     });
 
-    const accountsWithMetadata = await Promise.all(
-      tokenAccounts.value.map(async (account) => {
-        const parsedInfo = account.account.data.parsed.info;
-        const mintInfo = await getMintInfo(parsedInfo.mint);
-        const uiAmount = parsedInfo.tokenAmount.uiAmount || 0;
-        const priceData = await getTokenPrice(parsedInfo.mint);
-
-        const result: TokenAccountInfo = {
-          mint: parsedInfo.mint,
-          symbol: mintInfo?.symbol || '',
-          decimals: parsedInfo.tokenAmount.decimals,
-          uiAmount,
-          owner: parsedInfo.owner,
-          address: account.pubkey.toBase58(),
-          usdValue: priceData.priceUsd ? priceData.priceUsd * uiAmount : 0
-        };
-
-        return result;
-      })
+    // First get all mint infos in parallel
+    const mintInfoPromises = tokenAccounts.value.map(account => 
+      getMintInfo(account.account.data.parsed.info.mint)
     );
+    const mintInfos = await Promise.all(mintInfoPromises);
 
-    // Filter out accounts with 0 balance and sort by USD value
-    return accountsWithMetadata
-      .filter(account => account.uiAmount > 0)
-      .sort((a, b) => (b.usdValue || 0) - (a.usdValue || 0));
+    // Prepare token accounts with mint info
+    const accountsWithMintInfo = tokenAccounts.value.map((account, index) => {
+      const parsedInfo = account.account.data.parsed.info;
+      const mintInfo = mintInfos[index];
+      const uiAmount = parsedInfo.tokenAmount.uiAmount || 0;
+
+      return {
+        mint: parsedInfo.mint,
+        symbol: mintInfo?.symbol || '',
+        decimals: parsedInfo.tokenAmount.decimals,
+        uiAmount,
+        owner: parsedInfo.owner,
+        address: account.pubkey.toBase58(),
+        usdValue: 0 // Will be updated with price data
+      };
+    });
+
+    // Filter out zero balances before fetching prices
+    const nonZeroAccounts = accountsWithMintInfo.filter(account => account.uiAmount > 0);
+    
+    // Batch fetch prices for all non-zero balance tokens
+    const prices = await batchGetTokenPrices(nonZeroAccounts.map(account => account.mint));
+    
+    // Update USD values
+    nonZeroAccounts.forEach(account => {
+      const priceData = prices.get(account.mint);
+      account.usdValue = priceData?.priceUsd ? priceData.priceUsd * account.uiAmount : 0;
+    });
+
+    // Sort by USD value
+    return nonZeroAccounts.sort((a, b) => b.usdValue - a.usdValue);
   } catch (error) {
     console.error('Error fetching token accounts:', error);
     throw error;
@@ -702,6 +714,88 @@ function decodeMetadata(buffer: Buffer): Metadata {
       isMutable: true,
       editionNonce: null
     };
+  }
+}
+
+// Cache for token prices with 5 minute expiry
+const tokenPriceCache = new Map<string, {
+  data: {
+    priceUsd: number | null;
+    priceChange24h: number | null;
+    volume24h: number | null;
+  };
+  timestamp: number;
+}>();
+
+const PRICE_CACHE_EXPIRY = 5 * 60 * 1000; // 5 minutes
+
+// Batch fetch token prices
+export async function batchGetTokenPrices(tokenAddresses: string[]): Promise<Map<string, {
+  priceUsd: number | null;
+  priceChange24h: number | null;
+  volume24h: number | null;
+}>> {
+  const now = Date.now();
+  const result = new Map();
+  const addressesToFetch = [];
+
+  // Check cache first
+  for (const address of tokenAddresses) {
+    const cached = tokenPriceCache.get(address);
+    if (cached && (now - cached.timestamp) < PRICE_CACHE_EXPIRY) {
+      result.set(address, cached.data);
+    } else {
+      addressesToFetch.push(address);
+    }
+  }
+
+  if (addressesToFetch.length === 0) {
+    return result;
+  }
+
+  // Batch fetch prices for uncached tokens
+  try {
+    const responses = await Promise.all(
+      addressesToFetch.map(address =>
+        fetch(`https://api.dexscreener.com/latest/dex/tokens/${address}`)
+          .then(res => res.json())
+          .catch(() => null)
+      )
+    );
+
+    responses.forEach((data, index) => {
+      const address = addressesToFetch[index];
+      let priceData = {
+        priceUsd: null,
+        priceChange24h: null,
+        volume24h: null,
+      };
+
+      if (data?.pairs && data.pairs.length > 0) {
+        const mostLiquidPair = data.pairs.reduce((prev: any, current: any) => {
+          return (prev.liquidity?.usd || 0) > (current.liquidity?.usd || 0) ? prev : current;
+        });
+
+        priceData = {
+          priceUsd: mostLiquidPair.priceUsd ? parseFloat(mostLiquidPair.priceUsd) : null,
+          priceChange24h: mostLiquidPair.priceChange?.h24 ? parseFloat(mostLiquidPair.priceChange.h24) : null,
+          volume24h: mostLiquidPair.volume?.h24 || null,
+        };
+      }
+
+      // Update cache
+      tokenPriceCache.set(address, {
+        data: priceData,
+        timestamp: now
+      });
+      
+      result.set(address, priceData);
+    });
+
+    return result;
+  } catch (error) {
+    console.error('Error batch fetching token prices:', error);
+    return result;
   }
 }
 
