@@ -31,7 +31,8 @@
       {
         "name": "next"
       }
-    ]
+    ],
+    "suppressImplicitAnyIndexErrors": true
   },
   "include": [
     "**/*.ts",
