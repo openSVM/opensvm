@@ -4,29 +4,12 @@ import { useEffect, useState, useCallback } from 'react';
 import { Card, CardHeader, CardContent, Text, Stack, Button } from 'rinlab';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
-import { getAccountInfo, getTransactionHistory, getTokenAccounts, type TransactionInfo, type TokenAccountInfo } from '@/lib/solana';
+import { getTokenAccounts, getTransactionHistory, unsubscribeFromTransactions, type TransactionInfo, type AccountData } from '@/lib/solana';
 import AccountOverview from '@/components/AccountOverview';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import Image from 'next/image';
 import TransactionTable from '@/components/TransactionTable';
-
-interface AccountInfo {
-  address: string;
-  lamports: number;
-  owner: string;
-  executable: boolean;
-  rentEpoch: number;
-  data: {
-    parsed?: {
-      info?: {
-        owner: string;
-      };
-    };
-    program?: string;
-    space?: number;
-  } | Buffer;
-}
 
 export default function AccountPage() {
   const params = useParams();
@@ -34,9 +17,8 @@ export default function AccountPage() {
   const router = useRouter();
   const address = params.address as string;
   
-  const [accountInfo, setAccountInfo] = useState<AccountInfo | null>(null);
+  const [accountData, setAccountData] = useState<AccountData | null>(null);
   const [transactions, setTransactions] = useState<TransactionInfo[]>([]);
-  const [tokenAccounts, setTokenAccounts] = useState<TokenAccountInfo[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   
@@ -45,46 +27,31 @@ export default function AccountPage() {
   const [hasMore, setHasMore] = useState(true);
   const [transactionType, setTransactionType] = useState(searchParams.get('type') || 'all');
   const [activeTab, setActiveTab] = useState('overview');
-  const itemsPerPage = 25;
+  const itemsPerPage = 50;
 
-  const loadTransactions = useCallback(async (page = 1, type = transactionType) => {
-    try {
-      const before = page > 1 ? transactions[transactions.length - 1]?.signature : undefined;
-      const txHistory = await getTransactionHistory(address, {
-        limit: itemsPerPage,
-        before,
-        type: type as 'all' | 'sol' | 'token' | 'nft'
-      });
+  // Handle new transactions from WebSocket
+  const handleNewTransaction = useCallback((newTx: TransactionInfo) => {
+    setTransactions(prev => {
+      const updated = [newTx, ...prev];
+      return updated.slice(0, 100);
+    });
+  }, []);
 
-      if (page === 1) {
-        setTransactions(txHistory);
-      } else {
-        setTransactions(prev => [...prev, ...txHistory]);
-      }
-
-      setHasMore(txHistory.length === itemsPerPage);
-      setCurrentPage(page);
-    } catch (err) {
-      console.error('Error loading transactions:', err);
-      setError('Failed to load transactions');
-    }
-  }, [address, transactions, transactionType]);
-
+  // Load initial data
   useEffect(() => {
     async function loadAccountData() {
       try {
-        const [info, tokens] = await Promise.all([
-          getAccountInfo(address),
-          getTokenAccounts(address)
+        const [data, txHistory] = await Promise.all([
+          getTokenAccounts(address),
+          getTransactionHistory(address, {
+            limit: itemsPerPage,
+            type: transactionType as 'all' | 'sol' | 'token' | 'nft'
+          }, handleNewTransaction)
         ]);
 
-        if (!info) {
-          throw new Error('Account not found');
-        }
-
-        setAccountInfo(info);
-        setTokenAccounts(tokens);
-        await loadTransactions();
+        setAccountData(data);
+        setTransactions(txHistory);
+        setHasMore(txHistory.length === itemsPerPage);
       } catch (err) {
         setError('Failed to load account details');
         console.error('Error loading account:', err);
@@ -94,17 +61,49 @@ export default function AccountPage() {
     }
 
     loadAccountData();
-  }, [address, loadTransactions]);
+
+    // Cleanup subscription on unmount
+    return () => {
+      unsubscribeFromTransactions(address);
+    };
+  }, [address, transactionType, handleNewTransaction]);
 
   const handleTypeChange = (newType: string) => {
     setTransactionType(newType);
     router.push(`/account/${address}?type=${newType}`);
-    loadTransactions(1, newType);
+    // Reset and reload with new type
+    setTransactions([]);
+    setIsLoading(true);
+    getTransactionHistory(address, {
+      limit: itemsPerPage,
+      type: newType as 'all' | 'sol' | 'token' | 'nft'
+    }, handleNewTransaction)
+      .then(txHistory => {
+        setTransactions(txHistory);
+        setHasMore(txHistory.length === itemsPerPage);
+        setIsLoading(false);
+      })
+      .catch(err => {
+        console.error('Error loading transactions:', err);
+        setIsLoading(false);
+      });
   };
 
-  const handleLoadMore = () => {
-    if (hasMore) {
-      loadTransactions(currentPage + 1);
+  const handleLoadMore = async () => {
+    if (!hasMore || isLoading) return;
+
+    try {
+      const lastTx = transactions[transactions.length - 1];
+      const moreTxs = await getTransactionHistory(address, {
+        limit: itemsPerPage,
+        before: lastTx.signature,
+        type: transactionType as 'all' | 'sol' | 'token' | 'nft'
+      });
+
+      setTransactions(prev => [...prev, ...moreTxs]);
+      setHasMore(moreTxs.length === itemsPerPage);
+    } catch (err) {
+      console.error('Error loading more transactions:', err);
     }
   };
 
@@ -121,7 +120,7 @@ export default function AccountPage() {
     );
   }
 
-  if (isLoading || !accountInfo) {
+  if (isLoading || !accountData) {
     return (
       <Card>
         <CardHeader>
@@ -134,23 +133,18 @@ export default function AccountPage() {
     );
   }
 
-  const fungibleTokens = tokenAccounts;
-  const nftTokens = [];
-
   return (
     <div className="container mx-auto py-6 space-y-6">
       <AccountOverview 
         address={address}
-        solBalance={accountInfo ? accountInfo.lamports / 1e9 : 0}
-        tokenAccounts={tokenAccounts.slice(0, 4)}
-        isSystemProgram={accountInfo?.owner === '11111111111111111111111111111111'}
+        solBalance={accountData.lamports / 1e9}
+        tokenAccounts={accountData.tokenAccounts.slice(0, 4)}
+        isSystemProgram={accountData.isSystemProgram}
         parsedOwner={
-          accountInfo?.owner === '11111111111111111111111111111111' ? 'System Program' : 
-          (accountInfo?.owner === 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA' || 
-           accountInfo?.owner === 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb') 
-            ? (!Buffer.isBuffer(accountInfo.data) 
-                ? accountInfo.data.parsed?.info?.owner 
-                : address)
+          accountData.isSystemProgram ? 'System Program' : 
+          (accountData.owner === 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA' || 
+           accountData.owner === 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb') 
+            ? accountData.tokenAccounts[0]?.owner || address
             : address
         }
       />
@@ -171,26 +165,22 @@ export default function AccountPage() {
                   <Text variant="label">Address</Text>
                   <Text variant="default" className="font-mono">{address}</Text>
                 </div>
-                {accountInfo && (
-                  <>
-                    <div>
-                      <Text variant="label">Owner</Text>
-                      <Text variant="default" className="font-mono">{accountInfo.owner}</Text>
-                    </div>
-                    <div>
-                      <Text variant="label">Executable</Text>
-                      <Text variant="default">{accountInfo.executable ? 'Yes' : 'No'}</Text>
-                    </div>
-                  </>
-                )}
+                <div>
+                  <Text variant="label">Owner</Text>
+                  <Text variant="default" className="font-mono">{accountData.owner}</Text>
+                </div>
+                <div>
+                  <Text variant="label">Executable</Text>
+                  <Text variant="default">{accountData.executable ? 'Yes' : 'No'}</Text>
+                </div>
               </div>
             </TabsContent>
 
             <TabsContent value="tokens">
               <div className="p-6">
-                {tokenAccounts.length > 0 ? (
+                {accountData.tokenAccounts.length > 0 ? (
                   <div className="space-y-4">
-                    {tokenAccounts.map((token, index) => (
+                    {accountData.tokenAccounts.map((token, index) => (
                       <div key={index} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50">
                         <div className="flex items-center space-x-4">
                           {token.icon ? (

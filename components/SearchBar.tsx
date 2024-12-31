@@ -1,18 +1,18 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { getSearchRoute } from '@/lib/utils';
 
-interface SearchBarProps {
-  onSearch: (address: string) => void;
-}
-
-export default function SearchBar({ onSearch }: SearchBarProps) {
+export default function SearchBar() {
   const [query, setQuery] = useState('');
+  const router = useRouter();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (query.trim()) {
-      onSearch(query.trim());
+      const route = getSearchRoute(query.trim());
+      router.push(route);
     }
   };
 
@@ -23,7 +23,7 @@ export default function SearchBar({ onSearch }: SearchBarProps) {
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search transactions, blocks, programs and tokens"
+          placeholder="Search by address, transaction, block or token"
           className="w-full rounded-l-lg border border-r-0 border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 focus:border-[#00ffbd] focus:outline-none focus:ring-1 focus:ring-[#00ffbd]"
         />
         <button

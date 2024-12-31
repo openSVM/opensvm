@@ -1,4 +1,4 @@
-import { Connection, PublicKey, clusterApiUrl, ParsedTransactionWithMeta, BlockResponse, GetProgramAccountsFilter, SystemProgram } from '@solana/web3.js';
+import { Connection, PublicKey, clusterApiUrl, ParsedTransactionWithMeta, BlockResponse, GetProgramAccountsFilter, SystemProgram, MessageAccountKeys } from '@solana/web3.js';
 import { TOKEN_PROGRAM_ID, getMint } from '@solana/spl-token';
 
 // Initialize connection to Chainstack RPC
@@ -146,19 +146,49 @@ export async function getRPCLatency(): Promise<number> {
   }
 }
 
-// Get account info
-export async function getAccountInfo(address: string) {
+// Cache for account info
+interface AccountCacheEntry {
+  data: {
+    address: string;
+    lamports: number;
+    owner: string;
+    executable: boolean;
+    rentEpoch: number;
+    data: any;
+  };
+  timestamp: number;
+  subscription?: number;
+}
+
+const accountInfoCache = new Map<string, AccountCacheEntry>();
+
+const ACCOUNT_CACHE_EXPIRY = 30 * 1000; // 30 seconds
+
+// Get account info with caching and WebSocket subscription
+export async function getAccountInfo(
+  address: string,
+  onUpdate?: (accountInfo: any) => void
+) {
   try {
+    const now = Date.now();
+    const cached = accountInfoCache.get(address);
+
+    // Return cached data if still valid
+    if (cached && (now - cached.timestamp) < ACCOUNT_CACHE_EXPIRY) {
+      return cached.data;
+    }
+
+    // Fetch new data
     const publicKey = new PublicKey(address);
     const accountInfo = await connection.getParsedAccountInfo(publicKey, {
-      commitment: 'finalized'
+      commitment: 'confirmed'
     });
     
     if (!accountInfo.value) {
       return null;
     }
 
-    return {
+    const result = {
       address,
       lamports: accountInfo.value.lamports,
       owner: accountInfo.value.owner.toBase58(),
@@ -166,9 +196,119 @@ export async function getAccountInfo(address: string) {
       rentEpoch: accountInfo.value.rentEpoch,
       data: accountInfo.value.data
     };
+
+    // Cache the result
+    const cacheEntry = {
+      data: result,
+      timestamp: now
+    };
+
+    // Set up WebSocket subscription for account updates if callback provided
+    if (onUpdate && !cached?.subscription) {
+      const subId = connection.onAccountChange(
+        publicKey,
+        (accountInfo) => {
+          const updated = {
+            address,
+            lamports: accountInfo.lamports,
+            owner: accountInfo.owner.toBase58(),
+            executable: accountInfo.executable,
+            rentEpoch: accountInfo.rentEpoch,
+            data: accountInfo.data
+          };
+
+          // Update cache
+          const existing = accountInfoCache.get(address);
+          if (existing) {
+            accountInfoCache.set(address, {
+              ...existing,
+              data: updated,
+              timestamp: Date.now()
+            });
+          }
+
+          onUpdate(updated);
+        },
+        'confirmed'
+      );
+
+      cacheEntry.subscription = subId;
+    }
+
+    accountInfoCache.set(address, cacheEntry);
+    return result;
   } catch (error) {
     console.error('Error fetching account info:', error);
     return null;
+  }
+}
+
+// Batch fetch account info for multiple addresses
+export async function getMultipleAccounts(addresses: string[]) {
+  try {
+    const now = Date.now();
+    const result = new Map();
+    const addressesToFetch = [];
+
+    // Check cache first
+    for (const address of addresses) {
+      const cached = accountInfoCache.get(address);
+      if (cached && (now - cached.timestamp) < ACCOUNT_CACHE_EXPIRY) {
+        result.set(address, cached.data);
+      } else {
+        addressesToFetch.push(address);
+      }
+    }
+
+    if (addressesToFetch.length === 0) {
+      return result;
+    }
+
+    // Fetch uncached accounts in batches of 100
+    const BATCH_SIZE = 100;
+    const publicKeys = addressesToFetch.map(addr => new PublicKey(addr));
+    
+    for (let i = 0; i < publicKeys.length; i += BATCH_SIZE) {
+      const batch = publicKeys.slice(i, i + BATCH_SIZE);
+      const accounts = await connection.getMultipleAccountsInfo(batch, 'confirmed');
+      
+      accounts.forEach((account, index) => {
+        if (!account) return;
+
+        const address = addressesToFetch[i + index];
+        const accountData = {
+          address,
+          lamports: account.lamports,
+          owner: account.owner.toBase58(),
+          executable: account.executable,
+          rentEpoch: account.rentEpoch,
+          data: account.data
+        };
+
+        // Cache the result
+        accountInfoCache.set(address, {
+          data: accountData,
+          timestamp: now
+        });
+
+        result.set(address, accountData);
+      });
+    }
+
+    return result;
+  } catch (error) {
+    console.error('Error batch fetching accounts:', error);
+    return new Map();
+  }
+}
+
+// Cleanup function to remove account subscriptions
+export function unsubscribeFromAccount(address: string) {
+  const cached = accountInfoCache.get(address);
+  if (cached?.subscription) {
+    connection.removeAccountChangeListener(cached.subscription);
+    const { subscription, ...rest } = cached;
+    accountInfoCache.set(address, rest);
   }
 }
 
@@ -196,43 +336,57 @@ export interface TransactionInfo {
   programs: string[];
 }
 
+// Cache for transaction data
+const transactionCache = new Map<string, {
+  data: TransactionInfo;
+  timestamp: number;
+}>();
+
+const TX_CACHE_EXPIRY = 5 * 60 * 1000; // 5 minutes
+
+// Track active subscriptions to avoid duplicates
+const activeSubscriptions = new Map<string, number>();
+
 export async function getTransactionHistory(
   address: string, 
-  options: TransactionHistoryOptions = {}
+  options: TransactionHistoryOptions = {},
+  onUpdate?: (transaction: TransactionInfo) => void
 ): Promise<TransactionInfo[]> {
   try {
     const publicKey = new PublicKey(address);
-    const { limit = 10, before, until, type = 'all' } = options;
+    const { limit = 50, before, until, type = 'all' } = options;
+    const now = Date.now();
 
+    // Get initial transactions in a single call with a larger limit
     const signatures = await connection.getSignaturesForAddress(
       publicKey,
       { 
         limit,
-        before: before ? before : undefined, // Keep as string since that's what the API expects
+        before: before ? before : undefined,
         until: until ? until : undefined,
       }
     );
 
-    const transactions = await Promise.all(
-      signatures.map(async (sig) => {
+    // Process all signatures in a single batch
+    const txs = await connection.getParsedTransactions(
+      signatures.map(sig => sig.signature),
+      { maxSupportedTransactionVersion: 0 }
+    );
+
+    const transactions = txs
+      .map((tx, index) => {
+        if (!tx || !tx.meta) return null;
+        const signature = signatures[index].signature;
+
         try {
-          const tx = await connection.getParsedTransaction(sig.signature, {
-            maxSupportedTransactionVersion: 0,
-          });
-
-          if (!tx || !tx.meta) return null;
-
           const blockTime = tx.blockTime || 0;
           const slot = tx.slot;
           const fee = tx.meta.fee / 1e9;
           const status = tx.meta.err ? 'error' : 'success';
-
-          // Get the first signer as the 'from' address
           const from = tx.transaction.message.accountKeys.find(key => key.signer)?.pubkey.toBase58() || '';
 
-          // Initialize transaction info
           const txInfo: TransactionInfo = {
-            signature: sig.signature,
+            signature,
             slot,
             blockTime,
             status,
@@ -244,7 +398,79 @@ export async function getTransactionHistory(
           };
 
           // Process instructions
-          if (tx.transaction.message.instructions) {
+          tx.transaction.message.instructions.forEach((inst: any) => {
+            if (!inst) return;
+
+            let programId = '';
+            if ('programId' in inst) {
+              programId = inst.programId.toBase58();
+            } else if ('program' in inst) {
+              programId = inst.program;
+            }
+
+            if (!programId) return;
+
+            if (!txInfo.programs.includes(programId)) {
+              txInfo.programs.push(programId);
+            }
+
+            txInfo.instructions.push({
+              program: programId,
+              data: inst.data || ''
+            });
+
+            if (inst.program === 'system' && inst.parsed?.type === 'transfer') {
+              txInfo.value = (inst.parsed.info.lamports || 0) / 1e9;
+            }
+          });
+
+          // Cache the transaction
+          transactionCache.set(signature, {
+            data: txInfo,
+            timestamp: now
+          });
+
+          return txInfo;
+        } catch (err) {
+          console.error(`Error processing transaction ${signature}:`, err);
+          return null;
+        }
+      })
+      .filter((tx): tx is TransactionInfo => tx !== null)
+      .sort((a, b) => b.blockTime - a.blockTime);
+
+    // Set up WebSocket subscription for new transactions if callback provided
+    if (onUpdate && !activeSubscriptions.has(address)) {
+      const subId = connection.onLogs(
+        publicKey,
+        async (logs) => {
+          // Only process if signature exists and we have a callback
+          if (!logs.signature || !onUpdate) return;
+
+          try {
+            // Check if we already have this transaction
+            if (transactionCache.has(logs.signature)) return;
+
+            // Fetch and process the new transaction
+            const tx = await connection.getParsedTransaction(logs.signature, {
+              maxSupportedTransactionVersion: 0
+            });
+
+            if (!tx || !tx.meta) return;
+
+            const txInfo: TransactionInfo = {
+              signature: logs.signature,
+              slot: tx.slot,
+              blockTime: tx.blockTime || 0,
+              status: tx.meta.err ? 'error' : 'success',
+              fee: tx.meta.fee / 1e9,
+              value: 0,
+              from: tx.transaction.message.accountKeys.find(key => key.signer)?.pubkey.toBase58() || '',
+              instructions: [],
+              programs: []
+            };
+
+            // Process instructions
             tx.transaction.message.instructions.forEach((inst: any) => {
               if (!inst) return;
 
@@ -257,36 +483,50 @@ export async function getTransactionHistory(
 
               if (!programId) return;
 
-              // Add program to the list if not already included
               if (!txInfo.programs.includes(programId)) {
                 txInfo.programs.push(programId);
               }
 
-              // Add instruction info
               txInfo.instructions.push({
                 program: programId,
                 data: inst.data || ''
               });
 
-              // Handle SOL transfers
               if (inst.program === 'system' && inst.parsed?.type === 'transfer') {
                 txInfo.value = (inst.parsed.info.lamports || 0) / 1e9;
               }
             });
+
+            // Cache and notify
+            transactionCache.set(logs.signature, {
+              data: txInfo,
+              timestamp: Date.now()
+            });
+
+            onUpdate(txInfo);
+          } catch (err) {
+            console.error('Error processing new transaction:', err);
           }
+        },
+        'confirmed'
+      );
 
-          return txInfo;
-        } catch (err) {
-          console.error(`Error processing transaction ${sig.signature}:`, err);
-          return null;
-        }
-      })
-    );
+      activeSubscriptions.set(address, subId);
+    }
 
-    return transactions.filter((tx): tx is TransactionInfo => tx !== null);
+    return transactions;
   } catch (error) {
     console.error('Error fetching transaction history:', error);
     return [];
+  }
+}
+
+// Cleanup function to remove subscriptions
+export function unsubscribeFromTransactions(address: string) {
+  const subId = activeSubscriptions.get(address);
+  if (subId !== undefined) {
+    connection.removeOnLogsListener(subId);
+    activeSubscriptions.delete(address);
   }
 }
 
@@ -491,50 +731,118 @@ export interface TokenAccountInfo {
   usdValue: number; // Added USD value field
 }
 
-export async function getTokenAccounts(address: string): Promise<TokenAccountInfo[]> {
+export interface AccountData {
+  address: string;
+  lamports: number;
+  owner: string;
+  executable: boolean;
+  rentEpoch: number;
+  tokenAccounts: TokenAccountInfo[];
+  isSystemProgram: boolean;
+}
+
+// Cache for token metadata
+const tokenMetadataCache = new Map<string, {
+  symbol: string;
+  decimals: number;
+  timestamp: number;
+}>();
+
+const TOKEN_METADATA_EXPIRY = 5 * 60 * 1000; // 5 minutes
+
+export async function getTokenAccounts(address: string): Promise<AccountData> {
   try {
     const publicKey = new PublicKey(address);
-    const tokenAccounts = await connection.getParsedTokenAccountsByOwner(publicKey, {
-      programId: TOKEN_PROGRAM_ID,
+    const now = Date.now();
+    
+    // Get token accounts and account info in parallel
+    const [tokenAccounts, accountInfo] = await Promise.all([
+      connection.getParsedTokenAccountsByOwner(publicKey, {
+        programId: TOKEN_PROGRAM_ID,
+      }),
+      connection.getAccountInfo(publicKey)
+    ]);
+
+    if (!accountInfo) {
+      throw new Error('Account not found');
+    }
+
+    // Get unique mints that need metadata
+    const mintsToFetch = new Set<string>();
+    tokenAccounts.value.forEach(account => {
+      const mint = account.account.data.parsed.info.mint;
+      if (!tokenMetadataCache.has(mint) || 
+          now - tokenMetadataCache.get(mint)!.timestamp > TOKEN_METADATA_EXPIRY) {
+        mintsToFetch.add(mint);
+      }
     });
 
-    // First get all mint infos in parallel
-    const mintInfoPromises = tokenAccounts.value.map(account => 
-      getMintInfo(account.account.data.parsed.info.mint)
+    // Batch fetch mint metadata
+    if (mintsToFetch.size > 0) {
+      const mintPubkeys = Array.from(mintsToFetch).map(mint => new PublicKey(mint));
+      const mintInfos = await connection.getMultipleAccountsInfo(mintPubkeys);
+      
+      mintInfos.forEach((info, index) => {
+        if (!info) return;
+        const mint = mintPubkeys[index].toBase58();
+        try {
+          const data = info.data;
+          const decimals = data[44];
+          // Note: Symbol would need additional parsing from metadata program
+          // For now, we'll use a placeholder
+          tokenMetadataCache.set(mint, {
+            symbol: '',  // Will be updated with price data
+            decimals,
+            timestamp: now
+          });
+        } catch (err) {
+          console.error(`Error parsing mint ${mint}:`, err);
+        }
+      });
+    }
+
+    // Process token accounts with cached metadata
+    const accountsWithMetadata = await Promise.all(
+      tokenAccounts.value.map(async (account) => {
+        const parsedInfo = account.account.data.parsed.info;
+        const mint = parsedInfo.mint;
+        const metadata = tokenMetadataCache.get(mint) || {
+          symbol: '',
+          decimals: parsedInfo.tokenAmount.decimals
+        };
+        const uiAmount = parsedInfo.tokenAmount.uiAmount || 0;
+        
+        // Get price data (this could also be batched/cached if needed)
+        const priceData = await getTokenPrice(mint);
+        // Update symbol only if we have additional metadata
+        const symbol = metadata.symbol || 'Unknown';
+
+        return {
+          mint,
+          symbol,
+          decimals: metadata.decimals,
+          uiAmount,
+          owner: parsedInfo.owner,
+          address: account.pubkey.toBase58(),
+          usdValue: priceData.priceUsd ? priceData.priceUsd * uiAmount : 0
+        };
+      })
     );
-    const mintInfos = await Promise.all(mintInfoPromises);
 
-    // Prepare token accounts with mint info
-    const accountsWithMintInfo = tokenAccounts.value.map((account, index) => {
-      const parsedInfo = account.account.data.parsed.info;
-      const mintInfo = mintInfos[index];
-      const uiAmount = parsedInfo.tokenAmount.uiAmount || 0;
+    // Filter out zero balances and sort by USD value
+    const nonZeroAccounts = accountsWithMetadata
+      .filter(account => account.uiAmount > 0)
+      .sort((a, b) => (b.usdValue || 0) - (a.usdValue || 0));
 
-      return {
-        mint: parsedInfo.mint,
-        symbol: mintInfo?.symbol || '',
-        decimals: parsedInfo.tokenAmount.decimals,
-        uiAmount,
-        owner: parsedInfo.owner,
-        address: account.pubkey.toBase58(),
-        usdValue: 0 // Will be updated with price data
-      };
-    });
-
-    // Filter out zero balances before fetching prices
-    const nonZeroAccounts = accountsWithMintInfo.filter(account => account.uiAmount > 0);
-    
-    // Batch fetch prices for all non-zero balance tokens
-    const prices = await batchGetTokenPrices(nonZeroAccounts.map(account => account.mint));
-    
-    // Update USD values
-    nonZeroAccounts.forEach(account => {
-      const priceData = prices.get(account.mint);
-      account.usdValue = priceData?.priceUsd ? priceData.priceUsd * account.uiAmount : 0;
-    });
-
-    // Sort by USD value
-    return nonZeroAccounts.sort((a, b) => b.usdValue - a.usdValue);
+    return {
+      address,
+      lamports: accountInfo.lamports,
+      owner: accountInfo.owner.toBase58(),
+      executable: accountInfo.executable,
+      rentEpoch: accountInfo.rentEpoch,
+      tokenAccounts: nonZeroAccounts,
+      isSystemProgram: accountInfo.owner.equals(SystemProgram.programId)
+    };
   } catch (error) {
     console.error('Error fetching token accounts:', error);
     throw error;
