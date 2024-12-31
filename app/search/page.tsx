@@ -4,14 +4,22 @@ import { Card, CardHeader, CardContent } from 'rinlab';
 import { SearchParams } from 'next/navigation';
 
 type Props = {
-  searchParams: Promise<any>;
-  params: Promise<any>;
+  searchParams: { q?: string };
+  params: Record<string, string>;
 };
 
-export default async function SearchPage({
+export default function SearchPage({
   searchParams,
 }: Props) {
   const query = searchParams.q || '';
+
+  if (!query) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <h1 className="text-2xl font-bold mb-6">Please enter a search query</h1>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto px-4 py-8">

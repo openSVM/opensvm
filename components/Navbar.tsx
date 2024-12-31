@@ -1,15 +1,19 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, FormEvent } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { AIChatSidebar } from './ai/AIChatSidebar';
-import { Menu, X } from 'lucide-react';
+import { Menu, X, Search } from 'lucide-react';
+import { PublicKey } from '@solana/web3.js';
 
 interface NavbarProps {
   children: React.ReactNode;
 }
 
 export function Navbar({ children }: NavbarProps) {
+  const router = useRouter();
+  const [searchQuery, setSearchQuery] = useState('');
   const [isAIChatOpen, setIsAIChatOpen] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(400);
   const [isResizing, setIsResizing] = useState(false);
@@ -26,6 +30,28 @@ export function Navbar({ children }: NavbarProps) {
   const handleResizeEnd = useCallback(() => {
     setIsResizing(false);
   }, []);
+
+  const isSolanaAddress = (query: string): boolean => {
+    try {
+      // Try to create a PublicKey from the query
+      new PublicKey(query);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const handleSearch = (e: FormEvent) => {
+    e.preventDefault();
+    const trimmedQuery = searchQuery.trim();
+    if (!trimmedQuery) return;
+
+    if (isSolanaAddress(trimmedQuery)) {
+      router.push(`/account/${trimmedQuery}`);
+    } else {
+      router.push(`/search?q=${encodeURIComponent(trimmedQuery)}`);
+    }
+  };
 
   return (
     <>
@@ -52,6 +78,20 @@ export function Navbar({ children }: NavbarProps) {
                 </Link>
               </div>
 
+              {/* Search Bar */}
+              <form onSubmit={handleSearch} className="hidden md:flex flex-1 max-w-md mx-6">
+                <div className="relative w-full">
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search accounts, tokens, or programs..."
+                    className="w-full px-4 py-2 pl-10 bg-gray-100 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00e599] focus:border-transparent"
+                  />
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+                </div>
+              </form>
+
               {/* Desktop Menu */}
               <div className="hidden md:flex items-center space-x-6">
                 <Link href="/" className="text-sm font-medium hover:text-gray-600">Home</Link>
@@ -75,6 +115,19 @@ export function Navbar({ children }: NavbarProps) {
             {/* Mobile Menu */}
             <div className={`md:hidden transition-all duration-300 ease-in-out ${isMenuOpen ? 'max-h-64 opacity-100' : 'max-h-0 opacity-0'} overflow-hidden`}>
               <div className="py-2 space-y-2">
+                {/* Mobile Search */}
+                <form onSubmit={handleSearch} className="px-4">
+                  <div className="relative w-full">
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="Search accounts, tokens, or programs..."
+                      className="w-full px-4 py-2 pl-10 bg-gray-100 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00e599] focus:border-transparent"
+                    />
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+                  </div>
+                </form>
                 <Link href="/" className="block px-4 py-2 text-sm hover:bg-gray-100 rounded-lg">Home</Link>
                 <Link href="/tokens" className="block px-4 py-2 text-sm hover:bg-gray-100 rounded-lg">Tokens</Link>
                 <Link href="/nfts" className="block px-4 py-2 text-sm hover:bg-gray-100 rounded-lg">NFTs</Link>
