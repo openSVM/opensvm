@@ -150,25 +150,29 @@ export default function TransactionTable({
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap">
                     <Text variant="default" className="text-[13px]">
-                      {tx.value.toFixed(4)}
+                      {tx.value !== undefined ? tx.value.toFixed(4) : '-'}
                     </Text>
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap">
                     <Text variant="default" className="text-[13px]">
-                      {tx.fee.toFixed(6)}
+                      {tx.fee !== undefined ? tx.fee.toFixed(6) : '-'}
                     </Text>
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center space-x-2">
-                      {tx.programs.map((program, i) => (
-                        <Link
-                          key={i}
-                          href={`/account/${program}`}
-                          className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 hover:bg-gray-200"
-                        >
-                          {program.slice(0, 4)}...{program.slice(-4)}
-                        </Link>
-                      ))}
+                      {tx.programs && tx.programs.length > 0 ? (
+                        tx.programs.map((program, i) => (
+                          <Link
+                            key={i}
+                            href={`/account/${program}`}
+                            className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 hover:bg-gray-200"
+                          >
+                            {program.slice(0, 4)}...{program.slice(-4)}
+                          </Link>
+                        ))
+                      ) : (
+                        <span className="text-[13px] text-gray-500">-</span>
+                      )}
                     </div>
                   </td>
                 </tr>

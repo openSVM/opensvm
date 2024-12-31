@@ -161,86 +161,14 @@ interface AccountCacheEntry {
 }
 
 const accountInfoCache = new Map<string, AccountCacheEntry>();
-
-const ACCOUNT_CACHE_EXPIRY = 30 * 1000; // 30 seconds
+const ACCOUNT_CACHE_EXPIRY = 30 * 1000;
 
 // Get account info with caching and WebSocket subscription
 export async function getAccountInfo(
   address: string,
   onUpdate?: (accountInfo: any) => void
 ) {
-  try {
-    const now = Date.now();
-    const cached = accountInfoCache.get(address);
-
-    // Return cached data if still valid
-    if (cached && (now - cached.timestamp) < ACCOUNT_CACHE_EXPIRY) {
-      return cached.data;
-    }
-
-    // Fetch new data
-    const publicKey = new PublicKey(address);
-    const accountInfo = await connection.getParsedAccountInfo(publicKey, {
-      commitment: 'confirmed'
-    });
-    
-    if (!accountInfo.value) {
-      return null;
-    }
-
-    const result = {
-      address,
-      lamports: accountInfo.value.lamports,
-      owner: accountInfo.value.owner.toBase58(),
-      executable: accountInfo.value.executable,
-      rentEpoch: accountInfo.value.rentEpoch,
-      data: accountInfo.value.data
-    };
-
-    // Cache the result
-    const cacheEntry = {
-      data: result,
-      timestamp: now
-    };
-
-    // Set up WebSocket subscription for account updates if callback provided
-    if (onUpdate && !cached?.subscription) {
-      const subId = connection.onAccountChange(
-        publicKey,
-        (accountInfo) => {
-          const updated = {
-            address,
-            lamports: accountInfo.lamports,
-            owner: accountInfo.owner.toBase58(),
-            executable: accountInfo.executable,
-            rentEpoch: accountInfo.rentEpoch,
-            data: accountInfo.data
-          };
-
-          // Update cache
-          const existing = accountInfoCache.get(address);
-          if (existing) {
-            accountInfoCache.set(address, {
-              ...existing,
-              data: updated,
-              timestamp: Date.now()
-            });
-          }
-
-          onUpdate(updated);
-        },
-        'confirmed'
-      );
-
-      cacheEntry.subscription = subId;
-    }
-
-    accountInfoCache.set(address, cacheEntry);
-    return result;
-  } catch (error) {
-    console.error('Error fetching account info:', error);
-    return null;
-  }
+  return (await getMultipleAccounts([address])).get(address) || null;
 }
 
 // Batch fetch account info for multiple addresses
@@ -270,7 +198,9 @@ export async function getMultipleAccounts(addresses: string[]) {
     
     for (let i = 0; i < publicKeys.length; i += BATCH_SIZE) {
       const batch = publicKeys.slice(i, i + BATCH_SIZE);
-      const accounts = await connection.getMultipleAccountsInfo(batch, 'confirmed');
+      const accounts = await connection.getMultipleAccountsInfo(batch, {
+        commitment: 'confirmed'
+      });
       
       accounts.forEach((account, index) => {
         if (!account) return;
@@ -282,7 +212,7 @@ export async function getMultipleAccounts(addresses: string[]) {
           owner: account.owner.toBase58(),
           executable: account.executable,
           rentEpoch: account.rentEpoch,
-          data: account.data
+          data: Buffer.isBuffer(account.data) ? account.data : Buffer.from(account.data, 'base64')
         };
 
         // Cache the result
@@ -338,7 +268,7 @@ export interface TransactionInfo {
 
 // Cache for transaction data
 const transactionCache = new Map<string, {
-  data: TransactionInfo;
+  data: DetailedTransactionInfo;
   timestamp: number;
 }>();
 
@@ -350,8 +280,8 @@ const activeSubscriptions = new Map<string, number>();
 export async function getTransactionHistory(
   address: string, 
   options: TransactionHistoryOptions = {},
-  onUpdate?: (transaction: TransactionInfo) => void
-): Promise<TransactionInfo[]> {
+  onUpdate?: (transaction: DetailedTransactionInfo) => void
+): Promise<DetailedTransactionInfo[]> {
   try {
     const publicKey = new PublicKey(address);
     const { limit = 50, before, until, type = 'all' } = options;
@@ -368,76 +298,9 @@ export async function getTransactionHistory(
     );
 
     // Process all signatures in a single batch
-    const txs = await connection.getParsedTransactions(
-      signatures.map(sig => sig.signature),
-      { maxSupportedTransactionVersion: 0 }
+    const transactions = await getMultipleTransactionDetails(
+      signatures.map(sig => sig.signature)
     );
-
-    const transactions = txs
-      .map((tx, index) => {
-        if (!tx || !tx.meta) return null;
-        const signature = signatures[index].signature;
-
-        try {
-          const blockTime = tx.blockTime || 0;
-          const slot = tx.slot;
-          const fee = tx.meta.fee / 1e9;
-          const status = tx.meta.err ? 'error' : 'success';
-          const from = tx.transaction.message.accountKeys.find(key => key.signer)?.pubkey.toBase58() || '';
-
-          const txInfo: TransactionInfo = {
-            signature,
-            slot,
-            blockTime,
-            status,
-            fee,
-            value: 0,
-            from,
-            instructions: [],
-            programs: []
-          };
-
-          // Process instructions
-          tx.transaction.message.instructions.forEach((inst: any) => {
-            if (!inst) return;
-
-            let programId = '';
-            if ('programId' in inst) {
-              programId = inst.programId.toBase58();
-            } else if ('program' in inst) {
-              programId = inst.program;
-            }
-
-            if (!programId) return;
-
-            if (!txInfo.programs.includes(programId)) {
-              txInfo.programs.push(programId);
-            }
-
-            txInfo.instructions.push({
-              program: programId,
-              data: inst.data || ''
-            });
-
-            if (inst.program === 'system' && inst.parsed?.type === 'transfer') {
-              txInfo.value = (inst.parsed.info.lamports || 0) / 1e9;
-            }
-          });
-
-          // Cache the transaction
-          transactionCache.set(signature, {
-            data: txInfo,
-            timestamp: now
-          });
-
-          return txInfo;
-        } catch (err) {
-          console.error(`Error processing transaction ${signature}:`, err);
-          return null;
-        }
-      })
-      .filter((tx): tx is TransactionInfo => tx !== null)
-      .sort((a, b) => b.blockTime - a.blockTime);
 
     // Set up WebSocket subscription for new transactions if callback provided
     if (onUpdate && !activeSubscriptions.has(address)) {
@@ -452,50 +315,8 @@ export async function getTransactionHistory(
             if (transactionCache.has(logs.signature)) return;
 
             // Fetch and process the new transaction
-            const tx = await connection.getParsedTransaction(logs.signature, {
-              maxSupportedTransactionVersion: 0
-            });
-
-            if (!tx || !tx.meta) return;
-
-            const txInfo: TransactionInfo = {
-              signature: logs.signature,
-              slot: tx.slot,
-              blockTime: tx.blockTime || 0,
-              status: tx.meta.err ? 'error' : 'success',
-              fee: tx.meta.fee / 1e9,
-              value: 0,
-              from: tx.transaction.message.accountKeys.find(key => key.signer)?.pubkey.toBase58() || '',
-              instructions: [],
-              programs: []
-            };
-
-            // Process instructions
-            tx.transaction.message.instructions.forEach((inst: any) => {
-              if (!inst) return;
-
-              let programId = '';
-              if ('programId' in inst) {
-                programId = inst.programId.toBase58();
-              } else if ('program' in inst) {
-                programId = inst.program;
-              }
-
-              if (!programId) return;
-
-              if (!txInfo.programs.includes(programId)) {
-                txInfo.programs.push(programId);
-              }
-
-              txInfo.instructions.push({
-                program: programId,
-                data: inst.data || ''
-              });
-
-              if (inst.program === 'system' && inst.parsed?.type === 'transfer') {
-                txInfo.value = (inst.parsed.info.lamports || 0) / 1e9;
-              }
-            });
+            const txInfo = (await getMultipleTransactionDetails([logs.signature]))[0];
+            if (!txInfo) return;
 
             // Cache and notify
             transactionCache.set(logs.signature, {
@@ -514,7 +335,7 @@ export async function getTransactionHistory(
       activeSubscriptions.set(address, subId);
     }
 
-    return transactions;
+    return transactions.filter((tx): tx is DetailedTransactionInfo => tx !== null);
   } catch (error) {
     console.error('Error fetching transaction history:', error);
     return [];
@@ -532,9 +353,10 @@ export function unsubscribeFromTransactions(address: string) {
 
 async function getTokenSymbol(mint: string): Promise<string | undefined> {
   try {
-    const tokenInfo = await connection.getParsedAccountInfo(new PublicKey(mint));
-    if (tokenInfo.value?.data && 'parsed' in tokenInfo.value.data) {
-      return tokenInfo.value.data.parsed.info.symbol;
+    const accounts = await getMultipleAccounts([mint]);
+    const tokenInfo = accounts.get(mint);
+    if (tokenInfo?.data && 'parsed' in tokenInfo.data) {
+      return tokenInfo.data.parsed.info.symbol;
     }
   } catch (error) {
     console.error('Error fetching token symbol:', error);
@@ -563,68 +385,109 @@ export interface DetailedTransactionInfo {
 }
 
 export async function getTransactionDetails(signature: string): Promise<DetailedTransactionInfo | null> {
+  return (await getMultipleTransactionDetails([signature]))[0] || null;
+}
+
+export async function getMultipleTransactionDetails(signatures: string[]): Promise<(DetailedTransactionInfo | null)[]> {
   try {
-    const tx = await connection.getParsedTransaction(signature, {
-      maxSupportedTransactionVersion: 0,
+    const now = Date.now();
+    const result: (DetailedTransactionInfo | null)[] = [];
+    const sigsToFetch: string[] = [];
+
+    // Check cache first
+    signatures.forEach(sig => {
+      const cached = transactionCache.get(sig);
+      if (cached && (now - cached.timestamp) < TX_CACHE_EXPIRY) {
+        result.push(cached.data);
+      } else {
+        sigsToFetch.push(sig);
+        result.push(null);
+      }
     });
 
-    if (!tx) {
-      return null;
+    if (sigsToFetch.length === 0) {
+      return result;
     }
 
-    // Extract from and to addresses from the first transfer instruction
-    const accountKeys = tx.transaction.message.accountKeys;
-    let from = accountKeys[0].pubkey.toBase58();
-    let to = from;
-    let amount = 0;
-    let type = 'Unknown';
+    // Fetch transactions in batches
+    const BATCH_SIZE = 100;
+    for (let i = 0; i < sigsToFetch.length; i += BATCH_SIZE) {
+      const batch = sigsToFetch.slice(i, i + BATCH_SIZE);
+      const txs = await connection.getParsedTransactions(batch, {
+        maxSupportedTransactionVersion: 0,
+      });
 
-    // Try to determine transaction type and extract transfer details
-    if (tx.meta && tx.transaction.message.instructions.length > 0) {
-      const instruction = tx.transaction.message.instructions[0];
-      
-      if ('program' in instruction) {
-        if (instruction.program === 'system') {
-          type = 'System Transfer';
-          if (instruction.parsed.type === 'transfer') {
-            amount = instruction.parsed.info.lamports / 1e9;
-            from = instruction.parsed.info.source;
-            to = instruction.parsed.info.destination;
+      txs.forEach((tx, index) => {
+        if (!tx) return;
+
+        const signature = batch[index];
+        const resultIndex = signatures.indexOf(signature);
+
+        // Extract from and to addresses from the first transfer instruction
+        const accountKeys = tx.transaction.message.accountKeys;
+        let from = accountKeys[0].pubkey.toBase58();
+        let to = from;
+        let amount = 0;
+        let type = 'Unknown';
+
+        // Try to determine transaction type and extract transfer details
+        if (tx.meta && tx.transaction.message.instructions.length > 0) {
+          const instruction = tx.transaction.message.instructions[0];
+          
+          if ('program' in instruction) {
+            if (instruction.program === 'system') {
+              type = 'System Transfer';
+              if (instruction.parsed.type === 'transfer') {
+                amount = instruction.parsed.info.lamports / 1e9;
+                from = instruction.parsed.info.source;
+                to = instruction.parsed.info.destination;
+              }
+            } else if (instruction.program === 'spl-token') {
+              type = 'Token Transfer';
+            }
+          } else if ('programId' in instruction) {
+            const programId = instruction.programId.toString();
+            if (programId === SystemProgram.programId.toString()) {
+              type = 'System Transfer';
+            } else if (programId === TOKEN_PROGRAM_ID.toString()) {
+              type = 'Token Transfer';
+            }
           }
-        } else if (instruction.program === 'spl-token') {
-          type = 'Token Transfer';
         }
-      } else if ('programId' in instruction) {
-        const programId = instruction.programId.toString();
-        if (programId === SystemProgram.programId.toString()) {
-          type = 'System Transfer';
-        } else if (programId === TOKEN_PROGRAM_ID.toString()) {
-          type = 'Token Transfer';
-        }
-      }
+
+        const txInfo: DetailedTransactionInfo = {
+          signature,
+          slot: tx.slot,
+          blockTime: tx.blockTime,
+          status: tx.meta?.err ? 'error' : 'success',
+          fee: (tx.meta?.fee || 0) / 1e9,
+          from,
+          to,
+          amount,
+          type,
+          computeUnits: tx.meta?.computeUnitsConsumed || 0,
+          accounts: accountKeys.map(key => key.pubkey.toBase58()),
+          instructions: tx.transaction.message.instructions.map(ix => ({
+            programId: 'program' in ix ? ix.program : ix.programId.toString(),
+            data: 'data' in ix ? ix.data : '',
+          })),
+          logs: tx.meta?.logMessages || [],
+        };
+
+        // Cache the result
+        transactionCache.set(signature, {
+          data: txInfo,
+          timestamp: now
+        });
+
+        result[resultIndex] = txInfo;
+      });
     }
 
-    return {
-      signature,
-      slot: tx.slot,
-      blockTime: tx.blockTime,
-      status: tx.meta?.err ? 'error' : 'success',
-      fee: (tx.meta?.fee || 0) / 1e9,
-      from,
-      to,
-      amount,
-      type,
-      computeUnits: tx.meta?.computeUnitsConsumed || 0,
-      accounts: accountKeys.map(key => key.pubkey.toBase58()),
-      instructions: tx.transaction.message.instructions.map(ix => ({
-        programId: 'program' in ix ? ix.program : ix.programId.toString(),
-        data: 'data' in ix ? ix.data : '',
-      })),
-      logs: tx.meta?.logMessages || [],
-    };
+    return result;
   } catch (error) {
     console.error('Error fetching transaction details:', error);
-    return null;
+    return signatures.map(() => null);
   }
 }
 
@@ -750,98 +613,208 @@ const tokenMetadataCache = new Map<string, {
 
 const TOKEN_METADATA_EXPIRY = 5 * 60 * 1000; // 5 minutes
 
+// Add new cache for batch token prices
+const BATCH_TOKEN_PRICE_CACHE = new Map<string, {
+  data: {
+    priceUsd: number | null;
+    priceChange24h: number | null;
+    volume24h: number | null;
+  };
+  timestamp: number;
+}>();
+
+const BATCH_SIZE = 100; // Maximum batch size for RPC requests
+const CACHE_DURATION = 30 * 1000; // 30 seconds cache
+
 export async function getTokenAccounts(address: string): Promise<AccountData> {
   try {
     const publicKey = new PublicKey(address);
     const now = Date.now();
     
-    // Get token accounts and account info in parallel
-    const [tokenAccounts, accountInfo] = await Promise.all([
-      connection.getParsedTokenAccountsByOwner(publicKey, {
-        programId: TOKEN_PROGRAM_ID,
-      }),
-      connection.getAccountInfo(publicKey)
-    ]);
+    // Get token accounts first to collect all needed addresses
+    const tokenAccounts = await connection.getTokenAccountsByOwner(publicKey, {
+      programId: TOKEN_PROGRAM_ID
+    });
 
+    // Collect all addresses we need to fetch
+    const addressesToFetch = new Set<string>([address]); // Start with the main account
+    const tokenDataMap = new Map<string, { amount: bigint, pubkey: PublicKey }>();
+    const metadataAddresses = new Map<string, string>(); // mint -> metadata address
+
+    // Process token accounts to collect mint addresses
+    for (const { account, pubkey } of tokenAccounts.value) {
+      const data = Buffer.isBuffer(account.data) ? account.data : Buffer.from(account.data, 'base64');
+      if (!data) continue;
+      
+      try {
+        const amount = data.slice(64, 72).readBigUInt64LE(0);
+        if (amount === 0n) continue; // Skip zero balances early
+        
+        const mintAddress = new PublicKey(data.slice(0, 32)).toBase58();
+        addressesToFetch.add(mintAddress); // Add mint address
+        tokenDataMap.set(mintAddress, { amount, pubkey });
+
+        // Get and add metadata address
+        const metadataAddress = (await getMetadataAddress(new PublicKey(mintAddress))).toBase58();
+        addressesToFetch.add(metadataAddress);
+        metadataAddresses.set(mintAddress, metadataAddress);
+      } catch (err) {
+        console.error('Error parsing token data:', err);
+      }
+    }
+
+    // Fetch all accounts in a single batch call
+    const accounts = await getMultipleAccounts(Array.from(addressesToFetch));
+    
+    // Get main account info
+    const accountInfo = accounts.get(address);
     if (!accountInfo) {
       throw new Error('Account not found');
     }
 
-    // Get unique mints that need metadata
-    const mintsToFetch = new Set<string>();
-    tokenAccounts.value.forEach(account => {
-      const mint = account.account.data.parsed.info.mint;
-      if (!tokenMetadataCache.has(mint) || 
-          now - tokenMetadataCache.get(mint)!.timestamp > TOKEN_METADATA_EXPIRY) {
-        mintsToFetch.add(mint);
-      }
-    });
-
-    // Batch fetch mint metadata
-    if (mintsToFetch.size > 0) {
-      const mintPubkeys = Array.from(mintsToFetch).map(mint => new PublicKey(mint));
-      const mintInfos = await connection.getMultipleAccountsInfo(mintPubkeys);
-      
-      mintInfos.forEach((info, index) => {
-        if (!info) return;
-        const mint = mintPubkeys[index].toBase58();
-        try {
-          const data = info.data;
-          const decimals = data[44];
-          // Note: Symbol would need additional parsing from metadata program
-          // For now, we'll use a placeholder
-          tokenMetadataCache.set(mint, {
-            symbol: '',  // Will be updated with price data
-            decimals,
-            timestamp: now
-          });
-        } catch (err) {
-          console.error(`Error parsing mint ${mint}:`, err);
-        }
-      });
+    // Early return if no token accounts
+    if (tokenAccounts.value.length === 0) {
+      return {
+        address,
+        lamports: accountInfo.lamports,
+        owner: accountInfo.owner,
+        executable: accountInfo.executable,
+        rentEpoch: accountInfo.rentEpoch,
+        tokenAccounts: [],
+        isSystemProgram: accountInfo.owner === SystemProgram.programId.toBase58()
+      };
     }
 
-    // Process token accounts with cached metadata
-    const accountsWithMetadata = await Promise.all(
-      tokenAccounts.value.map(async (account) => {
-        const parsedInfo = account.account.data.parsed.info;
-        const mint = parsedInfo.mint;
-        const metadata = tokenMetadataCache.get(mint) || {
-          symbol: '',
-          decimals: parsedInfo.tokenAmount.decimals
-        };
-        const uiAmount = parsedInfo.tokenAmount.uiAmount || 0;
-        
-        // Get price data (this could also be batched/cached if needed)
-        const priceData = await getTokenPrice(mint);
-        // Update symbol only if we have additional metadata
-        const symbol = metadata.symbol || 'Unknown';
+    // Process mint accounts and their metadata
+    const mintAddressesArray = Array.from(tokenDataMap.keys());
+    const mintInfoResults: [string, MintInfo | null][] = [];
+    
+    for (const mintAddress of mintAddressesArray) {
+      const cached = tokenMetadataCache.get(mintAddress);
+      if (cached && (now - cached.timestamp) < CACHE_DURATION) {
+        mintInfoResults.push([mintAddress, { 
+          decimals: cached.decimals,
+          symbol: cached.symbol
+        }]);
+        continue;
+      }
 
+      const mintAccountInfo = accounts.get(mintAddress);
+      const metadataAccountInfo = accounts.get(metadataAddresses.get(mintAddress)!);
+      
+      // Parse mint data
+      const mintData = Buffer.isBuffer(mintAccountInfo?.data) ? 
+        mintAccountInfo?.data : 
+        mintAccountInfo?.data ? Buffer.from(mintAccountInfo.data, 'base64') : null;
+
+      if (!mintData) {
+        mintInfoResults.push([mintAddress, null]);
+        continue;
+      }
+
+      // First byte is version, next byte is initialized
+      const decimals = mintData[44]; // Decimals is at offset 44 in mint account data
+      let mintInfo: MintInfo;
+
+      if (metadataAccountInfo?.data) {
+        try {
+          const metadata = decodeMetadata(
+            Buffer.isBuffer(metadataAccountInfo.data) ? 
+              metadataAccountInfo.data : 
+              Buffer.from(metadataAccountInfo.data, 'base64')
+          );
+          mintInfo = {
+            symbol: metadata.data.symbol || undefined,
+            name: metadata.data.name || undefined,
+            decimals
+          };
+        } catch (error) {
+          console.error('Error decoding metadata:', error);
+          mintInfo = { 
+            decimals,
+            name: `SPL Token (${mintAddress.slice(0, 4)}...${mintAddress.slice(-4)})`
+          };
+        }
+      } else {
+        mintInfo = { 
+          decimals,
+          name: `SPL Token (${mintAddress.slice(0, 4)}...${mintAddress.slice(-4)})`
+        };
+      }
+
+      // Cache the result
+      tokenMetadataCache.set(mintAddress, {
+        symbol: mintInfo.symbol || 'Unknown',
+        decimals: mintInfo.decimals,
+        timestamp: now
+      });
+
+      mintInfoResults.push([mintAddress, mintInfo]);
+    }
+
+    // Batch fetch prices
+    const pricePromises: Promise<[string, {
+      priceUsd: number | null;
+      priceChange24h: number | null;
+      volume24h: number | null;
+    }]>[] = [];
+
+    for (let i = 0; i < mintAddressesArray.length; i += BATCH_SIZE) {
+      const batch = mintAddressesArray.slice(i, i + BATCH_SIZE);
+      const batchPromises = batch.map(async mintAddress => {
+        const cached = BATCH_TOKEN_PRICE_CACHE.get(mintAddress);
+        if (cached && (now - cached.timestamp) < CACHE_DURATION) {
+          return [mintAddress, cached.data] as [string, typeof cached.data];
+        }
+        const price = await getTokenPrice(mintAddress);
+        BATCH_TOKEN_PRICE_CACHE.set(mintAddress, {
+          data: price,
+          timestamp: now
+        });
+        return [mintAddress, price] as [string, typeof price];
+      });
+      pricePromises.push(...batchPromises);
+    }
+
+    // Wait for price data
+    const priceResults = await Promise.all(pricePromises);
+
+    // Create lookup maps for fast access
+    const mintInfoMap = new Map(mintInfoResults);
+    const priceMap = new Map(priceResults);
+
+    // Process token accounts with all data available
+    const accountsWithMetadata = mintAddressesArray
+      .map(mintAddress => {
+        const tokenData = tokenDataMap.get(mintAddress);
+        const mintInfo = mintInfoMap.get(mintAddress);
+        const priceData = priceMap.get(mintAddress);
+        
+        if (!tokenData || !mintInfo) return null;
+        
+        const uiAmount = Number(tokenData.amount) / Math.pow(10, mintInfo.decimals);
+        
         return {
-          mint,
-          symbol,
-          decimals: metadata.decimals,
+          mint: mintAddress,
+          symbol: mintInfo.symbol || 'Unknown',
+          decimals: mintInfo.decimals,
           uiAmount,
-          owner: parsedInfo.owner,
-          address: account.pubkey.toBase58(),
-          usdValue: priceData.priceUsd ? priceData.priceUsd * uiAmount : 0
+          owner: publicKey.toBase58(),
+          address: tokenData.pubkey.toBase58(),
+          usdValue: priceData?.priceUsd ? priceData.priceUsd * uiAmount : 0
         };
       })
-    );
-
-    // Filter out zero balances and sort by USD value
-    const nonZeroAccounts = accountsWithMetadata
-      .filter(account => account.uiAmount > 0)
+      .filter((account): account is TokenAccountInfo => account !== null)
       .sort((a, b) => (b.usdValue || 0) - (a.usdValue || 0));
 
     return {
       address,
       lamports: accountInfo.lamports,
-      owner: accountInfo.owner.toBase58(),
+      owner: accountInfo.owner,
       executable: accountInfo.executable,
       rentEpoch: accountInfo.rentEpoch,
-      tokenAccounts: nonZeroAccounts,
-      isSystemProgram: accountInfo.owner.equals(SystemProgram.programId)
+      tokenAccounts: accountsWithMetadata,
+      isSystemProgram: accountInfo.owner === SystemProgram.programId.toBase58()
     };
   } catch (error) {
     console.error('Error fetching token accounts:', error);
@@ -858,36 +831,36 @@ interface MintInfo {
 async function getMintInfo(mintAddress: string): Promise<MintInfo | null> {
   try {
     const mintPublicKey = new PublicKey(mintAddress);
-    const mintAccountInfo = await connection.getParsedAccountInfo(mintPublicKey);
+    const metadataAddress = await getMetadataAddress(mintPublicKey);
+    
+    // Fetch both mint and metadata accounts in one batch
+    const accounts = await getMultipleAccounts([mintAddress, metadataAddress.toBase58()]);
+    const mintAccountInfo = accounts.get(mintAddress);
+    const metadataAccountInfo = accounts.get(metadataAddress.toBase58());
 
-    if (!mintAccountInfo.value?.data || !('parsed' in mintAccountInfo.value.data)) {
+    if (!mintAccountInfo?.data || !('parsed' in mintAccountInfo.data)) {
       return null;
     }
 
-    const { decimals } = mintAccountInfo.value.data.parsed.info;
+    const { decimals } = mintAccountInfo.data.parsed.info;
 
     // Try to get metadata if it exists
-    try {
-      const metadataAddress = await getMetadataAddress(mintPublicKey);
-      const metadataAccountInfo = await connection.getAccountInfo(metadataAddress);
-      
-      if (metadataAccountInfo && metadataAccountInfo.data) {
+    if (metadataAccountInfo?.data) {
+      try {
         const metadata = decodeMetadata(metadataAccountInfo.data);
         return {
           symbol: metadata.data.symbol || undefined,
           name: metadata.data.name || undefined,
           decimals
         };
+      } catch (error) {
+        console.error('Error decoding metadata:', error);
       }
-    } catch (error) {
-      console.error('Error fetching metadata:', error);
-      // Continue without metadata
     }
 
     // Return basic info if metadata is not available
     return { 
       decimals,
-      symbol: `SPL Token`,
       name: `SPL Token (${mintAddress.slice(0, 4)}...${mintAddress.slice(-4)})`
     };
   } catch (error) {
