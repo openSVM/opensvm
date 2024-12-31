@@ -2,10 +2,11 @@ import { Suspense } from 'react';
 import { Card, CardHeader, CardContent } from 'rinlab';
 
 interface SearchPageProps {
+  params: { [key: string]: string | string[] | undefined };
   searchParams: { q?: string };
 }
 
-export default function SearchPage({ searchParams }: SearchPageProps) {
+export default async function SearchPage({ searchParams }: SearchPageProps) {
   const query = searchParams.q || '';
 
   return (
