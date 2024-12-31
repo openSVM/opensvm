@@ -105,14 +105,13 @@ export default function HomePage() {
   ];
 
   return (
-    <main className="min-h-screen">
+    <main className="min-h-screen bg-white">
       {/* Mobile View */}
       <div className="md:hidden">
-        <div className="relative h-[40vh] w-full overflow-hidden">
-          <CyberpunkPerlin />
+        <div className="relative h-[25vh] w-full bg-white">
           <div className="absolute inset-0 flex flex-col items-center justify-center px-4">
-            <h1 className="text-2xl font-bold text-white text-center mb-4">
-              Explore the Solana Blockchain
+            <h1 className="text-3xl font-bold text-gray-900 text-center mb-4">
+              OpenSVM Explorer
             </h1>
             <form onSubmit={handleSearch} className="w-full">
               <div className="flex flex-col gap-2">
@@ -120,9 +119,12 @@ export default function HomePage() {
                   placeholder="Search by address, signature, block..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="flex-1 bg-white/90 backdrop-blur-sm"
+                  className="w-full bg-white border border-gray-200 text-gray-900 placeholder:text-gray-400 h-12 pl-4 rounded-lg focus:border-gray-400 focus:ring-gray-400"
                 />
-                <Button type="submit" className="w-full">
+                <Button 
+                  type="submit" 
+                  className="w-full h-12 bg-gray-900 hover:bg-gray-800 text-white font-medium rounded-lg"
+                >
                   Search
                 </Button>
               </div>
@@ -130,50 +132,49 @@ export default function HomePage() {
           </div>
         </div>
 
-        <div className="px-4 py-8">
-          <div className="grid grid-cols-1 gap-4 mb-8">
-            <div className="bg-white rounded-lg shadow p-4">
+        <div className="px-4 py-6">
+          <div className="grid grid-cols-2 gap-3 mb-6">
+            <div className="bg-white border border-gray-200 rounded-lg p-4 col-span-2">
               <h3 className="text-sm font-medium text-gray-500">Current Epoch</h3>
-              <p className="text-2xl font-bold">{stats?.epoch || '...'}</p>
-              <p className="text-sm text-gray-500">{stats?.epochProgress || 0}% complete</p>
+              <p className="text-2xl font-medium text-gray-900">{stats?.epoch || '...'}</p>
+              <div className="w-full bg-gray-100 h-1 mt-2 rounded-full overflow-hidden">
+                <div 
+                  className="bg-gray-900 h-1" 
+                  style={{ width: `${stats?.epochProgress || 0}%` }}
+                />
+              </div>
+              <p className="text-sm text-gray-500 mt-1">{stats?.epochProgress?.toFixed(2) || 0}% complete</p>
             </div>
-            <div className="bg-white rounded-lg shadow p-4">
+            <div className="bg-white border border-gray-200 rounded-lg p-4">
               <h3 className="text-sm font-medium text-gray-500">TPS</h3>
-              <p className="text-2xl font-bold">{stats?.tps || '...'}</p>
-              <p className="text-sm text-gray-500">{stats?.successRate || 0}% success rate</p>
+              <p className="text-2xl font-medium text-gray-900">{stats?.tps || '...'}</p>
+              <p className="text-sm text-gray-500">{stats?.successRate?.toFixed(1) || 0}% success</p>
             </div>
-            <div className="bg-white rounded-lg shadow p-4">
-              <h3 className="text-sm font-medium text-gray-500">Active Validators</h3>
-              <p className="text-2xl font-bold">{stats?.activeValidators || '...'}</p>
-              <p className="text-sm text-gray-500">Block Height: {stats?.blockHeight || '...'}</p>
+            <div className="bg-white border border-gray-200 rounded-lg p-4">
+              <h3 className="text-sm font-medium text-gray-500">Validators</h3>
+              <p className="text-2xl font-medium text-gray-900">{stats?.activeValidators || '...'}</p>
+              <p className="text-sm text-gray-500">Active now</p>
             </div>
           </div>
 
           <div className="space-y-6">
-            <div className="bg-white rounded-lg shadow p-4">
+            <div className="bg-white border border-gray-200 rounded-lg p-6">
               <h2 className="text-lg font-semibold mb-4">Recent Blocks</h2>
               <RecentBlocks />
             </div>
-            <div className="bg-white rounded-lg shadow p-4">
+            <div className="bg-white border border-gray-200 rounded-lg p-6">
               <h2 className="text-lg font-semibold mb-4">Recent Transactions</h2>
               <TransactionsInBlock />
-            </div>
-          </div>
-
-          <div className="mt-8 bg-white rounded-lg shadow p-4">
-            <h2 className="text-lg font-semibold mb-4">Network Performance</h2>
-            <div className="h-[300px]">
-              <NetworkResponseChart />
             </div>
           </div>
         </div>
       </div>
 
       {/* Desktop View */}
-      <div className="hidden md:block bg-white relative overflow-hidden">
-        <div className="container mx-auto px-4 py-8 relative">
+      <div className="hidden md:block relative">
+        <div className="container mx-auto px-4 py-8">
           {/* Hero Section */}
-          <div className="max-w-3xl mx-auto mb-12 relative z-10">
+          <div className="max-w-3xl mx-auto mb-12">
             <div className="text-center mb-8">
               <h1 className="text-5xl font-bold text-gray-900 mb-4">
                 OpenSVM Explorer
@@ -201,7 +202,7 @@ export default function HomePage() {
           </div>
 
           {/* Stats Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-12 relative z-10">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
             {STATS_ITEMS.map((stat) => (
               <div 
                 key={stat.label} 
@@ -215,7 +216,7 @@ export default function HomePage() {
 
           {/* Network Stats */}
           {stats && (
-            <div className="bg-white border border-gray-200 rounded-lg p-6 mb-12 relative z-10 shadow-sm">
+            <div className="bg-white border border-gray-200 rounded-lg p-6 mb-8">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div>
                   <div className="text-sm text-gray-500 mb-1">Current Epoch</div>
@@ -240,18 +241,28 @@ export default function HomePage() {
           )}
 
           {/* Main Content */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 relative z-10">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+              <h2 className="text-lg font-semibold mb-4">Recent Blocks</h2>
               <RecentBlocks />
             </div>
             <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+              <h2 className="text-lg font-semibold mb-4">Recent Transactions</h2>
               <TransactionsInBlock />
             </div>
           </div>
 
+          {/* Network Performance Section */}
+          <div className="mt-6 bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+            <h2 className="text-lg font-semibold mb-4">Network Performance</h2>
+            <div className="h-[300px]">
+              <NetworkResponseChart />
+            </div>
+          </div>
+
           {/* Network Visualization Section */}
-          <div className="mt-12 bg-white border border-gray-200 rounded-lg p-6 relative z-10 shadow-sm">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">Network Visualization</h2>
+          <div className="mt-6 bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+            <h2 className="text-lg font-semibold mb-4">Network Visualization</h2>
             <div className="h-[500px] relative rounded-lg overflow-hidden border border-gray-200">
               <CyberpunkPerlin />
             </div>
@@ -261,14 +272,6 @@ export default function HomePage() {
             </p>
           </div>
         </div>
-
-        <style jsx global>{`
-          .text-shadow-glow {
-            text-shadow: 0 0 10px rgba(6, 182, 212, 0.5),
-                         0 0 20px rgba(6, 182, 212, 0.3),
-                         0 0 30px rgba(6, 182, 212, 0.2);
-          }
-        `}</style>
       </div>
     </main>
   );
