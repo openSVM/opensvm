@@ -45,7 +45,7 @@ export default function TokensPage() {
   const [searchQuery, setSearchQuery] = useState('');
 
   return (
-    <main className="min-h-screen bg-white">
+    <main className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8">
         {/* Search Section */}
         <div className="max-w-3xl mx-auto mb-12">
@@ -54,44 +54,44 @@ export default function TokensPage() {
             placeholder="Search tokens by name or address..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-gray-50 border border-gray-200 text-gray-900 placeholder:text-gray-400 h-12 px-4 rounded-lg"
+            className="w-full bg-background border border-border text-foreground placeholder:text-muted-foreground h-12 px-4 rounded-lg"
           />
         </div>
 
         {/* Tokens Table */}
-        <div className="bg-gray-50 border border-gray-200 rounded-lg overflow-hidden">
+        <div className="bg-background border border-border rounded-lg overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="bg-gray-100">
-                  <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">Name</th>
-                  <th className="px-6 py-3 text-right text-sm font-medium text-gray-500">Price</th>
-                  <th className="px-6 py-3 text-right text-sm font-medium text-gray-500">24h Change</th>
-                  <th className="px-6 py-3 text-right text-sm font-medium text-gray-500">24h Volume</th>
-                  <th className="px-6 py-3 text-right text-sm font-medium text-gray-500">Market Cap</th>
+                <tr className="bg-background">
+                  <th className="px-6 py-3 text-left text-sm font-medium text-muted-foreground">Name</th>
+                  <th className="px-6 py-3 text-right text-sm font-medium text-muted-foreground">Price</th>
+                  <th className="px-6 py-3 text-right text-sm font-medium text-muted-foreground">24h Change</th>
+                  <th className="px-6 py-3 text-right text-sm font-medium text-muted-foreground">24h Volume</th>
+                  <th className="px-6 py-3 text-right text-sm font-medium text-muted-foreground">Market Cap</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200">
+              <tbody className="divide-y divide-border">
                 {EXAMPLE_TOKENS.map((token) => (
-                  <tr key={token.symbol} className="hover:bg-gray-50">
+                  <tr key={token.symbol} className="hover:bg-muted/50">
                     <td className="px-6 py-4">
                       <div className="flex items-center">
                         <div>
-                          <div className="font-medium text-gray-900">{token.name}</div>
-                          <div className="text-sm text-gray-500">{token.symbol}</div>
+                          <div className="font-medium text-foreground">{token.name}</div>
+                          <div className="text-sm text-muted-foreground">{token.symbol}</div>
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-right text-sm text-gray-900">
+                    <td className="px-6 py-4 text-right text-sm text-foreground">
                       ${token.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 })}
                     </td>
-                    <td className={`px-6 py-4 text-right text-sm ${token.change24h >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    <td className={`px-6 py-4 text-right text-sm ${token.change24h >= 0 ? 'text-success' : 'text-destructive'}`}>
                       {token.change24h >= 0 ? '+' : ''}{token.change24h}%
                     </td>
-                    <td className="px-6 py-4 text-right text-sm text-gray-900">
+                    <td className="px-6 py-4 text-right text-sm text-foreground">
                       ${token.volume24h.toLocaleString()}
                     </td>
-                    <td className="px-6 py-4 text-right text-sm text-gray-900">
+                    <td className="px-6 py-4 text-right text-sm text-foreground">
                       ${token.marketCap.toLocaleString()}
                     </td>
                   </tr>
