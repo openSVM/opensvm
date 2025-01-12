@@ -71,7 +71,7 @@ export function ThemeSwitcher() {
         <Button 
           variant="ghost" 
           size="icon"
-          className="h-9 w-9 p-0 flex items-center justify-center"
+          className="h-9 w-9 p-0 flex items-center justify-center bg-background hover:bg-accent hover:text-accent-foreground"
           >
           {currentTheme.icon}
           <span className="sr-only">Toggle theme</span>
