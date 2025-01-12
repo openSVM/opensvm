@@ -50,7 +50,9 @@ export const AIChatSidebar = memo(function AIChatSidebar({
     clearNotes,
     resetEverything,
     retryAction,
-    setAgentMessages
+    setAgentMessages,
+    startRecording,
+    isRecording
   } = useAIChatTabs({ agent });
 
   const handleWidthChange = useCallback((newWidth: number) => {
@@ -245,6 +247,8 @@ To get started, just ask me anything about Solana blockchain data or PumpFun tra
       onShare={handleShare}
       onSettings={handleSettings}
       onHelp={handleHelp}
+      onVoiceRecord={startRecording}
+      isRecording={isRecording}
       className="transition-transform duration-200"
     />
   );

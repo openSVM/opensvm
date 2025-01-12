@@ -48,6 +48,7 @@ export function useAIChatTabs({ agent }: UseAIChatTabsProps) {
   const [input, setInput] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [agentActions, setAgentActions] = useState<AgentAction[]>([]);
+  const [isRecording, setIsRecording] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -207,6 +208,35 @@ export function useAIChatTabs({ agent }: UseAIChatTabsProps) {
     });
   };
 
+  const startRecording = () => {
+    try {
+      const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+      recognition.lang = 'en-US';
+      recognition.interimResults = false;
+      recognition.maxAlternatives = 1;
+
+      recognition.onresult = (event) => {
+        const speechResult = event.results[0][0].transcript;
+        setInput(speechResult);
+        setIsRecording(false);
+      };
+
+      recognition.onerror = (event) => {
+        console.error('Speech recognition error:', event.error);
+        setIsRecording(false);
+      };
+
+      recognition.onend = () => {
+        setIsRecording(false);
+      };
+
+      recognition.start();
+      setIsRecording(true);
+    } catch (error) {
+      console.error('Speech recognition is not supported in this browser.');
+    }
+  };
+
   const handleNewChat = () => {
     if (activeTab === 'agent') {
       agent.clearContext();
@@ -334,6 +364,8 @@ export function useAIChatTabs({ agent }: UseAIChatTabsProps) {
     clearNotes,
     resetEverything,
     retryAction,
-    setAgentMessages
+    setAgentMessages,
+    startRecording,
+    isRecording
   };
 } 
