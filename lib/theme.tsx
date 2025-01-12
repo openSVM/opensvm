@@ -17,7 +17,7 @@ function getSystemTheme(): Theme {
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setTheme] = useState<Theme>('dos');
+  const [theme, setTheme] = useState<Theme>('high-contrast');
   const [mounted, setMounted] = useState(false);
 
   // Effect to initialize theme on client-side only
@@ -26,7 +26,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     if (savedTheme && ['paper', 'high-contrast', 'dos', 'cyberpunk', 'solarized'].includes(savedTheme)) {
       setTheme(savedTheme);
     } else {
-      setTheme('dos'); // Default to DOS theme
+      setTheme(theme); // Default to DOS theme
     }
     setMounted(true);
   }, []);

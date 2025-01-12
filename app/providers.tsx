@@ -4,7 +4,7 @@ import { ThemeProvider } from '@/lib/theme';
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
-    <ThemeProvider>
+    <ThemeProvider defaultTheme="theme-paper">
       {children}
     </ThemeProvider>
   );
