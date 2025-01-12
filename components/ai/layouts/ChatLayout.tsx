@@ -43,7 +43,7 @@ export function ChatLayout({
   onExpand,
 }: ChatLayoutProps) {
   const [width, setWidth] = useState(() => 
-    window.innerWidth < 640 ? window.innerWidth : 400
+    window.innerWidth < 640 ? window.innerWidth : 480
   );
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
