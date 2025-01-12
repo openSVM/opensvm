@@ -26,7 +26,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     if (savedTheme && ['paper', 'high-contrast', 'dos', 'cyberpunk', 'solarized'].includes(savedTheme)) {
       setTheme(savedTheme);
     } else {
-      setTheme(theme); // Default to DOS theme
+      setTheme(theme); // Default to 'high-contrast' theme
     }
     setMounted(true);
   }, []);
