@@ -63,7 +63,7 @@ const themes = [
 
 export function ThemeSwitcher() {
   const { theme, setTheme } = useTheme();
-  const currentTheme = themes.find(t => t.value === theme) || themes[0];
+  const currentTheme = themes.find(t => t.value === theme) || themes[1];
 
   return (
     <DropdownMenu>
@@ -71,8 +71,8 @@ export function ThemeSwitcher() {
         <Button 
           variant="ghost" 
           size="icon"
-          className="h-9 w-9 border border-border bg-background hover:bg-accent hover:text-accent-foreground"
-        >
+          className="h-9 w-9 p-0 flex items-center justify-center"
+          >
           {currentTheme.icon}
           <span className="sr-only">Toggle theme</span>
         </Button>
