@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { Card, CardHeader, CardContent, Text, Stack, Button } from 'rinlab';
+import { Card, CardHeader, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import { getTokenAccounts, getConnection, type TransactionInfo, type AccountData, type DetailedTransactionInfo } from '@/lib/solana';
@@ -52,7 +53,7 @@ export default function AccountPage() {
         ]);
 
         // Fetch all transactions in one call
-        const txs = await connection.getTransactions(
+        const txs = await connection.getParsedTransactions(
           signatures.map(sig => sig.signature),
           {
             maxSupportedTransactionVersion: 0,
@@ -138,12 +139,12 @@ export default function AccountPage() {
 
   if (error) {
     return (
-      <Card>
+      <Card className="bg-background border border-border">
         <CardHeader>
-          <Text variant="heading">Account Details</Text>
+          <h2 className="text-lg font-semibold">Account Details</h2>
         </CardHeader>
         <CardContent>
-          <Text variant="error" className="text-center">{error}</Text>
+          <p className="text-sm text-destructive text-center">{error}</p>
         </CardContent>
       </Card>
     );
@@ -151,12 +152,12 @@ export default function AccountPage() {
 
   if (isLoading || !accountData) {
     return (
-      <Card>
+      <Card className="bg-background border border-border">
         <CardHeader>
-          <Text variant="heading">Account Details</Text>
+          <h2 className="text-lg font-semibold">Account Details</h2>
         </CardHeader>
         <CardContent>
-          <Text variant="default" className="text-center">Loading account details...</Text>
+          <p className="text-sm text-center">Loading account details...</p>
         </CardContent>
       </Card>
     );
@@ -191,16 +192,16 @@ export default function AccountPage() {
             <TabsContent value="overview">
               <div className="p-6 space-y-4">
                 <div>
-                  <Text variant="label">Address</Text>
-                  <Text variant="default" className="font-mono">{address}</Text>
+                  <span className="text-sm text-muted-foreground">Address</span>
+                  <span className="text-sm font-mono">{address}</span>
                 </div>
                 <div>
-                  <Text variant="label">Owner</Text>
-                  <Text variant="default" className="font-mono">{accountData.owner}</Text>
+                  <span className="text-sm text-muted-foreground">Owner</span>
+                  <span className="text-sm font-mono">{accountData.owner}</span>
                 </div>
                 <div>
-                  <Text variant="label">Executable</Text>
-                  <Text variant="default">{accountData.executable ? 'Yes' : 'No'}</Text>
+                  <span className="text-sm text-muted-foreground">Executable</span>
+                  <span className="text-sm">{accountData.executable ? 'Yes' : 'No'}</span>
                 </div>
               </div>
             </TabsContent>
@@ -230,28 +231,28 @@ export default function AccountPage() {
                             </div>
                           )}
                           <div>
-                            <Text variant="default" className="font-medium">{token.symbol || 'Unknown Token'}</Text>
-                            <Text variant="label">{token.mint}</Text>
+                            <span className="text-sm font-medium">{token.symbol || 'Unknown Token'}</span>
+                            <span className="text-sm text-muted-foreground">{token.mint}</span>
                           </div>
                         </div>
-                        <Text variant="default">
+                        <span className="text-sm">
                           {Number(token.uiAmount).toLocaleString(undefined, {
                             minimumFractionDigits: 0,
                             maximumFractionDigits: token.decimals
                           })}
-                        </Text>
+                        </span>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <Text variant="default" className="text-center py-8">No tokens found</Text>
+                  <p className="text-sm text-center py-8">No tokens found</p>
                 )}
               </div>
             </TabsContent>
 
             <TabsContent value="nfts">
               <div className="p-6">
-                <Text variant="default" className="text-center py-8">No NFTs found</Text>
+                <p className="text-sm text-center py-8">No NFTs found</p>
               </div>
             </TabsContent>
 

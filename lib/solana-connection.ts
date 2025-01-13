@@ -15,9 +15,10 @@ class ConnectionPool {
       confirmTransactionInitialTimeout: 60000
     };
 
-    // Initialize with default endpoint
-    const defaultEndpoint = process.env.NEXT_PUBLIC_RPC_ENDPOINT || 'https://api.mainnet-beta.solana.com';
-    this.connections = [new Connection(defaultEndpoint, this.config)];
+    // Initialize with OpenSVM endpoints by default
+    this.isOpenSvmMode = true;
+    this.connections = opensvmRpcEndpoints.map(url => new Connection(url, this.config));
+    console.log('Initialized OpenSVM connection pool with', this.connections.length, 'endpoints');
   }
 
   public static getInstance(): ConnectionPool {
