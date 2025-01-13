@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="400" height="400" viewBox="0 0 400 400" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="400" height="400" fill="#F3F4F6"/>
+  <path d="M200 150C183.431 150 170 163.431 170 180C170 196.569 183.431 210 200 210C216.569 210 230 196.569 230 180C230 163.431 216.569 150 200 150ZM160 180C160 157.909 177.909 140 200 140C222.091 140 240 157.909 240 180C240 202.091 222.091 220 200 220C177.909 220 160 202.091 160 180Z" fill="#9CA3AF"/>
+  <path d="M190 250H210V260H190V250Z" fill="#9CA3AF"/>
+  <path d="M170 170H190V190H170V170Z" fill="#9CA3AF"/>
+  <path d="M210 170H230V190H210V170Z" fill="#9CA3AF"/>
+  <text x="200" y="300" text-anchor="middle" font-family="system-ui" font-size="24" fill="#6B7280">NFT</text>
+</svg>

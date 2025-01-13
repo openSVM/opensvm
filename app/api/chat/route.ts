@@ -1,10 +1,13 @@
 import { NextResponse } from 'next/server';
 
-if (!process.env.ANTHROPIC_API_KEY) {
-  throw new Error('ANTHROPIC_API_KEY environment variable is not set');
-}
-
 export async function POST(req: Request) {
+  if (!process.env.ANTHROPIC_API_KEY) {
+    return NextResponse.json(
+      { error: 'ANTHROPIC_API_KEY environment variable is not set' },
+      { status: 500 }
+    );
+  }
+
   try {
     const { messages } = await req.json();
 
@@ -38,4 +41,4 @@ export async function POST(req: Request) {
       { status: 500 }
     );
   }
-} 
+}

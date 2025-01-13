@@ -3,6 +3,7 @@ import { SolanaAgent } from './agent';
 import { TransactionCapability } from '../capabilities/transaction';
 import { AccountCapability } from '../capabilities/account';
 import { NetworkCapability } from '../capabilities/network';
+import { TokenEstimationCapability } from '../capabilities/token-estimation';
 import { AgentConfig } from '../types';
 
 const DEFAULT_SYSTEM_PROMPT = `I am an AI assistant specialized in analyzing Solana blockchain data. 
@@ -14,6 +15,7 @@ Some things I can help with:
 - Checking account balances and activity
 - Monitoring network performance and validator status
 - Explaining complex blockchain operations in simple terms
+- Estimating token usage for AI models
 
 Please provide transaction signatures, account addresses, or ask about network metrics, 
 and I'll help you understand what's happening on the Solana blockchain.`;
@@ -32,7 +34,8 @@ export function createSolanaAgent(
     capabilities: [
       new TransactionCapability(connection),
       new AccountCapability(connection),
-      new NetworkCapability(connection)
+      new NetworkCapability(connection),
+      new TokenEstimationCapability()
     ],
     systemPrompt: options.systemPrompt || DEFAULT_SYSTEM_PROMPT,
     maxContextSize: options.maxContextSize,
@@ -40,4 +43,4 @@ export function createSolanaAgent(
   };
 
   return new SolanaAgent(config);
-} 
+}

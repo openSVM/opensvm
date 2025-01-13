@@ -1,12 +1,12 @@
 import Image from 'next/image';
 import { Card, CardHeader, CardContent, Grid, Text, Button } from 'rinlab';
-import { TokenAccountInfo } from '@/lib/solana';
+import { TokenAccount } from '@/lib/solana';
 import { useEffect, useState } from 'react';
 
 interface AccountOverviewProps {
   address: string;
   solBalance: number;
-  tokenAccounts: TokenAccountInfo[];
+  tokenAccounts: TokenAccount[];
   isSystemProgram?: boolean;
   parsedOwner?: string;
 }
@@ -34,91 +34,34 @@ export default function AccountOverview({
 
   return (
     <div className="space-y-4">
-      {/* Mobile View */}
-      <div className="md:hidden space-y-6">
-        {/* Account Balance Section */}
-        <div className="grid grid-cols-1 gap-4">
-          <div className="bg-background border border-border rounded-lg p-4">
-            <h3 className="text-sm font-medium text-foreground">SOL Balance</h3>
-            <p className="text-2xl font-bold text-foreground">{solBalance.toFixed(4)} SOL</p>
-          </div>
-          <div className="bg-background border border-border rounded-lg p-4">
-            <h3 className="text-sm font-medium text-foreground">Token Accounts</h3>
-            <p className="text-2xl font-bold text-foreground">{tokenAccounts.length}</p>
-          </div>
-          <div className="bg-background border border-border rounded-lg p-4">
-            <h3 className="text-sm font-medium text-foreground">NFTs</h3>
-            <p className="text-2xl font-bold text-foreground">{0}</p>
-          </div>
-        </div>
-
-        {/* Token Accounts Section */}
-        <div className="bg-background border border-border rounded-lg overflow-hidden">
-          <div className="p-4 border-b border-border">
-            <h2 className="text-lg font-semibold text-foreground">Token Accounts</h2>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-background">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-foreground uppercase tracking-wider">Token</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-foreground uppercase tracking-wider">Balance</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {tokenAccounts.map((token, index) => (
-                  <tr key={index} className="hover:bg-muted transition-colors">
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <div className="flex items-center space-x-3">
-                        {token.icon && (
-                          <img src={token.icon} alt={token.symbol} className="w-6 h-6 rounded-full border border-border" />
-                        )}
-                        <div className="font-medium text-foreground">{token.symbol}</div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <div className="text-sm text-foreground">{Number(token.uiAmount || 0).toLocaleString(undefined, {
-                        minimumFractionDigits: 0,
-                        maximumFractionDigits: token.decimals
-                      })} {token.symbol}</div>
-                      <div className="text-xs text-muted-foreground">${token.usdValue.toFixed(2)}</div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
       {/* Desktop View */}
-      <div className="hidden md:block">
+      <div className="block">
         <div className="flex flex-row gap-2">
           <div className="flex-1">
             <Card className="bg-background border border-border">
               <CardHeader>
-                <Text variant="heading" className="text-foreground">Overview</Text>
+                <Text variant="heading">Overview</Text>
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <Text variant="label" className="text-foreground">SOL Balance</Text>
+                    <Text variant="label">SOL Balance</Text>
                     <div className="flex items-center gap-2">
-                      <Text variant="default" className="text-foreground">
+                      <Text variant="default">
                         {solBalance.toFixed(4)} SOL
                       </Text>
-                      <Text variant="label" className="text-muted-foreground">
+                      <Text variant="label" className="text-gray-400">
                         (${(solBalance * 198.35).toFixed(2)})
                       </Text>
                     </div>
                   </div>
                   <div className="flex items-center justify-between">
-                    <Text variant="label" className="text-foreground">Token Balance</Text>
+                    <Text variant="label">Token Balance</Text>
                     <div className="flex items-center gap-2">
-                      <Text variant="default" className="text-foreground">
+                      <Text variant="default">
                         {tokenAccounts.length} Tokens
                       </Text>
-                      <Text variant="label" className="text-muted-foreground">
+                      <Text variant="label" className="text-gray-400">
                         (${totalValueUsd.toFixed(2)})
                       </Text>
                     </div>
@@ -128,7 +71,7 @@ export default function AccountOverview({
                       {tokenAccounts.map((token, index) => (
                         <div 
                           key={index} 
-                          className="flex items-center justify-between px-2 hover:bg-muted cursor-pointer border-b border-border last:border-b-0 transition-colors"
+                          className="flex items-center justify-between px-2 py-1 hover:bg-muted cursor-pointer border-b border-border last:border-b-0 transition-colors"
                           onClick={() => handleTokenClick(token.address)}
                         >
                           <div className="flex items-center flex-1">
@@ -146,14 +89,14 @@ export default function AccountOverview({
                               />
                             )}
                             <div className="flex items-center space-x-2">
-                              <Text variant="default" className="text-foreground">
+                              <Text variant="default">
                                 {Number(token.uiAmount || 0).toLocaleString(undefined, {
                                   minimumFractionDigits: 0,
                                   maximumFractionDigits: token.decimals
                                 })} {token.symbol}
                               </Text>
                               {token.usdValue > 0 && (
-                                <Text variant="label" className="text-muted-foreground">
+                                <Text variant="label" className="text-gray-400">
                                   (${token.usdValue.toFixed(2)})
                                 </Text>
                               )}
@@ -174,14 +117,14 @@ export default function AccountOverview({
           <div className="flex-1">
             <Card className="bg-background border border-border">
               <CardHeader>
-                <Text variant="heading" className="text-foreground">More info</Text>
+                <Text variant="heading">More info</Text>
               </CardHeader>
               <CardContent>
                 <div className="space-y-1.5">
                   <div>
-                    <Text variant="label" className="text-foreground">Owner</Text>
+                    <Text variant="label">Owner</Text>
                     <div className="flex items-center">
-                      <Text variant="default" className="hover:text-muted-foreground cursor-pointer text-foreground transition-colors">
+                      <Text variant="default" className="hover:text-muted-foreground cursor-pointer transition-colors">
                         {isSystemProgram ? 'System Program' : parsedOwner}
                       </Text>
                       <Button variant="ghost" className="p-1 ml-1 text-foreground hover:text-muted-foreground transition-colors">
@@ -193,12 +136,12 @@ export default function AccountOverview({
                     </div>
                   </div>
                   <div>
-                    <Text variant="label" className="text-foreground">isOnCurve</Text>
+                    <Text variant="label">isOnCurve</Text>
                     <div className="inline-block px-2 py-0.5 bg-background border border-border text-foreground text-[13px] rounded">TRUE</div>
                   </div>
                   <div>
-                    <Text variant="label" className="text-foreground">Stake</Text>
-                    <Text variant="default" className="text-foreground">0 SOL</Text>
+                    <Text variant="label">Stake</Text>
+                    <Text variant="default">0 SOL</Text>
                   </div>
                 </div>
               </CardContent>
@@ -208,7 +151,7 @@ export default function AccountOverview({
           <div className="flex-1">
             <Card className="bg-background border border-border">
               <CardHeader className="flex items-center justify-between">
-                <Text variant="heading" className="text-foreground">Announcements</Text>
+                <Text variant="heading">Announcements</Text>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
@@ -218,7 +161,7 @@ export default function AccountOverview({
                       href="https://pad404.com" 
                       target="_blank" 
                       rel="noopener noreferrer" 
-                      className="ml-2 text-[13px] text-foreground hover:text-muted-foreground transition-colors"
+                      className="ml-2 text-[13px] hover:text-muted-foreground transition-colors"
                     >
                       Insider: <span className="text-destructive">$PIX404</span> launching pad404.com next week! MPL404-fy your favourite memecoin and revive the community!
                     </a>
@@ -229,7 +172,7 @@ export default function AccountOverview({
                       href="https://opensvm.com" 
                       target="_blank" 
                       rel="noopener noreferrer" 
-                      className="ml-2 text-[13px] text-foreground hover:text-muted-foreground transition-colors"
+                      className="ml-2 text-[13px] hover:text-muted-foreground transition-colors"
                     >
                       New utility for <span className="text-foreground">$SVMAI</span>: create paid announcements on opensvm.com with ease, pay with $SVMAI via UI or our on-chain program, soon avaialiable for humans, agents and fully on-chain entities!
                     </a>
@@ -242,4 +185,4 @@ export default function AccountOverview({
       </div>
     </div>
   );
-} 
+}

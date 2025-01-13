@@ -3,7 +3,7 @@
 import { useState, FormEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ThemeSwitcher } from './ui/theme-switcher';
+import { SettingsMenu } from './SettingsMenu';
 import { Input } from './ui/input';
 import { Search } from 'lucide-react';
 import { Button } from './ui/button';
@@ -91,7 +91,7 @@ export function Navbar({ children }: NavbarProps) {
                 Analytics
               </Link>
             </div>
-            <ThemeSwitcher />
+            <SettingsMenu />
             <Button className="bg-[#00DC82] text-black hover:bg-[#00DC82]/90">
               Connect Wallet
             </Button>
@@ -113,4 +113,4 @@ export function Navbar({ children }: NavbarProps) {
       />
     </>
   );
-} 
+}

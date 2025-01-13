@@ -1,0 +1,17 @@
+export const opensvmRpcEndpoints = [
+  "https://solana-mainnet.core.chainstack.com/3279e9a9b10693f36a6cc44a14c30df4",
+  "https://solana-mainnet.core.chainstack.com/8c62fd97fd6ee6946f3d5eee90a14e5b",
+  "https://solana-mainnet.core.chainstack.com/faef3f1042f51b24ac487f66e5e89dfe",
+  "https://solana-mainnet.core.chainstack.com/5d3c1b6f1649c601e126835aa728672e",
+  "https://solana-mainnet.core.chainstack.com/ea2bc88d75ada1b8eb44ef8da4c2505c",
+  "https://solana-mainnet.core.chainstack.com/1281d7f62b46be59c4d77b6622881589",
+  "https://solana-mainnet.core.chainstack.com/30f1d3f4b50a09f8c8e153fdd27f77f8",
+  "https://solana-mainnet.core.chainstack.com/fccebc645514ede8cffbbe648ad4a6a5",
+  "https://solana-mainnet.core.chainstack.com/2d68d1d48e8a9bd7eb967b50ee027e2d",
+  "https://solana-mainnet.core.chainstack.com/1ba0ecd3f4c01055b31d4e99c8b2f929",
+  "https://solana-mainnet.core.chainstack.com/b8d764e8ecfbf6276577e27c74b1df3e",
+  "https://solana-mainnet.core.chainstack.com/2614877d6f834a32d3e2404d0c9fcf49",
+  "https://solana-mainnet.core.chainstack.com/854812e579680cd6b35463e320a2c2fc",
+  "https://solana-mainnet.core.chainstack.com/2054291ced4a2b8a1d5b0cb28dc676a3",
+  "https://solana-mainnet.core.chainstack.com/3135a15a652411c80791271d057b918b",
+];

@@ -4,7 +4,8 @@ import { useEffect, useState, useCallback } from 'react';
 import { Card, CardHeader, CardContent, Text, Stack, Button } from 'rinlab';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
-import { getTokenAccounts, getTransactionHistory, unsubscribeFromTransactions, type TransactionInfo, type AccountData, type DetailedTransactionInfo } from '@/lib/solana';
+import { getTokenAccounts, getConnection, type TransactionInfo, type AccountData, type DetailedTransactionInfo } from '@/lib/solana';
+import { PublicKey } from '@solana/web3.js';
 import AccountOverview from '@/components/AccountOverview';
 import Link from 'next/link';
 import { format } from 'date-fns';
@@ -41,17 +42,79 @@ export default function AccountPage() {
   useEffect(() => {
     async function loadAccountData() {
       try {
-        const [data, txHistory] = await Promise.all([
+        setIsLoading(true);
+        const connection = await getConnection();
+        
+        // Get account data and signatures in parallel
+        const [data, signatures] = await Promise.all([
           getTokenAccounts(address),
-          getTransactionHistory(address, {
-            limit: itemsPerPage,
-            type: transactionType as 'all' | 'sol' | 'token' | 'nft'
-          }, handleNewTransaction)
+          connection.getSignaturesForAddress(new PublicKey(address), { limit: 100 })
         ]);
 
+        // Fetch all transactions in one call
+        const txs = await connection.getTransactions(
+          signatures.map(sig => sig.signature),
+          {
+            maxSupportedTransactionVersion: 0,
+            commitment: 'confirmed'
+          }
+        );
+
+        // Process transactions
+        const processedTxs = txs
+          .map((tx, i): TransactionInfo | null => {
+            if (!tx) return null;
+            const sig = signatures[i];
+            
+            // Extract token transfer info
+            const tokenBalance = tx.meta?.preTokenBalances?.[0] || tx.meta?.postTokenBalances?.[0];
+            if (tokenBalance?.mint) {
+              return {
+                signature: sig.signature,
+                timestamp: sig.blockTime || 0,
+                slot: sig.slot || 0,
+                success: tx.meta?.err === null,
+                type: 'token',
+                amount: tokenBalance.uiTokenAmount?.uiAmount,
+                symbol: undefined,
+                mint: tokenBalance.mint
+              };
+            }
+            
+            // Check for SOL transfers
+            if (tx.meta?.preBalances?.length && tx.meta?.postBalances?.length) {
+              const balanceChange = Math.abs(tx.meta.postBalances[0] - tx.meta.preBalances[0]);
+              if (balanceChange > 0) {
+                return {
+                  signature: sig.signature,
+                  timestamp: sig.blockTime || 0,
+                  slot: sig.slot || 0,
+                  success: tx.meta?.err === null,
+                  type: 'sol',
+                  amount: balanceChange / 1e9,
+                  symbol: undefined,
+                  mint: undefined
+                };
+              }
+            }
+
+            // Default unknown transaction
+            return {
+              signature: sig.signature,
+              timestamp: sig.blockTime || 0,
+              slot: sig.slot || 0,
+              success: tx.meta?.err === null,
+              type: 'unknown',
+              amount: undefined,
+              symbol: undefined,
+              mint: undefined
+            };
+          })
+          .filter((tx): tx is TransactionInfo => tx !== null);
+
         setAccountData(data);
-        setTransactions(txHistory);
-        setHasMore(txHistory.length === itemsPerPage);
+        setTransactions(processedTxs);
+        setHasMore(false);
       } catch (err) {
         setError('Failed to load account details');
         console.error('Error loading account:', err);
@@ -61,50 +124,16 @@ export default function AccountPage() {
     }
 
     loadAccountData();
-
-    // Cleanup subscription on unmount
-    return () => {
-      unsubscribeFromTransactions(address);
-    };
-  }, [address, transactionType, handleNewTransaction]);
+  }, [address]);
 
   const handleTypeChange = (newType: string) => {
     setTransactionType(newType);
     router.push(`/account/${address}?type=${newType}`);
-    // Reset and reload with new type
-    setTransactions([]);
-    setIsLoading(true);
-    getTransactionHistory(address, {
-      limit: itemsPerPage,
-      type: newType as 'all' | 'sol' | 'token' | 'nft'
-    }, handleNewTransaction)
-      .then(txHistory => {
-        setTransactions(txHistory);
-        setHasMore(txHistory.length === itemsPerPage);
-        setIsLoading(false);
-      })
-      .catch(err => {
-        console.error('Error loading transactions:', err);
-        setIsLoading(false);
-      });
   };
 
-  const handleLoadMore = async () => {
-    if (!hasMore || isLoading) return;
-
-    try {
-      const lastTx = transactions[transactions.length - 1];
-      const moreTxs = await getTransactionHistory(address, {
-        limit: itemsPerPage,
-        before: lastTx.signature,
-        type: transactionType as 'all' | 'sol' | 'token' | 'nft'
-      });
-
-      setTransactions(prev => [...prev, ...moreTxs]);
-      setHasMore(moreTxs.length === itemsPerPage);
-    } catch (err) {
-      console.error('Error loading more transactions:', err);
-    }
+  const handleLoadMore = () => {
+    // All transactions are loaded at once
+    setHasMore(false);
   };
 
   if (error) {
@@ -149,14 +178,14 @@ export default function AccountPage() {
         }
       />
 
-      <Card>
-        <CardContent className="p-0">
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList>
-              <TabsTrigger value="overview">Overview</TabsTrigger>
-              <TabsTrigger value="tokens">Tokens</TabsTrigger>
-              <TabsTrigger value="nfts">NFTs</TabsTrigger>
-              <TabsTrigger value="transactions">Transactions</TabsTrigger>
+      <Card className="bg-background border border-border">
+        <CardContent className="p-0 overflow-hidden">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="w-full flex border-b border-border">
+              <TabsTrigger value="overview" className="flex-1 px-4 py-2 text-sm font-medium text-foreground hover:text-foreground/80 border-b-2 border-transparent data-[state=active]:border-foreground data-[state=active]:text-foreground">Overview</TabsTrigger>
+              <TabsTrigger value="tokens" className="flex-1 px-4 py-2 text-sm font-medium text-foreground hover:text-foreground/80 border-b-2 border-transparent data-[state=active]:border-foreground data-[state=active]:text-foreground">Tokens</TabsTrigger>
+              <TabsTrigger value="nfts" className="flex-1 px-4 py-2 text-sm font-medium text-foreground hover:text-foreground/80 border-b-2 border-transparent data-[state=active]:border-foreground data-[state=active]:text-foreground">NFTs</TabsTrigger>
+              <TabsTrigger value="transactions" className="flex-1 px-4 py-2 text-sm font-medium text-foreground hover:text-foreground/80 border-b-2 border-transparent data-[state=active]:border-foreground data-[state=active]:text-foreground">Transactions</TabsTrigger>
             </TabsList>
 
             <TabsContent value="overview">
@@ -241,4 +270,4 @@ export default function AccountPage() {
       </Card>
     </div>
   );
-} 
+}

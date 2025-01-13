@@ -25,6 +25,15 @@
     --input: 240 5.9% 90%;
     --ring: 142.1 76.2% 36.3%;
     --radius: 0.5rem;
+
+    /* Font families */
+    --font-berkeley: 'Berkeley Mono', monospace;
+    --font-inter: 'Inter', sans-serif;
+    --font-jetbrains: 'JetBrains Mono', monospace;
+    --font-family: var(--font-berkeley);
+
+    /* Base font size - controlled by settings */
+    --base-font-size: 16px;
   }
 
   .theme-high-contrast {
@@ -70,6 +79,29 @@
     --radius: 0px;
   }
 
+  .theme-cyberpunk {
+    --background: 300 89% 5%;
+    --foreground: 300 100% 98%;
+    --card: 300 89% 5%;
+    --card-foreground: 300 100% 98%;
+    --popover: 300 89% 5%;
+    --popover-foreground: 300 100% 98%;
+    --primary: 326 100% 50%;
+    --primary-foreground: 300 0% 0%;
+    --secondary: 266 100% 64%;
+    --secondary-foreground: 300 0% 0%;
+    --muted: 300 50% 10%;
+    --muted-foreground: 300 50% 80%;
+    --accent: 326 100% 50%;
+    --accent-foreground: 300 0% 0%;
+    --destructive: 0 100% 67%;
+    --destructive-foreground: 300 100% 98%;
+    --border: 326 100% 50%;
+    --input: 300 50% 10%;
+    --ring: 326 100% 40%;
+    --radius: 0px;
+  }
+
   .theme-paper {
     --background: 45 29% 97%;
     --foreground: 20 14.3% 4.1%;
@@ -99,9 +131,12 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-family: var(--font-family);
+    font-size: var(--base-font-size);
   }
 }
 
+/* Berkeley Mono */
 @font-face {
   font-family: 'Berkeley Mono';
   src: url('/fonts/BerkeleyMono-Regular.woff2') format('woff2');
@@ -116,7 +151,8 @@
   font-style: normal;
 }
 
-html {
-  font-family: 'Berkeley Mono', monospace;
-  font-weight: 500;
-}
+/* Inter */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+/* JetBrains Mono */
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap');

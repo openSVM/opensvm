@@ -1,11 +1,11 @@
 'use client';
 
-import { ThemeProvider } from '@/lib/theme';
+import { SettingsProvider } from '@/lib/settings';
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
-    <ThemeProvider>
+    <SettingsProvider>
       {children}
-    </ThemeProvider>
+    </SettingsProvider>
   );
-} 
+}

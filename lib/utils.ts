@@ -1,58 +1,38 @@
-import { type ClassValue, clsx } from "clsx"
-import { twMerge } from "tailwind-merge"
+import { type ClassValue, clsx } from "clsx";
+import { twMerge } from "tailwind-merge";
 
 export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs))
+  return twMerge(clsx(inputs));
 }
 
-export function formatNumber(num: number) {
-  return new Intl.NumberFormat().format(num)
-}
-
-// Detect input type for search
-export function detectSearchInputType(input: string): {
-  type: 'account' | 'transaction' | 'block' | 'token' | 'search';
-  value: string;
-} {
-  // Clean the input
-  const cleanInput = input.trim();
-
-  // Transaction signature pattern (base58, 88 characters)
-  if (/^[1-9A-HJ-NP-Za-km-z]{88}$/.test(cleanInput)) {
-    return { type: 'transaction', value: cleanInput };
-  }
-
-  // Block number pattern (numeric)
-  if (/^\d+$/.test(cleanInput)) {
-    return { type: 'block', value: cleanInput };
-  }
-
-  // Account/Token address pattern (base58, 32-44 characters)
-  if (/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(cleanInput)) {
-    // For now, we'll treat all base58 addresses as account addresses
-    // In a real implementation, you might want to check if it's a token mint
-    // by querying the token program
-    return { type: 'account', value: cleanInput };
-  }
-
-  // Default to search
-  return { type: 'search', value: cleanInput };
-}
-
-// Get route for search input
-export function getSearchRoute(input: string): string {
-  const { type, value } = detectSearchInputType(input);
+// Input sanitization for search queries
+export function sanitizeSearchQuery(query: string): string {
+  if (!query) return '';
   
-  switch (type) {
-    case 'account':
-      return `/account/${value}`;
-    case 'transaction':
-      return `/tx/${value}`;
-    case 'block':
-      return `/block/${value}`;
-    case 'token':
-      return `/token/${value}`;
-    default:
-      return `/search?q=${encodeURIComponent(value)}`;
-  }
-} 
+  // Remove any potentially harmful characters
+  const sanitized = query
+    .trim()
+    // Remove HTML/script tags
+    .replace(/<[^>]*>/g, '')
+    // Remove special characters except those valid in addresses
+    .replace(/[^\w\s-_.]/g, '')
+    // Limit length
+    .slice(0, 100);
+    
+  return sanitized;
+}
+
+// Format number with commas and decimal places
+export function formatNumber(num: number, decimals: number = 2): string {
+  return new Intl.NumberFormat('en-US', {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals
+  }).format(num);
+}
+
+// Validate Solana address format
+export function isValidSolanaAddress(address: string): boolean {
+  // Basic validation for base58 format and length
+  const base58Regex = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+  return base58Regex.test(address);
+}

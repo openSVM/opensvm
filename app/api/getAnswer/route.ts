@@ -6,17 +6,27 @@ import {
 } from "@/utils/TogetherAIStream";
 import Together from "together-ai";
 
-const together = new Together({
-  apiKey: process.env["TOGETHER_API_KEY"],
-  baseURL: "https://together.helicone.ai/v1",
-  defaultHeaders: {
-    "Helicone-Auth": `Bearer ${process.env.HELICONE_API_KEY}`,
-  },
-});
-
 export const maxDuration = 45;
 
 export async function POST(request: Request) {
+  if (!process.env.TOGETHER_API_KEY) {
+    return new Response(
+      JSON.stringify({ error: 'TOGETHER_API_KEY environment variable is not set' }),
+      { 
+        status: 500,
+        headers: { 'Content-Type': 'application/json' }
+      }
+    );
+  }
+
+  const together = new Together({
+    apiKey: process.env.TOGETHER_API_KEY,
+    baseURL: "https://together.helicone.ai/v1",
+    defaultHeaders: {
+      "Helicone-Auth": `Bearer ${process.env.HELICONE_API_KEY}`,
+    },
+  });
+
   let { question, sources } = await request.json();
 
   console.log("[getAnswer] Fetching text from source URLS");

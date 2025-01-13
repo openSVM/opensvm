@@ -6,9 +6,7 @@
     "jsx": "preserve",
     "baseUrl": ".",
     "paths": {
-      "@/*": [
-        "./*"
-      ]
+      "@/*": ["./*"]
     },
     "skipLibCheck": true,
     "noImplicitAny": false,
@@ -32,7 +30,6 @@
         "name": "next"
       }
     ],
-    "suppressImplicitAnyIndexErrors": true,
     "ignoreDeprecations": "5.0",
     "checkJs": false,
     "noEmitOnError": false,
