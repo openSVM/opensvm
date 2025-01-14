@@ -133,6 +133,7 @@ export function Navbar({ children }: NavbarProps) {
               <Link href="/analytics" className="text-sm font-medium text-foreground hover:text-foreground/80">
                 Analytics
               </Link>
+              <SettingsMenu />
               <Button className="bg-[#00DC82] text-black hover:bg-[#00DC82]/90">
                 Connect Wallet
               </Button>
