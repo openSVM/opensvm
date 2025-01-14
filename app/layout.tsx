@@ -14,7 +14,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className="theme-high-contrast" suppressHydrationWarning>
+    <html lang="en" className="theme-cyberpunk" suppressHydrationWarning>
       <body>
         <Providers>
           <Navbar>
