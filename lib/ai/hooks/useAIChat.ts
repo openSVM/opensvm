@@ -14,6 +14,7 @@ export function useAIChat({ agent, initialMessage }: UseAIChatProps) {
   }]);
   const [input, setInput] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

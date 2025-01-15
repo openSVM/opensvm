@@ -239,7 +239,7 @@ export default function HomePage() {
           <div className="mt-6">
             <div className="bg-background border border-border rounded-lg p-6">
               <h2 className="text-lg font-semibold text-foreground mb-4">Network Performance</h2>
-              <div className="h-[300px]">
+              <div className="h-[360px] md:h-[340px]">
                 <NetworkResponseChart />
               </div>
             </div>

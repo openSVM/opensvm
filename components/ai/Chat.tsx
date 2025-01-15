@@ -30,6 +30,8 @@ interface ChatProps {
   onSettings?: () => void;
   onHelp?: () => void;
   onExpand?: () => void;
+  onVoiceRecord?: () => void;
+  isRecording?: boolean;
 }
 
 export function Chat({
@@ -57,7 +59,9 @@ export function Chat({
   onShare,
   onSettings,
   onHelp,
-  onExpand
+  onExpand,
+  onVoiceRecord,
+  isRecording
 }: ChatProps) {
   return (
     <ChatLayout 
@@ -91,6 +95,8 @@ export function Chat({
         onClearNotes={onClearNotes}
         agentActions={agentActions}
         onRetryAction={onRetryAction}
+        onVoiceRecord={onVoiceRecord}
+        isRecording={isRecording}
       />
     </ChatLayout>
   );

@@ -1,7 +1,8 @@
-import { Send, Trash2 } from 'lucide-react';
+import { Loader, Mic, Send, Trash2 } from 'lucide-react';
 import { Message, Note, AgentAction } from '@/lib/ai/types';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { useState } from 'react';
 
 interface ChatUIProps {
   messages: Message[];
@@ -18,6 +19,12 @@ interface ChatUIProps {
   agentActions?: AgentAction[];
   onRetryAction?: (id: string) => void;
   showTabs?: boolean;
+  onVoiceRecord?: () => void;
+  isRecording?: boolean;
+}
+
+interface VoiceInputProps {
+  onInputChange: (value: string) => void;
 }
 
 export function ChatUI({
@@ -31,7 +38,9 @@ export function ChatUI({
   notes = [],
   onClearNotes,
   agentActions = [],
-  onRetryAction
+  onRetryAction,
+  onVoiceRecord,
+  isRecording
 }: ChatUIProps) {
   const renderContent = () => {
     switch (activeTab) {
@@ -201,14 +210,21 @@ export function ChatUI({
       {renderContent()}
       <div className="p-4 border-t border-white/20">
         <form onSubmit={onSubmit} className="relative">
-          <input
-            type="text"
+          <textarea
             value={input}
             onChange={(e) => onInputChange(e.target.value)}
             placeholder={isProcessing ? "Processing..." : activeTab === 'notes' ? "Add knowledge..." : "Ask a question..."}
             disabled={isProcessing}
-            className="w-full bg-black text-white text-[12px] px-4 py-3 pr-10 rounded-lg border border-white/20 focus:outline-none focus:border-white/40 placeholder-white/50 disabled:opacity-50"
+            className="w-full bg-black text-white text-[12px] px-4 py-3 pr-16 rounded-lg border border-white/20 focus:outline-none focus:border-white/40 placeholder-white/50 disabled:opacity-50"
           />
+          <button
+            onClick={onVoiceRecord}
+            disabled={isRecording}
+            className={`absolute right-10 top-1/2 -translate-y-1/2 text-white disabled:opacity-50 p-1 hover:bg-white/10 rounded-smz`}
+            title={isRecording ? 'Recording...' : 'Start Voice Input'}
+          >
+            {isRecording ? <Loader className="animate-spin" size={20} /> : <Mic size={20} />}
+          </button>
           <button
             type="submit"
             disabled={isProcessing}

@@ -42,7 +42,9 @@ export function ChatLayout({
   onHelp,
   onExpand,
 }: ChatLayoutProps) {
-  const [width, setWidth] = useState(400);
+  const [width, setWidth] = useState(() => 
+    window.innerWidth < 640 ? window.innerWidth : 480
+  );
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -178,7 +180,7 @@ export function ChatLayout({
                 </button>
                 <button 
                   onClick={() => onTabChange?.('notes')}
-                  className={`px-4 h-[40px] text-sm font-medium ${activeTab === 'notes' ? 'bg-white text-black' : 'text-white hover:bg-white/10'}`}
+                  className={`hidden sm:block px-4 h-[40px] text-sm font-medium ${activeTab === 'notes' ? 'bg-white text-black' : 'text-white hover:bg-white/10'}`}
                 >
                   KNOWLEDGE
                 </button>
@@ -186,20 +188,20 @@ export function ChatLayout({
               <div className="flex items-center ml-auto px-2 gap-1">
                 <button 
                   onClick={handleExpand}
-                  className="p-2 text-white hover:bg-white/10 rounded-sm transition-colors" 
+                  className="hidden sm:block p-2 text-white hover:bg-white/10 rounded-sm transition-colors" 
                   title={isExpanded ? "Collapse" : "Expand"}
                 >
                   <Maximize2 size={16} className={isExpanded ? "rotate-45" : ""} />
                 </button>
                 <button 
-                  className="p-2 text-white hover:bg-white/10 rounded-sm transition-colors" 
+                  className="hidden sm:block p-2 text-white hover:bg-white/10 rounded-sm transition-colors" 
                   title="Reset"
                   onClick={onReset}
                 >
                   <RotateCcw size={16} />
                 </button>
                 <button 
-                  className="p-2 text-white hover:bg-white/10 rounded-sm transition-colors" 
+                  className="hidden sm:block p-2 text-white hover:bg-white/10 rounded-sm transition-colors" 
                   title="New Chat"
                   onClick={onNewChat}
                 >
@@ -228,6 +230,20 @@ export function ChatLayout({
               }`}
             >
               <div className="py-1">
+                <button 
+                  onClick={onReset}
+                  className="block sm:hidden w-full px-4 py-2 text-sm text-white hover:bg-white/10 flex items-center gap-2 transition-colors"
+                >
+                  <RotateCcw size={16} />
+                  Reset
+                </button>
+                <button 
+                  onClick={onReset}
+                  className="block sm:hidden w-full px-4 py-2 text-sm text-white hover:bg-white/10 flex items-center gap-2 transition-colors"
+                >
+                  <Plus size={16} />
+                  New Chat
+                </button>
                 <button
                   onClick={handleOpenSettings}
                   className="w-full px-4 py-2 text-sm text-white hover:bg-white/10 flex items-center gap-2 transition-colors"
