@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { getSearchRoute } from '@/lib/utils';
+import { getSearchRoute, isValidTransactionSignature, isValidSolanaAddress } from '@/lib/utils';
 
 export default function SearchBar() {
   const [query, setQuery] = useState('');
@@ -11,16 +11,56 @@ export default function SearchBar() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!query.trim() || isLoading) return;
+    const trimmedQuery = query.trim();
+    if (!trimmedQuery || isLoading) return;
     
     try {
       setIsLoading(true);
-      const route = await getSearchRoute(query.trim());
-      router.push(route);
+      
+      // Check if query is a block number
+      if (/^\d+$/.test(trimmedQuery)) {
+        console.log('Redirecting to block page:', trimmedQuery);
+        router.push(`/block/${trimmedQuery}`);
+        return;
+      }
+      
+      // Check if query is a transaction signature (88 chars)
+      if (isValidTransactionSignature(trimmedQuery)) {
+        console.log('Redirecting to transaction page:', trimmedQuery);
+        window.location.href = `/tx/${trimmedQuery}`;
+        return;
+      }
+      
+      // Check if query is a valid Solana address
+      if (isValidSolanaAddress(trimmedQuery)) {
+        // Check account type using API
+        const response = await fetch(`/api/check-account-type?address=${encodeURIComponent(trimmedQuery)}`);
+        const data = await response.json();
+        
+      switch (data.type) {
+        case 'token':
+          console.log('Redirecting to token page:', query);
+          window.location.href = `/token/${query.trim()}`;
+          break;
+        case 'program':
+          console.log('Redirecting to program page:', query);
+          window.location.href = `/program/${query.trim()}`;
+          break;
+        case 'account':
+          console.log('Redirecting to account page:', query);
+          window.location.href = `/account/${query.trim()}`;
+          break;
+        default:
+          window.location.href = `/search?q=${encodeURIComponent(query.trim())}`;
+      }
+      } else {
+        // If no specific match, use the search page
+        router.push(`/search?q=${encodeURIComponent(trimmedQuery)}`);
+      }
     } catch (error) {
-      console.error('Error getting search route:', error);
+      console.error('Error processing search:', error);
       // On error, use the search page
-      router.push(`/search?q=${encodeURIComponent(query.trim())}`);
+      router.push(`/search?q=${encodeURIComponent(trimmedQuery)}`);
     } finally {
       setIsLoading(false);
     }
