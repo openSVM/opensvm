@@ -1,50 +1,132 @@
-import { Suspense } from 'react';
+'use client';
+
+import React, { Suspense, useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardHeader, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { sanitizeSearchQuery, formatNumber, isValidSolanaAddress } from '@/lib/utils';
+import { sanitizeSearchQuery, formatNumber, isValidSolanaAddress, isValidTransactionSignature, isTokenMint } from '@/lib/utils';
 
 interface SearchPageProps {
-  searchParams: { q?: string };
   params: Record<string, string>;
 }
 
-async function searchAccounts(rawQuery: string) {
-  const query = sanitizeSearchQuery(rawQuery);
-  if (!query) return { error: 'Invalid search query' };
-  
-  // Validate if query looks like a Solana address
-  if (query.length > 30 && !isValidSolanaAddress(query)) {
-    return { error: 'Invalid Solana address format' };
-  }
-  try {
-    const response = await fetch(`/api/search/accounts?q=${encodeURIComponent(query)}`);
-    if (!response.ok) throw new Error('Failed to fetch accounts');
-    return response.json();
-  } catch (error) {
-    console.error('Account search error:', error);
-    return { error: 'Failed to search accounts' };
-  }
-}
-
-export default async function SearchPage({
-  searchParams,
+export default function SearchPage({
+  params,
 }: SearchPageProps) {
-  const query = sanitizeSearchQuery(searchParams?.q || '');
-  
-  let accountResults = null;
-  let error = null;
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const query = searchParams?.get('q') || '';
+  const [searchResults, setSearchResults] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
-  if (query) {
-    try {
-      accountResults = await searchAccounts(query);
-    } catch (e) {
-      error = 'Failed to perform search';
-      console.error(e);
+  // Handle redirects on mount
+  useEffect(() => {
+    async function handleRedirect() {
+      if (!query) return;
+
+      setIsLoading(true);
+      try {
+        // Check if query is a block number
+        if (/^\d+$/.test(query)) {
+          router.push(`/block/${query}`);
+          return;
+        }
+        
+        // Check if query is a transaction signature (88 chars)
+        if (isValidTransactionSignature(query)) {
+          router.push(`/tx/${query}`);
+          return;
+        }
+        
+        // Check if query is a valid Solana address
+        if (isValidSolanaAddress(query)) {
+          try {
+            // Check account type using API
+            const response = await fetch(`/api/check-account-type?address=${encodeURIComponent(query)}`);
+            const data = await response.json();
+            
+            switch (data.type) {
+              case 'token':
+                console.log('Redirecting to token page:', query);
+                router.push(`/token/${query}`);
+                return;
+              case 'program':
+                console.log('Redirecting to program page:', query);
+                router.push(`/program/${query}`);
+                return;
+              case 'account':
+              default:
+                console.log('Redirecting to account page:', query);
+                router.push(`/account/${query}`);
+                return;
+            }
+          } catch (error) {
+            console.error('Error checking account type:', error);
+            // On error, default to account page
+            router.push(`/account/${query}`);
+            return;
+          }
+        }
+      } finally {
+        setIsLoading(false);
+      }
     }
-  } else {
+
+    handleRedirect();
+  }, [query, router]);
+  
+  // Handle general search
+  useEffect(() => {
+    async function performSearch() {
+      if (!query) {
+        setSearchResults(null);
+        return;
+      }
+
+      const sanitizedQuery = sanitizeSearchQuery(query);
+      if (!sanitizedQuery) {
+        setSearchResults(null);
+        return;
+      }
+
+      try {
+        setIsLoading(true);
+        const response = await fetch(`/api/search/accounts?q=${encodeURIComponent(sanitizedQuery)}`);
+        if (!response.ok) throw new Error('Failed to fetch accounts');
+        const results = await response.json();
+        setSearchResults(results);
+      } catch (e) {
+        setError('Failed to perform search');
+        console.error(e);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    performSearch();
+  }, [query]);
+
+  if (!query) {
     return (
       <div className="container mx-auto px-4 py-8">
         <h1 className="text-2xl font-bold mb-6">Please enter a search query</h1>
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <h1 className="text-2xl font-bold mb-6">Loading...</h1>
+        <Card>
+          <CardHeader>
+            <h2 className="text-lg font-semibold">Loading Results</h2>
+          </CardHeader>
+          <CardContent>
+            <Skeleton className="h-24 w-full" />
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -77,11 +159,11 @@ export default async function SearchPage({
                   <h2 className="text-lg font-semibold">Accounts</h2>
                 </CardHeader>
                 <CardContent>
-                  {accountResults?.error ? (
-                    <p className="text-red-500">{accountResults.error}</p>
-                  ) : accountResults?.length ? (
+                  {searchResults?.error ? (
+                    <p className="text-red-500">{searchResults.error}</p>
+                  ) : searchResults?.length ? (
                     <div className="space-y-4">
-                      {accountResults.map((account: any) => (
+                      {searchResults.map((account: any) => (
                         <div key={account.address} className="p-4 border rounded">
                           <p className="font-mono text-sm">{account.address}</p>
                           {account.balance && (
