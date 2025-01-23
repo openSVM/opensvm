@@ -39,9 +39,13 @@ export function isValidSolanaAddress(address: string): boolean {
 
 // Validate Solana transaction signature format
 export function isValidTransactionSignature(signature: string): boolean {
+  if (!signature) return false;
+  
   // Transaction signatures are 88 characters long and base58 encoded
   const base58Regex = /^[1-9A-HJ-NP-Za-km-z]{88}$/;
-  return base58Regex.test(signature);
+  const isValid = base58Regex.test(signature);
+  console.log('Validating transaction signature:', signature, 'Result:', isValid);
+  return isValid;
 }
 
 import { PublicKey } from '@solana/web3.js';
