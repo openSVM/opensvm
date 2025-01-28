@@ -17,23 +17,47 @@ export default function NFTsPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let mounted = true;
+    let retryCount = 0;
+    const maxRetries = 3;
+    const retryDelay = 1000;
+
     async function fetchCollections() {
       try {
         const response = await fetch('/api/nfts/collections');
-        if (!response.ok) {
-          throw new Error('Failed to fetch collections');
-        }
         const data = await response.json();
-        setCollections(data);
+        
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to fetch collections');
+        }
+        
+        if (mounted) {
+          if (!Array.isArray(data)) {
+            throw new Error('Invalid response format');
+          }
+          setCollections(data);
+          setLoading(false);
+          setError(null);
+        }
       } catch (err) {
         console.error('Error fetching NFT collections:', err);
-        setError('Failed to load NFT collections. Please try again later.');
-      } finally {
-        setLoading(false);
+        if (mounted) {
+          if (retryCount < maxRetries) {
+            console.log(`Retrying... Attempt ${retryCount + 1} of ${maxRetries}`);
+            retryCount++;
+            setTimeout(fetchCollections, retryDelay);
+          } else {
+            setLoading(false);
+            setError(err instanceof Error ? err.message : 'Failed to load NFT collections. Please try again later.');
+          }
+        }
       }
     }
 
     fetchCollections();
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   if (error) {
@@ -54,7 +78,7 @@ export default function NFTsPage() {
         {loading ? (
           // Loading skeletons
           Array.from({ length: 6 }).map((_, i) => (
-            <Card key={i}>
+            <Card key={i} data-testid="nft-skeleton">
               <CardHeader>
                 <Skeleton className="h-4 w-3/4" />
               </CardHeader>
@@ -64,10 +88,10 @@ export default function NFTsPage() {
               </CardContent>
             </Card>
           ))
-        ) : collections.length > 0 ? (
+        ) : collections?.length > 0 ? (
           // Display collections
           collections.map((collection) => (
-            <Card key={collection.address}>
+            <Card key={collection.address} data-testid="nft-collection">
               <CardHeader>
                 <h3 className="text-lg font-semibold">{collection.name}</h3>
                 <p className="text-sm text-gray-500">{collection.symbol}</p>

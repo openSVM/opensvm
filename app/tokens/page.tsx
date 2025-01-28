@@ -1,10 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 
 interface Token {
+  mint: string;
   name: string;
   symbol: string;
   price: number;
@@ -13,8 +15,10 @@ interface Token {
   marketCap: number;
 }
 
-const EXAMPLE_TOKENS: Token[] = [
+// Well-known token mints
+const KNOWN_TOKENS: Token[] = [
   {
+    mint: 'So11111111111111111111111111111111111111112',
     name: 'Solana',
     symbol: 'SOL',
     price: 198.35,
@@ -23,6 +27,7 @@ const EXAMPLE_TOKENS: Token[] = [
     marketCap: 85000000000
   },
   {
+    mint: 'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263',
     name: 'Bonk',
     symbol: 'BONK',
     price: 0.000016,
@@ -31,18 +36,41 @@ const EXAMPLE_TOKENS: Token[] = [
     marketCap: 950000000
   },
   {
+    mint: '4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R',
     name: 'Raydium',
     symbol: 'RAY',
     price: 1.23,
     change24h: 5.7,
     volume24h: 7890123,
     marketCap: 250000000
-  },
-  // Add more example tokens as needed
+  }
 ];
 
 export default function TokensPage() {
   const [searchQuery, setSearchQuery] = useState('');
+
+  const router = useRouter();
+  const [tokens, setTokens] = useState<Token[]>(KNOWN_TOKENS);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchTokens() {
+      try {
+        // TODO: Implement real token data fetching
+        setTokens(KNOWN_TOKENS);
+      } catch (error) {
+        console.error('Error fetching tokens:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchTokens();
+  }, []);
+
+  const handleTokenClick = (mint: string) => {
+    router.push(`/token/${mint}`);
+  };
 
   return (
     <main className="min-h-screen bg-background">
@@ -72,8 +100,12 @@ export default function TokensPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {EXAMPLE_TOKENS.map((token) => (
-                  <tr key={token.symbol} className="hover:bg-muted/50">
+                {tokens.map((token) => (
+                  <tr 
+                    key={token.mint} 
+                    className="hover:bg-muted/50 cursor-pointer" 
+                    onClick={() => handleTokenClick(token.mint)}
+                  >
                     <td className="px-6 py-4">
                       <div className="flex items-center">
                         <div>
@@ -103,4 +135,4 @@ export default function TokensPage() {
       </div>
     </main>
   );
-} 
+}

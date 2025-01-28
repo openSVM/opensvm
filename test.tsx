@@ -1,3 +1,5 @@
+import { render, screen } from '@testing-library/react';
+
 // Test program to verify visualizer layout
 const testData = new Uint8Array([
   // First row (16 bytes)
@@ -24,3 +26,10 @@ export default function TestPage() {
     </div>
   );
 }
+
+describe('TestPage', () => {
+  it('renders program visualizer', () => {
+    render(<TestPage />);
+    expect(screen.getByText('Test')).toBeInTheDocument();
+  });
+});
