@@ -11,7 +11,7 @@ global.fetch = jest.fn();
 describe('NFTsPage', () => {
   beforeEach(() => {
     jest.resetAllMocks();
-    jest.useFakeTimers();
+    jest.useFakeTimers({ advanceTimers: true });
     (global.fetch as jest.Mock).mockReset();
   });
 
@@ -21,9 +21,18 @@ describe('NFTsPage', () => {
     jest.clearAllTimers();
   });
 
-  it('shows loading state initially', () => {
+  const waitForStateUpdate = async () => {
+    await act(async () => {
+      await Promise.resolve();
+      jest.runAllTimers();
+      await Promise.resolve();
+    });
+  };
+
+  it('shows loading state initially', async () => {
     render(<NFTsPage />);
     expect(screen.getAllByTestId('nft-skeleton')).toHaveLength(6);
+    await waitForStateUpdate();
   });
 
   it('displays NFT collections when fetch succeeds', async () => {
@@ -55,9 +64,8 @@ describe('NFTsPage', () => {
     expect(screen.getAllByTestId('nft-skeleton')).toHaveLength(6);
 
     // Wait for collections to load
-    await waitFor(() => {
-      expect(screen.getAllByTestId('nft-collection')).toHaveLength(2);
-    });
+    await waitForStateUpdate();
+    expect(screen.getAllByTestId('nft-collection')).toHaveLength(2);
 
     // Verify collection details
     expect(screen.getByText('DRiP')).toBeInTheDocument();
@@ -80,13 +88,12 @@ describe('NFTsPage', () => {
     expect(screen.getAllByTestId('nft-skeleton')).toHaveLength(6);
 
     // Wait for error state and loading to clear
-    await waitFor(() => {
-      expect(screen.queryAllByTestId('nft-skeleton')).toHaveLength(0);
-      const errorElement = screen.getByText('Cannot read properties of undefined (reading \'json\')');
-      expect(errorElement).toBeInTheDocument();
-      expect(errorElement.className).toContain('text-red-600');
-      expect(screen.queryAllByTestId('nft-collection')).toHaveLength(0);
-    }, { timeout: 4000 });
+    await waitForStateUpdate();
+    expect(screen.queryAllByTestId('nft-skeleton')).toHaveLength(0);
+    const errorElement = screen.getByText('Cannot read properties of undefined (reading \'json\')');
+    expect(errorElement).toBeInTheDocument();
+    expect(errorElement.className).toContain('text-red-600');
+    expect(screen.queryAllByTestId('nft-collection')).toHaveLength(0);
   });
 
   it('makes initial request plus 2 retries when fetch fails', async () => {
@@ -110,37 +117,32 @@ describe('NFTsPage', () => {
     // Initial loading state
     expect(screen.getAllByTestId('nft-skeleton')).toHaveLength(6);
 
-    // Wait for retries to complete
-    await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledTimes(3);
-    }, { timeout: 4000 });
-
     // Initial attempt
-    await act(async () => {
-      await Promise.resolve();
-      await flushPromises();
-    });
+    await waitForStateUpdate();
 
     // First retry
     await act(async () => {
       jest.advanceTimersByTime(1000);
       await Promise.resolve();
-      await flushPromises();
     });
+    await waitForStateUpdate();
 
     // Second retry
     await act(async () => {
       jest.advanceTimersByTime(1000);
       await Promise.resolve();
-      await flushPromises();
     });
+    await waitForStateUpdate();
 
-    // Wait for final state updates
+    // Wait for all retries to complete
     await act(async () => {
       jest.advanceTimersByTime(1000);
       await Promise.resolve();
-      await flushPromises();
     });
+    await waitForStateUpdate();
+
+    // Verify all three attempts were made
+    expect(global.fetch).toHaveBeenCalledTimes(3);
 
     // Verify final state
     expect(screen.queryAllByTestId('nft-skeleton')).toHaveLength(0);
@@ -162,11 +164,7 @@ describe('NFTsPage', () => {
 
     render(<NFTsPage />);
 
-    await act(async () => {
-      await Promise.resolve();
-      jest.runAllTimers();
-      await Promise.resolve();
-    });
+    await waitForStateUpdate();
 
     expect(screen.queryAllByTestId('nft-skeleton')).toHaveLength(0);
     expect(screen.queryAllByTestId('nft-collection')).toHaveLength(0);
@@ -201,13 +199,8 @@ describe('NFTsPage', () => {
 
     expect(screen.getByTestId('nft-collection')).toBeInTheDocument();
 
-    // Simulate image error
+    // Verify placeholder image is used immediately for invalid URLs
     const img = screen.getByAltText('DRiP');
-    act(() => {
-      img.dispatchEvent(new Event('error'));
-    });
-
-    // Verify placeholder image is used
     expect(img).toHaveAttribute('src', '/images/placeholder-nft.svg');
   });
 });
