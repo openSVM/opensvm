@@ -1,173 +1,174 @@
-'use client';
-
-import { useState } from 'react';
-import { SVMNetwork, NetworkTableColumn, networkColumns } from '@/lib/types/network';
+import React from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
-import { Button } from '@/components/ui/button';
-import { 
-  ArrowUpDown, 
-  Github, 
-  Globe, 
-  FileText, 
-  MessageCircle, 
-  Twitter, 
-  MessageSquare 
-} from 'lucide-react';
 
-interface NetworksTableProps {
-  networks: SVMNetwork[];
+interface SVMNetwork {
+  name: string;
+  description: string;
+  github: string;
+  landingPage: string;
+  whitepaper: string;
+  telegram: string;
+  twitter: string;
+  discord: string;
 }
 
-export function NetworksTable({ networks }: NetworksTableProps) {
-  const [sortConfig, setSortConfig] = useState<{
-    key: keyof SVMNetwork;
-    direction: 'asc' | 'desc';
-  } | null>(null);
-  const [expandedDescription, setExpandedDescription] = useState<string | null>(null);
+const networks: SVMNetwork[] = [
+  {
+    name: "Eclipse",
+    description: "Eclipse is building Solana on Ethereum, using the SVM to scale Ethereum. It combines Solana's performance with Ethereum's network effects.",
+    github: "https://github.com/eclipse-labs",
+    landingPage: "https://www.eclipse.xyz/",
+    whitepaper: "missing",
+    telegram: "https://t.me/eclipsebuilders",
+    twitter: "https://x.com/EclipseFND",
+    discord: "https://discord.com/invite/eclipse-fnd"
+  },
+  {
+    name: "Lollipop",
+    description: "Lollipop proposes a formal specification for implementing SVM rollups on top of the Solana Layer 1 blockchain, aiming to enhance scalability.",
+    github: "missing",
+    landingPage: "missing",
+    whitepaper: "https://arxiv.org/pdf/2405.08882.pdf",
+    telegram: "https://t.me/lollipopsvm",
+    twitter: "https://x.com/lollipopsvm",
+    discord: "missing"
+  },
+  {
+    name: "SOON",
+    description: "SOON is an Ethereum Layer 2 solution utilizing the Solana Virtual Machine to expedite transaction settlement times.",
+    github: "https://github.com/soonlabs",
+    landingPage: "missing",
+    whitepaper: "missing",
+    telegram: "https://t.me/soonlabs",
+    twitter: "https://x.com/soonlabs",
+    discord: "missing"
+  },
+  {
+    name: "Termina",
+    description: "Termina leverages the power of the Solana Virtual Machine to scale ecosystems with dedicated blockspace and throughput.",
+    github: "missing",
+    landingPage: "https://www.termina.technology/",
+    whitepaper: "missing",
+    telegram: "https://t.me/terminatech",
+    twitter: "https://x.com/terminatech",
+    discord: "missing"
+  },
+  {
+    name: "Nitro",
+    description: "Nitro is an Optimistic rollup solution that utilizes the Solana Virtual Machine (SVM) to enable Solana developers to port dApps to various ecosystems.",
+    github: "missing",
+    landingPage: "missing",
+    whitepaper: "missing",
+    telegram: "https://t.me/nitroprotocol",
+    twitter: "https://x.com/nitro_protocol",
+    discord: "missing"
+  },
+  {
+    name: "Cascade",
+    description: "Cascade is an SVM rollup optimized for the IBC ecosystem, allowing Solana projects to deploy and access Cosmos app-chain liquidity.",
+    github: "missing",
+    landingPage: "missing",
+    whitepaper: "missing",
+    telegram: "https://t.me/cascadeprotocol",
+    twitter: "https://x.com/cascade_protocol",
+    discord: "missing"
+  }
+];
 
-  const truncateDescription = (text: string, maxLength: number = 100) => {
-    if (text.length <= maxLength) return text;
-    return text.slice(0, maxLength) + '...';
-  };
-
-  const handleDescriptionClick = (networkId: string) => {
-    setExpandedDescription(expandedDescription === networkId ? null : networkId);
-  };
-
-  const sortedNetworks = [...networks].sort((a, b) => {
-    if (!sortConfig) return 0;
-
-    const { key, direction } = sortConfig;
-    const aValue = a[key];
-    const bValue = b[key];
-
-    if (aValue < bValue) return direction === 'asc' ? -1 : 1;
-    if (aValue > bValue) return direction === 'asc' ? 1 : -1;
-    return 0;
-  });
-
-  const handleSort = (key: keyof SVMNetwork) => {
-    setSortConfig(current => ({
-      key,
-      direction: current?.key === key && current.direction === 'asc' ? 'desc' : 'asc'
-    }));
-  };
-
-  const renderSortButton = (column: NetworkTableColumn) => {
-    if (!column.sortable) return null;
-    
-    return (
-      <Button
-        variant="ghost"
-        onClick={() => handleSort(column.key as keyof SVMNetwork)}
-        className="h-8 px-2"
-      >
-        <ArrowUpDown className="h-4 w-4" />
-      </Button>
-    );
-  };
-
-  const renderLinks = (links: SVMNetwork['links']) => {
-    return (
-      <div className="flex gap-2">
-        {links.github && (
-          <Link href={links.github} target="_blank" rel="noopener noreferrer" className="hover:text-primary">
-            <Github className="h-5 w-5" />
-          </Link>
-        )}
-        {links.landing && (
-          <Link href={links.landing} target="_blank" rel="noopener noreferrer" className="hover:text-primary">
-            <Globe className="h-5 w-5" />
-          </Link>
-        )}
-        {links.whitepaper && (
-          <Link href={links.whitepaper} target="_blank" rel="noopener noreferrer" className="hover:text-primary">
-            <FileText className="h-5 w-5" />
-          </Link>
-        )}
-        {links.telegram && (
-          <Link href={links.telegram} target="_blank" rel="noopener noreferrer" className="hover:text-primary">
-            <MessageCircle className="h-5 w-5" />
-          </Link>
-        )}
-        {links.twitter && (
-          <Link href={links.twitter} target="_blank" rel="noopener noreferrer" className="hover:text-primary">
-            <Twitter className="h-5 w-5" />
-          </Link>
-        )}
-        {links.discord && (
-          <Link href={links.discord} target="_blank" rel="noopener noreferrer" className="hover:text-primary">
-            <MessageSquare className="h-5 w-5" />
-          </Link>
-        )}
-      </div>
-    );
-  };
-
-  const getStatusColor = (status: SVMNetwork['status']) => {
-    switch (status) {
-      case 'active':
-        return 'text-green-500';
-      case 'development':
-        return 'text-yellow-500';
-      case 'deprecated':
-        return 'text-red-500';
-      default:
-        return '';
-    }
-  };
-
+const NetworksTable: React.FC = () => {
   return (
-    <div className="rounded-md border">
-      <table className="w-full">
-        <thead>
-          <tr className="border-b bg-muted/50">
-            {networkColumns.map((column) => (
-              <th key={column.key} className="h-12 px-4 text-left align-middle font-medium">
-                <div className="flex items-center gap-2">
-                  {column.label}
-                  {renderSortButton(column)}
-                </div>
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {sortedNetworks.map((network) => (
-            <tr key={network.id} className="border-b">
-              <td className="p-4 align-middle font-medium">{network.name}</td>
-              <td 
-                className="p-4 align-middle cursor-pointer group relative"
-                onClick={() => handleDescriptionClick(network.id)}
-              >
-                <div className={`
-                  transition-all duration-200 ease-in-out
-                  ${expandedDescription === network.id ? 'text-primary' : 'group-hover:text-primary'}
-                `}>
-                  {expandedDescription === network.id 
-                    ? network.description
-                    : (
-                      <>
-                        {truncateDescription(network.description)}
-                        <span className="ml-1 text-xs text-muted-foreground group-hover:text-primary">
-                          (click to expand)
-                        </span>
-                      </>
-                    )
-                  }
-                </div>
-              </td>
-              <td className="p-4 align-middle">{renderLinks(network.links)}</td>
-              <td className="p-4 align-middle">
-                <span className={getStatusColor(network.status)}>
-                  {network.status.charAt(0).toUpperCase() + network.status.slice(1)}
-                </span>
-              </td>
-              <td className="p-4 align-middle">{network.lastUpdated}</td>
+    <div className="container mx-auto py-8">
+      <h1 className="text-4xl font-bold mb-8">SVM Networks Registry</h1>
+      <div className="overflow-x-auto">
+        <table className="min-w-full bg-background border border-border">
+          <thead>
+            <tr className="bg-muted">
+              <th className="px-6 py-3 text-left text-sm font-semibold">Project</th>
+              <th className="px-6 py-3 text-left text-sm font-semibold">Description</th>
+              <th className="px-6 py-3 text-left text-sm font-semibold">Links</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody className="divide-y divide-border">
+            {networks.map((network) => (
+              <tr key={network.name} className="hover:bg-muted/50">
+                <td className="px-6 py-4">
+                  <div className="font-semibold">{network.name}</div>
+                </td>
+                <td className="px-6 py-4">
+                  <p className="text-sm text-muted-foreground">{network.description}</p>
+                </td>
+                <td className="px-6 py-4">
+                  <div className="flex flex-wrap gap-2">
+                    {network.github !== "missing" && (
+                      <Link
+                        href={network.github}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-primary hover:text-primary/80"
+                      >
+                        GitHub
+                      </Link>
+                    )}
+                    {network.landingPage !== "missing" && (
+                      <Link
+                        href={network.landingPage}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-primary hover:text-primary/80"
+                      >
+                        Website
+                      </Link>
+                    )}
+                    {network.whitepaper !== "missing" && (
+                      <Link
+                        href={network.whitepaper}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-primary hover:text-primary/80"
+                      >
+                        Whitepaper
+                      </Link>
+                    )}
+                    {network.telegram !== "missing" && (
+                      <Link
+                        href={network.telegram}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-primary hover:text-primary/80"
+                      >
+                        Telegram
+                      </Link>
+                    )}
+                    {network.twitter !== "missing" && (
+                      <Link
+                        href={network.twitter}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-primary hover:text-primary/80"
+                      >
+                        Twitter
+                      </Link>
+                    )}
+                    {network.discord !== "missing" && (
+                      <Link
+                        href={network.discord}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-primary hover:text-primary/80"
+                      >
+                        Discord
+                      </Link>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
-}
+};
+
+export default NetworksTable;
