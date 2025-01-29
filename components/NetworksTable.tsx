@@ -63,23 +63,23 @@ const networks: SVMNetwork[] = [
     telegram: "https://t.me/nitroprotocol",
     twitter: "https://x.com/nitro_protocol",
     discord: "missing"
-  },
-  {
-    name: "Cascade",
-    description: "Cascade is an SVM rollup optimized for the IBC ecosystem, allowing Solana projects to deploy and access Cosmos app-chain liquidity.",
-    github: "missing",
-    landingPage: "missing",
-    whitepaper: "missing",
-    telegram: "https://t.me/cascadeprotocol",
-    twitter: "https://x.com/cascade_protocol",
-    discord: "missing"
   }
 ];
 
 const NetworksTable: React.FC = () => {
   return (
     <div className="container mx-auto py-8">
-      <h1 className="text-4xl font-bold mb-8">SVM Networks Registry</h1>
+      <div className="flex items-center gap-4 mb-8">
+        <h1 className="text-4xl font-bold">SVM Networks Registry</h1>
+        <Link
+          href="https://blog.superteam.fun/p/solana-need-l2s-and-appchains"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-sm text-primary hover:text-primary/80"
+        >
+          (What is SVM?)
+        </Link>
+      </div>
       <div className="overflow-x-auto">
         <table className="min-w-full bg-background border border-border">
           <thead>
