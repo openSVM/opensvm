@@ -79,6 +79,11 @@ export function Navbar({ children }: NavbarProps) {
                 trigger="Explore"
                 items={[
                   {
+                    label: "Networks",
+                    href: "/networks",
+                    description: "Explore SVM networks and their resources"
+                  },
+                  {
                     label: "Recent Blocks",
                     href: "/blocks",
                     description: "View latest blocks and transactions"
