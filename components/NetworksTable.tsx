@@ -63,6 +63,96 @@ const networks: SVMNetwork[] = [
     telegram: "https://t.me/nitroprotocol",
     twitter: "https://x.com/nitro_protocol",
     discord: "missing"
+  },
+  {
+    name: "Sonic SVM",
+    description: "Sonic is the first chain extension on Solana, designed for games and applications, and is powered by the Sonic HyperGrid Framework.",
+    github: "missing",
+    landingPage: "https://www.sonic.game/",
+    whitepaper: "missing",
+    telegram: "missing",
+    twitter: "missing",
+    discord: "missing"
+  },
+  {
+    name: "MagicBlock",
+    description: "MagicBlock introduces Ephemeral Rollups, SVM-based runtimes that accelerate state transitions for selected Solana accounts, enhancing performance for on-chain games and applications.",
+    github: "https://github.com/magicblock-labs/ephemeral-rollups-spl",
+    landingPage: "https://magicblock.gg/",
+    whitepaper: "https://docs.magicblock.gg/introduction",
+    telegram: "missing",
+    twitter: "missing",
+    discord: "missing"
+  },
+  {
+    name: "Fogo",
+    description: "Fogo is a high-performance Layer 1 blockchain built on the Solana Virtual Machine (SVM), utilizing the Firedancer client to achieve real-time experiences at scale.",
+    github: "missing",
+    landingPage: "https://fogo.io",
+    whitepaper: "https://fogo.io/whitepaper",
+    telegram: "missing",
+    twitter: "https://x.com/FogoChain",
+    discord: "missing"
+  },
+  {
+    name: "Solayer",
+    description: "Solayer is a hardware-accelerated blockchain designed to infinitely scale the SVM, enabling high-throughput, near-zero latency use cases.",
+    github: "missing",
+    landingPage: "https://solayer.io",
+    whitepaper: "missing",
+    telegram: "missing",
+    twitter: "https://x.com/SolayerFdn",
+    discord: "missing"
+  },
+  {
+    name: "Mantis",
+    description: "Mantis is a groundbreaking project on Solana that aims to revolutionize cross-chain trading and MEV extraction through its multi-chain intent settlement protocol.",
+    github: "https://github.com/ComposableFi/mantis-solana",
+    landingPage: "https://mantis.app/",
+    whitepaper: "https://docs.mantis.app/",
+    telegram: "missing",
+    twitter: "https://x.com/mantis",
+    discord: "missing"
+  },
+  {
+    name: "Code",
+    description: "Code is a mobile app leveraging self-custodial blockchain technology to deliver a seamless payments experience that is instant, global, and private.",
+    github: "https://github.com/code-payments/code-vm",
+    landingPage: "https://getcode.com/",
+    whitepaper: "missing",
+    telegram: "missing",
+    twitter: "missing",
+    discord: "missing"
+  },
+  {
+    name: "Grass",
+    description: "Grass is a decentralized AI data collection network built on the Solana blockchain, allowing users to earn rewards by sharing their unused internet bandwidth.",
+    github: "missing",
+    landingPage: "https://www.getgrass.io/",
+    whitepaper: "missing",
+    telegram: "missing",
+    twitter: "https://x.com/getgrass_io",
+    discord: "missing"
+  },
+  {
+    name: "Atlas SVM",
+    description: "Atlas is a blockchain optimized for verifiable finance, combining traditional finance's performance with DeFi's transparency.",
+    github: "missing",
+    landingPage: "https://www.atlas.xyz/",
+    whitepaper: "missing",
+    telegram: "missing",
+    twitter: "missing",
+    discord: "missing"
+  },
+  {
+    name: "Sovereign Labs",
+    description: "Sovereign Labs is developing an ecosystem of seamlessly interoperable and scalable rollups that can run on any blockchain, leveraging proof aggregation and zk-rollup components to enhance scalability and interoperability.",
+    github: "https://github.com/Sovereign-Labs",
+    landingPage: "https://www.sovereign.xyz/",
+    whitepaper: "missing",
+    telegram: "missing",
+    twitter: "https://x.com/Sovereign_Labs",
+    discord: "https://discord.gg/sovereign-labs"
   }
 ];
 
