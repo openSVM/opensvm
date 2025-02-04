@@ -1,97 +1,164 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { Card, CardHeader, CardContent } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
+import { useState, useEffect } from 'react';
+import Image from 'next/image';
 
 interface NFTCollection {
   address: string;
   name: string;
   symbol: string;
-  image?: string;
+  image: string;
 }
+
+const fetchNFTCollections = async (): Promise<NFTCollection[]> => {
+  const response = await fetch('/api/nft-collections');
+  if (!response.ok) {
+    throw new Error(await response.text());
+  }
+  return response.json();
+};
 
 export default function NFTsPage() {
   const [collections, setCollections] = useState<NFTCollection[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
-    async function fetchCollections() {
+    let mounted = true;
+    let retryTimeout: NodeJS.Timeout;
+
+    const fetchCollections = async () => {
       try {
-        const response = await fetch('/api/nfts/collections');
-        if (!response.ok) {
-          throw new Error('Failed to fetch collections');
-        }
+        const response = await fetch('/api/nft-collections');
         const data = await response.json();
-        setCollections(data);
+        if (mounted) {
+          setCollections(data);
+          setError(null);
+        }
       } catch (err) {
-        console.error('Error fetching NFT collections:', err);
-        setError('Failed to load NFT collections. Please try again later.');
+        if (mounted) {
+          const errorMessage = err instanceof Error ? err.message : 'Failed to fetch NFT collections';
+          setError(errorMessage);
+          if (retryCount < 2) {
+            const nextRetry = () => {
+              if (mounted) {
+                setRetryCount(prev => prev + 1);
+              }
+            };
+            retryTimeout = setTimeout(nextRetry, 1000);
+          }
+        }
       } finally {
-        setLoading(false);
+        if (mounted) {
+          setLoading(false);
+        }
       }
-    }
+    };
 
     fetchCollections();
-  }, []);
+
+    return () => {
+      mounted = false;
+      if (retryTimeout) {
+        clearTimeout(retryTimeout);
+      }
+    };
+  }, [retryCount]);
+
+  if (loading) {
+    return (
+      <div className="container mx-auto py-8">
+        <div className="mb-8">
+          <h1 className="text-4xl font-bold mb-2">NFT Collections</h1>
+          <p className="text-muted-foreground">
+            Browse NFT collections on the Solana network.
+          </p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} data-testid="nft-skeleton" className="rounded-lg border p-4 animate-pulse">
+              <div className="w-full h-48 bg-muted mb-4" />
+              <div className="h-4 bg-muted w-3/4 mb-2" />
+              <div className="h-4 bg-muted w-1/2" />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   if (error) {
     return (
-      <div className="container mx-auto p-6">
-        <h1 className="text-2xl font-bold mb-6">NFT Collections</h1>
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-          <p className="text-red-600 dark:text-red-400">{error}</p>
+      <div className="container mx-auto py-8">
+        <div className="mb-8">
+          <h1 className="text-4xl font-bold mb-2">NFT Collections</h1>
+          <p className="text-muted-foreground">
+            Browse NFT collections on the Solana network.
+          </p>
+        </div>
+        <div className="rounded-md border p-8 text-center">
+          <p className="text-red-600" data-testid="error-message">{error}</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (collections.length === 0) {
+    return (
+      <div className="container mx-auto py-8">
+        <div className="mb-8">
+          <h1 className="text-4xl font-bold mb-2">NFT Collections</h1>
+          <p className="text-muted-foreground">
+            Browse NFT collections on the Solana network.
+          </p>
+        </div>
+        <div className="rounded-md border p-8 text-center">
+          <p className="text-muted-foreground">No NFT collections found</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto p-6">
-      <h1 className="text-2xl font-bold mb-6">NFT Collections</h1>
+    <div className="container mx-auto py-8">
+      <div className="mb-8">
+        <h1 className="text-4xl font-bold mb-2">NFT Collections</h1>
+        <p className="text-muted-foreground">
+          Browse NFT collections on the Solana network.
+        </p>
+      </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {loading ? (
-          // Loading skeletons
-          Array.from({ length: 6 }).map((_, i) => (
-            <Card key={i}>
-              <CardHeader>
-                <Skeleton className="h-4 w-3/4" />
-              </CardHeader>
-              <CardContent>
-                <Skeleton className="h-32 w-full mb-4" />
-                <Skeleton className="h-4 w-1/2" />
-              </CardContent>
-            </Card>
-          ))
-        ) : collections.length > 0 ? (
-          // Display collections
-          collections.map((collection) => (
-            <Card key={collection.address}>
-              <CardHeader>
-                <h3 className="text-lg font-semibold">{collection.name}</h3>
-                <p className="text-sm text-gray-500">{collection.symbol}</p>
-              </CardHeader>
-              <CardContent>
-                {collection.image && (
-                  <div className="relative h-32 w-full mb-4 bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden">
-                    <img
-                      src={collection.image}
-                      alt={collection.name}
-                      className="object-cover w-full h-full"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src = '/images/placeholder-nft.svg';
-                      }}
-                    />
-                  </div>
-                )}
-                <p className="text-sm font-mono truncate">{collection.address}</p>
-              </CardContent>
-            </Card>
-          ))
-        ) : (
-          <p className="col-span-full text-center text-gray-500">No NFT collections found</p>
-        )}
+        {collections.map((collection) => (
+          <div
+            key={collection.name}
+            data-testid="nft-collection"
+            className="rounded-lg border p-4"
+          >
+            {collection.image.startsWith('/') || collection.image.startsWith('http') ? (
+              <Image
+                src={collection.image}
+                alt={collection.name}
+                width={400}
+                height={300}
+                className="w-full h-48 object-cover rounded-md mb-4"
+                onError={(e) => {
+                  e.currentTarget.src = '/images/placeholder-nft.svg';
+                }}
+              />
+            ) : (
+              <Image
+                src="/images/placeholder-nft.svg"
+                alt={collection.name}
+                width={400}
+                height={300}
+                className="w-full h-48 object-cover rounded-md mb-4"
+              />
+            )}
+            <h3 className="font-semibold text-lg mb-2">{collection.name}</h3>
+            <p className="text-muted-foreground">{collection.symbol}</p>
+          </div>
+        ))}
       </div>
     </div>
   );

@@ -5,13 +5,32 @@ import { Card, CardHeader, CardContent, Text, Stack, Button } from 'rinlab';
 import { useParams, useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 import Link from 'next/link';
-import { getTransactionDetails, type DetailedTransactionInfo } from '@/lib/solana';
+import { getTransactionDetails } from '@/lib/solana';
+import { ParsedTransactionWithMeta } from '@solana/web3.js';
+
+interface TransactionDetails {
+  signature: string;
+  slot: number;
+  blockTime: number;
+  status: 'success' | 'error';
+  computeUnits: number;
+  fee: number;
+  from: string;
+  to: string;
+  value: number;
+  type: string;
+  logs: string[];
+  instructions: Array<{
+    programId: string;
+    data?: string;
+  }>;
+}
 
 export default function TransactionPage() {
   const params = useParams();
   const router = useRouter();
   const signature = params.signature as string;
-  const [transaction, setTransaction] = useState<DetailedTransactionInfo | null>(null);
+  const [transaction, setTransaction] = useState<TransactionDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -19,8 +38,31 @@ export default function TransactionPage() {
 
   useEffect(() => {
     getTransactionDetails(signature)
-      .then(tx => {
-        setTransaction(tx);
+      .then((tx: ParsedTransactionWithMeta | null) => {
+        if (!tx || !tx.meta) {
+          throw new Error('Transaction not found or invalid');
+        }
+
+        // Transform the transaction data into our expected format
+        const details: TransactionDetails = {
+          signature,
+          slot: tx.slot || 0,
+          blockTime: tx.blockTime || 0,
+          status: tx.meta.err ? 'error' : 'success',
+          computeUnits: tx.meta.computeUnitsConsumed || 0,
+          fee: tx.meta.fee / 1e9, // Convert lamports to SOL
+          from: tx.transaction.message.accountKeys[0]?.pubkey.toString() || '',
+          to: tx.transaction.message.accountKeys[1]?.pubkey.toString() || '',
+          value: (tx.meta.postBalances[1] - tx.meta.preBalances[1]) / 1e9, // Convert lamports to SOL
+          type: 'unknown', // You can add logic to determine transaction type
+          logs: tx.meta.logMessages || [],
+          instructions: tx.transaction.message.instructions.map(ix => ({
+            programId: ix.programId.toString(),
+            data: 'data' in ix ? ix.data : undefined
+          }))
+        };
+        
+        setTransaction(details);
         setIsLoading(false);
       })
       .catch(err => {
@@ -154,12 +196,12 @@ export default function TransactionPage() {
 
                 <div>
                   <Text variant="label" className="text-sm text-muted-foreground">Slot</Text>
-                  <Text variant="default">{transaction.slot.toLocaleString()}</Text>
+                  <Text variant="default">{transaction.slot ? transaction.slot.toLocaleString() : 'N/A'}</Text>
                 </div>
 
                 <div>
                   <Text variant="label" className="text-sm text-muted-foreground">Compute Units</Text>
-                  <Text variant="default">{transaction.computeUnits.toLocaleString()}</Text>
+                  <Text variant="default">{transaction.computeUnits ? transaction.computeUnits.toLocaleString() : 'N/A'}</Text>
                 </div>
               </div>
             </div>
@@ -180,11 +222,11 @@ export default function TransactionPage() {
                 <div className="flex justify-between items-center">
                   <div>
                     <Text variant="label" className="text-xs text-muted-foreground">Amount</Text>
-                    <Text variant="default">{transaction.value.toFixed(9)} SOL</Text>
+                    <Text variant="default">{transaction.value ? transaction.value.toFixed(9) : '0.000000000'} SOL</Text>
                   </div>
                   <div className="text-right">
                     <Text variant="label" className="text-xs text-muted-foreground">Fee</Text>
-                    <Text variant="default">{transaction.fee.toFixed(6)} SOL</Text>
+                    <Text variant="default">{transaction.fee ? transaction.fee.toFixed(6) : '0.000000'} SOL</Text>
                   </div>
                 </div>
               </div>
@@ -225,4 +267,4 @@ export default function TransactionPage() {
       </Card>
     </PageWrapper>
   );
-} 
+}

@@ -473,16 +473,27 @@ export async function unsubscribeFromTransactions(address: string): Promise<void
 
 export async function getTokenInfo(mint: string) {
   try {
-    const connection = await getConnection();
-    const mintPubkey = new PublicKey(mint);
-    const mintInfo = await getMint(connection, mintPubkey);
+    const response = await fetch(`/api/token/${mint}`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch token details');
+    }
+    const data = await response.json();
     return {
-      mint,
-      supply: Number(mintInfo.supply),
-      decimals: mintInfo.decimals,
-      isInitialized: mintInfo.isInitialized,
-      freezeAuthority: mintInfo.freezeAuthority?.toBase58(),
-      mintAuthority: mintInfo.mintAuthority?.toBase58()
+      ...data,
+      metadata: {
+        ...data.metadata,
+        name: data.metadata?.name || 'Unknown Token',
+        symbol: data.metadata?.symbol || '',
+        description: data.metadata?.description || '',
+        image: data.metadata?.image || '/images/placeholder-nft.svg',
+      },
+      price: 0, // Would need price API integration
+      priceChange24h: 0, // Would need price API integration
+      marketCap: data.supply * 0, // Would need price API integration
+      volume24h: data.volume24h || 0,
+      supply: data.supply || 0,
+      holders: data.holders || 0,
+      decimals: data.decimals
     };
   } catch (error) {
     console.error('Error fetching token info:', error);

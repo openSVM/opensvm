@@ -7,17 +7,28 @@ class ConnectionPool {
   private currentIndex = 0;
   private config: ConnectionConfig;
   private isOpenSvmMode = false;
+  private failedEndpoints: Set<string> = new Set();
+  private lastHealthCheck: number = 0;
+  private readonly healthCheckInterval = 30000; // 30 seconds
 
   private constructor() {
     this.config = {
       commitment: 'confirmed',
       disableRetryOnRateLimit: false,
-      confirmTransactionInitialTimeout: 60000
+      confirmTransactionInitialTimeout: 60000,
+      wsEndpoint: null // Disable WebSocket for better stability
     };
 
-    // Initialize with default endpoint
-    const defaultEndpoint = process.env.NEXT_PUBLIC_RPC_ENDPOINT || 'https://api.mainnet-beta.solana.com';
-    this.connections = [new Connection(defaultEndpoint, this.config)];
+    // Initialize with OpenSVM endpoints by default
+    this.isOpenSvmMode = true;
+    this.initializeConnections();
+  }
+
+  private initializeConnections() {
+    this.connections = opensvmRpcEndpoints
+      .filter(url => !this.failedEndpoints.has(url))
+      .map(url => new Connection(url, this.config));
+    console.log('Initialized OpenSVM connection pool with', this.connections.length, 'endpoints');
   }
 
   public static getInstance(): ConnectionPool {
@@ -31,18 +42,75 @@ class ConnectionPool {
     // If it's a special "opensvm" endpoint, initialize all OpenSVM connections
     if (endpoint === 'opensvm') {
       this.isOpenSvmMode = true;
-      this.connections = opensvmRpcEndpoints.map(url => new Connection(url, this.config));
+      this.failedEndpoints.clear(); // Reset failed endpoints
+      this.initializeConnections();
       this.currentIndex = 0;
-      console.log('Initialized OpenSVM connection pool with', this.connections.length, 'endpoints');
     } else {
       // Regular single endpoint mode
       this.isOpenSvmMode = false;
       this.connections = [new Connection(endpoint, this.config)];
       this.currentIndex = 0;
+      this.failedEndpoints.clear();
     }
   }
 
-  public getConnection(): Connection {
+  private async testConnection(connection: Connection): Promise<boolean> {
+    try {
+      const blockHeight = await connection.getBlockHeight();
+      return blockHeight > 0;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  private async findHealthyConnection(): Promise<Connection | null> {
+    const startIndex = this.currentIndex;
+    let attempts = 0;
+    
+    while (attempts < this.connections.length) {
+      const connection = this.connections[this.currentIndex];
+      const endpoint = opensvmRpcEndpoints[this.currentIndex];
+      
+      try {
+        const isHealthy = await this.testConnection(connection);
+        if (isHealthy) {
+          return connection;
+        }
+        
+        // Mark endpoint as failed
+        console.warn(`Endpoint ${endpoint} failed health check`);
+        this.failedEndpoints.add(endpoint);
+      } catch (error) {
+        console.error(`Error testing connection ${endpoint}:`, error);
+        this.failedEndpoints.add(endpoint);
+      }
+      
+      // Move to next connection
+      this.currentIndex = (this.currentIndex + 1) % this.connections.length;
+      attempts++;
+    }
+    
+    // If all connections failed, reset and try again
+    if (this.failedEndpoints.size === opensvmRpcEndpoints.length) {
+      console.warn('All endpoints failed, resetting failed endpoints list');
+      this.failedEndpoints.clear();
+      this.initializeConnections();
+    }
+    
+    return null;
+  }
+
+  public async getConnection(): Promise<Connection> {
+    // Perform health check if needed
+    const now = Date.now();
+    if (now - this.lastHealthCheck > this.healthCheckInterval) {
+      this.lastHealthCheck = now;
+      const healthyConnection = await this.findHealthyConnection();
+      if (healthyConnection) {
+        return healthyConnection;
+      }
+    }
+
     if (this.isOpenSvmMode && this.connections.length > 1) {
       // Round-robin selection for OpenSVM mode
       const connection = this.connections[this.currentIndex];
@@ -56,7 +124,7 @@ class ConnectionPool {
 
   public async healthCheck(): Promise<boolean> {
     try {
-      const connection = this.getConnection();
+      const connection = await this.getConnection();
       const blockHeight = await connection.getBlockHeight();
       return blockHeight > 0;
     } catch (error) {
@@ -67,7 +135,7 @@ class ConnectionPool {
 }
 
 // Export a function to get a connection
-export function getConnection(): Connection {
+export async function getConnection(): Promise<Connection> {
   return ConnectionPool.getInstance().getConnection();
 }
 

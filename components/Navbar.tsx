@@ -5,9 +5,9 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { SettingsMenu } from './SettingsMenu';
 import { Input } from './ui/input';
-import { MoreHorizontal, Search } from 'lucide-react';
+import { MoreHorizontal, Search, Activity, Layers, Coins } from 'lucide-react';
+import { NavDropdown } from './ui/dropdown-nav';
 import { Button } from './ui/button';
-import { PublicKey } from '@solana/web3.js';
 import { AIChatSidebar } from './ai/AIChatSidebar';
 
 interface NavbarProps {
@@ -36,12 +36,9 @@ export function Navbar({ children }: NavbarProps) {
   }, []);
 
   const isSolanaAddress = (query: string): boolean => {
-    try {
-      new PublicKey(query);
-      return true;
-    } catch {
-      return false;
-    }
+    // Simple validation for base58 string of correct length
+    const base58Regex = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+    return base58Regex.test(query);
   };
 
   const handleSearch = (e: FormEvent) => {
@@ -92,18 +89,91 @@ export function Navbar({ children }: NavbarProps) {
           {/* Right section */}
           <div className="hidden sm:flex items-center gap-4">
             <div className="flex items-center gap-6">
-              <Link href="/" className="text-sm font-medium text-foreground hover:text-foreground/80">
-                Home
-              </Link>
-              <Link href="/tokens" className="text-sm font-medium text-foreground hover:text-foreground/80">
-                Tokens
-              </Link>
-              <Link href="/nfts" className="text-sm font-medium text-foreground hover:text-foreground/80">
-                NFTs
-              </Link>
-              <Link href="/analytics" className="text-sm font-medium text-foreground hover:text-foreground/80">
-                Analytics
-              </Link>
+              <NavDropdown
+                trigger="Explore"
+                items={[
+                  {
+                    label: "Networks",
+                    href: "/networks",
+                    description: "Explore SVM networks and their resources"
+                  },
+                  {
+                    label: "Recent Blocks",
+                    href: "/blocks",
+                    description: "View latest blocks and transactions"
+                  },
+                  {
+                    label: "Programs",
+                    href: "/programs",
+                    description: "Explore Solana programs and their activity"
+                  },
+                  {
+                    label: "Slots",
+                    href: "/slots",
+                    description: "Browse slot details and validators"
+                  }
+                ]}
+              />
+              <NavDropdown
+                trigger="Tokens"
+                items={[
+                  {
+                    label: "All Tokens",
+                    href: "/tokens",
+                    description: "Browse all tokens and their metrics"
+                  },
+                  {
+                    label: "Top Gainers",
+                    href: "/tokens/gainers",
+                    description: "Tokens with highest price increases"
+                  },
+                  {
+                    label: "New Listings",
+                    href: "/tokens/new",
+                    description: "Recently listed tokens"
+                  }
+                ]}
+              />
+              <NavDropdown
+                trigger="NFTs"
+                items={[
+                  {
+                    label: "Collections",
+                    href: "/nfts",
+                    description: "Browse NFT collections"
+                  },
+                  {
+                    label: "Trending",
+                    href: "/nfts/trending",
+                    description: "Most active NFT collections"
+                  },
+                  {
+                    label: "New Mints",
+                    href: "/nfts/new",
+                    description: "Recently minted collections"
+                  }
+                ]}
+              />
+              <NavDropdown
+                trigger="Analytics"
+                items={[
+                  {
+                    label: "Network Stats",
+                    href: "/analytics",
+                    description: "Solana network performance metrics"
+                  },
+                  {
+                    label: "DeFi Overview",
+                    href: "/analytics/defi",
+                    description: "DeFi protocol statistics"
+                  },
+                  {
+                    label: "Token Analytics",
+                    href: "/analytics/tokens",
+                    description: "Token market analysis"
+                  }
+                ]}
+              />
             </div>
             <SettingsMenu />
             <Button className="bg-[#00DC82] text-black hover:bg-[#00DC82]/90">
