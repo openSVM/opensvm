@@ -18,3 +18,7 @@
 - Utility functions in /utils directory
 - API routes in /app/api directory
 - Global styles in app/globals.css
+- External API integrations in /lib directory
+  - Flipside Crypto API client for historical data
+  - Network-aware query handling
+  - Combined data retrieval patterns

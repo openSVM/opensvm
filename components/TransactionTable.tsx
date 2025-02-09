@@ -1,8 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { type TransactionInfo } from '@/lib/solana';
 import Link from 'next/link';
+import * as VTable from '@visactor/vtable';
+import type { ListTableConstructorOptions, ColumnDefine } from '@visactor/vtable';
 
 interface TransactionTableProps {
   transactions: TransactionInfo[];
@@ -12,92 +14,135 @@ interface TransactionTableProps {
 }
 
 export default function TransactionTable({ transactions, isLoading, hasMore, onLoadMore }: TransactionTableProps) {
-  const [page, setPage] = useState(0);
-  const rowsPerPage = 100;
+  const tableRef = useRef<HTMLDivElement>(null);
+  const tableInstanceRef = useRef<any>(null);
 
-  const start = page * rowsPerPage;
-  const end = start + rowsPerPage;
-  const currentTransactions = transactions.slice(start, end);
-  const totalPages = Math.ceil(transactions.length / rowsPerPage);
+  const [columnDefs] = useState<ColumnDefine[]>([
+    { 
+      field: 'signature', 
+      title: 'Signature', 
+      width: 200,
+      customRender: (args: any) => ({
+        type: 'text',
+        value: `${args.value.slice(0, 4)}...${args.value.slice(-4)}`,
+        expectedHeight: 40,
+        expectedWidth: 200,
+        elements: []
+      })
+    },
+    { field: 'type', title: 'Type', width: 100 },
+    { 
+      field: 'amount', 
+      title: 'Amount', 
+      width: 150,
+      customRender: (args: any) => ({
+        type: 'text',
+        value: args.row.amount === undefined ? '-' : 
+          `${args.row.amount} ${args.row.type === 'sol' ? 'SOL' : args.row.symbol || ''}`,
+        expectedHeight: 40,
+        expectedWidth: 150,
+        elements: []
+      })
+    },
+    { 
+      field: 'success', 
+      title: 'Status', 
+      width: 100,
+      customRender: (args: any) => ({
+        type: 'text',
+        value: args.value ? 'Success' : 'Failed',
+        expectedHeight: 40,
+        expectedWidth: 100,
+        elements: []
+      })
+    }
+  ]);
+
+  useEffect(() => {
+    if (!tableRef.current || !transactions.length) return;
+
+    const option: ListTableConstructorOptions = {
+      records: transactions,
+      columns: columnDefs,
+      widthMode: 'standard' as const,
+      heightMode: 'standard' as const,
+      defaultRowHeight: 40,
+      hover: {
+        highlightMode: 'row' as const,
+        disableHover: false
+      },
+      theme: VTable.themes.DEFAULT.extends({
+        defaultStyle: {
+          hover: {
+            cellBgColor: '#1e1e1e',
+            inlineRowBgColor: '#1e1e1e'
+          },
+          borderLineWidth: 1,
+          borderColor: '#333333',
+          color: '#ffffff',
+          bgColor: '#000000',
+          fontSize: 14,
+          fontFamily: 'inherit'
+        },
+        headerStyle: {
+          bgColor: '#000000',
+          color: '#ffffff',
+          fontWeight: 500,
+          fontSize: 14,
+          borderLineWidth: 1,
+          borderColor: '#333333'
+        },
+        frameStyle: {
+          borderColor: '#333333',
+          borderLineWidth: 1
+        },
+        underlayBackgroundColor: '#000000'
+      })
+    };
+
+    // Initialize table
+    if (tableRef.current) {
+      const rect = tableRef.current.getBoundingClientRect();
+      tableInstanceRef.current = new VTable.ListTable({
+        ...option,
+        container: tableRef.current,
+        defaultRowHeight: 40,
+        defaultHeaderRowHeight: 40,
+        widthMode: 'standard' as const,
+        heightMode: 'standard' as const
+      });
+
+      // Handle resize
+      const resizeObserver = new ResizeObserver(() => {
+        if (tableRef.current && tableInstanceRef.current) {
+          const newRect = tableRef.current.getBoundingClientRect();
+          tableInstanceRef.current.resize(newRect.width, newRect.height);
+        }
+      });
+
+      resizeObserver.observe(tableRef.current);
+
+      // Cleanup
+      return () => {
+        resizeObserver.disconnect();
+        if (tableInstanceRef.current) {
+          tableInstanceRef.current.dispose();
+        }
+      };
+    }
+  }, [transactions, columnDefs]);
 
   return (
-    <div className="overflow-x-auto">
-      <table className="min-w-full">
-        <thead>
-          <tr>
-            <th className="px-6 py-3 text-left text-sm font-medium uppercase">
-              Signature
-            </th>
-            <th className="px-6 py-3 text-left text-sm font-medium uppercase">
-              Type
-            </th>
-            <th className="px-6 py-3 text-left text-sm font-medium uppercase">
-              Amount
-            </th>
-            <th className="px-6 py-3 text-left text-sm font-medium uppercase">
-              Status
-            </th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-700">
-          {currentTransactions.map((tx) => (
-            <tr key={tx.signature}>
-              <td className="px-6 py-4 whitespace-nowrap">
-                <Link 
-                  href={`/tx/${tx.signature}`}
-                  className="text-blue-500 hover:text-blue-400"
-                >
-                  {tx.signature.slice(0, 8)}...{tx.signature.slice(-8)}
-                </Link>
-              </td>
-              <td className="px-6 py-4 whitespace-nowrap">
-                <span className="capitalize">{tx.type}</span>
-              </td>
-              <td className="px-6 py-4 whitespace-nowrap">
-                {tx.amount !== undefined ? (
-                  <span>
-                    {tx.amount} {tx.type === 'sol' ? 'SOL' : tx.symbol || ''}
-                  </span>
-                ) : (
-                  '-'
-                )}
-              </td>
-              <td className="px-6 py-4 whitespace-nowrap">
-                <span className={`px-2 py-1 text-xs font-medium rounded ${
-                  tx.success
-                    ? 'bg-green-900/20 text-green-500'
-                    : 'bg-red-900/20 text-red-500'
-                }`}>
-                  {tx.success ? 'Success' : 'Failed'}
-                </span>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-
-      <div className="px-6 py-4 flex items-center justify-between">
-        <p className="text-sm text-gray-400">
-          Showing {start + 1} to {Math.min(end, transactions.length)} of {transactions.length} results
-        </p>
-        <div className="flex gap-2">
-          <button
-            onClick={() => setPage(p => Math.max(0, p - 1))}
-            disabled={page === 0}
-            className="px-4 py-2 text-sm font-medium rounded bg-gray-900 text-gray-300 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Previous
-          </button>
-          <button
-            onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
-            disabled={page >= totalPages - 1}
-            className="px-4 py-2 text-sm font-medium rounded bg-gray-900 text-gray-300 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Next
-          </button>
-        </div>
-      </div>
-
+    <div className="w-full">
+      <div 
+        ref={tableRef} 
+        style={{ 
+          width: '100%',
+          height: Math.min(transactions.length * 40 + 40, 400), // 40px per row + header, max 400px
+          minHeight: 80 // Minimum height for header + one row
+        }} 
+      />
+      
       {hasMore && (
         <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700">
           <button

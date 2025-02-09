@@ -1,0 +1,67 @@
+<opensvm:Application> <rdf:type> <http://schema.org/SoftwareApplication> .
+<opensvm:Application> <rdfs:label> "OpenSVM" .
+<opensvm:Application> <rdfs:comment> "Solana blockchain visualization and monitoring platform" .
+
+# Core Components
+<opensvm:Application> <opensvm:hasComponent> <opensvm:SolanaIntegration> .
+<opensvm:Application> <opensvm:hasComponent> <opensvm:KnowledgeGraph> .
+<opensvm:Application> <opensvm:hasComponent> <opensvm:Visualization> .
+
+# Solana Integration
+<opensvm:SolanaIntegration> <rdf:type> <opensvm:Component> .
+<opensvm:SolanaIntegration> <rdfs:label> "Solana Integration" .
+<opensvm:SolanaIntegration> <opensvm:implements> "Transaction parsing" .
+<opensvm:SolanaIntegration> <opensvm:implements> "Account management" .
+<opensvm:SolanaIntegration> <opensvm:implements> "Token operations" .
+<opensvm:SolanaIntegration> <opensvm:implements> "RPC communication" .
+<opensvm:SolanaIntegration> <opensvm:sourceFile> "lib/solana.ts" .
+<opensvm:SolanaIntegration> <opensvm:sourceFile> "lib/solana-connection.ts" .
+
+# Knowledge Graph Engine
+<opensvm:KnowledgeGraph> <rdf:type> <opensvm:Component> .
+<opensvm:KnowledgeGraph> <rdfs:label> "Knowledge Graph Engine" .
+<opensvm:KnowledgeGraph> <opensvm:implements> "Graph construction" .
+<opensvm:KnowledgeGraph> <opensvm:implements> "Vector embeddings" .
+<opensvm:KnowledgeGraph> <opensvm:implements> "Relationship analysis" .
+<opensvm:KnowledgeGraph> <opensvm:implements> "Similarity search" .
+<opensvm:KnowledgeGraph> <opensvm:sourceFile> "lib/server/qdrant.ts" .
+<opensvm:KnowledgeGraph> <opensvm:dependsOn> "@qdrant/js-client-rest" .
+
+# Data Visualization
+<opensvm:Visualization> <rdf:type> <opensvm:Component> .
+<opensvm:Visualization> <rdfs:label> "Data Visualization" .
+<opensvm:Visualization> <opensvm:implements> "Transaction flows" .
+<opensvm:Visualization> <opensvm:implements> "Account relationships" .
+<opensvm:Visualization> <opensvm:implements> "Network metrics" .
+<opensvm:Visualization> <opensvm:implements> "Token analytics" .
+<opensvm:Visualization> <opensvm:sourceFile> "components/TransactionFlowChart.tsx" .
+<opensvm:Visualization> <opensvm:sourceFile> "components/NetworkCharts.tsx" .
+<opensvm:Visualization> <opensvm:dependsOn> "d3" .
+
+# Application Routes
+<opensvm:Routes> <rdf:type> <nextjs:AppRouter> .
+<opensvm:Routes> <opensvm:route> "/account/[address]" .
+<opensvm:Routes> <opensvm:route> "/analytics" .
+<opensvm:Routes> <opensvm:route> "/blocks" .
+<opensvm:Routes> <opensvm:route> "/networks" .
+<opensvm:Routes> <opensvm:route> "/nfts" .
+<opensvm:Routes> <opensvm:route> "/tokens" .
+<opensvm:Routes> <opensvm:route> "/tx/[signature]" .
+
+# API Layer
+<opensvm:API> <rdf:type> <opensvm:APILayer> .
+<opensvm:API> <opensvm:endpoint> "/api/account-stats" .
+<opensvm:API> <opensvm:endpoint> "/api/token-stats" .
+<opensvm:API> <opensvm:endpoint> "/api/historical-data" .
+<opensvm:API> <opensvm:endpoint> "/api/solana-rpc" .
+
+# Quality Attributes
+<opensvm:QualityAttributes> <opensvm:performance> "Caching layer" .
+<opensvm:QualityAttributes> <opensvm:performance> "Vector similarity search" .
+<opensvm:QualityAttributes> <opensvm:performance> "Batch processing" .
+<opensvm:QualityAttributes> <opensvm:scalability> "Distributed vector storage" .
+<opensvm:QualityAttributes> <opensvm:scalability> "Rate limiting" .
+<opensvm:QualityAttributes> <opensvm:scalability> "Connection pooling" .
+<opensvm:QualityAttributes> <opensvm:maintainability> "TypeScript type safety" .
+<opensvm:QualityAttributes> <opensvm:maintainability> "Component modularity" .
+<opensvm:QualityAttributes> <opensvm:maintainability> "Comprehensive testing" .

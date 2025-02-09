@@ -1,0 +1,29 @@
+.tableContainer {
+  :global {
+    .vtable {
+      font-family: 'Inter', sans-serif;
+      background-color: var(--background);
+      color: var(--foreground);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+
+      .header-cell {
+        background-color: var(--background);
+        color: var(--muted-foreground);
+        border-bottom: 1px solid var(--border);
+        font-weight: 500;
+      }
+
+      .body-cell {
+        background-color: var(--background);
+        color: var(--foreground);
+        border-bottom: 1px solid var(--border);
+      }
+
+      .row:hover {
+        background-color: var(--muted);
+      }
+    }
+  }
+}

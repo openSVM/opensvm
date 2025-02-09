@@ -7,6 +7,8 @@
 - Jest for testing
 - ESLint for code quality
 - Prettier for code formatting
+- External APIs:
+  - Flipside Crypto API for historical data
 
 ## Development Setup
 - Node.js environment
@@ -23,3 +25,8 @@
 - Maintain test coverage with Jest
 - Follow ESLint and Prettier configurations
 - Ensure accessibility standards are met
+- API Integration Requirements:
+  - Secure API key management
+  - Error handling for API failures
+  - Rate limiting consideration
+  - Response caching when appropriate

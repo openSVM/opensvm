@@ -1,5 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  env: {
+    FLIPSIDE_API_KEY: '167fcdba-cf42-42c8-9697-156978509b47'
+  },
   reactStrictMode: true,
   images: {
     domains: ['**'],
@@ -38,6 +41,14 @@ const nextConfig = {
       },
     ]
   },
+  // Enable standalone output mode for Docker optimization
+  output: 'standalone',
+  experimental: {
+    // Enable optimizations
+    optimizeCss: true,
+    optimizePackageImports: ['@solana/web3.js', '@solana/spl-token']
+    // Removed 'turbotrace' as it's invalid
+  }
 }
 
 module.exports = nextConfig

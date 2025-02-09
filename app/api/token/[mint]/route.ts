@@ -1,13 +1,24 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { Connection, PublicKey } from '@solana/web3.js';
+import { NextResponse } from 'next/server';
+import { PublicKey } from '@solana/web3.js';
 import { getMint } from '@solana/spl-token';
-import { getConnection } from '@/lib/solana-connection';
-import { rateLimit } from '@/lib/rate-limit';
+import { getConnection } from '@/lib/solana';
+import { rateLimiter, RateLimitError } from '@/lib/rate-limit';
 
-const limiter = rateLimit({
-  interval: 60 * 1000,
-  uniqueTokenPerInterval: 500,
-});
+// Rate limit configuration for token details
+const TOKEN_RATE_LIMIT = {
+  limit: 100,          // 5 requests
+  windowMs: 500,    // per 5 seconds
+  maxRetries: 10,     // Allow 2 retries
+  initialRetryDelay: 10,
+  maxRetryDelay: 3000
+};
+
+// Metadata fetch configuration
+const METADATA_FETCH_CONFIG = {
+  maxRetries: 3,
+  initialDelay: 10,
+  maxDelay: 50
+};
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -19,20 +30,88 @@ export async function OPTIONS() {
   return NextResponse.json({}, { headers: corsHeaders });
 }
 
-export async function GET(request: NextRequest, { params }: { params: { mint: string } }) {
-  const { mint } = params;
+export async function GET(
+  request: Request,
+  { params }: { params: { mint: string } }
+) {
   const baseHeaders = {
     ...corsHeaders,
     'Content-Type': 'application/json',
   };
 
   try {
-    await limiter.check(request, 10, 'TOKEN_DETAILS');
-    
-    const connection = await getConnection();
-    const mintPubkey = new PublicKey(mint);
+    // Apply rate limiting with retries
+    try {
+      await rateLimiter.rateLimit('TOKEN_DETAILS', TOKEN_RATE_LIMIT);
+    } catch (error) {
+      if (error instanceof RateLimitError) {
+        console.warn('Rate limit exceeded for TOKEN_DETAILS');
+        return NextResponse.json(
+          { 
+            error: 'Too many requests. Please try again later.',
+            retryAfter: Math.ceil(error.retryAfter / 1000)
+          },
+          { 
+            status: 429, 
+            headers: {
+              ...baseHeaders,
+              'Retry-After': Math.ceil(error.retryAfter / 1000).toString()
+            }
+          }
+        );
+      }
+      throw error;
+    }
 
-    // Get basic token info
+    const { mint } = await Promise.resolve(params);
+    const mintAddress = mint;
+    // Get connection with timeout
+    const connection = await Promise.race<ReturnType<typeof getConnection>>([
+      getConnection(),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Connection timeout')), 30000)
+      ) as Promise<ReturnType<typeof getConnection>>
+    ]);
+    
+    // Validate the address format first
+    let mintPubkey: PublicKey;
+    try {
+      mintPubkey = new PublicKey(mintAddress);
+    } catch (error) {
+      console.error('Invalid address format:', mintAddress);
+      return NextResponse.json(
+        { error: 'Invalid address format' },
+        { status: 400, headers: baseHeaders }
+      );
+    }
+
+    // Verify this is a token mint account
+    const accountInfo = await connection.getAccountInfo(mintPubkey);
+    if (!accountInfo) {
+      console.warn('Account not found for mint:', mintAddress);
+      return NextResponse.json(
+        { error: 'Account not found' },
+        { status: 404, headers: baseHeaders }
+      );
+    }
+    
+    // Token Program ID
+    const TOKEN_PROGRAM_ID = new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA');
+    
+    // Check if the account is owned by the Token Program
+    if (!accountInfo.owner.equals(TOKEN_PROGRAM_ID)) {
+      console.warn('Account is not a token mint account:', mintAddress);
+      return NextResponse.json(
+        {
+          error: 'Not a token mint account',
+          message: 'This account is not a token mint account.',
+          accountOwner: accountInfo.owner.toBase58(),
+        },
+        { status: 400, headers: baseHeaders }
+      );
+    }
+
+    // Proceed to get mint info
     const mintInfo = await getMint(connection, mintPubkey);
 
     // Get metadata account
@@ -48,7 +127,7 @@ export async function GET(request: NextRequest, { params }: { params: { mint: st
 
     // Fetch metadata account
     const metadataAccount = await connection.getAccountInfo(metadataAddress);
-    let metadata = null;
+    let metadata: { name: string; symbol: string; uri: string; description?: string; image?: string } | null = null;
 
     if (metadataAccount) {
       const data = metadataAccount.data;
@@ -100,26 +179,47 @@ export async function GET(request: NextRequest, { params }: { params: { mint: st
           metadata.image = json.image;
         } catch (error) {
           console.error('Error fetching metadata JSON:', error);
-          // Retry logic
-          let json;
-          let retries = 3;
-          while (retries > 0) {
+          // Enhanced retry logic with exponential backoff
+          let delay = METADATA_FETCH_CONFIG.initialDelay;
+          for (let attempt = 1; attempt <= METADATA_FETCH_CONFIG.maxRetries; attempt++) {
             try {
+              // Add jitter to prevent thundering herd
+              const jitter = Math.random() * 200;
+              await new Promise(resolve => setTimeout(resolve, delay + jitter));
+              
               const retryResponse = await fetch(uri, {
                 mode: 'cors',
                 headers: {
                   'User-Agent': 'OpenSVM/1.0'
                 }
               });
+              
               if (retryResponse.ok) {
-                json = await retryResponse.json();
+                const json = await retryResponse.json();
+                metadata.description = json.description;
+                metadata.image = json.image;
                 break;
               }
+              
+              // If we get a rate limit response, honor the Retry-After header
+              if (retryResponse.status === 429) {
+                const retryAfter = retryResponse.headers.get('Retry-After');
+                if (retryAfter) {
+                  delay = Math.min(
+                    parseInt(retryAfter) * 1000,
+                    METADATA_FETCH_CONFIG.maxDelay
+                  );
+                }
+              }
             } catch (retryError) {
-              console.error(`Metadata fetch retry failed (${4-retries}/3):`, retryError);
+              console.error(
+                `Metadata fetch retry failed (${attempt}/${METADATA_FETCH_CONFIG.maxRetries}):`,
+                retryError
+              );
             }
-            retries--;
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            // Exponential backoff
+            delay = Math.min(delay * 2, METADATA_FETCH_CONFIG.maxDelay);
           }
         }
       }
@@ -138,16 +238,17 @@ export async function GET(request: NextRequest, { params }: { params: { mint: st
 
     // Calculate 24h volume from recent transactions
     const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
-    let volume24h = 0;
-    recentTransactions.forEach(tx => {
+    const volume24h = recentTransactions.reduce((total, tx) => {
       if (tx?.blockTime && tx.blockTime * 1000 > oneDayAgo) {
-        tx.meta?.postTokenBalances?.forEach(balance => {
-          if (balance.mint === mint && balance.uiTokenAmount) {
-            volume24h += Number(balance.uiTokenAmount.uiAmount || 0);
+        return total + (tx.meta?.postTokenBalances?.reduce((txTotal, balance) => {
+          if (balance.mint === mintAddress && balance.uiTokenAmount) {
+            return txTotal + Number(balance.uiTokenAmount.uiAmount || 0);
           }
-        });
+          return txTotal;
+        }, 0) || 0);
       }
-    });
+      return total;
+    }, 0);
 
     const tokenData = {
       metadata,

@@ -1,12 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Connection, PublicKey } from '@solana/web3.js';
 import { getConnection } from '@/lib/solana-connection';
-import { rateLimit } from '@/lib/rate-limit';
+import { rateLimiter, RateLimitError } from '@/lib/rate-limit';
 
-const limiter = rateLimit({
-  interval: 60 * 1000, // 1 minute
-  uniqueTokenPerInterval: 500,
-});
+// Rate limit configuration for NFT collections
+const NFT_RATE_LIMIT = {
+  limit: 1000,         // 10 requests
+  windowMs: 60000,   // per minute
+  maxRetries: 2,     // Allow 2 retries
+  initialRetryDelay: 10,
+  maxRetryDelay: 5000
+};
+
+// Metadata fetch configuration
+const METADATA_FETCH_CONFIG = {
+  maxRetries: 300,
+  initialDelay: 10,
+  maxDelay: 5000,
+  timeout: 5000
+};
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -63,22 +75,44 @@ export async function OPTIONS() {
   return NextResponse.json({}, { headers: corsHeaders });
 }
 
-async function retryOperation<T>(
+async function retryWithBackoff<T>(
   operation: () => Promise<T>,
-  maxRetries: number = 3,
-  delayMs: number = 1000
+  config: {
+    maxRetries: number;
+    initialDelay: number;
+    maxDelay: number;
+    timeout?: number;
+  }
 ): Promise<T> {
   let lastError: any;
+  let delay = config.initialDelay;
   
-  for (let attempt = 0; attempt < maxRetries; attempt++) {
+  for (let attempt = 1; attempt <= config.maxRetries; attempt++) {
     try {
-      return await operation();
+      if (config.timeout) {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), config.timeout);
+        
+        try {
+          return await operation();
+        } finally {
+          clearTimeout(timeoutId);
+        }
+      } else {
+        return await operation();
+      }
     } catch (error) {
       lastError = error;
-      console.warn(`Attempt ${attempt + 1} failed:`, error);
-      if (attempt < maxRetries - 1) {
-        await new Promise(resolve => setTimeout(resolve, delayMs * (attempt + 1)));
-      }
+      console.warn(`Attempt ${attempt}/${config.maxRetries} failed:`, error);
+      
+      if (attempt === config.maxRetries) break;
+      
+      // Add jitter to prevent thundering herd
+      const jitter = Math.random() * 200;
+      await new Promise(resolve => setTimeout(resolve, delay + jitter));
+      
+      // Exponential backoff
+      delay = Math.min(delay * 2, config.maxDelay);
     }
   }
   
@@ -86,25 +120,32 @@ async function retryOperation<T>(
 }
 
 async function fetchCollectionMetadata(uri: string): Promise<any> {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 5000);
-  
-  try {
-    const response = await fetch(uri, {
-      signal: controller.signal,
-      headers: {
-        'Accept': 'application/json'
+  return retryWithBackoff(
+    async () => {
+      const response = await fetch(uri, {
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'OpenSVM/1.0'
+        }
+      });
+      
+      if (!response.ok) {
+        // Handle rate limits specially
+        if (response.status === 429) {
+          const retryAfter = response.headers.get('Retry-After');
+          if (retryAfter) {
+            await new Promise(resolve => 
+              setTimeout(resolve, parseInt(retryAfter) * 1000)
+            );
+          }
+        }
+        throw new Error(`Failed to fetch metadata: ${response.status}`);
       }
-    });
-    
-    if (!response.ok) {
-      throw new Error(`Failed to fetch metadata: ${response.status}`);
-    }
-    
-    return response.json();
-  } finally {
-    clearTimeout(timeoutId);
-  }
+      
+      return response.json();
+    },
+    METADATA_FETCH_CONFIG
+  );
 }
 
 async function fetchCollections(connection: Connection): Promise<any[]> {
@@ -124,7 +165,7 @@ async function fetchCollections(connection: Connection): Promise<any[]> {
           // Fetch metadata JSON
           let metadata;
           try {
-            metadata = await retryOperation(() => fetchCollectionMetadata(collection.uri), 2, 1000);
+            metadata = await fetchCollectionMetadata(collection.uri);
           } catch (error) {
             console.error(`Failed to fetch metadata for ${collection.address}:`, error);
           }
@@ -175,17 +216,26 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(collectionsCache, { headers: baseHeaders });
     }
 
-    // Apply rate limiting
+    // Apply rate limiting with retries
     try {
-      await limiter.check(request, 10, 'NFT_COLLECTIONS');
-    } catch {
-      return NextResponse.json(
-        { error: 'Too many requests. Please try again later.' },
-        { 
-          status: 429,
-          headers: baseHeaders
-        }
-      );
+      await rateLimiter.rateLimit('NFT_COLLECTIONS', NFT_RATE_LIMIT);
+    } catch (error) {
+      if (error instanceof RateLimitError) {
+        return NextResponse.json(
+          { 
+            error: 'Too many requests. Please try again later.',
+            retryAfter: Math.ceil(error.retryAfter / 1000)
+          },
+          { 
+            status: 429,
+            headers: {
+              ...baseHeaders,
+              'Retry-After': Math.ceil(error.retryAfter / 1000).toString()
+            }
+          }
+        );
+      }
+      throw error;
     }
 
     console.log('Getting Solana connection...');
@@ -200,8 +250,15 @@ export async function GET(request: NextRequest) {
       throw new Error('Failed to connect to Solana network');
     }
 
-    // Fetch collections
-    const collections = await retryOperation(() => fetchCollections(connection));
+    // Fetch collections with improved retry logic
+    const collections = await retryWithBackoff(
+      () => fetchCollections(connection),
+      {
+        maxRetries: 3,
+        initialDelay: 1000,
+        maxDelay: 5000
+      }
+    );
     
     if (!collections || collections.length === 0) {
       throw new Error('No valid collections found');

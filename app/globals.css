@@ -1,7 +1,9 @@
-@import '../styles/themes/dos.css';
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Import VTable styles */
+@import './styles/vtable.css';
 
 @layer base {
   :root {
