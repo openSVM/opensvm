@@ -2,6 +2,7 @@
 
 import { DetailedTransactionInfo, InstructionWithAccounts } from '@/lib/solana';
 import { useEffect, useState } from 'react';
+import AccountLink from './AccountLink';
 
 interface TransactionAnalysisProps {
   tx: DetailedTransactionInfo;
@@ -47,7 +48,7 @@ export default function TransactionAnalysis({ tx }: TransactionAnalysisProps) {
 
     // Process main instructions
     tx.details.instructions.forEach((ix: InstructionWithAccounts) => {
-      const programId = 'parsed' in ix ? ix.program : ix.programId.toString();
+      const programId = String('parsed' in ix ? ix.program : ix.programId);
       
       // Update program stats
       const programStats = programMap.get(programId) || {
@@ -64,7 +65,7 @@ export default function TransactionAnalysis({ tx }: TransactionAnalysisProps) {
       // Update account stats
       ix.accounts.forEach((accountIndex: number) => {
         const account = tx.details.accounts[accountIndex];
-        const address = account.pubkey.toString();
+        const address = String(account.pubkey);
         const accountStats = accountMap.get(address) || {
           address,
           type: account.signer ? 'Signer' : 'Regular Account',
@@ -85,7 +86,7 @@ export default function TransactionAnalysis({ tx }: TransactionAnalysisProps) {
     // Process inner instructions
     tx.details.innerInstructions?.forEach(inner => {
       inner.instructions.forEach((ix: InstructionWithAccounts) => {
-        const programId = 'parsed' in ix ? ix.program : ix.programId.toString();
+        const programId = String('parsed' in ix ? ix.program : ix.programId);
         
         // Update program stats
         const programStats = programMap.get(programId) || {
@@ -102,7 +103,7 @@ export default function TransactionAnalysis({ tx }: TransactionAnalysisProps) {
         // Update account stats
         ix.accounts.forEach((accountIndex: number) => {
           const account = tx.details.accounts[accountIndex];
-          const address = account.pubkey.toString();
+          const address = String(account.pubkey);
           const accountStats = accountMap.get(address) || {
             address,
             type: account.signer ? 'Signer' : 'Regular Account',
@@ -141,9 +142,13 @@ export default function TransactionAnalysis({ tx }: TransactionAnalysisProps) {
           {analysis.programStats.map((program, i) => (
             <div key={i} className="bg-neutral-900 rounded p-3">
               <div className="flex justify-between items-center">
-                <div className="font-mono text-sm text-neutral-400">
+                <AccountLink 
+                  address={program.name}
+                  className="font-mono text-sm text-neutral-400 hover:text-neutral-200 transition-colors"
+                >
                   {program.name.slice(0, 4)}...{program.name.slice(-4)}
-                </div>
+                  <span className="sr-only">{program.name}</span>
+                </AccountLink>
                 <div className="flex gap-4 text-sm">
                   <span className="text-neutral-300">{program.count} calls</span>
                   <span className="text-neutral-500">{program.totalAccounts} accounts</span>
@@ -162,9 +167,13 @@ export default function TransactionAnalysis({ tx }: TransactionAnalysisProps) {
           {analysis.accountStats.map((account, i) => (
             <div key={i} className="bg-neutral-900 rounded p-3">
               <div className="flex justify-between items-center">
-                <div className="font-mono text-sm text-neutral-400">
+                <AccountLink 
+                  address={account.address}
+                  className="font-mono text-sm text-neutral-400 hover:text-neutral-200 transition-colors"
+                >
                   {account.address.slice(0, 4)}...{account.address.slice(-4)}
-                </div>
+                  <span className="sr-only">{account.address}</span>
+                </AccountLink>
                 <div className="flex gap-4 text-sm">
                   <span className="text-green-500">{account.writeCount} writes</span>
                   <span className="text-blue-500">{account.readCount} reads</span>

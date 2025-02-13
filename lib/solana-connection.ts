@@ -1,5 +1,5 @@
 import { Connection, ConnectionConfig } from '@solana/web3.js';
-import { opensvmRpcEndpoints } from './opensvm-rpc';
+import { getRpcEndpoints, getRpcHeaders } from './opensvm-rpc';
 import { rateLimit, RateLimitError } from './rate-limit';
 
 class ProxyConnection extends Connection {
@@ -12,37 +12,40 @@ class ProxyConnection extends Connection {
   }> = [];
   private isProcessingQueue = false;
   private lastRequestTime = 0;
-  private readonly minRequestInterval = 100; // Reduced interval for better concurrency
-  private readonly maxConcurrentRequests = 3; // Allow multiple concurrent requests
-  private readonly maxRetries = 3;
+  private readonly minRequestInterval = 10; // Decreased from 25
+  private readonly maxConcurrentRequests = 12; // Increased from 8
+  private readonly maxRetries = 12; // Increased from 8
   private activeRequests = 0;
 
   constructor(endpoint: string, config?: ConnectionConfig) {
     super(endpoint, {
       ...config,
-      // Add bigint configuration
       commitment: 'confirmed',
       disableRetryOnRateLimit: false,
-      confirmTransactionInitialTimeout: 60000,
-      wsEndpoint: null, // Disable WebSocket for better stability
+      confirmTransactionInitialTimeout: 60000, // Decreased from 180000
+      wsEndpoint: null,
       fetch: async (url, options) => {
-        const maxRetries = 3;
+        const headers = getRpcHeaders(endpoint);
+        const maxRetries = 12; // Increased from 8
         let lastError;
 
         for (let i = 0; i < maxRetries; i++) {
           try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+
             const response = await fetch(url, {
               ...options,
               headers: {
-                ...options?.headers,
-                'Origin': 'https://explorer.solana.com',
-                'User-Agent': 'Mozilla/5.0',
-                'Accept': '*/*',
-                'Accept-Encoding': 'gzip, deflate, br',
-                'Connection': 'keep-alive',
-                'Referer': 'https://explorer.solana.com/'
-              }
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                ...headers,
+                ...(options?.headers || {})
+              },
+              signal: controller.signal
             });
+
+            clearTimeout(timeoutId);
 
             if (response.ok) {
               return response;
@@ -51,10 +54,13 @@ class ProxyConnection extends Connection {
             lastError = new Error(`HTTP error! status: ${response.status}`);
           } catch (error) {
             lastError = error;
+            if (error.name === 'AbortError') {
+              console.warn('Request timed out, retrying...');
+            }
           }
 
-          // Wait before retrying
-          await new Promise(resolve => setTimeout(resolve, Math.min(1000 * Math.pow(2, i), 4000)));
+          // Exponential backoff with max delay of 2 seconds
+          await new Promise(resolve => setTimeout(resolve, Math.min(1000 * Math.pow(1.1, i), 2000))); // Changed from 1.25 to 1.1
         }
 
         throw lastError;
@@ -97,25 +103,34 @@ class ProxyConnection extends Connection {
     }
 
     try {
-      const response = await fetch('/api/solana-rpc', {
+      const headers = getRpcHeaders(this.rpcEndpoint);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+
+      const response = await fetch(this.rpcEndpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          ...headers
         },
         body: JSON.stringify({
           jsonrpc: '2.0',
           id: 1,
           method: request.method,
           params: request.args
-        })
+        }),
+        signal: controller.signal
       });
+
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         const error = new Error(`HTTP error! status: ${response.status}`);
         if (response.status === 429 || response.status === 403) {
           if (request.retryCount < this.maxRetries) {
             console.warn(`Request failed with ${response.status}, retrying (${request.retryCount + 1}/${this.maxRetries})...`);
-            await new Promise(resolve => setTimeout(resolve, Math.min(1000 * Math.pow(2, request.retryCount), 8000)));
+            await new Promise(resolve => setTimeout(resolve, Math.min(1000 * Math.pow(1.1, request.retryCount), 2000))); // Changed from 1.25 to 1.1
             this.requestQueue.push({ ...request, retryCount: request.retryCount + 1 });
             return;
           }
@@ -132,7 +147,7 @@ class ProxyConnection extends Connection {
     } catch (error) {
       if (error instanceof Error && request.retryCount < this.maxRetries) {
         console.warn(`Request failed, retrying (${request.retryCount + 1}/${this.maxRetries})...`, error);
-        await new Promise(resolve => setTimeout(resolve, Math.min(1000 * Math.pow(2, request.retryCount), 8000)));
+        await new Promise(resolve => setTimeout(resolve, Math.min(1000 * Math.pow(1.1, request.retryCount), 2000))); // Changed from 1.25 to 1.1
         this.requestQueue.push({ ...request, retryCount: request.retryCount + 1 });
         return;
       }
@@ -158,23 +173,23 @@ class ConnectionPool {
   private isOpenSvmMode = false;
   private failedEndpoints: Set<string> = new Set();
   private lastHealthCheck: number = 0;
-  private readonly healthCheckInterval = 30000; // 30 seconds
+  private readonly healthCheckInterval = 60000; // Decreased from 120000
 
   private constructor() {
     this.config = {
       commitment: 'confirmed',
       disableRetryOnRateLimit: false,
-      confirmTransactionInitialTimeout: 60000,
-      wsEndpoint: null // Disable WebSocket for better stability
+      confirmTransactionInitialTimeout: 60000, // Decreased from 180000
+      wsEndpoint: null
     };
 
-    // Initialize with OpenSVM endpoints by default
     this.isOpenSvmMode = true;
     this.initializeConnections();
   }
 
   private initializeConnections() {
-    this.connections = opensvmRpcEndpoints
+    const endpoints = getRpcEndpoints();
+    this.connections = endpoints
       .filter(url => !this.failedEndpoints.has(url))
       .map(url => new ProxyConnection(url, this.config));
     console.log('Initialized OpenSVM connection pool with', this.connections.length, 'endpoints');
@@ -188,14 +203,12 @@ class ConnectionPool {
   }
 
   public updateEndpoint(endpoint: string): void {
-    // If it's a special "opensvm" endpoint, initialize all OpenSVM connections
     if (endpoint === 'opensvm') {
       this.isOpenSvmMode = true;
-      this.failedEndpoints.clear(); // Reset failed endpoints
+      this.failedEndpoints.clear();
       this.initializeConnections();
       this.currentIndex = 0;
     } else {
-      // Regular single endpoint mode
       this.isOpenSvmMode = false;
       this.connections = [new ProxyConnection(endpoint, this.config)];
       this.currentIndex = 0;
@@ -205,11 +218,18 @@ class ConnectionPool {
 
   private async testConnection(connection: ProxyConnection): Promise<boolean> {
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout for health checks
       const blockHeight = await connection.getBlockHeight();
+      clearTimeout(timeoutId);
       return blockHeight > 0;
     } catch (error) {
       if (error instanceof RateLimitError) {
         console.warn(`Rate limit hit during health check for ${connection.rpcEndpoint}`);
+        return true; // Don't fail just because of rate limit
+      }
+      if (error.name === 'AbortError') {
+        console.warn(`Health check timed out for ${connection.rpcEndpoint}`);
         return false;
       }
       console.error(`Error testing connection:`, error);
@@ -220,10 +240,11 @@ class ConnectionPool {
   private async findHealthyConnection(): Promise<ProxyConnection | null> {
     const startIndex = this.currentIndex;
     let attempts = 0;
+    const endpoints = getRpcEndpoints();
     
     while (attempts < this.connections.length) {
       const connection = this.connections[this.currentIndex];
-      const endpoint = opensvmRpcEndpoints[this.currentIndex];
+      const endpoint = endpoints[this.currentIndex];
       
       try {
         const isHealthy = await this.testConnection(connection);
@@ -231,7 +252,6 @@ class ConnectionPool {
           return connection;
         }
         
-        // Mark endpoint as failed
         console.warn(`Endpoint ${endpoint} failed health check`);
         this.failedEndpoints.add(endpoint);
       } catch (error) {
@@ -239,13 +259,11 @@ class ConnectionPool {
         this.failedEndpoints.add(endpoint);
       }
       
-      // Move to next connection
       this.currentIndex = (this.currentIndex + 1) % this.connections.length;
       attempts++;
     }
     
-    // If all connections failed, reset and try again
-    if (this.failedEndpoints.size === opensvmRpcEndpoints.length) {
+    if (this.failedEndpoints.size === endpoints.length) {
       console.warn('All endpoints failed, resetting failed endpoints list');
       this.failedEndpoints.clear();
       this.initializeConnections();
@@ -255,7 +273,6 @@ class ConnectionPool {
   }
 
   public async getConnection(): Promise<Connection> {
-    // Perform health check if needed
     const now = Date.now();
     if (now - this.lastHealthCheck > this.healthCheckInterval) {
       this.lastHealthCheck = now;
@@ -266,39 +283,35 @@ class ConnectionPool {
     }
 
     if (this.isOpenSvmMode && this.connections.length > 1) {
-      // Apply rate limiting with reasonable limits for RPC requests
       const connection = this.connections[this.currentIndex];
       try {
         await rateLimit(`rpc-${connection.rpcEndpoint}`, {
-          limit: 20,    // Increased limit for better concurrency
-          windowMs: 1000, // per second
-          maxRetries: 5,
-          initialRetryDelay: 500,
-          maxRetryDelay: 5000
+          limit: 100, // Increased from 80
+          windowMs: 1000,
+          maxRetries: 20, // Increased from 15
+          initialRetryDelay: 50, // Decreased from 100
+          maxRetryDelay: 500 // Decreased from 1000
         });
         
-        // Round-robin selection for OpenSVM mode
         this.currentIndex = (this.currentIndex + 1) % this.connections.length;
         return connection;
       } catch (error) {
         if (error instanceof RateLimitError) {
           console.warn(`Rate limit exceeded for ${connection.rpcEndpoint}, switching endpoints`);
-          // Move to next connection immediately when rate limited
           this.currentIndex = (this.currentIndex + 1) % this.connections.length;
-          return this.getConnection(); // Retry with next connection
+          return this.getConnection();
         }
         throw error;
       }
     }
     
-    // For single endpoint mode, apply more conservative rate limits
     const connection = this.connections[0];
     await rateLimit(`rpc-single-${connection.rpcEndpoint}`, {
-      limit: 10,     // Increased limit for better concurrency
-      windowMs: 1000, // per second
-      maxRetries: 5,
-      initialRetryDelay: 500,
-      maxRetryDelay: 5000
+      limit: 50, // Increased from 40
+      windowMs: 1000,
+      maxRetries: 20, // Increased from 15
+      initialRetryDelay: 50, // Decreased from 100
+      maxRetryDelay: 500 // Decreased from 1000
     });
     
     return connection;
@@ -316,15 +329,12 @@ class ConnectionPool {
   }
 }
 
-// Export a function to get a connection
 export async function getConnection(): Promise<Connection> {
   return ConnectionPool.getInstance().getConnection();
 }
 
-// Export a function to update the RPC endpoint
 export function updateRpcEndpoint(endpoint: string): void {
   ConnectionPool.getInstance().updateEndpoint(endpoint);
 }
 
-// Export the pool instance for direct access if needed
 export const connectionPool = ConnectionPool.getInstance();

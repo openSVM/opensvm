@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import React, { useState } from 'react';
 
 interface TooltipProps {
   content: React.ReactNode;
@@ -11,54 +11,53 @@ interface TooltipProps {
 export function Tooltip({ content, children, className = '' }: TooltipProps) {
   const [isVisible, setIsVisible] = useState(false);
   const [position, setPosition] = useState({ x: 0, y: 0 });
-  const tooltipRef = useRef<HTMLDivElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const tooltipRef = React.useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (isVisible && tooltipRef.current && containerRef.current) {
-      const rect = containerRef.current.getBoundingClientRect();
-      const tooltipRect = tooltipRef.current.getBoundingClientRect();
-      
-      // Position above the element by default
-      let x = rect.left + (rect.width - tooltipRect.width) / 2;
-      let y = rect.top - tooltipRect.height - 8;
-
-      // Adjust if tooltip would go off screen
-      if (y < 0) {
-        y = rect.bottom + 8; // Show below instead
-      }
-      if (x < 0) {
-        x = 0;
-      } else if (x + tooltipRect.width > window.innerWidth) {
-        x = window.innerWidth - tooltipRect.width;
-      }
-
-      setPosition({ x, y });
-    }
-  }, [isVisible]);
+  const handleMouseEnter = (e: React.MouseEvent) => {
+    const rect = (e.target as HTMLElement).getBoundingClientRect();
+    setPosition({
+      x: rect.left + window.scrollX,
+      y: rect.bottom + window.scrollY + 5
+    });
+    setIsVisible(true);
+  };
 
   return (
-    <div
-      ref={containerRef}
-      onMouseEnter={() => setIsVisible(true)}
+    <div 
+      className={`relative inline-flex items-center ${className}`}
+      onMouseEnter={handleMouseEnter}
       onMouseLeave={() => setIsVisible(false)}
-      className="relative inline-block"
     >
       {children}
       {isVisible && (
         <div
           ref={tooltipRef}
-          className={`fixed z-50 p-2 bg-background border border-border rounded-lg shadow-lg text-sm ${className}`}
+          className="absolute z-50 px-2 py-1 text-xs text-white bg-neutral-900 rounded shadow-lg whitespace-nowrap tooltip-animation"
           style={{
             left: position.x,
             top: position.y,
-            transform: 'translate3d(0, 0, 0)',
-            pointerEvents: 'none'
+            transform: 'translateX(-50%)'
           }}
         >
           {content}
         </div>
       )}
+      <style jsx global>{`
+        .tooltip-animation {
+          animation: tooltipFadeIn 0.2s ease-in-out;
+        }
+        
+        @keyframes tooltipFadeIn {
+          from {
+            opacity: 0;
+            transform: translateX(-50%) translateY(-5px);
+          }
+          to {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+          }
+        }
+      `}</style>
     </div>
   );
 }

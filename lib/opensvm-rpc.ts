@@ -1,50 +1,56 @@
+// RPC endpoints with auth headers
 export const opensvmRpcEndpoints = [
-  "https://solana-mainnet.core.chainstack.com/fc5394114ce3fe05b1c523349252e76f",
-  "https://solana-mainnet.core.chainstack.com/cd6e2bb80d19b697f17ea3761ae9ece9",
-  "https://solana-mainnet.core.chainstack.com/f2b7c8d701faf4bee609715c08de9ad3",
-  "https://solana-mainnet.core.chainstack.com/5edfea39b64d94d4e10a12ad47b53881",
-  "https://solana-mainnet.core.chainstack.com/bd5c5fb01c25a8d73186118f43663b52",
-  "https://solana-mainnet.core.chainstack.com/5a6dd2fc267c55487183806006b74e0b",
-  "https://solana-mainnet.core.chainstack.com/b0be66291959f0f8443e967b872d8ec9",
-  "https://solana-mainnet.core.chainstack.com/36d3f4e59a6a10d598d308f56dfbb70f",
-  "https://solana-mainnet.core.chainstack.com/170bc8e96fb64fae6cbb87670199f930",
-  "https://solana-mainnet.core.chainstack.com/ed3b20420d263624e89c58bc8a85284a",
-  "https://solana-mainnet.core.chainstack.com/8b903b3b3e750ae61bd1626695147e9a",
-  "https://solana-mainnet.core.chainstack.com/2a4774987c627ca84358ca0480ef6b37",
-  "https://solana-mainnet.core.chainstack.com/a5569c29a36440e8f583037594d58fbb",
-  "https://solana-mainnet.core.chainstack.com/2c9721c741e16bf07d836a22693bb484",
-  "https://solana-mainnet.core.chainstack.com/60c2f764ce1a9b7751708f7a804a78f0",
-  "https://solana-mainnet.core.chainstack.com/85a4d574aeb6d94e447459e797afdbf1",
-  "https://solana-mainnet.core.chainstack.com/16be34f80f436f61078393a62c8ed78a",
-  "https://solana-mainnet.core.chainstack.com/e2a4f0b86e475f8755a26ca7b891e99f",
-  "https://solana-mainnet.core.chainstack.com/b5688dcb15e7b9677be6c6e895d6959e",
-  "https://solana-mainnet.core.chainstack.com/a61fa4347ef1ff55a3860859bc2f36b0",
-  "https://solana-mainnet.core.chainstack.com/84254faf68a29ae7ea5ef1eba09dd9ac",
-  "https://solana-mainnet.core.chainstack.com/40852ca2e83ce90260147da1ac7937f7",
-  "https://solana-mainnet.core.chainstack.com/1b697157b8efc854939d53114cd306fb",
-  "https://solana-mainnet.core.chainstack.com/5f3eda5ff1f5b35d313e43962e8e56d1",
-  "https://solana-mainnet.core.chainstack.com/5f1fa523a989f7ab4efa47033ba794bd",
-  "https://solana-mainnet.core.chainstack.com/a215f6e3e51acaf74dd0ba151df66590",
-  "https://solana-mainnet.core.chainstack.com/92e9a59fb0281aa6236d7af79c325b36",
-  "https://solana-mainnet.core.chainstack.com/3c70b20cc989a9a71724ef4b405c3142",
-  "https://solana-mainnet.core.chainstack.com/f78afadaf0838a79f4a7543add6088ec",
-  "https://solana-mainnet.core.chainstack.com/abefb89c43306b36b9cab2b9bb8fe5cf",
-  "https://solana-mainnet.core.chainstack.com/1e399a3b52482e884056e8eb354a947b",
-  "https://solana-mainnet.core.chainstack.com/8d68421fcb23870e848c79d16fd845c0",
-  "https://solana-mainnet.core.chainstack.com/db193032ecef43d1802658adc52e7b80",
-  "https://solana-mainnet.core.chainstack.com/7811f03d1359b854ec3832c8c57cb8e7",
-  "https://solana-mainnet.core.chainstack.com/f5003ac52310a32595158654f163369b",
-  "https://solana-mainnet.core.chainstack.com/272c9cd0abf193deb822ae72270b0ef4",
-  "https://solana-mainnet.core.chainstack.com/9a7be268a5e855e745e5b2ca19347fde",
-  "https://solana-mainnet.core.chainstack.com/fdbf302f580f72db5eb6c2acdd29e088",
-  "https://solana-mainnet.core.chainstack.com/674d14608f0e8a59253aa164ca49e17f",
-  "https://solana-mainnet.core.chainstack.com/d078377f77b39e4a816d16a772fb5c1b",
-  "https://solana-mainnet.core.chainstack.com/6bf48514f20a8761d5c57f597fff4f5e",
-  "https://solana-mainnet.core.chainstack.com/06f47d05cd776920fd6b9722677c9f95",
-  "https://solana-mainnet.core.chainstack.com/6829165173775609ccb27f84b341b8dd",
-  "https://solana-mainnet.core.chainstack.com/106594540ff5001e955439d3cb2897cd",
-  "https://solana-mainnet.core.chainstack.com/43cabb2f0c16421221e8882cc1775b3a",
-  "https://solana-mainnet.core.chainstack.com/7c5ca2795c2a61d93390a550d695f677",
-  "https://solana-mainnet.core.chainstack.com/ca02729c47d99d985321b0814f532799",
-  "https://solana-mainnet.core.chainstack.com/8135645be93476ae2242427761551e3c"
+  {
+    url: process.env.SOLANA_RPC_URL || "https://api.devnet.solana.com", // Use devnet as fallback
+    headers: {}, // No special headers needed for devnet
+    priority: 1
+  },
+  {
+    url: "https://api.testnet.solana.com", // Add testnet as backup
+    headers: {},
+    priority: 2
+  },
+  {
+    url: "https://rpc.ankr.com/solana_devnet", // Ankr devnet
+    headers: {},
+    priority: 3
+  },
+  {
+    url: "https://api.devnet.rpcpool.com", // RPC Pool devnet
+    headers: {},
+    priority: 4
+  }
 ];
+
+// Helper to get endpoint URLs in priority order
+export function getRpcEndpoints(): string[] {
+  // Sort by priority and filter out any undefined or empty URLs
+  return opensvmRpcEndpoints
+    .sort((a, b) => (a.priority || 999) - (b.priority || 999))
+    .map(endpoint => endpoint.url)
+    .filter(url => url && url.length > 0);
+}
+
+// Helper to get headers for an endpoint with additional performance headers
+export function getRpcHeaders(url: string): Record<string, string> {
+  const endpoint = opensvmRpcEndpoints.find(e => e.url === url);
+  const commonHeaders = {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json'
+  };
+
+  // Add endpoint-specific headers
+  const headers = {
+    ...commonHeaders,
+    ...(endpoint?.headers || {})
+  };
+
+  // Remove any undefined or null headers
+  Object.keys(headers).forEach(key => {
+    if (headers[key] === undefined || headers[key] === null || headers[key] === '') {
+      delete headers[key];
+    }
+  });
+
+  return headers;
+}

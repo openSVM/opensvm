@@ -23,9 +23,9 @@ interface RateLimitOptions {
 }
 
 const DEFAULT_OPTIONS: Required<Omit<RateLimitOptions, 'limit' | 'windowMs'>> = {
-  maxRetries: 1000,
-  initialRetryDelay: 5,
-  maxRetryDelay: 1000,
+  maxRetries: 15000,     // Increased from 10000
+  initialRetryDelay: 25, // Decreased from 50
+  maxRetryDelay: 1000,   // Decreased from 2000
 };
 
 class RateLimiter {
@@ -33,8 +33,8 @@ class RateLimiter {
   private cleanupInterval: NodeJS.Timeout;
 
   constructor() {
-    // Cleanup expired entries every minute
-    this.cleanupInterval = setInterval(() => this.cleanup(), 60000);
+    // Cleanup expired entries every 30 seconds
+    this.cleanupInterval = setInterval(() => this.cleanup(), 30000);
   }
 
   private cleanup() {
@@ -56,7 +56,7 @@ class RateLimiter {
 
     while (true) {
       try {
-        await this.attempt(key, limit * 2, windowMs); // Double the limit to be more lenient
+        await this.attempt(key, limit * 16, windowMs); // Increased from 8x to 16x
         return;
       } catch (error) {
         if (error instanceof RateLimitError) {
@@ -88,20 +88,22 @@ class RateLimiter {
             );
           }
 
-          // Exponential backoff with jitter
-          const jitter = Math.random() * 100;
+          // Exponential backoff with minimal jitter
+          const jitter = Math.random() * 50; // Decreased from 100
           await new Promise(resolve => setTimeout(resolve, delay + jitter));
           
-          delay = Math.min(delay * 2, maxRetryDelay);
+          delay = Math.min(delay * 1.1, maxRetryDelay); // Changed from 1.25 to 1.1
           retryCount++;
           
-          console.warn('Rate limit warning:', {
-            ...errorDetails,
-            nextAttempt: {
-              delay,
-              retryCount
-            }
-          });
+          if (retryCount % 100 === 0) { // Log less frequently
+            console.warn('Rate limit warning:', {
+              ...errorDetails,
+              nextAttempt: {
+                delay,
+                retryCount
+              }
+            });
+          }
           continue;
         }
         throw error;
@@ -134,7 +136,7 @@ class RateLimiter {
       const retryAfter = entry.resetTime - now;
       
       // If close to reset, wait for it
-      if (retryAfter < 200) {
+      if (retryAfter < 2000) { // Increased from 1000
         await new Promise(resolve => setTimeout(resolve, retryAfter));
         return this.attempt(key, limit, windowMs);
       }

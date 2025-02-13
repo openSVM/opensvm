@@ -1,53 +1,47 @@
 /** @type {import('next').NextConfig} */
+
 const nextConfig = {
   env: {
-    FLIPSIDE_API_KEY: '167fcdba-cf42-42c8-9697-156978509b47'
+    USE_MOCK_DATA: 'false', // Disable mock data to use real data
+    SOLANA_RPC_URL: process.env.SOLANA_RPC_URL,
   },
-  reactStrictMode: true,
-  images: {
-    domains: ['**'],
-  },
-  transpilePackages: ['@solana/web3.js', '@solana/spl-token'],
-  webpack: (config, { isServer }) => {
-    if (!isServer) {
-      config.resolve.fallback = {
-        ...config.resolve.fallback,
-        fs: false,
-        os: false,
-        path: false,
-        crypto: false,
-      };
+  experimental: {
+    optimizeCss: true,
+    serverActions: {
+      bodySizeLimit: '2mb'
     }
+  },
+  serverExternalPackages: ['@solana/web3.js'],
+  images: {
+    domains: ['raw.githubusercontent.com', 'arweave.net', 'www.arweave.net'],
+  },
+  webpack: (config) => {
+    config.externals.push('pino-pretty', 'lokijs', 'encoding');
     return config;
   },
-  typescript: {
-    // !! WARN !!
-    // Dangerously allow production builds to successfully complete even if
-    // your project has type errors.
-    // !! WARN !!
-    ignoreBuildErrors: true,
+  httpAgentOptions: {
+    keepAlive: true,
   },
-  eslint: {
-    // Warning: This allows production builds to successfully complete even if
-    // your project has ESLint errors.
-    ignoreDuringBuilds: true,
+  poweredByHeader: false,
+  compress: true,
+  reactStrictMode: true,
+  onDemandEntries: {
+    // period (in ms) where the server will keep pages in the buffer
+    maxInactiveAge: 30 * 1000,
+    // number of pages that should be kept simultaneously without being disposed
+    pagesBufferLength: 5,
   },
-  async redirects() {
+  async headers() {
     return [
       {
-        source: '/address',
-        destination: '/account',
-        permanent: true,
+        source: '/api/:path*',
+        headers: [
+          { key: 'Access-Control-Allow-Origin', value: '*' },
+          { key: 'Access-Control-Allow-Methods', value: 'GET, POST, PUT, DELETE, OPTIONS' },
+          { key: 'Access-Control-Allow-Headers', value: 'Content-Type, Authorization' },
+        ],
       },
     ]
-  },
-  // Enable standalone output mode for Docker optimization
-  output: 'standalone',
-  experimental: {
-    // Enable optimizations
-    optimizeCss: true,
-    optimizePackageImports: ['@solana/web3.js', '@solana/spl-token']
-    // Removed 'turbotrace' as it's invalid
   }
 }
 
