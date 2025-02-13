@@ -1,22 +1,22 @@
 // RPC endpoints with auth headers
 export const opensvmRpcEndpoints = [
   {
-    url: process.env.SOLANA_RPC_URL || "https://api.devnet.solana.com", // Use devnet as fallback
-    headers: {}, // No special headers needed for devnet
+    url: process.env.SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com", // Use mainnet as fallback
+    headers: {}, // No special headers needed for public RPC
     priority: 1
   },
   {
-    url: "https://api.testnet.solana.com", // Add testnet as backup
+    url: "https://solana-mainnet.rpc.extrnode.com", // ExtrNode mainnet
     headers: {},
     priority: 2
   },
   {
-    url: "https://rpc.ankr.com/solana_devnet", // Ankr devnet
+    url: "https://rpc.ankr.com/solana", // Ankr mainnet
     headers: {},
     priority: 3
   },
   {
-    url: "https://api.devnet.rpcpool.com", // RPC Pool devnet
+    url: "https://solana.public-rpc.com", // Public RPC mainnet
     headers: {},
     priority: 4
   }
