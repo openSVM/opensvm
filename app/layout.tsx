@@ -4,8 +4,8 @@ import { Navbar } from "@/components/Navbar";
 import { Providers } from './providers';
 
 export const metadata: Metadata = {
-  title: "OpenSVM - Solana Virtual Machine Explorer",
-  description: "Explore the Solana blockchain with AI assistance",
+  title: "OpenSVM - AI Explorer and RPC nodes provider for all SVM networks (Solana Virtual Machine)",
+  description: "Explore all SVM networks with AI assistance, or create your Solana Network Extension for free.",
   icons: {
     icon: '/favicon.svg',
     shortcut: '/favicon.svg',

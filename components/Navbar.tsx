@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, FormEvent } from 'react';
+import { useState, FormEvent, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { SettingsMenu } from './SettingsMenu';
 import { Input } from './ui/input';
-import { Search, Activity, Layers, Coins } from 'lucide-react';
+import { MoreHorizontal, Search, Activity, Layers, Coins } from 'lucide-react';
 import { NavDropdown } from './ui/dropdown-nav';
 import { Button } from './ui/button';
 import { AIChatSidebar } from './ai/AIChatSidebar';
@@ -16,10 +16,24 @@ interface NavbarProps {
 
 export function Navbar({ children }: NavbarProps) {
   const router = useRouter();
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [isAIChatOpen, setIsAIChatOpen] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(400);
   const [isResizing, setIsResizing] = useState(false);
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setIsMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const isSolanaAddress = (query: string): boolean => {
     // Simple validation for base58 string of correct length
@@ -47,7 +61,7 @@ export function Navbar({ children }: NavbarProps) {
           <div className="flex items-center gap-2">
             <Link href="/" className="flex items-center gap-2">
               <span className="font-bold text-lg text-foreground">OPENSVM</span>
-              <button 
+              <button
                 onClick={() => setIsAIChatOpen(true)}
                 className="text-muted-foreground text-sm hover:text-foreground cursor-pointer"
               >
@@ -73,7 +87,7 @@ export function Navbar({ children }: NavbarProps) {
           </div>
 
           {/* Right section */}
-          <div className="flex items-center gap-4">
+          <div className="hidden sm:flex items-center gap-4">
             <div className="flex items-center gap-6">
               <NavDropdown
                 trigger="Explore"
@@ -166,6 +180,35 @@ export function Navbar({ children }: NavbarProps) {
               Connect Wallet
             </Button>
           </div>
+
+          <div className="flex items-center gap-4 sm:hidden">
+            <MoreHorizontal size={16} onClick={() => setIsMenuOpen(true)} />
+          </div>
+
+          <div
+            ref={menuRef}
+            className={`absolute right-2 top-[40px] w-48 bg-black border border-white/20 rounded-lg shadow-lg overflow-hidden transition-all duration-200 ${isMenuOpen ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-2 pointer-events-none'
+              }`}
+          >
+            <div className="p-4 flex flex-col items-center gap-6">
+              <Link href="/" className="text-sm font-medium text-foreground hover:text-foreground/80">
+                Home
+              </Link>
+              <Link href="/tokens" className="text-sm font-medium text-foreground hover:text-foreground/80">
+                Tokens
+              </Link>
+              <Link href="/nfts" className="text-sm font-medium text-foreground hover:text-foreground/80">
+                NFTs
+              </Link>
+              <Link href="/analytics" className="text-sm font-medium text-foreground hover:text-foreground/80">
+                Analytics
+              </Link>
+              <SettingsMenu />
+              <Button className="bg-[#00DC82] text-black hover:bg-[#00DC82]/90">
+                Connect Wallet
+              </Button>
+            </div>
+          </div>
         </div>
       </nav>
       <main className="pt-14 min-h-screen">
@@ -173,7 +216,7 @@ export function Navbar({ children }: NavbarProps) {
       </main>
 
       {/* AI Chat Sidebar */}
-      <AIChatSidebar 
+      <AIChatSidebar
         isOpen={isAIChatOpen}
         onClose={() => setIsAIChatOpen(false)}
         onWidthChange={setSidebarWidth}
