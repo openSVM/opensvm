@@ -4,8 +4,17 @@ import { Navbar } from "@/components/Navbar";
 import { Providers } from './providers';
 
 export const metadata: Metadata = {
-  title: "OpenSVM - Solana Virtual Machine Explorer",
-  description: "Explore the Solana blockchain with AI assistance",
+  title: "OpenSVM - AI Explorer and RPC nodes provider for all SVM networks (Solana Virtual Machine)",
+  description: "Explore all SVM networks with AI assistance, or create your Solana Network Extension for free.",
+  icons: {
+    icon: '/favicon.svg',
+    shortcut: '/favicon.svg',
+    apple: '/favicon.svg',
+    other: {
+      rel: 'icon',
+      url: '/favicon.svg',
+    },
+  },
 };
 
 export default function RootLayout({
@@ -14,7 +23,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className="theme-cyberpunk" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+      </head>
       <body>
         <Providers>
           <Navbar>

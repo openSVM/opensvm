@@ -1,10 +1,14 @@
 import * as React from "react"
 import { cn } from "@/lib/utils"
 
+export type ButtonVariant = 'default' | 'outline' | 'ghost' | 'link' | 'destructive';
+
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'default' | 'outline' | 'ghost' | 'link';
+  variant?: ButtonVariant;
   size?: 'default' | 'sm' | 'lg' | 'icon';
 }
+
+const destructiveStyles = "bg-destructive text-destructive-foreground hover:bg-destructive/90";
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant = 'default', size = 'default', ...props }, ref) => {

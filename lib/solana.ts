@@ -1,581 +1,432 @@
-import { Connection, PublicKey, clusterApiUrl, ParsedTransactionWithMeta, GetProgramAccountsFilter, SystemProgram, MessageAccountKeys, VersionedBlockResponse, AccountInfo, ConfirmedSignatureInfo, ParsedInstruction, VersionedTransaction } from '@solana/web3.js';
-import { TOKEN_PROGRAM_ID, getMint } from '@solana/spl-token';
-import { opensvmRpcEndpoints } from './opensvm-rpc';
+import {
+  Connection,
+  PublicKey,
+  ParsedTransactionWithMeta,
+  ParsedInstruction,
+  PartiallyDecodedInstruction,
+  AccountMeta,
+  ParsedMessageAccount,
+  AccountInfo as SolanaAccountInfo,
+  BlockResponse,
+  VersionedBlockResponse
+} from '@solana/web3.js';
+import { getConnection as getProxyConnection } from './solana-connection';
+export { getConnection } from './solana-connection';
 
-// Utility function to chunk array into smaller arrays
-function chunks<T>(array: T[], size: number): T[][] {
-  if (!array?.length) return [];
-  return Array.from({ length: Math.ceil(array.length / size) }, (_, i) =>
-    array.slice(i * size, i * size + size)
-  ).filter(chunk => chunk.length > 0);
-}
+// Type definitions
+export type AccountData = {
+  lamports: number;
+  owner: string;
+  executable: boolean;
+  tokenAccounts: Array<TokenAccount>;
+  isSystemProgram: boolean;
+};
 
-export interface TransactionInfo {
+export type TokenAccount = {
+  mint: string;
+  owner: string;
+  amount: number;
+  decimals: number;
+  uiAmount: number;
+  symbol?: string;
+  icon?: string;
+  usdValue?: number;
+  address?: string;
+  name?: string;
+  txCount?: number;
+  volume?: number;
+  isLoading?: boolean;
+};
+
+export type TokenInfo = {
+  address: string;
+  symbol: string;
+  name: string;
+  decimals: number;
+  totalSupply: number;
+  owner: string;
+  frozen: boolean;
+  mintAuthority?: string;
+  freezeAuthority?: string;
+};
+
+export type Transaction = {
+  signature: string;
+  type: 'Success' | 'Failed';
+  timestamp: number | null;
+};
+
+export type BlockDetails = {
+  slot: number;
+  blockhash: string;
+  parentSlot: number;
+  blockTime: number | null;
+  previousBlockhash: string;
+  timestamp: number;
+  transactions: Transaction[];
+  transactionCount: number;
+  successCount: number;
+  failureCount: number;
+  totalSolVolume: number;
+  totalFees: number;
+  rewards: {
+    pubkey: string;
+    lamports: number;
+    postBalance: number;
+    rewardType: string;
+  }[];
+  programs: {
+    address: string;
+    count: number;
+    name?: string;
+  }[];
+  blockTimeDelta?: number;
+  tokenTransfers: {
+    mint: string;
+    symbol?: string;
+    amount: number;
+  }[];
+};
+
+export type BaseTransactionInfo = {
   signature: string;
   timestamp: number;
   slot: number;
   success: boolean;
-  type: 'sol' | 'token' | 'nft' | 'unknown';
+  type: 'sol' | 'token' | 'unknown';
   amount?: number;
   symbol?: string;
   mint?: string;
-}
+};
 
-export interface DetailedTransactionInfo extends TransactionInfo {
-  blockTime: number;
-  fee: number;
-  status: 'confirmed' | 'finalized' | 'processed';
-}
+export type ParsedInstructionWithAccounts = {
+  program: string;
+  programId: string;
+  parsed: any;
+  accounts: number[];
+  data: string;
+  computeUnits?: number;
+  computeUnitsConsumed?: number;
+};
 
-export interface TokenAccount {
-  mint: string;
-  owner: string;
-  symbol: string;
-  decimals: number;
-  uiAmount: number;
-  icon?: string;
-  usdValue: number;
-  address: string;
-}
+export type PartiallyDecodedInstructionWithAccounts = {
+  programId: string;
+  accounts: number[];
+  data: string;
+  computeUnits?: number;
+  computeUnitsConsumed?: number;
+};
 
-export interface AccountData {
-  lamports: number;
-  owner: string;
-  executable: boolean;
-  tokenAccounts: TokenAccount[];
-  isSystemProgram: boolean;
-}
+export type InstructionWithAccounts = ParsedInstructionWithAccounts | PartiallyDecodedInstructionWithAccounts;
 
-export interface TransactionHistoryOptions {
-  limit?: number;
-  before?: string;
-  until?: string;
-  type?: 'all' | 'sol' | 'token' | 'nft';
-}
+export type InnerInstructions = {
+  index: number;
+  instructions: InstructionWithAccounts[];
+};
 
-// Use mainnet RPC endpoints
-const RPC_ENDPOINTS = [
-    "opensvm",
-    "https://solana-mainnet.core.chainstack.com/263c9f53f4e4cdb897c0edc4a64cd007",
-    "https://api.mainnet-beta.solana.com",
-    "https://solana-api.projectserum.com",
-];
+export type DetailedTransactionInfo = BaseTransactionInfo & {
+  details?: {
+    instructions: InstructionWithAccounts[];
+    accounts: {
+      pubkey: string;
+      signer: boolean;
+      writable: boolean;
+    }[];
+    preBalances: number[];
+    postBalances: number[];
+    preTokenBalances?: any[];
+    postTokenBalances?: any[];
+    logs?: string[];
+    innerInstructions?: InnerInstructions[];
+    tokenChanges?: {
+      mint: string;
+      preAmount: number;
+      postAmount: number;
+      change: number;
+    }[];
+    solChanges?: {
+      accountIndex: number;
+      preBalance: number;
+      postBalance: number;
+      change: number;
+    }[];
+  };
+  relatedTransactions?: any[];
+};
 
-// Cache the validated connection
-let cachedConnection: Connection | null = null;
-
-async function validateConnection(endpoint: string): Promise<boolean> {
+export function validateSolanaAddress(address: string): PublicKey {
   try {
-    // Special handling for OpenSVM endpoints
-    if (endpoint === 'opensvm') {
-      // Try the first OpenSVM endpoint as a test
-      const testConnection = new Connection(opensvmRpcEndpoints[0], {
-        commitment: 'confirmed',
-        wsEndpoint: undefined,
-      });
-      await testConnection.getLatestBlockhash();
-      return true;
+    const pubkey = new PublicKey(address);
+    if (!PublicKey.isOnCurve(pubkey.toBytes())) {
+      throw new Error('Invalid Solana address: not on ed25519 curve');
     }
-
-    // Regular endpoint validation
-    const testConnection = new Connection(endpoint, {
-      commitment: 'confirmed',
-      wsEndpoint: undefined,
-    });
-    await testConnection.getLatestBlockhash();
-    return true;
+    return pubkey;
   } catch (error) {
-    console.warn(`Endpoint ${endpoint} failed health check:`, error);
-    return false;
+    throw new Error('Invalid Solana address');
   }
 }
 
-async function createConnection(): Promise<Connection> {
-  // Return cached connection if available
-  if (cachedConnection) {
-    try {
-      await cachedConnection.getLatestBlockhash();
-      return cachedConnection;
-    } catch (error) {
-      console.warn('Cached connection failed, refreshing...');
-      cachedConnection = null;
-    }
-  }
-
-  // Try each endpoint until we find a working one
-  for (const endpoint of RPC_ENDPOINTS) {
-    console.log(`Trying endpoint: ${endpoint}`);
-    if (endpoint === 'opensvm') {
-      // For OpenSVM, create a connection pool with all endpoints
-      const connections = opensvmRpcEndpoints.map(url => new Connection(url, {
-        commitment: 'confirmed',
-        wsEndpoint: undefined,
-      }));
-      
-      // Try each OpenSVM endpoint until one works
-      for (const conn of connections) {
-        try {
-          await conn.getLatestBlockhash();
-          cachedConnection = conn;
-          return cachedConnection;
-        } catch (error) {
-          console.warn('OpenSVM endpoint failed:', error);
-          continue;
-        }
-      }
-    } else {
-      const isValid = await validateConnection(endpoint);
-      if (isValid) {
-        cachedConnection = new Connection(endpoint, {
-          commitment: 'confirmed',
-          wsEndpoint: undefined,
-        });
-        return cachedConnection;
+export async function getAccountInfo(address: string): Promise<SolanaAccountInfo<Buffer> | null> {
+  try {
+    const connection = await getProxyConnection();
+    const pubkey = validateSolanaAddress(address);
+    
+    // Try each endpoint until one succeeds
+    let lastError;
+    for (let i = 0; i < 3; i++) {
+      try {
+        const accountInfo = await connection.getAccountInfo(pubkey);
+        return accountInfo;
+      } catch (error) {
+        console.warn(`Attempt ${i + 1} failed:`, error);
+        lastError = error;
+        // Wait a bit before retrying
+        await new Promise(resolve => setTimeout(resolve, 1000));
       }
     }
-  }
-
-  // If all endpoints fail, use fallback public RPC
-  console.error('All RPC endpoints failed, using fallback public RPC');
-  const fallbackEndpoint = clusterApiUrl('mainnet-beta');
-  cachedConnection = new Connection(fallbackEndpoint, { 
-    commitment: 'confirmed',
-    wsEndpoint: undefined,
-  });
-  return cachedConnection;
-}
-
-// Initialize connection to RPC - now returns a Promise
-export const initializeConnection = createConnection();
-
-// Export a function to get the current connection or create a new one if needed
-export async function getConnection(): Promise<Connection> {
-  return cachedConnection || createConnection();
-}
-
-// Get RPC latency
-export async function getRPCLatency(): Promise<number> {
-  const start = performance.now();
-  try {
-    const connection = await getConnection();
-    await connection.getLatestBlockhash();
-    return Math.round(performance.now() - start);
+    
+    throw lastError;
   } catch (error) {
-    console.error('Error measuring RPC latency:', error);
-    return 0;
+    console.error('Error fetching account info:', error);
+    throw new Error('Failed to fetch account info');
   }
 }
 
-// Get network stats
-export interface NetworkStats {
-  epoch: number;
-  epochProgress: number;
-  blockHeight: number;
-  activeValidators: number | null;
-  tps: number;
-  successRate: number;
-}
-
-// Cache for network stats
-let networkStatsCache: NetworkStats | null = null;
-const STATS_CACHE_DURATION = 10000; // 10 seconds
-let lastStatsUpdate = 0;
-
-export async function getNetworkStats(): Promise<NetworkStats | null> {
-  const now = Date.now();
-  
-  // Return cached stats if available and fresh
-  if (networkStatsCache && (now - lastStatsUpdate) < STATS_CACHE_DURATION) {
-    return networkStatsCache;
-  }
-
+export async function getTokenInfo(mintAddress: string): Promise<TokenInfo> {
   try {
-    const connection = await getConnection();
-    const [epochInfo, validators, perfSamples] = await Promise.all([
-      connection.getEpochInfo(),
-      connection.getVoteAccounts(),
-      connection.getRecentPerformanceSamples(1)
-    ]);
+    const connection = await getProxyConnection();
+    const pubkey = validateSolanaAddress(mintAddress);
+    
+    const accountInfo = await connection.getAccountInfo(pubkey);
+    if (!accountInfo) {
+      throw new Error('Token not found');
+    }
 
-    networkStatsCache = {
-      epoch: epochInfo.epoch,
-      epochProgress: (epochInfo.slotIndex / epochInfo.slotsInEpoch) * 100,
-      blockHeight: epochInfo.absoluteSlot,
-      activeValidators: validators.current.length + validators.delinquent.length,
-      tps: perfSamples[0] ? Math.round(perfSamples[0].numTransactions / perfSamples[0].samplePeriodSecs) : 0,
-      successRate: 100
+    // Parse mint data
+    const data = accountInfo.data;
+    const mintAuthority = data.slice(0, 32);
+    const supply = data.slice(36, 44);
+    const decimals = data[44];
+    const freezeAuthority = data.slice(46, 78);
+
+    return {
+      address: mintAddress,
+      symbol: '', // Would need token registry integration for these
+      name: '',
+      decimals: decimals,
+      totalSupply: Number(supply.readBigUInt64LE(0)),
+      owner: accountInfo.owner.toString(),
+      frozen: false,
+      mintAuthority: new PublicKey(mintAuthority).toString(),
+      freezeAuthority: new PublicKey(freezeAuthority).toString()
     };
-
-    lastStatsUpdate = now;
-    return networkStatsCache;
   } catch (error) {
-    console.error('Error fetching network stats:', error);
-    return networkStatsCache || null;
+    console.error('Error fetching token info:', error);
+    throw new Error('Failed to fetch token info');
   }
 }
 
-// Export the connection getter for direct access
-// Get transaction details
-export async function getTransactionDetails(signature: string): Promise<ParsedTransactionWithMeta | null> {
+export async function getBlockDetails(slot: number): Promise<BlockDetails> {
+  console.log(`Fetching block details for slot ${slot}`);
+  let connection;
   try {
-    const connection = await getConnection();
-    const transactions = await connection.getParsedTransactions(
-      [signature],
-      {
-        maxSupportedTransactionVersion: 0,
-        commitment: 'confirmed'
-      }
-    );
-    return transactions[0] || null;
-  } catch (error) {
-    console.error('Error fetching transaction details:', error);
-    return null;
-  }
-}
+    connection = await getProxyConnection();
+    const currentSlot = await connection.getSlot();
+    console.log(`Current slot: ${currentSlot}`);
 
-// Get block details
-export async function getBlockDetails(slot: number): Promise<VersionedBlockResponse | null> {
-  try {
-    const connection = await getConnection();
+    if (slot < currentSlot - 500000) {
+      console.log(`Requested slot ${slot} is too old, using more recent slot`);
+      slot = currentSlot - 10;
+    }
+
+    console.log(`Fetching block for slot ${slot}`);
     const block = await connection.getBlock(slot, {
       maxSupportedTransactionVersion: 0,
       commitment: 'confirmed'
     });
-    return block;
-  } catch (error) {
-    console.error('Error fetching block details:', error);
-    return null;
-  }
-}
 
-export const connection = {
-  get current() {
-    if (!cachedConnection) {
-      throw new Error('Connection not initialized. Call getConnection() first.');
-    }
-    return cachedConnection;
-  }
-};
-
-// Store WebSocket subscriptions by address
-const transactionSubscriptions = new Map<string, number>();
-
-export async function getTransactionHistory(
-  address: string,
-  options: TransactionHistoryOptions = {},
-  onNewTransaction?: (tx: DetailedTransactionInfo) => void
-): Promise<TransactionInfo[]> {
-  // Validate input parameters
-  if (!address) {
-    console.error('Address is required');
-    return [];
-  }
-
-  try {
-    // Validate Solana address
-    let pubkey: PublicKey;
-    try {
-      pubkey = new PublicKey(address);
-      if (!PublicKey.isOnCurve(pubkey.toBytes())) {
-        console.error('Invalid Solana address');
-        return [];
-      }
-    } catch (err) {
-      console.error('Invalid Solana address format');
-      return [];
+    if (!block) {
+      throw new Error(`Block not found for slot ${slot}`);
     }
 
-    const connection = await getConnection();
-    const { limit = 50, before, until, type = 'all' } = options;
+    const blockResponse = block as VersionedBlockResponse;
 
-    // Get signatures with proper range handling and consistency
-    const minContextSlot = await connection.getSlot('confirmed');
-    const signatures = await connection.getSignaturesForAddress(
-      pubkey,
-      {
-        limit,
-        before: before ? before : undefined,
-        until: until ? until : undefined,
-        minContextSlot
-      },
-      'confirmed'
-    ) || [];
-
-    // Return early if no signatures
-    if (signatures.length === 0) {
-      return [];
-    }
-
-    // Ensure signatures array is valid
-    if (!Array.isArray(signatures)) {
-      console.error('Invalid signatures array');
-      return [];
-    }
-
-    // Shared transaction processing logic
-    function processTransaction(tx: ParsedTransactionWithMeta, signature: string, blockTime: number | null, slot: number): TransactionInfo | null {
-        // Basic signature check
-        if (!signature) return null;
-
-        // Initialize transaction info with defaults
-        const txInfo: TransactionInfo = {
-            signature,
-            timestamp: blockTime || 0,
-            slot: slot || 0,
-            success: tx.meta?.err === null,
-            type: 'unknown',
-            amount: undefined,
-            symbol: undefined,
-            mint: undefined
-        };
-
-        // Return early if no metadata
-        const meta = tx.meta;
-        if (!meta) return txInfo;
-
-        // Extract balance information
-        const preBalances = meta.preBalances || [];
-        const postBalances = meta.postBalances || [];
-        const preTokenBalances = meta.preTokenBalances || [];
-        const postTokenBalances = meta.postTokenBalances || [];
-        
-        // Check for token transfers
-        const tokenBalance = preTokenBalances?.[0] || postTokenBalances?.[0];
-        if (tokenBalance?.mint) {
-            txInfo.type = 'token';
-            txInfo.mint = tokenBalance.mint;
-            if (tokenBalance.uiTokenAmount?.uiAmount) {
-                txInfo.amount = Number(tokenBalance.uiTokenAmount.uiAmount);
-            }
-        }
-        // Check for SOL transfers
-        else if (preBalances.length > 0 && postBalances.length > 0) {
-            const balanceChange = Math.abs(postBalances[0] - preBalances[0]);
-            if (balanceChange > 0) {
-                txInfo.type = 'sol';
-                txInfo.amount = balanceChange / 1e9;
-            }
-        }
-
-        // Filter by type if specified
-        if (type !== 'all' && type !== txInfo.type) {
-            return null;
-        }
-
-        return txInfo;
-    }
-
-    // Batch fetch transactions in chunks
-    const chunkedSignatures = chunks(signatures, 100);
-    const transactionResults = await Promise.all(
-      chunkedSignatures.map(async (chunk) => {
-        try {
-          const txs = await connection.getParsedTransactions(
-            chunk.map(sig => sig.signature),
-            {
-              maxSupportedTransactionVersion: 0,
-              commitment: 'confirmed'
-            }
-          );
-          
-          return chunk.map((sig, i): TransactionInfo | null => {
-            const tx = txs[i];
-            if (!tx) return null;
-            return processTransaction(tx, sig.signature, sig.blockTime, sig.slot);
-          });
-        } catch (err) {
-          console.error('Error processing transaction chunk:', err);
-          return [];
-        }
+    const blockTime = blockResponse.blockTime || null;
+    let totalSolVolume = 0;
+    let totalFees = 0;
+    const programCounts = new Map<string, number>();
+    const tokenTransfers = new Map<string, number>();
+const transactions = (blockResponse.transactions || []).map(tx => {
+  // Process program invocations
+  if (tx.meta?.logMessages) {
+    const programInvokes = tx.meta.logMessages
+      .filter(log => log.includes('Program') && log.includes('invoke'))
+      .map(log => {
+        const match = log.match(/Program (\w+) invoke/);
+        return match?.[1];
       })
+      .filter((address): address is string => !!address);
+
+    programInvokes.forEach(address => {
+      programCounts.set(address, (programCounts.get(address) ?? 0) + 1);
+    });
+
+    // Process token transfers
+    const tokenLogs = tx.meta.logMessages.filter(log =>
+      log.includes('Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA invoke'));
+    
+    if (tokenLogs.length > 0) {
+      tx.meta.logMessages
+        .filter(log => log.includes('Transfer') && log.includes('tokens'))
+        .forEach(log => {
+          const match = log.match(/Transfer (\d+) tokens/);
+          if (match) {
+            const amount = parseInt(match[1]);
+            const mintAddress = tx.transaction.message.getAccountKeys?.()?.[1]?.toString();
+            if (mintAddress) {
+              tokenTransfers.set(
+                mintAddress,
+                (tokenTransfers.get(mintAddress) ?? 0) + amount
+              );
+            }
+          }
+        });
+    }
+  }
+
+  // Process fees and balances
+  if (tx.meta) {
+    totalFees += tx.meta.fee ?? 0;
+    tx.meta.preBalances?.forEach((pre, index) => {
+      const post = tx.meta.postBalances?.[index];
+      if (post !== undefined && post < pre) {
+        totalSolVolume += (pre - post);
+      }
+    });
+  }
+
+  // Return transaction with strict typing
+  const transaction: Transaction = {
+    signature: tx.transaction.signatures[0]?.toString() || '',
+    type: tx.meta?.err ? 'Failed' : 'Success',
+    timestamp: blockTime
+  };
+
+  return transaction;
+});
+
+    const { successCount, failureCount } = transactions.reduce(
+      (acc, tx) => ({
+        successCount: acc.successCount + (tx.type === 'Success' ? 1 : 0),
+        failureCount: acc.failureCount + (tx.type === 'Failed' ? 1 : 0)
+      }),
+      { successCount: 0, failureCount: 0 }
     );
 
-    // Safely process and flatten results
-    const transactions = (transactionResults || [])
-      .flat()
-      .filter((tx): tx is TransactionInfo => {
-        if (!tx || typeof tx !== 'object') return false;
-        return 'signature' in tx && typeof tx.signature === 'string';
-      })
-      .map(tx => {
-        // Ensure all required fields have valid values
-        return {
-          signature: tx.signature,
-          timestamp: typeof tx.timestamp === 'number' ? tx.timestamp : 0,
-          slot: typeof tx.slot === 'number' ? tx.slot : 0,
-          success: typeof tx.success === 'boolean' ? tx.success : false,
-          type: tx.type || 'unknown',
-          amount: typeof tx.amount === 'number' ? tx.amount : undefined,
-          symbol: typeof tx.symbol === 'string' ? tx.symbol : undefined,
-          mint: typeof tx.mint === 'string' ? tx.mint : undefined
-        };
-      });
-
-    // Setup WebSocket subscription for new transactions if callback provided
-    if (onNewTransaction && !transactionSubscriptions.has(address)) {
-      const subId = await connection.onLogs(
-        pubkey,
-        async (logs) => {
-          try {
-            const signature = logs.signature;
-            const txs = await connection.getParsedTransactions(
-              [signature],
-              {
-                maxSupportedTransactionVersion: 0,
-                commitment: 'confirmed'
-              }
-            );
-            const tx = txs[0];
-            
-            if (!tx) return;
-
-            // Use shared transaction processing logic
-            const txInfo = processTransaction(tx, signature, tx.blockTime, tx.slot || 0);
-            if (!txInfo) return;
-
-            // Add detailed transaction info
-            const detailedTxInfo: DetailedTransactionInfo = {
-              ...txInfo,
-              blockTime: tx.blockTime || 0,
-              fee: tx.meta?.fee || 0,
-              status: 'confirmed'
-            };
-
-            onNewTransaction(detailedTxInfo);
-          } catch (err) {
-            console.error('Error processing new transaction:', err);
-          }
-        },
-        'confirmed'
-      );
-      transactionSubscriptions.set(address, subId);
-    }
-
-    return transactions;
-  } catch (error) {
-    console.error('Error fetching transaction history:', error);
-    throw error;
-  }
-}
-
-export async function unsubscribeFromTransactions(address: string): Promise<void> {
-  const subId = transactionSubscriptions.get(address);
-  if (subId) {
-    try {
-      const connection = await getConnection();
-      await connection.removeOnLogsListener(subId);
-      transactionSubscriptions.delete(address);
-    } catch (error) {
-      console.error('Error unsubscribing from transactions:', error);
-    }
-  }
-}
-
-export async function getTokenInfo(mint: string) {
-  try {
-    const response = await fetch(`/api/token/${mint}`);
-    if (!response.ok) {
-      throw new Error('Failed to fetch token details');
-    }
-    const data = await response.json();
     return {
-      ...data,
-      metadata: {
-        ...data.metadata,
-        name: data.metadata?.name || 'Unknown Token',
-        symbol: data.metadata?.symbol || '',
-        description: data.metadata?.description || '',
-        image: data.metadata?.image || '/images/placeholder-nft.svg',
-      },
-      price: 0, // Would need price API integration
-      priceChange24h: 0, // Would need price API integration
-      marketCap: data.supply * 0, // Would need price API integration
-      volume24h: data.volume24h || 0,
-      supply: data.supply || 0,
-      holders: data.holders || 0,
-      decimals: data.decimals
+      slot,
+      blockhash: blockResponse.blockhash || '',
+      parentSlot: blockResponse.parentSlot || slot - 1,
+      blockTime,
+      previousBlockhash: blockResponse.previousBlockhash || '',
+      timestamp: blockTime ? blockTime * 1000 : Date.now(),
+      transactions: transactions || [],
+      transactionCount: transactions?.length || 0,
+      successCount,
+      failureCount,
+      totalSolVolume: totalSolVolume / 1e9,
+      totalFees: totalFees / 1e9,
+      rewards: blockResponse.rewards?.map(reward => ({
+        pubkey: reward.pubkey || '',
+        lamports: reward.lamports || 0,
+        postBalance: reward.postBalance || 0,
+        rewardType: reward.rewardType || ''
+      })) || [],
+      programs: Array.from(programCounts.entries())
+        .map(([address, count]) => ({
+          address,
+          count,
+          name: undefined
+        }))
+        .sort((a, b) => b.count - a.count),
+      tokenTransfers: Array.from(tokenTransfers.entries())
+        .map(([mint, amount]) => ({
+          mint,
+          amount,
+          symbol: undefined
+        }))
+        .sort((a, b) => b.amount - a.amount)
     };
-  } catch (error) {
-    console.error('Error fetching token info:', error);
-    throw error;
-  }
-}
-
-export async function getAccountInfo(address: string) {
-  try {
-    const connection = await getConnection();
-    const pubkey = new PublicKey(address);
-    const accountInfo = await connection.getAccountInfo(pubkey);
-    if (!accountInfo) {
-      throw new Error('Account not found');
-    }
-    return {
-      address,
-      lamports: accountInfo.lamports,
-      owner: accountInfo.owner.toBase58(),
-      executable: accountInfo.executable,
-      rentEpoch: accountInfo.rentEpoch,
-      space: accountInfo.data.length
-    };
-  } catch (error) {
-    console.error('Error fetching account info:', error);
-    throw error;
-  }
-}
-
-export async function getTokenAccounts(address: string): Promise<AccountData> {
-  try {
-    const connection = await getConnection();
-    const pubkey = new PublicKey(address);
-    
-    // Get all token accounts owned by this address
-    const tokenAccounts = await connection.getParsedTokenAccountsByOwner(pubkey, {
-      programId: TOKEN_PROGRAM_ID
+  } catch (error: any) {
+    console.error('Error in getBlockDetails:', {
+      error: error.message || error,
+      stack: error.stack,
+      slot,
+      endpoint: connection.rpcEndpoint
     });
 
-    // Collect all account pubkeys we need to fetch (main account + all mint accounts)
-    const mintPubkeys = tokenAccounts.value.map(ta => new PublicKey(ta.account.data.parsed.info.mint));
-    const accountsToFetch = [pubkey, ...mintPubkeys];
-
-    // Fetch all account infos in one RPC call
-    const accountInfos = await connection.getMultipleAccountsInfo(accountsToFetch);
+    if (error.message?.includes('429') || error.message?.includes('Too many requests')) {
+      throw new Error('Rate limit exceeded. Please try again in a few moments.');
+    }
+    if (error.message?.includes('skipped, or missing')) {
+      throw new Error('Block not available. Try a more recent block number.');
+    }
+    if (error.message?.includes('block not available')) {
+      throw new Error(`Block ${slot} is not available. The block may be too old or not yet confirmed.`);
+    }
+    if (error.message?.includes('failed to get')) {
+      throw new Error(`Failed to fetch block ${slot}. The RPC node may be experiencing issues.`);
+    }
     
-    const [mainAccountInfo, ...mintAccountInfos] = accountInfos;
-    if (!mainAccountInfo) {
-      throw new Error('Account not found');
+    throw new Error(`Failed to fetch block details: ${error.message || 'Unknown error'}`);
+  }
+}
+
+export async function getRPCLatency(connection: Connection, publicKey: PublicKey): Promise<number> {
+  const start = Date.now();
+  try {
+    await connection.getBalance(publicKey);
+    return Date.now() - start;
+  } catch (error) {
+    console.warn('Error measuring RPC latency:', error);
+    return -1;
+  }
+}
+
+export async function getTransactionDetails(signature: string): Promise<DetailedTransactionInfo> {
+  try {
+    const connection = await getProxyConnection();
+    const tx = await connection.getParsedTransaction(signature, {
+      maxSupportedTransactionVersion: 0,
+      commitment: 'confirmed'
+    });
+
+    if (!tx) {
+      throw new Error('Transaction not found');
     }
 
-    // Process token accounts with mint info
-    const processedAccounts: TokenAccount[] = tokenAccounts.value.map((ta, i) => {
-      const parsedInfo = ta.account.data.parsed.info;
-      const mintAccountInfo = mintAccountInfos[i];
-      if (!mintAccountInfo) {
-        throw new Error(`Mint account not found for token ${parsedInfo.mint}`);
+    const timestamp = tx.blockTime ? new Date(tx.blockTime * 1000) : new Date();
+    const success = tx.meta?.err === null;
+
+    return {
+      signature,
+      timestamp: timestamp.getTime(),
+      slot: tx.slot,
+      success,
+      type: 'unknown',
+      details: {
+        instructions: [],
+        accounts: [],
+        preBalances: tx.meta?.preBalances || [],
+        postBalances: tx.meta?.postBalances || [],
+        preTokenBalances: tx.meta?.preTokenBalances || [],
+        postTokenBalances: tx.meta?.postTokenBalances || [],
+        logs: tx.meta?.logMessages || [],
+        innerInstructions: []
       }
-
-      return {
-        mint: parsedInfo.mint,
-        owner: parsedInfo.owner,
-        symbol: '', // Token metadata would need to be fetched separately
-        decimals: parsedInfo.tokenAmount.decimals,
-        uiAmount: Number(parsedInfo.tokenAmount.uiAmount),
-        icon: undefined, // Token metadata would need to be fetched separately
-        usdValue: 0, // Token price would need to be fetched separately
-        address: ta.pubkey.toBase58()
-      };
-    });
-
-    const accountData: AccountData = {
-      lamports: mainAccountInfo.lamports,
-      owner: mainAccountInfo.owner.toBase58(),
-      executable: mainAccountInfo.executable,
-      tokenAccounts: processedAccounts,
-      isSystemProgram: mainAccountInfo.owner.equals(SystemProgram.programId)
     };
-
-    return accountData;
   } catch (error) {
-    console.error('Error fetching token accounts:', error);
-    throw error;
+    console.error('Error fetching transaction details:', error);
+    throw new Error('Failed to fetch transaction details');
   }
 }

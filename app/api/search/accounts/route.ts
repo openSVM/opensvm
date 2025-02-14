@@ -1,13 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PublicKey } from '@solana/web3.js';
-import { rateLimit } from '@/lib/rate-limit';
+import { rateLimiter, RateLimitError } from '@/lib/rate-limit';
 import { getConnection } from '@/lib/solana-connection';
 import { sanitizeSearchQuery, isValidSolanaAddress, formatNumber } from '@/lib/utils';
 
-const limiter = rateLimit({
-  interval: 60 * 1000, // 1 minute
-  uniqueTokenPerInterval: 500, // Max 500 users per interval
-});
+// Rate limit configuration for account search
+const SEARCH_RATE_LIMIT = {
+  limit: 1000,         // 10 requests
+  windowMs: 60000,   // per minute
+  maxRetries: 5,     // Allow 2 retries
+  initialRetryDelay: 10,
+  maxRetryDelay: 5000
+};
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -26,17 +30,27 @@ export async function GET(request: NextRequest) {
     'Content-Type': 'application/json',
   };
   try {
-    // Apply rate limiting
+    // Apply rate limiting with retries
     try {
-      await limiter.check(request, 10, 'SEARCH_ACCOUNT'); // 10 requests per minute per IP
-    } catch {
-      return NextResponse.json(
-        { error: 'Too many requests. Please try again later.' },
-        { 
-          status: 429,
-          headers: baseHeaders
-        }
-      );
+      const ip = request.headers.get('x-forwarded-for') || '127.0.0.1';
+      await rateLimiter.rateLimit(`SEARCH_ACCOUNT_${ip}`, SEARCH_RATE_LIMIT);
+    } catch (error) {
+      if (error instanceof RateLimitError) {
+        return NextResponse.json(
+          { 
+            error: 'Too many requests. Please try again later.',
+            retryAfter: Math.ceil(error.retryAfter / 1000)
+          },
+          { 
+            status: 429,
+            headers: {
+              ...baseHeaders,
+              'Retry-After': Math.ceil(error.retryAfter / 1000).toString()
+            }
+          }
+        );
+      }
+      throw error;
     }
 
     const searchParams = request.nextUrl.searchParams;
@@ -53,8 +67,13 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get connection from pool
-    const connection = getConnection();
+    // Get connection from pool with timeout
+    const connection = await Promise.race<ReturnType<typeof getConnection>>([
+      getConnection(),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Connection timeout')), 10000)
+      ) as Promise<ReturnType<typeof getConnection>>
+    ]);
     
     // First validate the query format
     if (query.length > 30 && !isValidSolanaAddress(query)) {

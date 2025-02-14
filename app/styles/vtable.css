@@ -1,0 +1,179 @@
+/* VTable container */
+.vtable-container {
+  position: relative;
+  width: 100%;
+  height: 600px;
+  overflow: hidden;
+  background: var(--background);
+}
+
+.vtable {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+}
+
+/* Canvas container */
+.vtable canvas {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  background: transparent !important;
+}
+
+/* Cell content */
+.vtable-cell {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  padding: 8px 12px;
+  font-family: Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--foreground);
+}
+
+/* Links */
+.vtable-cell a {
+  color: hsl(var(--primary));
+  text-decoration: none;
+}
+
+.vtable-cell a:hover {
+  text-decoration: underline;
+}
+
+/* Headers */
+.vtable-header {
+  font-weight: 600;
+  background-color: var(--secondary);
+  border-bottom: 1px solid var(--border);
+}
+
+/* Rows */
+.vtable-row {
+  border-bottom: 1px solid var(--border);
+}
+
+.vtable-row:hover {
+  background-color: var(--muted);
+}
+
+/* Cells */
+.vtable-cell {
+  padding: 8px 12px;
+  border-right: 1px solid var(--border);
+}
+
+.vtable-cell:last-child {
+  border-right: none;
+}
+
+/* Loading state */
+.vtable-loading {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(var(--background), 0.8);
+}
+
+.vtable-loading-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--border);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: vtable-spin 1s linear infinite;
+}
+
+@keyframes vtable-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Error state */
+.vtable-error {
+  padding: 16px;
+  color: var(--destructive);
+  text-align: center;
+}
+
+/* Empty state */
+.vtable-empty {
+  padding: 16px;
+  color: var(--muted-foreground);
+  text-align: center;
+}
+
+/* Theme-specific styles */
+[data-theme="light"] .vtable {
+  --vtable-foreground: hsl(var(--foreground));
+  --vtable-background: hsl(var(--background));
+  --vtable-border: hsl(var(--border));
+  --vtable-header: hsl(var(--secondary));
+  --vtable-hover: hsl(var(--muted));
+}
+
+[data-theme="dark"] .vtable {
+  --vtable-foreground: hsl(var(--foreground));
+  --vtable-background: hsl(var(--background));
+  --vtable-border: hsl(var(--border));
+  --vtable-header: hsl(var(--secondary));
+  --vtable-hover: hsl(var(--muted));
+}
+
+/* Table styles */
+.vtable [class*="vtable-cell"] {
+  color: var(--vtable-foreground) !important;
+  background-color: var(--vtable-background) !important;
+  border-color: var(--vtable-border) !important;
+}
+
+.vtable [class*="vtable-header-cell"] {
+  color: var(--vtable-foreground) !important;
+  background-color: var(--vtable-header) !important;
+  border-color: var(--vtable-border) !important;
+}
+
+.vtable [class*="vtable-cell"]:hover {
+  background-color: var(--vtable-hover) !important;
+}
+
+/* Force theme colors */
+.vtable [style*="background"],
+.vtable [style*="background-color"] {
+  background-color: var(--vtable-background) !important;
+}
+
+.vtable [style*="color"]:not(a) {
+  color: var(--vtable-foreground) !important;
+}
+
+.vtable [style*="border-color"] {
+  border-color: var(--vtable-border) !important;
+}
+
+/* Header override */
+.vtable [class*="vtable-header"] [style*="background"],
+.vtable [class*="vtable-header"] [style*="background-color"] {
+  background-color: var(--vtable-header) !important;
+}
+
+/* Hover override */
+.vtable [class*="vtable-cell"]:hover [style*="background"],
+.vtable [class*="vtable-cell"]:hover [style*="background-color"] {
+  background-color: var(--vtable-hover) !important;
+}

@@ -1,0 +1,94 @@
+/* Remove default VTable styles */
+.vc-table {
+  * {
+    all: unset;
+    box-sizing: border-box;
+  }
+}
+
+/* Apply theme-aware styles */
+.vc-table {
+  width: 100%;
+  font-family: var(--font-family);
+  border-collapse: collapse;
+
+  .vc-table-header {
+    border-bottom: 1px solid hsl(var(--border));
+    background: transparent;
+
+    .vc-table-header-cell {
+      padding: 0.75rem;
+      font-weight: 600;
+      color: hsl(var(--foreground));
+      text-align: left;
+      cursor: pointer;
+      user-select: none;
+    }
+  }
+
+  .vc-table-body {
+    .vc-table-row {
+      border-bottom: 1px solid hsl(var(--border));
+
+      &:last-child {
+        border-bottom: none;
+      }
+    }
+
+    .vc-table-cell {
+      padding: 0.75rem;
+      color: hsl(var(--foreground));
+      background: transparent;
+      transition: background-color 0.2s;
+
+      &:hover {
+        background: hsl(var(--muted) / 0.3);
+      }
+    }
+  }
+
+  .vc-table-cell-selected {
+    background: hsl(var(--accent) / 0.2) !important;
+    color: hsl(var(--accent-foreground));
+  }
+
+  .vc-table-sort-icon {
+    color: hsl(var(--foreground) / 0.5);
+    margin-left: 0.5rem;
+  }
+}
+
+/* Theme-specific overrides */
+.theme-high-contrast .vc-table {
+  .vc-table-cell:hover {
+    background: hsl(var(--muted) / 0.5);
+  }
+}
+
+.theme-dos .vc-table {
+  border-radius: 0;
+  
+  .vc-table-cell:hover {
+    background: hsl(var(--secondary));
+  }
+}
+
+.theme-cyberpunk .vc-table {
+  .vc-table-header {
+    border-color: hsl(var(--primary));
+  }
+
+  .vc-table-body .vc-table-row {
+    border-color: hsl(var(--primary) / 0.3);
+  }
+
+  .vc-table-cell:hover {
+    background: hsl(var(--primary) / 0.1);
+  }
+}
+
+.theme-paper .vc-table {
+  .vc-table-cell:hover {
+    background: hsl(var(--muted) / 0.7);
+  }
+}

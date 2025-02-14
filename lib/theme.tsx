@@ -17,15 +17,15 @@ function getSystemTheme(): Theme {
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setTheme] = useState<Theme>('high-contrast');
+  const [theme, setTheme] = useState<Theme>('paper');
   const [mounted, setMounted] = useState(false);
 
   // Effect to initialize theme on client-side only
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme') as Theme;
-    // Reset to high-contrast if no theme is saved or if the saved theme is the old default (dos)
-    if (!savedTheme || savedTheme === 'dos') {
-      setTheme('high-contrast');
+    // Reset to paper if no theme is saved or if the saved theme is the old default (dos)
+    if (!savedTheme || savedTheme === 'dos' || savedTheme === 'high-contrast') {
+      setTheme('paper');
     } else if (['paper', 'high-contrast', 'cyberpunk', 'solarized'].includes(savedTheme)) {
       setTheme(savedTheme);
     }

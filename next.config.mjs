@@ -1,13 +1,19 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  api: {
+    bodyParser: {
+      sizeLimit: '10mb',
+    },
+    responseLimit: '10mb',
+  },
   reactStrictMode: true,
   webpack: (config, { isServer }) => {
     // Handle ES modules
     config.experiments = { ...config.experiments, topLevelAwait: true };
     
     // Add necessary polyfills
-    config.resolve.fallback = {git 
-      ...config.resolve.fallb
+    config.resolve.fallback = {
+      ...config.resolve.fallback,
       fs: false,
       path: false,
       crypto: false,

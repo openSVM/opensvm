@@ -80,7 +80,7 @@ export function Navbar({ children }: NavbarProps) {
                   placeholder="Search accounts, tokens, or programs..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-muted/50 border-0 pl-10 h-9"
+                  className="w-full bg-background border border-border hover:border-foreground/20 focus:border-foreground/40 pl-10 h-9 transition-colors"
                 />
               </div>
             </form>
