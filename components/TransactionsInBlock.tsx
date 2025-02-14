@@ -5,7 +5,7 @@ import Link from 'next/link';
 
 interface Transaction {
   signature: string;
-  type: string;
+  type: 'Success' | 'Failed';
   timestamp: number | null;
 }
 

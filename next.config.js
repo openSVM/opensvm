@@ -4,6 +4,8 @@ const nextConfig = {
   env: {
     USE_MOCK_DATA: 'false', // Disable mock data to use real data
     SOLANA_RPC_URL: process.env.SOLANA_RPC_URL,
+    OPENSVM_RPC_LIST: process.env.OPENSVM_RPC_LIST,
+    OPENSVM_RPC_LIST_2: process.env.OPENSVM_RPC_LIST_2
   },
   experimental: {
     optimizeCss: true,
@@ -29,7 +31,7 @@ const nextConfig = {
     // period (in ms) where the server will keep pages in the buffer
     maxInactiveAge: 30 * 1000,
     // number of pages that should be kept simultaneously without being disposed
-    pagesBufferLength: 5,
+    pagesBufferLength: 15,
   },
   async headers() {
     return [

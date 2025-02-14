@@ -7,7 +7,6 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./*"],
-      "lib/*": ["./lib/*"]
     },
     "skipLibCheck": true,
     "noImplicitAny": false,
@@ -23,7 +22,7 @@
     ],
     "incremental": true,
     "module": "esnext",
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
     "plugins": [

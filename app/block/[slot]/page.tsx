@@ -13,4 +13,4 @@ export default function BlockPage() {
       <BlockDetails slot={slot} />
     </div>
   );
-} 
+}

@@ -1,10 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { getBlockDetails } from '@/lib/solana';
+import { getBlockDetails, type BlockDetails as BlockDetailsType } from '@/lib/solana';
 import { Button } from '@/components/ui/button';
 import { TransactionsInBlock } from '@/components/TransactionsInBlock';
-import { VersionedBlockResponse, PublicKey } from '@solana/web3.js';
 import Link from 'next/link';
 import { Copy } from 'lucide-react';
 
@@ -26,45 +25,8 @@ const copyToClipboard = async (text: string) => {
   }
 };
 
-interface Transaction {
-  signature: string;
-  type: string;
-  timestamp: number | null;
-}
-
-interface FormattedBlockDetails {
-  slot: number;
-  timestamp: number | null;
-  blockhash: string;
-  parentSlot: number;
-  transactions: Transaction[];
-  transactionCount: number;
-  successCount: number;
-  failureCount: number;
-  previousBlockhash: string;
-  totalSolVolume: number;
-  totalFees: number;
-  rewards?: {
-    pubkey: string;
-    lamports: number;
-    postBalance: number;
-    rewardType: string;
-  }[];
-  programs: {
-    address: string;
-    count: number;
-    name?: string;
-  }[];
-  blockTimeDelta?: number;
-  tokenTransfers: {
-    mint: string;
-    symbol?: string;
-    amount: number;
-  }[];
-}
-
 export default function BlockDetails({ slot }: { slot: string }) {
-  const [block, setBlock] = useState<FormattedBlockDetails | null>(null);
+  const [block, setBlock] = useState<BlockDetailsType | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showTransactions, setShowTransactions] = useState(false);
@@ -75,128 +37,20 @@ export default function BlockDetails({ slot }: { slot: string }) {
     async function fetchBlock() {
       try {
         setTransactionsLoading(true);
+        console.log('Fetching block details for slot:', slot);
         const blockDetails = await getBlockDetails(parseInt(slot));
         if (blockDetails) {
-          // Transform VersionedBlockResponse into FormattedBlockDetails
-          // Process transactions and count successes/failures
-          let successCount = 0;
-          let failureCount = 0;
-          let totalSolVolume = 0;
-          let totalFees = 0;
-          const programCounts = new Map<string, number>();
-          const tokenTransfers = new Map<string, number>();
-          
-          const formattedTransactions = blockDetails.transactions?.map(tx => {
-            // Track program invocations from log messages
-            if (tx.meta?.logMessages) {
-              const programInvokes = tx.meta.logMessages
-                .filter(log => log.includes('Program') && log.includes('invoke'))
-                .map(log => {
-                  const match = log.match(/Program (\w+) invoke/);
-                  return match?.[1];
-                })
-                .filter((address): address is string => !!address);
-
-              programInvokes.forEach(address => {
-                const count = programCounts.get(address) ?? 0;
-                programCounts.set(address, count + 1);
-              });
-
-              // Track token transfers from SPL Token program logs
-              const tokenLogs = tx.meta.logMessages.filter(log => 
-                log.includes('Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA invoke'));
-              
-              if (tokenLogs.length > 0) {
-                const transferLogs = tx.meta.logMessages.filter(log => 
-                  log.includes('Transfer') && log.includes('tokens'));
-                
-                transferLogs.forEach(log => {
-                  const match = log.match(/Transfer (\d+) tokens/);
-                  if (match) {
-                    const amount = parseInt(match[1]);
-                    // Get mint address from the instruction
-                    const accountKeys = tx.transaction.message.getAccountKeys?.() ?? [];
-                    const mintAddress = accountKeys[1]?.toString();
-                    if (mintAddress) {
-                      const currentAmount = tokenTransfers.get(mintAddress) ?? 0;
-                      tokenTransfers.set(mintAddress, currentAmount + amount);
-                    }
-                  }
-                });
-              }
-            }
-            // Calculate SOL volume and fees
-            if (tx.meta) {
-              // Calculate fees (in lamports)
-              totalFees += tx.meta.fee ?? 0;
-              
-              // Calculate SOL transfers
-              tx.meta.preBalances.forEach((pre, index) => {
-                const post = tx.meta.postBalances[index];
-                if (post < pre) {
-                  // Only count decreases in balance as transfers
-                  totalSolVolume += (pre - post);
-                }
-              });
-            }
-            // Determine transaction type based on error and status
-            let type = 'Success';
-            if (tx.meta?.err) {
-              // Check if error is an object with toString method
-              type = typeof tx.meta.err === 'object' && tx.meta.err !== null ? 
-                'Failed: ' + tx.meta.err.toString() : 
-                'Failed';
-              failureCount++;
-            } else {
-              successCount++;
-            }
-            return {
-              signature: tx.transaction.signatures[0] ?? 'Unknown',
-              type,
-              timestamp: blockDetails.blockTime
-            };
-          }) ?? [];
-
           // Store current block time for next block's delta calculation
           if (blockDetails.blockTime) {
             setPreviousBlockTime(blockDetails.blockTime);
           }
 
-          setBlock({
-            slot: parseInt(slot),
-            timestamp: blockDetails.blockTime ?? null,
-            blockhash: blockDetails.blockhash ?? 'Unknown',
-            parentSlot: blockDetails.parentSlot ?? 0,
-            transactionCount: blockDetails.transactions?.length ?? 0,
-            transactions: formattedTransactions,
-            successCount,
-            failureCount,
-            previousBlockhash: blockDetails.previousBlockhash ?? 'Unknown',
-            totalSolVolume: totalSolVolume / 1e9, // Convert lamports to SOL
-            totalFees: totalFees / 1e9, // Convert lamports to SOL
-            rewards: blockDetails.rewards,
-            programs: Array.from(programCounts.entries())
-              .map(([address, count]) => ({ 
-                address, 
-                count,
-                name: getProgramName(address)
-              }))
-              .sort((a, b) => b.count - a.count),
-            blockTimeDelta: blockDetails.blockTime && previousBlockTime ? 
-              blockDetails.blockTime - previousBlockTime : undefined,
-            tokenTransfers: Array.from(tokenTransfers.entries())
-              .map(([mint, amount]) => ({
-                mint,
-                amount,
-                symbol: undefined // We'll implement token symbol lookup later
-              }))
-              .sort((a, b) => b.amount - a.amount)
-          });
+          setBlock(blockDetails);
         } else {
           setError('Block not found');
         }
-      } catch (err) {
-        setError('Failed to fetch block details');
+      } catch (err: any) {
+        setError(err.message || 'Failed to fetch block details');
       } finally {
         setLoading(false);
         setTransactionsLoading(false);
@@ -258,7 +112,7 @@ export default function BlockDetails({ slot }: { slot: string }) {
           </h1>
           <p className="text-muted-foreground">
             {block?.timestamp
-              ? new Date(block.timestamp * 1000).toLocaleString()
+              ? new Date(block.timestamp).toLocaleString()
               : 'Timestamp not available'}
           </p>
         </div>
@@ -410,7 +264,7 @@ export default function BlockDetails({ slot }: { slot: string }) {
 
         {showTransactions && (
           <div className="mt-8">
-            <TransactionsInBlock block={block} />
+            <TransactionsInBlock block={{ slot: block.slot, transactions: block.transactions }} />
           </div>
         )}
       </div>

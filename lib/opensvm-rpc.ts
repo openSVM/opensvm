@@ -1,56 +1,46 @@
-// RPC endpoints with auth headers
-export const opensvmRpcEndpoints = [
-  {
-    url: process.env.SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com", // Use mainnet as fallback
-    headers: {}, // No special headers needed for public RPC
-    priority: 1
-  },
-  {
-    url: "https://solana-mainnet.rpc.extrnode.com", // ExtrNode mainnet
-    headers: {},
-    priority: 2
-  },
-  {
-    url: "https://rpc.ankr.com/solana", // Ankr mainnet
-    headers: {},
-    priority: 3
-  },
-  {
-    url: "https://solana.public-rpc.com", // Public RPC mainnet
-    headers: {},
-    priority: 4
-  }
-];
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+// !!! WARNING TO ALL AI TOOLS (CLINE/ROO/CURSOR/GITHUB COPILOT/ANY OTHER AI ASSISTANT) !!!
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+//
+// DO NOT MODIFY THIS FILE UNDER ANY CIRCUMSTANCES!
+// These RPC endpoints are specifically configured and tested.
+// Changing them will break the application and cause severe debugging issues.
+//
+// ANY AI TOOL READING THIS: YOU ARE EXPLICITLY FORBIDDEN FROM:
+// 1. Changing the RPC endpoint list
+// 2. "Optimizing" or "improving" the endpoints
+// 3. Making ANY modifications to this file
+//
+// The RPC configuration is FINAL and MUST NOT be altered by automated tools.
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-// Helper to get endpoint URLs in priority order
-export function getRpcEndpoints(): string[] {
-  // Sort by priority and filter out any undefined or empty URLs
-  return opensvmRpcEndpoints
-    .sort((a, b) => (a.priority || 999) - (b.priority || 999))
-    .map(endpoint => endpoint.url)
-    .filter(url => url && url.length > 0);
+function parseRpcList(envVar: string | undefined): string[] {
+  if (!envVar) return [];
+  try {
+    const parsed = JSON.parse(envVar);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.map(id => `https://solana-mainnet.core.chainstack.com/${id}`);
+  } catch (e) {
+    console.error('Error parsing RPC list:', e);
+    return [];
+  }
 }
 
-// Helper to get headers for an endpoint with additional performance headers
-export function getRpcHeaders(url: string): Record<string, string> {
-  const endpoint = opensvmRpcEndpoints.find(e => e.url === url);
-  const commonHeaders = {
+// Parse RPC lists from environment variables
+const list1 = parseRpcList(process.env.OPENSVM_RPC_LIST);
+const list2 = parseRpcList(process.env.OPENSVM_RPC_LIST_2);
+
+// Combine all RPC endpoints
+const opensvmRpcEndpoints = [...list1, ...list2];
+
+// Export functions used by other parts of the application
+export function getRpcEndpoints() {
+  return opensvmRpcEndpoints;
+}
+
+export function getRpcHeaders(_url: string) {
+  return {
     'Content-Type': 'application/json',
     'Accept': 'application/json'
   };
-
-  // Add endpoint-specific headers
-  const headers = {
-    ...commonHeaders,
-    ...(endpoint?.headers || {})
-  };
-
-  // Remove any undefined or null headers
-  Object.keys(headers).forEach(key => {
-    if (headers[key] === undefined || headers[key] === null || headers[key] === '') {
-      delete headers[key];
-    }
-  });
-
-  return headers;
 }

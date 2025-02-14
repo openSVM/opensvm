@@ -1,5 +1,5 @@
 {
-  "name": "turbo-seek",
+  "name": "opensvm",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -55,6 +55,7 @@
     "d3-transition": "^3.0.1",
     "d3-zoom": "^3.0.0",
     "date-fns": "^4.1.0",
+    "dotenv": "^16.4.7",
     "encoding": "^0.1.13",
     "eventsource-parser": "^3.0.0",
     "framer-motion": "^11.18.2",

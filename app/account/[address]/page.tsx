@@ -1,6 +1,6 @@
 import { getConnection } from '@/lib/solana-connection';
 import { PublicKey } from '@solana/web3.js';
-import { validateSolanaAddress } from '@/lib/solana';
+import { validateSolanaAddress, getAccountInfo as getSolanaAccountInfo } from '@/lib/solana';
 import AccountInfo from '@/components/AccountInfo';
 import AccountTabs from './tabs';
 
@@ -15,13 +15,12 @@ interface AccountData {
   }[];
 }
 
-async function getAccountInfo(address: string): Promise<AccountData> {
+async function getAccountData(address: string): Promise<AccountData> {
   const connection = await getConnection();
   
   try {
     const pubkey = validateSolanaAddress(address);
-
-    const accountInfo = await connection.getAccountInfo(pubkey);
+    const accountInfo = await getSolanaAccountInfo(address);
     const balance = await connection.getBalance(pubkey);
     const tokenAccounts = await connection.getParsedTokenAccountsByOwner(pubkey, {
       programId: new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA'),
@@ -57,8 +56,8 @@ interface PageProps {
 }
 
 export default async function AccountPage({ params, searchParams }: PageProps) {
-  const { address: rawAddress } = await params;
-  const { tab } = await searchParams;
+  const { address: rawAddress } = await Promise.resolve(params);
+  const { tab } = await Promise.resolve(searchParams);
   const activeTab = tab || 'tokens';
   
   try {
@@ -87,7 +86,7 @@ export default async function AccountPage({ params, searchParams }: PageProps) {
 
     // Fetch account info
     try {
-      const accountInfo = await getAccountInfo(address);
+      const accountInfo = await getAccountData(address);
 
       return (
         <div className="container mx-auto px-4 py-8">
