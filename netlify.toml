@@ -1,6 +1,6 @@
 [build]
-  command = "npm run build"
-  publish = ".next"
+  command = "npm run build && cp public/index.html .next/standalone/"
+  publish = ".next/standalone"
   functions = ".netlify/functions"
   ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF ."
 
@@ -8,17 +8,20 @@
   NEXT_USE_NETLIFY_EDGE = "true"
   NODE_VERSION = "20"
   NEXT_TELEMETRY_DISABLED = "1"
+  NEXT_PRIVATE_TARGET = "server"
+
+# Handle Next.js
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+  [plugins.inputs]
+    useServerBuild = true
 
 # Handle environment variables for SVM RPC
 [[plugins]]
   package = "netlify-plugin-inline-functions-env"
   [plugins.inputs]
     buildEvent = "onPreBuild"
-    include = ["OPENSVM_RPC_LIST", "OPENSVM_RPC_LIST_2"]
-
-# Handle Next.js
-[[plugins]]
-  package = "@netlify/plugin-nextjs"
+    include = ["OPENSVM_RPC_LIST"]
 
 # Handle static assets
 [[redirects]]
@@ -33,20 +36,24 @@
   status = 200
   force = true
 
-# Handle API routes
+# Handle root path
 [[redirects]]
-  from = "/api/*"
-  to = "/.netlify/functions/nextjs-server/api/:splat"
+  from = "/"
+  to = "/index.html"
   status = 200
   force = true
 
-# Handle all other routes through Next.js
+# Handle all other routes
 [[redirects]]
   from = "/*"
   to = "/.netlify/functions/nextjs-server"
   status = 200
-  force = true
 
 [functions]
   directory = ".netlify/functions"
+  node_bundler = "esbuild"
+  external_node_modules = ["@next/env"]
   included_files = ["agent_notes/vtable_study/vtable_docs/**"]
+
+[build.processing]
+  skip_processing = false

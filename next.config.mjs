@@ -76,8 +76,11 @@ const nextConfig = {
       },
     ]
   },
-  // Add output configuration to include static files
   output: 'standalone',
+  generateBuildId: async () => 'build',
+  generateEtags: false,
+  distDir: '.next',
+  cleanDistDir: true,
 };
 
 export default nextConfig;
