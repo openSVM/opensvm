@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { getTopPrograms } from '@/lib/solana';
+import { getConnection } from '@/lib/solana';
 
 interface Program {
   address: string;
@@ -15,8 +15,47 @@ export function TopPrograms() {
   useEffect(() => {
     async function fetchPrograms() {
       try {
-        const fetchedPrograms = await getTopPrograms(10);
-        setPrograms(fetchedPrograms);
+        const connection = await getConnection();
+        const slot = await connection.getSlot();
+        const blocks = await connection.getBlocks(Math.max(0, slot - 100), slot);
+        
+        // Get transactions from recent blocks
+        const programCounts = new Map<string, number>();
+        
+        for (const blockSlot of blocks) {
+          try {
+            const block = await connection.getBlock(blockSlot, {
+              maxSupportedTransactionVersion: 0
+            });
+            
+            if (!block) continue;
+
+            // Count program invocations from logs
+            block.transactions.forEach(tx => {
+              if (!tx.meta?.logMessages) return;
+              
+              tx.meta.logMessages
+                .filter(log => log.includes('Program') && log.includes('invoke'))
+                .forEach(log => {
+                  const match = log.match(/Program (\w+) invoke/);
+                  if (!match) return;
+                  
+                  const program = match[1];
+                  programCounts.set(program, (programCounts.get(program) || 0) + 1);
+                });
+            });
+          } catch (error) {
+            console.error(`Error fetching block ${blockSlot}:`, error);
+          }
+        }
+
+        // Convert to array and sort by count
+        const sortedPrograms = Array.from(programCounts.entries())
+          .map(([address, txCount]) => ({ address, txCount }))
+          .sort((a, b) => b.txCount - a.txCount)
+          .slice(0, 10); // Get top 10
+
+        setPrograms(sortedPrograms);
       } catch (error) {
         console.error('Error fetching programs:', error);
       } finally {
@@ -68,4 +107,4 @@ export function TopPrograms() {
       </div>
     </div>
   );
-} 
+}

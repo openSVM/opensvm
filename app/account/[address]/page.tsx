@@ -51,13 +51,14 @@ async function getAccountData(address: string): Promise<AccountData> {
 }
 
 interface PageProps {
-  params: { address: string };
-  searchParams: { [key: string]: string | string[] | undefined };
+  params: Promise<{ address: string }>;
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }
 
 export default async function AccountPage({ params, searchParams }: PageProps) {
-  const { address: rawAddress } = await Promise.resolve(params);
-  const { tab } = await Promise.resolve(searchParams);
+  const { address: rawAddress } = await params;
+  const resolvedSearchParams = await searchParams;
+  const { tab } = resolvedSearchParams;
   const activeTab = tab || 'tokens';
   
   try {

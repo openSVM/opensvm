@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(
   _request: NextRequest,
-  context: { params: { transaction: string } }
+  context: { params: Promise<{ transaction: string }> }
 ) {
   try {
-    const { transaction } = context.params;
+    const params = await context.params;
+    const { transaction } = await params;
     
     console.log('Solana proxy request:', {
       method: 'getTransaction',

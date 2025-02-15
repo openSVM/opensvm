@@ -203,11 +203,12 @@ async function fetchTransactionBatch(
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { address: string } }
+  context: { params: Promise<{ address: string }> }
 ) {
   const startTime = Date.now();
 
   try {
+    const params = await context.params;
     const { address: rawAddress } = await params;
     const address = decodeURIComponent(String(rawAddress));
     console.log(`Starting transfer fetch for ${address}`);

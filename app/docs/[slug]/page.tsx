@@ -5,23 +5,35 @@ import { Metadata } from 'next';
 import ReactMarkdown from 'react-markdown';
 
 interface Props {
-  params: {
-    slug: string;
-  };
+  params: Promise<{ slug: string }>;
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const title = params.slug.replace(/-/g, ' ');
+  const resolvedParams = await params;
+  const title = resolvedParams.slug.replace(/-/g, ' ');
   return {
     title: `${title} - Documentation`,
   };
 }
 
 export default async function DocPage({ params }: Props) {
-  const { slug } = params;
-  const filePath = path.join(process.cwd(), 'vtable_docs', `${slug}.md`);
+  const resolvedParams = await params;
+  const { slug } = resolvedParams;
+  
+  // Use path.join with __dirname to get the correct path in both dev and prod
+  const docsDir = path.join(process.cwd(), 'agent_notes', 'vtable_study', 'vtable_docs');
+  const filePath = path.join(docsDir, `${slug}.md`);
 
   try {
+    // Verify directory exists
+    try {
+      await fs.access(docsDir);
+    } catch (error) {
+      console.error(`Docs directory not found: ${docsDir}`);
+      notFound();
+    }
+
     const content = await fs.readFile(filePath, 'utf8');
 
     return (
@@ -30,6 +42,7 @@ export default async function DocPage({ params }: Props) {
       </div>
     );
   } catch (error) {
+    console.error(`Error reading doc file: ${filePath}`, error);
     notFound();
   }
 }

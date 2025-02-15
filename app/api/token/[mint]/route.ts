@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { PublicKey } from '@solana/web3.js';
 import { getMint } from '@solana/spl-token';
 import { getConnection } from '@/lib/solana';
@@ -31,8 +31,8 @@ export async function OPTIONS() {
 }
 
 export async function GET(
-  request: Request,
-  { params }: { params: { mint: string } }
+  request: NextRequest,
+  context: { params: Promise<{ mint: string }> }
 ) {
   const baseHeaders = {
     ...corsHeaders,
@@ -63,7 +63,8 @@ export async function GET(
       throw error;
     }
 
-    const { mint } = await Promise.resolve(params);
+    const params = await context.params;
+    const { mint } = await params;
     const mintAddress = mint;
     // Get connection with timeout
     const connection = await Promise.race<ReturnType<typeof getConnection>>([

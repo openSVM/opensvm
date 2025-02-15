@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { connection } from '@/lib/solana';
+import { getConnection } from '@/lib/solana';
 
 interface Transaction {
   signature: string;
@@ -58,4 +58,4 @@ export function TransactionsInBlock() {
       </div>
     </div>
   );
-} 
+}

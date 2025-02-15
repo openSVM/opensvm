@@ -2,12 +2,13 @@
 
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 export default function TestPageClient() {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+// sourcery skip: use-braces
     if (!containerRef.current) return;
 
     // Scene setup
@@ -69,6 +70,7 @@ export default function TestPageClient() {
     return () => {
       window.removeEventListener('resize', handleResize);
       if (containerRef.current) {
+        // eslint-disable-next-line react-hooks/exhaustive-deps
         containerRef.current.removeChild(renderer.domElement);
       }
       geometry.dispose();

@@ -116,12 +116,13 @@ async function getTokenTransfers(address: string): Promise<number> {
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { address: string } }
+  context: { params: Promise<{ address: string }> }
 ) {
-  // Get the address from params
-  const address = params?.address || '';
-  
   try {
+    // Get the address from params - properly awaited in Next.js 15
+    const params = await context.params;
+    const { address } = await params;
+    
     // Add overall API timeout
     let timeoutId: NodeJS.Timeout;
     const timeoutPromise = new Promise((_, reject) => {

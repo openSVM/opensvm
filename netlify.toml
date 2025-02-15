@@ -1,0 +1,52 @@
+[build]
+  command = "npm run build"
+  publish = ".next"
+  functions = ".netlify/functions"
+  ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF ."
+
+[build.environment]
+  NEXT_USE_NETLIFY_EDGE = "true"
+  NODE_VERSION = "20"
+  NEXT_TELEMETRY_DISABLED = "1"
+
+# Handle environment variables for SVM RPC
+[[plugins]]
+  package = "netlify-plugin-inline-functions-env"
+  [plugins.inputs]
+    buildEvent = "onPreBuild"
+    include = ["OPENSVM_RPC_LIST", "OPENSVM_RPC_LIST_2"]
+
+# Handle Next.js
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+# Handle static assets
+[[redirects]]
+  from = "/_next/static/*"
+  to = "/_next/static/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/agent_notes/vtable_study/vtable_docs/*"
+  to = "/agent_notes/vtable_study/vtable_docs/:splat"
+  status = 200
+  force = true
+
+# Handle API routes
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/nextjs-server/api/:splat"
+  status = 200
+  force = true
+
+# Handle all other routes through Next.js
+[[redirects]]
+  from = "/*"
+  to = "/.netlify/functions/nextjs-server"
+  status = 200
+  force = true
+
+[functions]
+  directory = ".netlify/functions"
+  included_files = ["agent_notes/vtable_study/vtable_docs/**"]

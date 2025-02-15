@@ -19,7 +19,7 @@ export async function GET(request: Request) {
 
   try {
     console.log('Checking account type:', address);
-    const connection = getConnection();
+    const connection = await getConnection();
     const pubkey = new PublicKey(address);
     const accountInfo = await connection.getAccountInfo(pubkey);
     

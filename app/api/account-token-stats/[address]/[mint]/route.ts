@@ -4,11 +4,12 @@ import { getConnection } from '@/lib/solana-connection';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { address: string; mint: string } }
+  context: { params: Promise<{ address: string; mint: string }> }
 ) {
   try {
     const connection = await getConnection();
-    const { address, mint } = params;
+    const params = await context.params;
+    const { address, mint } = await params;
 
     // Get SOL balance
     const balance = await connection.getBalance(new PublicKey(address));

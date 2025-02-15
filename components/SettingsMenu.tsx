@@ -1,9 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { useSettings, Theme, FontFamily, FontSize, RpcEndpoint } from '@/lib/settings';
+import { useSettings } from '@/lib/settings';
 import { updateRpcEndpoint } from '@/lib/solana-connection';
-import { opensvmRpcEndpoints } from '@/lib/opensvm-rpc';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,

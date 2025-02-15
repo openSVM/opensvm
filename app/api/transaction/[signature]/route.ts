@@ -30,7 +30,7 @@ export async function GET(
   try {
     // Get signature from params - properly awaited in Next.js 13+
     const params = await context.params;
-    const { signature } = params;
+    const { signature } = await params;
 
     if (!signature) {
       console.error('Transaction signature is missing');

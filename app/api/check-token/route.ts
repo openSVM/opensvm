@@ -19,7 +19,7 @@ export async function GET(request: Request) {
 
   try {
     console.log('Checking if address is token mint:', address);
-    const connection = getConnection();
+    const connection = await getConnection();
     const pubkey = new PublicKey(address);
     
     // First check if account exists and get its owner

@@ -1,5 +1,8 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { PublicKey } from '@solana/web3.js';
+import { getConnection } from './solana-connection';
+import { getMint } from '@solana/spl-token';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -48,10 +51,6 @@ export function isValidTransactionSignature(signature: string): boolean {
   return isValid;
 }
 
-import { PublicKey } from '@solana/web3.js';
-import { getConnection } from './solana-connection';
-import { getMint } from '@solana/spl-token';
-
 // Check if address is a token by verifying mint info
 export async function isTokenMint(address: string): Promise<boolean> {
   if (!isValidSolanaAddress(address)) {
@@ -61,7 +60,7 @@ export async function isTokenMint(address: string): Promise<boolean> {
 
   try {
     console.log('Checking if address is token mint:', address);
-    const connection = getConnection();
+    const connection = await getConnection();
     const pubkey = new PublicKey(address);
     
     // Try to get mint info - this will throw if not a valid mint

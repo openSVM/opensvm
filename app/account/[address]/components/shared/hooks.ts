@@ -144,6 +144,7 @@ export function useTransfers(address: string): UseTransfersResult {
       }
       fetchTransfers(0);
     }
+// eslint-disable-next-line react-hooks/exhaustive-deps
   }, [address]);
 
   const loadMore = () => {

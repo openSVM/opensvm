@@ -1,8 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { getTokenPrice } from '@/lib/solana';
 
 interface Memecoin {
   address: string;
@@ -54,28 +53,7 @@ const EXAMPLE_MEMECOINS: Memecoin[] = [
 
 export default function TrendingMemecoins() {
   const router = useRouter();
-  const [memecoins, setMemecoins] = useState<Memecoin[]>(EXAMPLE_MEMECOINS);
-
-  const fetchPrices = useCallback(async () => {
-    const updatedMemecoins = await Promise.all(
-      memecoins.map(async (coin) => {
-        const priceData = await getTokenPrice(coin.address);
-        const supply = coin.volume24h / (coin.price * Math.pow(10, coin.decimals));
-        return {
-          ...coin,
-          priceUsd: priceData.priceUsd,
-          change24h: priceData.priceChange24h || coin.change24h,
-          volume24h: priceData.volume24h || coin.volume24h,
-          marketCap: priceData.priceUsd ? priceData.priceUsd * supply : 0
-        };
-      })
-    );
-    setMemecoins(updatedMemecoins);
-  }, [memecoins]);
-
-  useEffect(() => {
-    fetchPrices();
-  }, [fetchPrices]);
+  const [memecoins] = useState<Memecoin[]>(EXAMPLE_MEMECOINS);
 
   const handleMemecoinClick = (address: string) => {
     router.push(`/token/${address}`);
@@ -105,10 +83,7 @@ export default function TrendingMemecoins() {
                 </span>
               </div>
               <div className="text-gray-700">
-                ${coin.priceUsd?.toLocaleString(undefined, {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 8
-                }) || (coin.price / Math.pow(10, coin.decimals)).toFixed(8)}
+                ${(coin.price / Math.pow(10, coin.decimals)).toFixed(8)}
               </div>
               <div className={`text-right ${coin.change24h >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                 {coin.change24h.toFixed(2)}%
@@ -125,4 +100,4 @@ export default function TrendingMemecoins() {
       </div>
     </div>
   );
-} 
+}

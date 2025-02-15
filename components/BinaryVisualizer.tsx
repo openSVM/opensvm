@@ -1,4 +1,5 @@
-import { createPlot } from 'lib/deepscatter/src/deepscatter.js';
+'use client';
+
 import { useEffect, useRef } from 'react';
 
 interface BinaryVisualizerProps {
@@ -12,47 +13,79 @@ export default function BinaryVisualizer({
   selectedInstruction,
   onInstructionSelect
 }: BinaryVisualizerProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const plotRef = useRef<any>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
-    if (!containerRef.current) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
 
-    // Initialize DeepScatter plot
-    const plot = createPlot({
-      canvas: containerRef.current,
-      width: containerRef.current.clientWidth,
-      height: containerRef.current.clientHeight,
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Set canvas size
+    const width = canvas.clientWidth;
+    const height = canvas.clientHeight;
+    canvas.width = width;
+    canvas.height = height;
+
+    // Calculate grid dimensions
+    const bytesPerRow = 32;
+    const cellSize = Math.min(
+      width / bytesPerRow,
+      height / Math.ceil(data.length / bytesPerRow)
+    );
+
+    // Clear canvas
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(0, 0, width, height);
+
+    // Draw bytes
+    data.forEach((byte, index) => {
+      const x = (index % bytesPerRow) * cellSize;
+      const y = Math.floor(index / bytesPerRow) * cellSize;
+
+      // Calculate color based on byte value
+      const intensity = Math.floor((byte / 255) * 255);
+      ctx.fillStyle = `rgb(${intensity}, ${intensity}, ${intensity})`;
+
+      // Draw cell
+      ctx.fillRect(x, y, cellSize - 1, cellSize - 1);
+
+      // Highlight selected instruction
+      if (index === selectedInstruction) {
+        ctx.strokeStyle = '#00ff00';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(x, y, cellSize - 1, cellSize - 1);
+      }
     });
 
-    plotRef.current = plot;
+    // Add click handler
+    const handleClick = (event: MouseEvent) => {
+      const rect = canvas.getBoundingClientRect();
+      const x = event.clientX - rect.left;
+      const y = event.clientY - rect.top;
 
-    // Convert binary data to points
-    const points = data.map((byte, offset) => ({
-      x: offset % 256,
-      y: Math.floor(offset / 256),
-      value: byte,
-      offset
-    }));
+      const col = Math.floor(x / cellSize);
+      const row = Math.floor(y / cellSize);
+      const offset = row * bytesPerRow + col;
 
-    plot.update(points);
+      if (offset < data.length && onInstructionSelect) {
+        onInstructionSelect(offset);
+      }
+    };
+
+    canvas.addEventListener('click', handleClick);
 
     return () => {
-      plot.destroy();
+      canvas.removeEventListener('click', handleClick);
     };
-  }, [data]);
-
-  useEffect(() => {
-    if (!plotRef.current || selectedInstruction === null || selectedInstruction === undefined) return;
-
-    // Highlight selected instruction
-    plotRef.current.highlight((d: any) => d.offset === selectedInstruction);
-  }, [selectedInstruction]);
+  }, [data, selectedInstruction, onInstructionSelect]);
 
   return (
-    <div 
-      ref={containerRef}
+    <canvas 
+      ref={canvasRef}
       style={{ width: '100%', height: '100%' }}
+      className="rounded-lg"
     />
   );
 }

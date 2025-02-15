@@ -5,17 +5,19 @@ import { useRouter } from 'next/navigation';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Search } from 'lucide-react';
-import { getConnection } from '@/lib/solana';
+import { getConnection, getRPCLatency } from '@/lib/solana';
 import { AIChatSidebar } from '@/components/ai/AIChatSidebar';
 import { RecentBlocks } from '@/components/RecentBlocks';
 import { TransactionsInBlock } from '@/components/TransactionsInBlock';
 import { NetworkResponseChart } from '@/components/NetworkResponseChart';
 
+type TransactionType = 'Success' | 'Failed';
+
 interface Block {
   slot: number;
   transactions?: {
     signature: string;
-    type: string;
+    type: TransactionType;
     timestamp: number | null;
   }[];
 }
@@ -39,6 +41,7 @@ export default function HomePage() {
   const [isAIChatOpen, setIsAIChatOpen] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(400);
   const [isResizing, setIsResizing] = useState(false);
+  const [networkData, setNetworkData] = useState<{ timestamp: number; successRate: number; latency: number; }[]>([]);
 
   useEffect(() => {
     let mounted = true;
@@ -47,6 +50,7 @@ export default function HomePage() {
       try {
         setIsLoading(true);
         const connection = await getConnection();
+        const latency = await getRPCLatency();
         
         // Get current slot and blocks in one batch
         const slot = await connection.getSlot();
@@ -68,13 +72,25 @@ export default function HomePage() {
 
         const tps = perfSamples[0] ? Math.round(perfSamples[0].numTransactions / perfSamples[0].samplePeriodSecs) : 0;
         
-        setStats({
+        const newStats = {
           epoch: epochInfo.epoch,
           epochProgress: (epochInfo.slotIndex / epochInfo.slotsInEpoch) * 100,
           blockHeight: epochInfo.absoluteSlot,
           activeValidators: validators.current.length + validators.delinquent.length,
           tps,
           successRate: 100,
+        };
+        
+        setStats(newStats);
+
+        // Update network data
+        setNetworkData(prev => {
+          const newData = [...prev, {
+            timestamp: Date.now(),
+            successRate: newStats.successRate,
+            latency
+          }];
+          return newData.slice(-30); // Keep last 30 data points
         });
       } catch (err) {
         console.error('Error fetching data:', err);
@@ -109,11 +125,11 @@ export default function HomePage() {
       });
       
       if (blockInfo) {
-        const blockWithTx = {
+        const blockWithTx: Block = {
           ...block,
           transactions: blockInfo.transactions.map(tx => ({
             signature: tx.transaction.signatures[0],
-            type: 'Transaction',
+            type: tx.meta?.err ? ('Failed' as const) : ('Success' as const),
             timestamp: blockInfo.blockTime
           }))
         };
@@ -239,8 +255,8 @@ export default function HomePage() {
           <div className="mt-6">
             <div className="bg-background border border-border rounded-lg p-6">
               <h2 className="text-lg font-semibold text-foreground mb-4">Network Performance</h2>
-              <div className="h-[360px] md:h-[340px]">
-                <NetworkResponseChart />
+              <div className="h-[300px]">
+                <NetworkResponseChart data={networkData} />
               </div>
             </div>
           </div>

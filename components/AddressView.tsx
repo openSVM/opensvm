@@ -1,12 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { type TransactionInfo, type AccountData } from '@/lib/solana';
+import { type BaseTransactionInfo, type AccountData } from '@/lib/solana';
 import TransactionTable from './TransactionTable';
 import AccountOverview from './AccountOverview';
 
 interface AddressViewProps {
-  transactions: TransactionInfo[];
+  transactions: BaseTransactionInfo[];
   accountData: AccountData;
   address: string;
 }

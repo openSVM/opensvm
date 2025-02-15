@@ -2,19 +2,23 @@
 
 import { useState, useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
-
-interface TokenAccount {
-  mint: string;
-  balance: number;
-}
+import { type TokenAccount } from '@/lib/solana';
 
 interface Props {
   address: string;
   solBalance: number;
-  tokenBalances: TokenAccount[];
+  tokenAccounts: TokenAccount[];
+  isSystemProgram: boolean;
+  parsedOwner: string;
 }
 
-export default function AccountOverview({ address, solBalance, tokenBalances }: Props) {
+export default function AccountOverview({ 
+  address, 
+  solBalance, 
+  tokenAccounts,
+  isSystemProgram,
+  parsedOwner 
+}: Props) {
   const [accountStats, setAccountStats] = useState<{
     totalTransactions: string | number | null;
     tokenTransfers: number | null;
@@ -60,25 +64,25 @@ export default function AccountOverview({ address, solBalance, tokenBalances }: 
           <div>
             <div className="text-sm text-neutral-400">Token Balance</div>
             <div className="flex items-center gap-2">
-              <div className="text-lg">{tokenBalances.length} Tokens</div>
+              <div className="text-lg">{tokenAccounts.length} Tokens</div>
               <div className="text-sm text-neutral-400">($0.00)</div>
             </div>
-            {tokenBalances.length > 0 && (
+            {tokenAccounts.length > 0 && (
               <div className="mt-2">
                 <button className="w-full flex items-center justify-between bg-neutral-900 rounded-lg p-3 hover:bg-neutral-900/80">
                   <div className="text-sm font-mono">
-                    {tokenBalances[0].mint.slice(0, 8)}...
+                    {tokenAccounts[0].mint.slice(0, 8)}...
                   </div>
                   <div className="text-sm">
-                    {tokenBalances[0].balance.toLocaleString()}
+                    {tokenAccounts[0].uiAmount.toLocaleString()}
                   </div>
                   <div className="text-xs text-neutral-400">
-                    t4gQ...
+                    {tokenAccounts[0].symbol || 'Unknown'}
                   </div>
                 </button>
-                {tokenBalances.length > 1 && (
+                {tokenAccounts.length > 1 && (
                   <div className="text-xs text-neutral-400 mt-2 text-center">
-                    + {tokenBalances.length - 1} more tokens
+                    + {tokenAccounts.length - 1} more tokens
                   </div>
                 )}
               </div>
