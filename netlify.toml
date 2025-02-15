@@ -28,12 +28,6 @@
   force = true
 
 [[redirects]]
-  from = "/agent_notes/vtable_study/vtable_docs/*"
-  to = "/agent_notes/vtable_study/vtable_docs/:splat"
-  status = 200
-  force = true
-
-[[redirects]]
   from = "/*"
   to = "/.netlify/functions/nextjs-server"
   status = 200
@@ -42,7 +36,6 @@
   directory = ".netlify/functions"
   node_bundler = "esbuild"
   external_node_modules = ["@next/env"]
-  included_files = ["agent_notes/vtable_study/vtable_docs/**"]
 
 [build.processing]
   skip_processing = false

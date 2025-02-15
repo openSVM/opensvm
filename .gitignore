@@ -1,5 +1,7 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 vtable_docs/
+agent_notes/
+
 # dependencies
 /node_modules
 /.pnp
