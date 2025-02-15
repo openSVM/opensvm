@@ -20,7 +20,13 @@
     buildEvent = "onPreBuild"
     include = ["OPENSVM_RPC_LIST"]
 
-# Handle static assets first
+# Handle root path explicitly
+[[redirects]]
+  from = "/"
+  to = "/.netlify/functions/nextjs-server/index"
+  status = 200
+
+# Handle static assets
 [[redirects]]
   from = "/_next/static/*"
   to = "/_next/static/:splat"
@@ -40,7 +46,7 @@
   status = 200
   force = true
 
-# Handle all other routes through Next.js, including root
+# Handle all other routes through Next.js
 [[redirects]]
   from = "/*"
   to = "/.netlify/functions/nextjs-server"
