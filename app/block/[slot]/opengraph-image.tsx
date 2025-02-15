@@ -1,4 +1,4 @@
-import { ImageResponse } from 'next/og';
+import { ImageResponse } from 'next/server';
 import { getConnection } from '@/lib/solana';
 import { formatNumber } from '@/lib/utils';
 

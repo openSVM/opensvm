@@ -59,7 +59,7 @@
     "dotenv": "^16.4.7",
     "encoding": "^0.1.13",
     "eventsource-parser": "^3.0.0",
-    "framer-motion": "^11.18.2",
+    
     "geojson-flatten": "^1.1.1",
     "glsl-easings": "^1.0.0",
     "glsl-fast-gaussian-blur": "^1.0.2",
@@ -74,7 +74,7 @@
     "lucide-react": "^0.294.0",
     "minimist": "^1.2.8",
     "netlify-plugin-inline-functions-env": "^1.0.9",
-    "next": "^15.1.6",
+    "next": "^13.4.24",
     "next-plausible": "^3.12.4",
     "next-themes": "^0.4.4",
     "rbush-3d": "^0.0.4",

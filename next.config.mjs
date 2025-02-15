@@ -8,9 +8,7 @@ const nextConfig = {
   },
   experimental: {
     optimizeCss: true,
-    serverActions: {
-      bodySizeLimit: '2mb'
-    },
+    serverActions: true,
     outputFileTracingRoot: process.cwd(),
     outputFileTracingExcludes: {
       '*': [
@@ -20,7 +18,7 @@ const nextConfig = {
       ],
     },
   },
-  serverExternalPackages: ['@solana/web3.js'],
+  
   images: {
     domains: ['raw.githubusercontent.com', 'arweave.net', 'www.arweave.net'],
     remotePatterns: [
@@ -30,7 +28,7 @@ const nextConfig = {
     ],
   },
   reactStrictMode: true,
-  output: 'standalone',
+  
   webpack: (config, { isServer }) => {
     // Handle ES modules
     config.experiments = { ...config.experiments, topLevelAwait: true };
