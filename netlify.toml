@@ -1,0 +1,43 @@
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+[build.environment]
+  NEXT_USE_NETLIFY_EDGE = "true"
+  NODE_VERSION = "20"
+
+# Ensure the docs directory is copied to the build output
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+# Copy additional files needed for docs
+[[plugins]]
+  package = "netlify-plugin-copy-files"
+  [plugins.inputs]
+    source = "agent_notes/vtable_study/vtable_docs"
+    destination = ".next/agent_notes/vtable_study/vtable_docs"
+
+# Handle environment variables for SVM RPC
+[[plugins]]
+  package = "netlify-plugin-inline-functions-env"
+  [plugins.inputs]
+    include = ["OPENSVM_RPC_LIST", "OPENSVM_RPC_LIST_2"]
+
+# Handle Next.js routing
+[[redirects]]
+  from = "/*"
+  to = "/_next/static/:splat"
+  status = 200
+  force = true
+  conditions = {Path = "/_next/static/*"}
+
+[[redirects]]
+  from = "/*"
+  to = "/404"
+  status = 404
+
+# Handle client-side routing
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
