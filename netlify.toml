@@ -8,12 +8,14 @@
   NEXT_USE_NETLIFY_EDGE = "true"
   NODE_VERSION = "20"
   NEXT_TELEMETRY_DISABLED = "1"
+  NEXT_PRIVATE_TARGET = "server"
 
 # Handle Next.js
 [[plugins]]
   package = "@netlify/plugin-nextjs"
   [plugins.inputs]
     useServerBuild = true
+    experimentalPublicDirectory = true
 
 # Handle environment variables for SVM RPC
 [[plugins]]
