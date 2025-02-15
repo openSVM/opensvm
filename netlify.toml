@@ -20,13 +20,7 @@
     buildEvent = "onPreBuild"
     include = ["OPENSVM_RPC_LIST"]
 
-# Handle root path explicitly
-[[redirects]]
-  from = "/"
-  to = "/.netlify/functions/nextjs-server/index"
-  status = 200
-
-# Handle static assets
+# Handle static assets first
 [[redirects]]
   from = "/_next/static/*"
   to = "/_next/static/:splat"
@@ -46,7 +40,7 @@
   status = 200
   force = true
 
-# Handle all other routes through Next.js
+# Handle all routes through Next.js
 [[redirects]]
   from = "/*"
   to = "/.netlify/functions/nextjs-server"
@@ -58,3 +52,14 @@
 
 [build.processing]
   skip_processing = false
+
+[build.processing.css]
+  bundle = true
+  minify = true
+
+[build.processing.js]
+  bundle = true
+  minify = true
+
+[build.processing.html]
+  pretty_urls = true
