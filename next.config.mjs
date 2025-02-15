@@ -77,8 +77,10 @@ const nextConfig = {
     ]
   },
   output: 'standalone',
+  generateBuildId: async () => 'build',
   generateEtags: false,
-  trailingSlash: false,
+  distDir: '.next',
+  cleanDistDir: true,
 };
 
 export default nextConfig;
