@@ -19,7 +19,7 @@
   package = "netlify-plugin-inline-functions-env"
   [plugins.inputs]
     buildEvent = "onPreBuild"
-    include = ["OPENSVM_RPC_LIST"]
+    include = ["OPENSVM_RPC_LIST", "OPENSVM_RPC_LIST_2"]
 
 # Handle static assets
 [[redirects]]
