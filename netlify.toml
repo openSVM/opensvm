@@ -13,8 +13,6 @@
 # Handle Next.js
 [[plugins]]
   package = "@netlify/plugin-nextjs"
-  [plugins.inputs]
-    useServerBuild = true
 
 # Handle environment variables for SVM RPC
 [[plugins]]
