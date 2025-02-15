@@ -40,14 +40,14 @@
 # Handle API routes
 [[redirects]]
   from = "/api/*"
-  to = "/.netlify/functions/nextjs-server/api/:splat"
+  to = "/.netlify/edge-functions/api/:splat"
   status = 200
   force = true
 
-# Handle all routes through Next.js
+# Handle all routes through Next.js Edge Functions
 [[redirects]]
   from = "/*"
-  to = "/.netlify/functions/nextjs-server"
+  to = "/.netlify/edge-functions/:splat"
   status = 200
 
 [functions]
@@ -69,4 +69,5 @@
   pretty_urls = true
 
 [build.edge_functions]
+  handler = "handler.ts"
   included_files = ["agent_notes/vtable_study/vtable_docs/**"]
