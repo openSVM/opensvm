@@ -1,6 +1,6 @@
 [build]
-  command = "npm run build"
-  publish = ".next"
+  command = "npm run build && cp public/index.html .next/standalone/"
+  publish = ".next/standalone"
   functions = ".netlify/functions"
   ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF ."
 
@@ -23,7 +23,7 @@
     buildEvent = "onPreBuild"
     include = ["OPENSVM_RPC_LIST"]
 
-# Handle static assets first
+# Handle static assets
 [[redirects]]
   from = "/_next/static/*"
   to = "/_next/static/:splat"
@@ -39,7 +39,7 @@
 # Handle root path
 [[redirects]]
   from = "/"
-  to = "/.netlify/functions/nextjs-server"
+  to = "/index.html"
   status = 200
   force = true
 
