@@ -3,7 +3,7 @@ import path from 'path';
 import Link from 'next/link';
 
 export default async function DocsPage() {
-  const docsDir = path.join(process.cwd(), 'vtable_docs');
+  const docsDir = path.join(process.cwd(), 'agent_notes/vtable_study/vtable_docs');
   const files = await fs.readdir(docsDir);
   const mdFiles = files.filter(file => file.endsWith('.md'));
 

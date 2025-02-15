@@ -1,19 +1,19 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { getBlockDetails } from '@/lib/solana';
+import { getBlockDetails, type BlockDetails as SolanaBlockDetails } from '@/lib/solana';
 
-interface BlockDetails {
+interface DisplayBlockDetails {
   slot: number;
   timestamp: number | null;
   blockhash: string;
   parentSlot: number;
-  transactions: number;
+  transactionCount: number;
   previousBlockhash: string;
 }
 
 export default function BlockDetailsView({ slot }: { slot: string }) {
-  const [block, setBlock] = useState<BlockDetails | null>(null);
+  const [block, setBlock] = useState<DisplayBlockDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -22,7 +22,14 @@ export default function BlockDetailsView({ slot }: { slot: string }) {
       try {
         const blockDetails = await getBlockDetails(parseInt(slot));
         if (blockDetails) {
-          setBlock(blockDetails);
+          setBlock({
+            slot: blockDetails.slot,
+            timestamp: blockDetails.blockTime,
+            blockhash: blockDetails.blockhash,
+            parentSlot: blockDetails.parentSlot,
+            transactionCount: blockDetails.transactionCount,
+            previousBlockhash: blockDetails.previousBlockhash
+          });
         } else {
           setError('Block not found');
         }
@@ -90,10 +97,10 @@ export default function BlockDetailsView({ slot }: { slot: string }) {
 
           <div className="rounded-lg border bg-card p-6">
             <div className="text-sm text-muted-foreground mb-2">Transactions</div>
-            <div className="font-mono">{block.transactions.toLocaleString()}</div>
+            <div className="font-mono">{block.transactionCount.toLocaleString()}</div>
           </div>
         </div>
       </div>
     </main>
   );
-} 
+}

@@ -2,7 +2,7 @@ import { AgentCapability, Tool, CapabilityType } from '../types';
 import { TokenEstimator } from '../utils/token-estimator';
 
 export class TokenEstimationCapability implements AgentCapability {
-  type: CapabilityType = 'utility';
+  type: CapabilityType = 'general';
 
   tools: Tool[] = [
     {

@@ -8,10 +8,6 @@ import AutocompleteSearchBar from '@/components/AutocompleteSearchBar';
 import { Select } from '@/components/ui/select';
 import { sanitizeSearchQuery, formatNumber, isValidSolanaAddress, isValidTransactionSignature } from '@/lib/utils';
 
-interface SearchPageProps {
-  params: Record<string, string>;
-}
-
 interface SearchResult {
   address: string;
   balance?: number;
@@ -360,9 +356,7 @@ function SearchResults() {
   );
 }
 
-export default function SearchPage({
-  params,
-}: SearchPageProps) {
+export default function SearchPage() {
   return (
     <Suspense
       fallback={

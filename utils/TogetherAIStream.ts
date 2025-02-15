@@ -1,8 +1,4 @@
-import {
-  createParser,
-  ParsedEvent,
-  ReconnectInterval,
-} from "eventsource-parser";
+import { createParser } from "eventsource-parser";
 
 export type ChatGPTAgent = "user" | "system";
 
@@ -14,18 +10,8 @@ export interface ChatGPTMessage {
 export interface TogetherAIStreamPayload {
   model: string;
   messages: ChatGPTMessage[];
-
   stream: boolean;
 }
-
-// TODO: Add back the Together TypeScript SDK with Helicone
-// const together = new Together({
-//   apiKey: process.env["TOGETHER_API_KEY"],
-//   baseURL: "https://together.helicone.ai/v1",
-//   defaultHeaders: {
-//     "Helicone-Auth": `Bearer ${process.env.HELICONE_API_KEY}`,
-//   },
-// });
 
 export async function TogetherAIStream(payload: TogetherAIStreamPayload) {
   const encoder = new TextEncoder();
@@ -43,14 +29,6 @@ export async function TogetherAIStream(payload: TogetherAIStreamPayload) {
 
   const readableStream = new ReadableStream({
     async start(controller) {
-      // callback
-      const onParse = (event: ParsedEvent | ReconnectInterval) => {
-        if (event.type === "event") {
-          const data = event.data;
-          controller.enqueue(encoder.encode(data));
-        }
-      };
-
       // optimistic error handling
       if (res.status !== 200) {
         const data = {
@@ -59,7 +37,7 @@ export async function TogetherAIStream(payload: TogetherAIStreamPayload) {
           body: await res.text(),
         };
         console.log(
-          `Error: recieved non-200 status code, ${JSON.stringify(data)}`,
+          `Error: received non-200 status code, ${JSON.stringify(data)}`,
         );
         controller.close();
         return;
@@ -67,7 +45,12 @@ export async function TogetherAIStream(payload: TogetherAIStreamPayload) {
 
       // stream response (SSE) from OpenAI may be fragmented into multiple chunks
       // this ensures we properly read chunks and invoke an event for each SSE event stream
-      const parser = createParser(onParse);
+      const parser = createParser({
+        onEvent(event) {
+          controller.enqueue(encoder.encode(event.data));
+        },
+      });
+
       // https://web.dev/streams/#asynchronous-iteration
       for await (const chunk of res.body as any) {
         parser.feed(decoder.decode(chunk));
@@ -91,7 +74,7 @@ export async function TogetherAIStream(payload: TogetherAIStreamPayload) {
           // this is a prefix character (i.e., "\n\n"), do nothing
           return;
         }
-        // stream transformed JSON resposne as SSE
+        // stream transformed JSON response as SSE
         const payload = { text: text };
         // https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#event_stream_format
         controller.enqueue(

@@ -1,13 +1,13 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { type TransactionInfo } from '@/lib/solana';
+import { type BaseTransactionInfo } from '@/lib/solana';
 import Link from 'next/link';
 import * as VTable from '@visactor/vtable';
 import type { ListTableConstructorOptions, ColumnDefine } from '@visactor/vtable';
 
 interface TransactionTableProps {
-  transactions: TransactionInfo[];
+  transactions: BaseTransactionInfo[];
   isLoading: boolean;
   hasMore: boolean;
   onLoadMore: () => void;

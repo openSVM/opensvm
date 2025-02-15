@@ -1,8 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { Line } from 'react-chartjs-2';
-import { getRPCLatency } from '@/lib/solana';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -24,39 +22,19 @@ ChartJS.register(
   Legend
 );
 
-const MAX_DATA_POINTS = 30;
+interface NetworkResponseData {
+  timestamp: number;
+  successRate: number;
+  latency: number;
+}
 
-export function NetworkResponseChart() {
-  const [latencyData, setLatencyData] = useState<number[]>([]);
-  const [labels, setLabels] = useState<string[]>([]);
+interface NetworkResponseChartProps {
+  data: NetworkResponseData[];
+}
 
-  useEffect(() => {
-    async function measureLatency() {
-      const latency = await getRPCLatency();
-      const now = new Date();
-      const timeStr = now.toLocaleTimeString();
-
-      setLatencyData(prev => {
-        const newData = [...prev, latency];
-        if (newData.length > MAX_DATA_POINTS) {
-          newData.shift();
-        }
-        return newData;
-      });
-
-      setLabels(prev => {
-        const newLabels = [...prev, timeStr];
-        if (newLabels.length > MAX_DATA_POINTS) {
-          newLabels.shift();
-        }
-        return newLabels;
-      });
-    }
-
-    measureLatency();
-    const interval = setInterval(measureLatency, 2000);
-    return () => clearInterval(interval);
-  }, []);
+export function NetworkResponseChart({ data }: NetworkResponseChartProps) {
+  const labels = data.map(d => new Date(d.timestamp).toLocaleTimeString());
+  const latencyData = data.map(d => d.latency);
 
   return (
     <div className="rounded-lg bg-black/20 backdrop-blur-sm p-6">
@@ -101,4 +79,4 @@ export function NetworkResponseChart() {
       </div>
     </div>
   );
-} 
+}

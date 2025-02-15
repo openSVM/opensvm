@@ -20,6 +20,16 @@ type TokenTransfers = {
   total_volume: number;
 }
 
+// Background refresh function
+async function refreshTokenStats(account: string, mint: string, cacheKey: string) {
+  try {
+    const stats = await getTokenStats(account, mint);
+    memoryCache.set(cacheKey, stats, CACHE_TTL);
+  } catch (error) {
+    console.error('Error refreshing token stats:', error);
+  }
+}
+
 async function getTokenStats(account: string, mint: string): Promise<TokenStats> {
   const cacheKey = `token-stats-${account}-${mint}`;
   const cachedData = memoryCache.get<TokenStats>(cacheKey);
@@ -126,12 +136,12 @@ async function getTokenStats(account: string, mint: string): Promise<TokenStats>
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { account: string; mint: string } }
+  context: { params: Promise<{ account: string; mint: string }> }
 ) {
-  const account = await Promise.resolve(params.account);
-  const mint = await Promise.resolve(params.mint);
-
   try {
+    const params = await context.params;
+    const { account, mint } = await params;
+
     // Add overall API timeout
     const timeoutPromise = new Promise((_, reject) => {
       setTimeout(() => reject(new Error('API timeout')), API_TIMEOUT);
@@ -173,15 +183,5 @@ export async function GET(
       { error: 'Failed to fetch token stats' },
       { status: 500 }
     );
-  }
-}
-
-// Background refresh function
-async function refreshTokenStats(account: string, mint: string, cacheKey: string) {
-  try {
-    const stats = await getTokenStats(account, mint);
-    memoryCache.set(cacheKey, stats, CACHE_TTL);
-  } catch (error) {
-    console.error('Error refreshing token stats:', error);
   }
 }

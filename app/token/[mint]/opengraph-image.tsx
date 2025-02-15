@@ -14,8 +14,8 @@ export default async function Image({ params }: { params: { mint: string } }) {
   try {
     const token = await getTokenInfo(params.mint);
     
-    const title = token?.metadata?.name || 'Token Overview';
-    const description = token?.metadata?.description || 'Solana Token Explorer';
+    const title = token?.name || 'Token Overview';
+    const description = `Supply: ${formatNumber(token?.totalSupply || 0)} • Decimals: ${token?.decimals || 0}`;
 
     return new ImageResponse(
       (
@@ -105,7 +105,7 @@ export default async function Image({ params }: { params: { mint: string } }) {
                   textAlign: 'center',
                 }}
               >
-                Supply: {formatNumber(token.supply)} • Holders: {formatNumber(token.holders)}
+                {description}
               </div>
             )}
             <div
@@ -116,7 +116,7 @@ export default async function Image({ params }: { params: { mint: string } }) {
                 maxWidth: '600px',
               }}
             >
-              {description}
+              {token?.symbol || 'Unknown Token'}
             </div>
             {token && (
               <div
@@ -164,4 +164,4 @@ export default async function Image({ params }: { params: { mint: string } }) {
       status: 500,
     });
   }
-} 
+}

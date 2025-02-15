@@ -1,10 +1,15 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getConnection } from '@/lib/solana';
 
-export async function GET(request: Request, { params }: { params: { slot: string } }) {
+export async function GET(
+  request: NextRequest,
+  context: { params: Promise<{ slot: string }> }
+) {
   try {
+    const params = await context.params;
+    const { slot } = await params;
     const conn = await getConnection();
-    const slot = request.url.split('/').pop();
+
     if (!slot) {
       return NextResponse.json(
         { error: 'Slot parameter is required' },
@@ -40,4 +45,4 @@ export async function GET(request: Request, { params }: { params: { slot: string
       { status: 500 }
     );
   }
-} 
+}

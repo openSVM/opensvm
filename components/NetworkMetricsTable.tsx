@@ -137,9 +137,11 @@ export function NetworkMetricsTable({ endpoint = 'https://api.mainnet-beta.solan
   });
 
   // Draw visualizations
+// eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     Object.keys(filters).forEach(field => {
       const canvas = cellRefs.current[`latest-${field}`];
+// sourcery skip: use-braces
       if (!canvas) return;
 
       const ctx = canvas.getContext('2d');
@@ -312,6 +314,7 @@ export function NetworkMetricsTable({ endpoint = 'https://api.mainnet-beta.solan
         }
       }
     });
+// eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filteredMetrics, theme]);
 
   const handleSort = (field: keyof BlockMetrics) => {

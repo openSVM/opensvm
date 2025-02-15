@@ -12,10 +12,10 @@ const testData = [
 ];
 
 const columns = [
-  { key: 'id', header: 'ID', width: 80, sortable: true },
-  { key: 'name', header: 'Name', width: 200, sortable: true },
-  { key: 'age', header: 'Age', width: 100, sortable: true },
-  { key: 'city', header: 'City', width: 150, sortable: true },
+  { field: 'id', title: 'ID', width: 80, sortable: true },
+  { field: 'name', title: 'Name', width: 200, sortable: true },
+  { field: 'age', title: 'Age', width: 100, sortable: true },
+  { field: 'city', title: 'City', width: 150, sortable: true },
 ];
 
 export default function TestPage() {

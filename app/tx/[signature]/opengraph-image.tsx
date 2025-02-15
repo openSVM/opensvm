@@ -13,9 +13,9 @@ export default async function Image({ params }: { params: { signature: string } 
   try {
     const tx = await getTransactionDetails(params.signature);
     
-    const title = tx ? `Transaction ${tx.status}` : 'Transaction Details';
+    const title = tx ? `Transaction ${tx.success ? 'Success' : 'Failed'}` : 'Transaction Details';
     const description = tx 
-      ? `${tx.type} - ${tx.amount.toFixed(4)} SOL`
+      ? `${tx.type} • Slot ${tx.slot}`
       : 'Solana Transaction Explorer';
 
     return new ImageResponse(
@@ -101,7 +101,7 @@ export default async function Image({ params }: { params: { signature: string } 
               <div
                 style={{
                   fontSize: '24px',
-                  color: '#00ffbd',
+                  color: tx.success ? '#00ffbd' : '#ff4d4d',
                   marginBottom: '20px',
                   textAlign: 'center',
                 }}
@@ -165,4 +165,4 @@ export default async function Image({ params }: { params: { signature: string } 
       status: 500,
     });
   }
-} 
+}
