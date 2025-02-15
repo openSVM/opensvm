@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { PublicKey } from '@solana/web3.js';
 import { getMint } from '@solana/spl-token';
