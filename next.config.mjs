@@ -76,8 +76,8 @@ const nextConfig = {
       },
     ]
   },
-  // Add output configuration to include static files
   output: 'standalone',
+  generateEtags: false,
   trailingSlash: false,
 };
 

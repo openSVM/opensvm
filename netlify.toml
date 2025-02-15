@@ -1,6 +1,6 @@
 [build]
   command = "npm run build"
-  publish = ".next"
+  publish = ".next/standalone"
   functions = ".netlify/functions"
   ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF ."
 
@@ -8,10 +8,13 @@
   NEXT_USE_NETLIFY_EDGE = "true"
   NODE_VERSION = "20"
   NEXT_TELEMETRY_DISABLED = "1"
+  NEXT_PRIVATE_TARGET = "server"
 
 # Handle Next.js
 [[plugins]]
   package = "@netlify/plugin-nextjs"
+  [plugins.inputs]
+    useServerBuild = true
 
 # Handle environment variables for SVM RPC
 [[plugins]]
@@ -41,6 +44,7 @@
 
 [functions]
   directory = ".netlify/functions"
+  node_bundler = "esbuild"
   included_files = ["agent_notes/vtable_study/vtable_docs/**"]
 
 [build.processing]
