@@ -9,16 +9,23 @@
   NODE_VERSION = "20"
   NEXT_TELEMETRY_DISABLED = "1"
 
+# Handle Next.js
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
 # Handle environment variables for SVM RPC
 [[plugins]]
   package = "netlify-plugin-inline-functions-env"
   [plugins.inputs]
     buildEvent = "onPreBuild"
-    include = ["OPENSVM_RPC_LIST", "OPENSVM_RPC_LIST_2"]
+    include = ["OPENSVM_RPC_LIST"]
 
-# Handle Next.js
-[[plugins]]
-  package = "@netlify/plugin-nextjs"
+# Handle root path and Next.js routes
+[[redirects]]
+  from = "/"
+  to = "/.netlify/functions/nextjs-server"
+  status = 200
+  force = true
 
 # Handle static assets
 [[redirects]]
