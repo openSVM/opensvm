@@ -6,16 +6,9 @@
   NEXT_USE_NETLIFY_EDGE = "true"
   NODE_VERSION = "20"
 
-# Ensure the docs directory is copied to the build output
+# Handle Next.js
 [[plugins]]
   package = "@netlify/plugin-nextjs"
-
-# Copy additional files needed for docs
-[[plugins]]
-  package = "netlify-plugin-copy-files"
-  [plugins.inputs]
-    source = "agent_notes/vtable_study/vtable_docs"
-    destination = ".next/agent_notes/vtable_study/vtable_docs"
 
 # Handle environment variables for SVM RPC
 [[plugins]]

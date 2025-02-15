@@ -73,7 +73,6 @@
     "lru-cache": "^11.0.2",
     "lucide-react": "^0.294.0",
     "minimist": "^1.2.8",
-    "netlify-plugin-copy-files": "^1.1.1",
     "netlify-plugin-inline-functions-env": "^1.0.9",
     "next": "^15.1.6",
     "next-plausible": "^3.12.4",
