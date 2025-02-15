@@ -12,6 +12,8 @@
 # Handle Next.js
 [[plugins]]
   package = "@netlify/plugin-nextjs"
+  [plugins.inputs]
+    useServerBuild = true
 
 # Handle environment variables for SVM RPC
 [[plugins]]
@@ -63,3 +65,6 @@
 
 [build.processing.html]
   pretty_urls = true
+
+[build.edge_functions]
+  included_files = ["agent_notes/vtable_study/vtable_docs/**"]
