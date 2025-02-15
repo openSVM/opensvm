@@ -1,6 +1,6 @@
 [build]
   command = "npm run build"
-  publish = ".next/standalone"
+  publish = ".next"
   functions = ".netlify/functions"
   ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF ."
 
@@ -23,7 +23,7 @@
     buildEvent = "onPreBuild"
     include = ["OPENSVM_RPC_LIST"]
 
-# Handle static assets
+# Handle static assets first
 [[redirects]]
   from = "/_next/static/*"
   to = "/_next/static/:splat"
@@ -36,7 +36,14 @@
   status = 200
   force = true
 
-# Handle all routes through Next.js
+# Handle root path
+[[redirects]]
+  from = "/"
+  to = "/.netlify/functions/nextjs-server"
+  status = 200
+  force = true
+
+# Handle all other routes
 [[redirects]]
   from = "/*"
   to = "/.netlify/functions/nextjs-server"
@@ -45,6 +52,7 @@
 [functions]
   directory = ".netlify/functions"
   node_bundler = "esbuild"
+  external_node_modules = ["@next/env"]
   included_files = ["agent_notes/vtable_study/vtable_docs/**"]
 
 [build.processing]
