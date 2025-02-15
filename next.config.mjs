@@ -21,6 +21,8 @@ const nextConfig = {
       },
     ],
   },
+  reactStrictMode: true,
+  output: 'standalone',
   webpack: (config, { isServer }) => {
     // Handle ES modules
     config.experiments = { ...config.experiments, topLevelAwait: true };
@@ -57,7 +59,6 @@ const nextConfig = {
   },
   poweredByHeader: false,
   compress: true,
-  reactStrictMode: true,
   onDemandEntries: {
     // period (in ms) where the server will keep pages in the buffer
     maxInactiveAge: 30 * 1000,
@@ -76,7 +77,6 @@ const nextConfig = {
       },
     ]
   },
-  output: 'standalone',
   generateBuildId: async () => 'build',
   generateEtags: false,
   distDir: '.next',
