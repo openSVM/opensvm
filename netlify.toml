@@ -1,10 +1,11 @@
 [build]
   command = "npm run build"
-  publish = ".next"
+  publish = ".next/standalone"
 
 [build.environment]
   NEXT_USE_NETLIFY_EDGE = "true"
   NODE_VERSION = "20"
+  NEXT_TELEMETRY_DISABLED = "1"
 
 # Handle Next.js
 [[plugins]]
@@ -16,21 +17,25 @@
   [plugins.inputs]
     include = ["OPENSVM_RPC_LIST", "OPENSVM_RPC_LIST_2"]
 
-# Handle Next.js routing
+# Handle static assets
 [[redirects]]
-  from = "/*"
+  from = "/_next/static/*"
   to = "/_next/static/:splat"
   status = 200
-  force = true
-  conditions = {Path = "/_next/static/*"}
 
 [[redirects]]
-  from = "/*"
-  to = "/404"
-  status = 404
+  from = "/agent_notes/*"
+  to = "/agent_notes/:splat"
+  status = 200
 
-# Handle client-side routing
+# Handle API routes
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/nextjs-server/api/:splat"
+  status = 200
+
+# Handle 404
 [[redirects]]
   from = "/*"
-  to = "/index.html"
+  to = "/.netlify/functions/nextjs-server"
   status = 200
