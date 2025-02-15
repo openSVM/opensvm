@@ -1,7 +1,4 @@
 [build]
-  command = "npm run build && cp -r public/* .next/standalone/"
-  publish = ".next/standalone"
-  functions = ".netlify/functions"
   ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF ."
 
 [build.environment]
