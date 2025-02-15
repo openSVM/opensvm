@@ -1,6 +1,7 @@
 [build]
   command = "npm run build"
   publish = ".next/standalone"
+  functions = ".netlify/functions"
   ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF ."
 
 [build.environment]
@@ -11,12 +12,15 @@
 # Handle Next.js
 [[plugins]]
   package = "@netlify/plugin-nextjs"
+  [plugins.inputs]
+    generateStaticRoutes = true
 
 # Handle environment variables for SVM RPC
 [[plugins]]
   package = "netlify-plugin-inline-functions-env"
   [plugins.inputs]
     include = ["OPENSVM_RPC_LIST", "OPENSVM_RPC_LIST_2"]
+    targetDirectory = ".netlify/functions"
 
 # Handle static assets
 [[redirects]]
@@ -46,4 +50,5 @@
   force = true
 
 [functions]
+  directory = ".netlify/functions"
   included_files = ["agent_notes/vtable_study/vtable_docs/**"]
