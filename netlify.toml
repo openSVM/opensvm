@@ -20,14 +20,7 @@
     buildEvent = "onPreBuild"
     include = ["OPENSVM_RPC_LIST"]
 
-# Handle root path and Next.js routes
-[[redirects]]
-  from = "/"
-  to = "/.netlify/functions/nextjs-server"
-  status = 200
-  force = true
-
-# Handle static assets
+# Handle static assets first
 [[redirects]]
   from = "/_next/static/*"
   to = "/_next/static/:splat"
@@ -47,13 +40,15 @@
   status = 200
   force = true
 
-# Handle all other routes through Next.js
+# Handle all other routes through Next.js, including root
 [[redirects]]
   from = "/*"
   to = "/.netlify/functions/nextjs-server"
   status = 200
-  force = true
 
 [functions]
   directory = ".netlify/functions"
   included_files = ["agent_notes/vtable_study/vtable_docs/**"]
+
+[build.processing]
+  skip_processing = false

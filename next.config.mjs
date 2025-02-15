@@ -78,6 +78,7 @@ const nextConfig = {
   },
   // Add output configuration to include static files
   output: 'standalone',
+  trailingSlash: false,
 };
 
 export default nextConfig;
