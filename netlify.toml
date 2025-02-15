@@ -2,25 +2,21 @@
   command = "npm run build"
   publish = ".next"
   functions = ".netlify/functions"
-  ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF ."
 
 [build.environment]
-  NEXT_USE_NETLIFY_EDGE = "true"
   NODE_VERSION = "20"
   NEXT_TELEMETRY_DISABLED = "1"
-  NEXT_PRIVATE_TARGET = "server"
 
-# Handle Next.js
 [[plugins]]
   package = "@netlify/plugin-nextjs"
 
-# Handle environment variables for SVM RPC
 [[plugins]]
   package = "netlify-plugin-inline-functions-env"
   [plugins.inputs]
     buildEvent = "onPreBuild"
     include = ["OPENSVM_RPC_LIST", "OPENSVM_RPC_LIST_2"]
 
+# Next.js specific routing
 [[redirects]]
   from = "/_next/static/*"
   to = "/_next/static/:splat"
@@ -28,9 +24,17 @@
   force = true
 
 [[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/nextjs-server"
+  status = 200
+
+[[redirects]]
   from = "/*"
   to = "/.netlify/functions/nextjs-server"
   status = 200
+  force = false
+  [conditions]
+    NEL = "true"
 
 [functions]
   directory = ".netlify/functions"
