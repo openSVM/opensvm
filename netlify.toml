@@ -1,6 +1,7 @@
 [build]
   command = "npm run build"
   publish = ".next/standalone"
+  ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF ."
 
 [build.environment]
   NEXT_USE_NETLIFY_EDGE = "true"
@@ -22,20 +23,27 @@
   from = "/_next/static/*"
   to = "/_next/static/:splat"
   status = 200
+  force = true
 
 [[redirects]]
-  from = "/agent_notes/*"
-  to = "/agent_notes/:splat"
+  from = "/agent_notes/vtable_study/vtable_docs/*"
+  to = "/agent_notes/vtable_study/vtable_docs/:splat"
   status = 200
+  force = true
 
 # Handle API routes
 [[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/nextjs-server/api/:splat"
   status = 200
+  force = true
 
-# Handle 404
+# Handle all other routes through Next.js
 [[redirects]]
   from = "/*"
   to = "/.netlify/functions/nextjs-server"
   status = 200
+  force = true
+
+[functions]
+  included_files = ["agent_notes/vtable_study/vtable_docs/**"]
