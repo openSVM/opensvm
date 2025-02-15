@@ -8,14 +8,10 @@
   NEXT_USE_NETLIFY_EDGE = "true"
   NODE_VERSION = "20"
   NEXT_TELEMETRY_DISABLED = "1"
-  NEXT_PRIVATE_TARGET = "server"
 
 # Handle Next.js
 [[plugins]]
   package = "@netlify/plugin-nextjs"
-  [plugins.inputs]
-    useServerBuild = true
-    experimentalPublicDirectory = true
 
 # Handle environment variables for SVM RPC
 [[plugins]]
@@ -24,7 +20,7 @@
     buildEvent = "onPreBuild"
     include = ["OPENSVM_RPC_LIST"]
 
-# Handle static assets first
+# Handle static assets
 [[redirects]]
   from = "/_next/static/*"
   to = "/_next/static/:splat"
@@ -37,17 +33,10 @@
   status = 200
   force = true
 
-# Handle API routes
-[[redirects]]
-  from = "/api/*"
-  to = "/.netlify/edge-functions/api/:splat"
-  status = 200
-  force = true
-
-# Handle all routes through Next.js Edge Functions
+# Handle all routes through Next.js
 [[redirects]]
   from = "/*"
-  to = "/.netlify/edge-functions/:splat"
+  to = "/.netlify/functions/nextjs-server"
   status = 200
 
 [functions]
@@ -56,18 +45,3 @@
 
 [build.processing]
   skip_processing = false
-
-[build.processing.css]
-  bundle = true
-  minify = true
-
-[build.processing.js]
-  bundle = true
-  minify = true
-
-[build.processing.html]
-  pretty_urls = true
-
-[build.edge_functions]
-  handler = "handler.ts"
-  included_files = ["agent_notes/vtable_study/vtable_docs/**"]
