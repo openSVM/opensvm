@@ -1,14 +1,21 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   env: {
-    USE_MOCK_DATA: 'false', // Disable mock data to use real data
+    USE_MOCK_DATA: 'false',
     SOLANA_RPC_URL: process.env.SOLANA_RPC_URL,
     OPENSVM_RPC_LIST: process.env.OPENSVM_RPC_LIST,
     OPENSVM_RPC_LIST_2: process.env.OPENSVM_RPC_LIST_2
   },
+  preconnect: [
+    'https://actions-registry.dial.to',
+    'https://api.mainnet-beta.solana.com',
+    'https://fonts.googleapis.com',
+    'https://fonts.gstatic.com',
+  ],
   experimental: {
     optimizeCss: true,
     serverActions: true,
+    optimizeFonts: true,
     outputFileTracingRoot: process.cwd(),
     outputFileTracingExcludes: {
       '*': [
@@ -26,7 +33,13 @@ const nextConfig = {
         hostname: 'www.google.com',
       },
     ],
+    deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048],
+    imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
+    formats: ['image/webp'],
+    minimumCacheTTL: 60,
   },
+  
+  // Enable React strict mode for better development
   reactStrictMode: true,
   
   webpack: (config, { isServer }) => {
@@ -60,17 +73,21 @@ const nextConfig = {
 
     return config;
   },
+
+  // Performance optimizations
   httpAgentOptions: {
     keepAlive: true,
   },
   poweredByHeader: false,
   compress: true,
+  
+  // Optimize page loading
   onDemandEntries: {
-    // period (in ms) where the server will keep pages in the buffer
     maxInactiveAge: 30 * 1000,
-    // number of pages that should be kept simultaneously without being disposed
     pagesBufferLength: 15,
   },
+
+  // CORS headers
   async headers() {
     return [
       {
@@ -81,11 +98,34 @@ const nextConfig = {
           { key: 'Access-Control-Allow-Headers', value: 'Content-Type, Authorization' },
         ],
       },
-    ]
+      {
+        // Add cache-control headers for static assets
+        source: '/static/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
+          },
+        ],
+      },
+      {
+        // Add cache-control headers for fonts
+        source: '/fonts/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
+          },
+        ],
+      },
+    ];
   },
+
+  // Build optimization
   generateBuildId: async () => 'build',
   generateEtags: false,
   distDir: '.next',
+  swcMinify: true,
   cleanDistDir: true,
 };
 

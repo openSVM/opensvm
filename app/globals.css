@@ -5,6 +5,25 @@
 /* Import VTable styles */
 @import './styles/vtable.css';
 
+/* Optimize font loading for LCP */
+@font-face {
+  font-family: 'Berkeley Mono';
+  src: url('/fonts/BerkeleyMono-Regular.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+  text-rendering: optimizeLegibility;
+}
+
+@font-face {
+  font-family: 'Berkeley Mono';
+  src: url('/fonts/BerkeleyMono-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+  text-rendering: optimizeLegibility;
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;
@@ -30,8 +49,6 @@
 
     /* Font families */
     --font-berkeley: 'Berkeley Mono', monospace;
-    --font-inter: 'Inter', sans-serif;
-    --font-jetbrains: 'JetBrains Mono', monospace;
     --font-family: var(--font-berkeley);
 
     /* Base font size - controlled by settings */
@@ -136,25 +153,15 @@
     font-family: var(--font-family);
     font-size: var(--base-font-size);
   }
+  
+  /* Optimize LCP text rendering */
+  h1 {
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    font-feature-settings: "kern" 1;
+    font-kerning: normal;
+    will-change: transform;
+    transform: translateZ(0);
+    backface-visibility: hidden;
+  }
 }
-
-/* Berkeley Mono */
-@font-face {
-  font-family: 'Berkeley Mono';
-  src: url('/fonts/BerkeleyMono-Regular.woff2') format('woff2');
-  font-weight: 500;
-  font-style: normal;
-}
-
-@font-face {
-  font-family: 'Berkeley Mono';
-  src: url('/fonts/BerkeleyMono-Bold.woff2') format('woff2');
-  font-weight: 700;
-  font-style: normal;
-}
-
-/* Inter */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-
-/* JetBrains Mono */
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap');
