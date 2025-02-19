@@ -34,8 +34,8 @@
   align-items: center;
   height: 100%;
   padding: 8px 12px;
-  font-family: Arial, sans-serif;
-  font-size: 14px;
+  font-family: var(--font-family);
+  font-size: var(--base-font-size);
   line-height: 1.5;
   color: var(--foreground);
 }
@@ -119,20 +119,16 @@
 }
 
 /* Theme-specific styles */
-[data-theme="light"] .vtable {
-  --vtable-foreground: hsl(var(--foreground));
-  --vtable-background: hsl(var(--background));
-  --vtable-border: hsl(var(--border));
-  --vtable-header: hsl(var(--secondary));
-  --vtable-hover: hsl(var(--muted));
-}
-
-[data-theme="dark"] .vtable {
-  --vtable-foreground: hsl(var(--foreground));
-  --vtable-background: hsl(var(--background));
-  --vtable-border: hsl(var(--border));
-  --vtable-header: hsl(var(--secondary));
-  --vtable-hover: hsl(var(--muted));
+.theme-cyberpunk .vtable,
+.theme-high-contrast .vtable,
+.theme-dos .vtable,
+.theme-paper .vtable,
+.theme-solarized .vtable {
+  --vtable-foreground: var(--foreground);
+  --vtable-background: var(--background);
+  --vtable-border: var(--border);
+  --vtable-header: var(--secondary);
+  --vtable-hover: var(--muted);
 }
 
 /* Table styles */

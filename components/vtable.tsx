@@ -164,7 +164,7 @@ export function VTableWrapper({
   }
 
   return (
-    <div className="vtable-container" style={{ height: '600px' }}>
+    <div className="vtable-container" style={{ height: '100%' }}>
       <div className="vtable" ref={containerRef} style={{ width: '100%', height: '100%' }} />
     </div>
   );
