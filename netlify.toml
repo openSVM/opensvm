@@ -13,7 +13,7 @@
 [[plugins]]
   package = "netlify-plugin-inline-functions-env"
   [plugins.inputs]
-    buildEvent = "onPreBuild"
+    buildEvent = "onBuild"
     include = ["OPENSVM_RPC_LIST", "OPENSVM_RPC_LIST_2"]
 
 # Next.js specific routing
