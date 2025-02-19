@@ -25,16 +25,14 @@
 
 [[redirects]]
   from = "/api/*"
-  to = "/.netlify/functions/nextjs-server"
+  to = "/.netlify/functions/___netlify-server-handler"
   status = 200
 
 [[redirects]]
   from = "/*"
-  to = "/.netlify/functions/nextjs-server"
+  to = "/.netlify/functions/___netlify-server-handler"
   status = 200
-  force = false
-  [conditions]
-    NEL = "true"
+  force = true
 
 [functions]
   directory = ".netlify/functions"
