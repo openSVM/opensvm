@@ -1,7 +1,3 @@
-[build]
-  command = "npm run build"
-  publish = ".next"
-  functions = ".netlify/functions"
 
 [build.environment]
   NODE_VERSION = "20"
@@ -15,29 +11,3 @@
   [plugins.inputs]
     buildEvent = "onBuild"
     include = ["OPENSVM_RPC_LIST", "OPENSVM_RPC_LIST_2"]
-
-# Next.js specific routing
-[[redirects]]
-  from = "/_next/static/*"
-  to = "/_next/static/:splat"
-  status = 200
-  force = true
-
-[[redirects]]
-  from = "/api/*"
-  to = "/.netlify/functions/___netlify-server-handler"
-  status = 200
-
-[[redirects]]
-  from = "/*"
-  to = "/.netlify/functions/___netlify-server-handler"
-  status = 200
-  force = true
-
-[functions]
-  directory = ".netlify/functions"
-  node_bundler = "esbuild"
-  external_node_modules = ["@next/env"]
-
-[build.processing]
-  skip_processing = false
