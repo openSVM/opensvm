@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from 'next/font/google';
 import "./globals.css";
-import { Navbar } from "@/components/Navbar";
-import { Providers } from './providers';
+import dynamic from 'next/dynamic';
 import { Suspense } from 'react';
 
 // Load fonts
@@ -16,6 +15,16 @@ const jetbrains = JetBrains_Mono({
   subsets: ['latin'],
   display: 'swap',
   variable: '--font-jetbrains',
+});
+
+// Dynamic imports with loading fallbacks
+const Providers = dynamic(() => import('./providers').then(mod => mod.Providers), {
+  loading: () => <div className="min-h-screen bg-background" />
+});
+
+const Navbar = dynamic(() => import('@/components/Navbar').then(mod => mod.Navbar), {
+  loading: () => null,
+  ssr: true // Keep SSR for shell
 });
 
 export const metadata: Metadata = {
@@ -40,7 +49,9 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning className={`${inter.variable} ${jetbrains.variable}`}>
       <head>
+        <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
         {/* Preconnect to critical domains */}
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
           rel="preconnect"
           href="https://api.mainnet-beta.solana.com"
@@ -79,15 +90,13 @@ export default function RootLayout({
         <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
       </head>
       <body className={inter.className}>
-        <Providers>
-          {/* Navbar can be deferred */}
-          <Suspense fallback={null}>
+        <Suspense fallback={<div className="min-h-screen bg-background" />}>
+          <Providers>
             <Navbar>
-              {/* Prioritize main content */}
               {children}
             </Navbar>
-          </Suspense>
-        </Providers>
+          </Providers>
+        </Suspense>
       </body>
     </html>
   );

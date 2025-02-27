@@ -1,132 +1,107 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  env: {
-    USE_MOCK_DATA: 'false',
-    SOLANA_RPC_URL: process.env.SOLANA_RPC_URL,
-    OPENSVM_RPC_LIST: process.env.OPENSVM_RPC_LIST,
-    OPENSVM_RPC_LIST_2: process.env.OPENSVM_RPC_LIST_2
-  },
-  preconnect: [
-    'https://actions-registry.dial.to',
-    'https://api.mainnet-beta.solana.com',
-    'https://fonts.googleapis.com',
-    'https://fonts.gstatic.com',
-  ],
-  experimental: {
-    optimizeCss: true,
-    serverActions: true,
-    optimizeFonts: true,
-    outputFileTracingRoot: process.cwd(),
-    outputFileTracingExcludes: {
-      '*': [
-        'node_modules/@swc/core-linux-x64-gnu',
-        'node_modules/@swc/core-linux-x64-musl',
-        'node_modules/@esbuild/linux-x64',
-      ],
-    },
-  },
-  
-  images: {
-    domains: ['raw.githubusercontent.com', 'arweave.net', 'www.arweave.net'],
-    remotePatterns: [
-      {
-        hostname: 'www.google.com',
-      },
-    ],
-    deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048],
-    imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
-    formats: ['image/webp'],
-    minimumCacheTTL: 60,
-  },
-  
-  // Enable React strict mode for better development
-  reactStrictMode: true,
-  
+  // Webpack configuration for optimizing chunks
   webpack: (config, { isServer }) => {
-    // Handle ES modules
-    config.experiments = { ...config.experiments, topLevelAwait: true };
-    
-    // Add necessary polyfills
-    config.resolve.fallback = {
-      ...config.resolve.fallback,
-      fs: false,
-      path: false,
-      crypto: false,
-    };
+    // Optimize client-side chunks
+    if (!isServer) {
+      config.optimization.splitChunks = {
+        chunks: 'all',
+        minSize: 20000,
+        maxSize: 70000,
+        cacheGroups: {
+          default: false,
+          vendors: false,
+          // Bundle commonly used libraries together
+          commons: {
+            name: 'commons',
+            chunks: 'all',
+            minChunks: 2,
+            reuseExistingChunk: true,
+          },
+          // Create a separate chunk for chart.js
+          charts: {
+            test: /[\\/]node_modules[\\/]chart\.js[\\/]/,
+            name: 'charts',
+            chunks: 'all',
+            priority: 10,
+          },
+          // Create a separate chunk for Solana dependencies
+          solana: {
+            test: /[\\/]node_modules[\\/]@solana[\\/]/,
+            name: 'solana',
+            chunks: 'all',
+            priority: 10,
+          },
+          // UI components chunk
+          ui: {
+            test: /[\\/]components[\\/]ui[\\/]/,
+            name: 'ui-components',
+            chunks: 'all',
+            enforce: true,
+            priority: 20,
+          },
+          // Icons chunk
+          icons: {
+            test: /[\\/]node_modules[\\/]lucide-react[\\/]/,
+            name: 'icons',
+            chunks: 'all',
+            priority: 15,
+          },
+          // Providers chunk
+          providers: {
+            test: /[\\/]providers[\\/]/,
+            name: 'providers',
+            chunks: 'all',
+            enforce: true,
+            priority: 20,
+          },
+        },
+      };
 
-    // Transpile deepscatter dependencies
-    config.module.rules.push({
-      test: /\.m?js/,
-      resolve: {
-        fullySpecified: false,
-      },
-    });
+      // Optimize module concatenation
+      config.optimization.concatenateModules = true;
 
-    // Handle Three.js imports
-    config.resolve.alias = {
-      ...config.resolve.alias,
-      'three': 'three/build/three.module.js',
-    };
-
-    // External packages
-    config.externals.push('pino-pretty', 'lokijs', 'encoding');
-
+      // Enable module size optimization
+      config.optimization.moduleIds = 'deterministic';
+    }
     return config;
   },
 
-  // Performance optimizations
-  httpAgentOptions: {
-    keepAlive: true,
+  // Image optimization
+  images: {
+    domains: ['arweave.net', 'www.arweave.net'],
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: '**.arweave.net',
+      },
+    ],
   },
+
+  // Experimental features
+  experimental: {
+    // Enable modern optimizations
+    optimizePackageImports: [
+      'lucide-react',
+      '@radix-ui/react-dropdown-menu',
+      '@radix-ui/react-dialog',
+      '@radix-ui/react-select',
+      '@radix-ui/react-tabs'
+    ],
+    // Enable server actions with increased limit
+    serverActions: {
+      bodySizeLimit: '2mb'
+    }
+  },
+
+  // Enable React strict mode
+  reactStrictMode: true,
+
+  // Enable production source maps for better debugging
+  productionBrowserSourceMaps: true,
+
+  // Disable unnecessary features
   poweredByHeader: false,
-  compress: true,
-  
-  // Optimize page loading
-  onDemandEntries: {
-    maxInactiveAge: 30 * 1000,
-    pagesBufferLength: 15,
-  },
-
-  // CORS headers
-  async headers() {
-    return [
-      {
-        source: '/api/:path*',
-        headers: [
-          { key: 'Access-Control-Allow-Origin', value: '*' },
-          { key: 'Access-Control-Allow-Methods', value: 'GET, POST, PUT, DELETE, OPTIONS' },
-          { key: 'Access-Control-Allow-Headers', value: 'Content-Type, Authorization' },
-        ],
-      },
-      {
-        // Add cache-control headers for static assets
-        source: '/static/:path*',
-        headers: [
-          {
-            key: 'Cache-Control',
-            value: 'public, max-age=31536000, immutable',
-          },
-        ],
-      },
-      {
-        // Add cache-control headers for fonts
-        source: '/fonts/:path*',
-        headers: [
-          {
-            key: 'Cache-Control',
-            value: 'public, max-age=31536000, immutable',
-          },
-        ],
-      },
-    ];
-  },
-
-  // Build optimization
-  generateBuildId: async () => 'build',
-  generateEtags: false,
-  distDir: '.next',
-  swcMinify: true,
-  cleanDistDir: true,
 };
 
 export default nextConfig;

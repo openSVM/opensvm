@@ -5,6 +5,16 @@ import { sanitizeSearchQuery } from '@/lib/utils';
 
 const connection = new Connection(process.env.NEXT_PUBLIC_RPC_URL || 'https://api.mainnet-beta.solana.com');
 
+interface TransactionResult {
+  address: string;
+  signature: string;
+  timestamp: string | null;
+  type: 'success' | 'failed';
+  status: 'success' | 'failed';
+  amount: number;
+  balance: number | null;
+}
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -25,7 +35,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Invalid query' }, { status: 400 });
     }
 
-    let results = [];
+    let results: TransactionResult[] = [];
 
     try {
       // Get recent transactions for the address
@@ -40,22 +50,22 @@ export async function GET(request: Request) {
               maxSupportedTransactionVersion: 0,
             });
 
-            if (!tx) return null;
+            if (!tx || !tx.meta) return null;
 
             const timestamp = sig.blockTime ? new Date(sig.blockTime * 1000).toISOString() : null;
-            const amount = tx.meta?.postBalances[0] 
-              ? (tx.meta.postBalances[0] - tx.meta.preBalances[0]) / 1e9 
-              : null;
+            const postBalance = tx.meta.postBalances[0] ?? 0;
+            const preBalance = tx.meta.preBalances[0] ?? 0;
+            const amount = (postBalance - preBalance) / 1e9;
             
             return {
               address: sanitizedQuery,
               signature: sig.signature,
               timestamp,
-              type: tx.meta?.err ? 'failed' : 'success',
-              status: tx.meta?.err ? 'failed' : 'success',
-              amount: Math.abs(amount || 0),
-              balance: tx.meta?.postBalances[0] ? tx.meta.postBalances[0] / 1e9 : null,
-            };
+              type: tx.meta.err ? 'failed' : 'success',
+              status: tx.meta.err ? 'failed' : 'success',
+              amount: Math.abs(amount),
+              balance: postBalance / 1e9,
+            } as TransactionResult;
           } catch (error) {
             console.error('Error fetching transaction:', error);
             return null;
@@ -63,7 +73,7 @@ export async function GET(request: Request) {
         })
       );
 
-      results = transactions.filter(tx => tx !== null);
+      results = transactions.filter((tx): tx is TransactionResult => tx !== null);
 
       // Apply filters
       if (start) {
@@ -79,10 +89,10 @@ export async function GET(request: Request) {
         results = results.filter(tx => tx.status === status.toLowerCase());
       }
       if (min) {
-        results = results.filter(tx => tx.amount && tx.amount >= parseFloat(min));
+        results = results.filter(tx => tx.amount >= parseFloat(min));
       }
       if (max) {
-        results = results.filter(tx => tx.amount && tx.amount <= parseFloat(max));
+        results = results.filter(tx => tx.amount <= parseFloat(max));
       }
 
     } catch (error) {

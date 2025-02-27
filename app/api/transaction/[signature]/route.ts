@@ -1,27 +1,27 @@
 import { NextRequest } from 'next/server';
-import { DetailedTransactionInfo } from '@/lib/solana';
+import type { DetailedTransactionInfo } from '@/lib/solana';
 import { getConnection } from '@/lib/solana-connection';
-import { ParsedTransactionWithMeta } from '@solana/web3.js';
+import type { ParsedTransactionWithMeta } from '@solana/web3.js';
 
 const defaultHeaders = {
   'Content-Type': 'application/json',
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization'
-};
+} as const;
 
 export async function OPTIONS() {
   return new Response(null, {
     status: 200,
-    headers: {
+    headers: new Headers({
       ...defaultHeaders,
       'Access-Control-Max-Age': '86400',
-    },
+    })
   });
 }
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   context: { params: Promise<{ signature: string }> }
 ) {
   const controller = new AbortController();
@@ -38,7 +38,7 @@ export async function GET(
         JSON.stringify({ error: 'Transaction signature is required' }),
         { 
           status: 400,
-          headers: defaultHeaders
+          headers: new Headers(defaultHeaders)
         }
       );
     }
@@ -64,7 +64,7 @@ export async function GET(
         JSON.stringify({ error: 'Transaction not found' }),
         { 
           status: 404,
-          headers: defaultHeaders
+          headers: new Headers(defaultHeaders)
         }
       );
     }
@@ -157,43 +157,49 @@ export async function GET(
               };
             }
           })
-        })) || []
+        })) || [],
+        tokenChanges: [],
+        solChanges: []
       }
     };
 
     // Try to determine transaction type and extract relevant details
     if (tx.meta?.preTokenBalances?.length && tx.meta.postTokenBalances?.length) {
       transactionInfo.type = 'token';
-      // Extract token transfer details if available
-      transactionInfo.details.tokenChanges = tx.meta.postTokenBalances
-        .map(post => {
-          const pre = tx.meta?.preTokenBalances?.find(p => p.accountIndex === post.accountIndex);
-          return {
-            mint: post.mint || '',
-            preAmount: pre?.uiTokenAmount?.uiAmount || 0,
-            postAmount: post.uiTokenAmount?.uiAmount || 0,
-            change: (post.uiTokenAmount?.uiAmount || 0) - (pre?.uiTokenAmount?.uiAmount || 0)
-          };
-        })
-        .filter(change => change.mint && (change.preAmount !== 0 || change.postAmount !== 0));
+      if (transactionInfo.details) {
+        // Extract token transfer details if available
+        transactionInfo.details.tokenChanges = tx.meta.postTokenBalances
+          .map(post => {
+            const pre = tx.meta?.preTokenBalances?.find(p => p.accountIndex === post.accountIndex);
+            return {
+              mint: post.mint || '',
+              preAmount: pre?.uiTokenAmount?.uiAmount || 0,
+              postAmount: post.uiTokenAmount?.uiAmount || 0,
+              change: (post.uiTokenAmount?.uiAmount || 0) - (pre?.uiTokenAmount?.uiAmount || 0)
+            };
+          })
+          .filter(change => change.mint && (change.preAmount !== 0 || change.postAmount !== 0));
+      }
     } else if (tx.meta?.preBalances?.length && tx.meta.postBalances?.length) {
       transactionInfo.type = 'sol';
-      // Extract SOL transfer details
-      transactionInfo.details.solChanges = tx.meta.postBalances
-        .map((post, i) => ({
-          accountIndex: i,
-          preBalance: tx.meta?.preBalances?.[i] || 0,
-          postBalance: post || 0,
-          change: (post || 0) - (tx.meta?.preBalances?.[i] || 0)
-        }))
-        .filter(change => change.change !== 0);
+      if (transactionInfo.details) {
+        // Extract SOL transfer details
+        transactionInfo.details.solChanges = tx.meta.postBalances
+          .map((post, i) => ({
+            accountIndex: i,
+            preBalance: tx.meta?.preBalances?.[i] || 0,
+            postBalance: post || 0,
+            change: (post || 0) - (tx.meta?.preBalances?.[i] || 0)
+          }))
+          .filter(change => change.change !== 0);
+      }
     }
 
     return new Response(
       JSON.stringify(transactionInfo),
       {
         status: 200,
-        headers: defaultHeaders
+        headers: new Headers(defaultHeaders)
       }
     );
   } catch (error) {
@@ -233,7 +239,7 @@ export async function GET(
       }),
       { 
         status,
-        headers: defaultHeaders
+        headers: new Headers(defaultHeaders)
       }
     );
   }

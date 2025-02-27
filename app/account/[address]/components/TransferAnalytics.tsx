@@ -1,11 +1,15 @@
 "use client";
 
 import { useEffect, useRef, useMemo } from 'react';
-import { Transfer } from './shared/types';
+import type { Transfer } from './shared/types';
 import { analyzeTransfers, transfersToCSV, downloadCSV, groupTransfersByTx } from './shared/transfer-analytics';
 
 interface TransferAnalyticsProps {
   transfers: Transfer[];
+}
+
+function isCanvasContext(ctx: CanvasRenderingContext2D | null): ctx is CanvasRenderingContext2D {
+  return ctx !== null;
 }
 
 export function TransferAnalytics({ transfers }: TransferAnalyticsProps) {
@@ -23,7 +27,7 @@ export function TransferAnalytics({ transfers }: TransferAnalyticsProps) {
 
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    if (!isCanvasContext(ctx)) return;
 
     // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -88,10 +92,13 @@ export function TransferAnalytics({ transfers }: TransferAnalyticsProps) {
 
     // X-axis labels
     ctx.textAlign = 'center';
-    const firstDay = new Date(analytics.volumeByDay[analytics.volumeByDay.length - 1].date);
-    const lastDay = new Date(analytics.volumeByDay[0].date);
-    ctx.fillText(firstDay.toLocaleDateString(), padding, canvas.height - padding + 20);
-    ctx.fillText(lastDay.toLocaleDateString(), canvas.width - padding, canvas.height - padding + 20);
+    const lastIndex = analytics.volumeByDay.length - 1;
+    if (lastIndex >= 0 && analytics.volumeByDay[lastIndex] && analytics.volumeByDay[0]) {
+      const firstDay = new Date(analytics.volumeByDay[lastIndex].date);
+      const lastDay = new Date(analytics.volumeByDay[0].date);
+      ctx.fillText(firstDay.toLocaleDateString(), padding, canvas.height - padding + 20);
+      ctx.fillText(lastDay.toLocaleDateString(), canvas.width - padding, canvas.height - padding + 20);
+    }
 
   }, [analytics.volumeByDay]);
 
@@ -185,7 +192,7 @@ export function TransferAnalytics({ transfers }: TransferAnalyticsProps) {
                 </div>
               </div>
               <div className="space-y-2">
-                {tx.transfers.map((transfer, i) => (
+                {tx.transfers.map((transfer: Transfer, i: number) => (
                   <div key={i} className="flex items-center justify-between text-sm">
                     <div className="flex items-center gap-2">
                       <span className="text-neutral-400">

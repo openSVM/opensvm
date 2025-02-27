@@ -1,9 +1,10 @@
-'use client';
+"use client";
 
-import { decodeInstruction } from '../../../lib/bpf';
+import { decodeInstruction } from '@/lib/bpf';
 
 interface DisassemblyViewProps {
   data: number[];
+  address: string;
 }
 
 const toHex = (num: number, width: number = 2): string => {
@@ -31,19 +32,24 @@ const DisassemblyView: React.FC<DisassemblyViewProps> = ({ data }) => {
           if (bytes.length < 8) return null;
           
           // Parse BPF instruction components (little-endian)
-          const opcode = bytes[0];
-          const dst_reg = bytes[1] & 0xf;
-          const src_reg = (bytes[1] >> 4) & 0xf;
-          const offset = new Int16Array(new Uint8Array([bytes[2], bytes[3]]).buffer)[0];
-          const imm = new Int32Array(new Uint8Array([bytes[4], bytes[5], bytes[6], bytes[7]]).buffer)[0];
+          const opcode = bytes[0] || 0;
+          const dst_reg = bytes[1] ? bytes[1] & 0xf : 0;
+          const src_reg = bytes[1] ? (bytes[1] >> 4) & 0xf : 0;
+          
+          // Create typed arrays for offset and imm
+          const offsetBuffer = new Uint8Array([bytes[2] || 0, bytes[3] || 0]).buffer;
+          const immBuffer = new Uint8Array([bytes[4] || 0, bytes[5] || 0, bytes[6] || 0, bytes[7] || 0]).buffer;
+          
+          const offset = new Int16Array(offsetBuffer)[0] || 0;
+          const imm = new Int32Array(immBuffer)[0] || 0;
 
-          // Create BPF instruction object
+          // Create BPF instruction object with explicit types
           const instruction = {
-            opcode,
-            dst_reg,
-            src_reg,
-            offset,
-            imm
+            opcode: opcode as number,
+            dst_reg: dst_reg as number,
+            src_reg: src_reg as number,
+            offset: offset as number,
+            imm: imm as number
           };
 
           // Get decoded instruction with register info
@@ -60,17 +66,17 @@ const DisassemblyView: React.FC<DisassemblyViewProps> = ({ data }) => {
               <div className="w-48 shrink-0 text-gray-400 font-light tracking-wider">
                 {bytes.map((b, idx) => (
                   <span key={idx} className={idx === 0 ? 'text-yellow-400/80' : ''}>
-                    {toHex(b)}{idx < 7 ? ' ' : ''}
+                    {toHex(b || 0)}{idx < 7 ? ' ' : ''}
                   </span>
                 ))}
               </div>
 
               {/* Components */}
               <div className="w-48 shrink-0 text-gray-400/80 font-light">
-                <span className="text-yellow-400/80">op:{toHex(bytes[0], 2)}</span>
-                <span className="text-blue-400/80"> r{bytes[1] & 0xf}</span>
+                <span className="text-yellow-400/80">op:{toHex(opcode, 2)}</span>
+                <span className="text-blue-400/80"> r{dst_reg}</span>
                 <span className="text-gray-500">,</span>
-                <span className="text-blue-400/80">r{(bytes[1] >> 4) & 0xf}</span>
+                <span className="text-blue-400/80">r{src_reg}</span>
                 {offset !== 0 && <span className="text-purple-400/80"> +{offset}</span>}
                 {imm !== 0 && <span className="text-green-400/80"> #{imm}</span>}
               </div>

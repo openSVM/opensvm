@@ -9,11 +9,7 @@
       "@/*": ["./*"],
     },
     "skipLibCheck": true,
-    "noImplicitAny": false,
-    "noUnusedLocals": false,
-    "noUnusedParameters": false,
-    "noFallthroughCasesInSwitch": false,
-    "strict": false,
+    "strict": true,
     "target": "ES2020",
     "lib": [
       "dom",
@@ -30,14 +26,15 @@
         "name": "next"
       }
     ],
-    "ignoreDeprecations": "5.0",
-    "checkJs": false,
-    "noEmitOnError": false,
-    "allowUnreachableCode": true,
-    "allowUnusedLabels": true,
-    "noImplicitReturns": false,
-    "noPropertyAccessFromIndexSignature": false,
-    "noUncheckedIndexedAccess": false
+    "noImplicitAny": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitReturns": true,
+    "noUncheckedIndexedAccess": true,
+    "forceConsistentCasingInFileNames": true,
+    "allowSyntheticDefaultImports": true,
+    "verbatimModuleSyntax": true
   },
   "include": [
     "**/*.ts",

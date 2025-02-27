@@ -1,454 +1,231 @@
-"use client";
+'use client';
 
-import { useCallback, useEffect, useState, useRef, useMemo } from 'react';
-import { VTableWrapper } from './vtable';
-import { useSearchParams, useRouter } from 'next/navigation';
-import debounce from 'lodash/debounce';
+import { useState, useMemo } from 'react';
+import { useTransfers } from '@/app/account/[address]/components/shared/hooks';
+import { Transfer } from '@/app/account/[address]/components/shared/types';
+import { VTableWrapper } from '@/components/vtable';
+import { Button } from '@/components/ui/button';
+import { formatNumber } from '@/lib/utils';
+import { Tooltip } from '@/components/ui/tooltip';
 
-interface Transfer {
-  txId: string;
-  date: string;
-  from: string;
-  to: string;
-  tokenSymbol: string;
-  tokenAmount: string;
-  usdValue: string;
-  currentUsdValue: string;
-  transferType: 'IN' | 'OUT';
-}
-
-interface Props {
+interface TransfersTableProps {
   address: string;
 }
 
-interface QueryParams {
-  before?: string;
-  limit?: number;
-  sortBy?: string;
-  sortOrder?: 'asc' | 'desc';
-  filterType?: 'IN' | 'OUT' | 'ALL';
-  minAmount?: number;
-  maxAmount?: number;
-  tokenSymbol?: string;
-}
+export function TransfersTable({ address }: TransfersTableProps) {
+  const { transfers, loading, error, hasMore, loadMore, totalCount } = useTransfers(address);
+  const [sortField, setSortField] = useState<keyof Transfer>('timestamp');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
-const PAGE_SIZE = 20;
-
-export function TransfersTable({ address }: Props) {
-  const [transfers, setTransfers] = useState<Transfer[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [hasMore, setHasMore] = useState(true);
-  const isFetchingRef = useRef(false);
-  const initialLoadRef = useRef(false);
-  const addressRef = useRef(address);
-  const searchParams = useSearchParams();
-  const router = useRouter();
-  const abortControllerRef = useRef<AbortController | null>(null);
-
-  // Cache transfers in memory
-  const transfersCache = useRef<Record<string, Transfer[]>>({});
-
-  const currentParams = useMemo((): QueryParams => ({
-    before: searchParams.get('before') || undefined,
-    limit: PAGE_SIZE,
-    sortBy: searchParams.get('sortBy') || 'date',
-    sortOrder: (searchParams.get('sortOrder') as 'asc' | 'desc') || 'desc',
-    filterType: (searchParams.get('filterType') as 'IN' | 'OUT' | 'ALL') || 'ALL',
-    minAmount: searchParams.get('minAmount') ? Number(searchParams.get('minAmount')) : undefined,
-    maxAmount: searchParams.get('maxAmount') ? Number(searchParams.get('maxAmount')) : undefined,
-    tokenSymbol: searchParams.get('tokenSymbol') || undefined,
-  }), [searchParams]);
-
-  const formatDate = (dateStr: string) => {
-    try {
-      const date = new Date(dateStr);
-      return date.toLocaleString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: false
-      });
-    } catch (err) {
-      return dateStr;
+  const handleSort = (field: string, direction: 'asc' | 'desc' | null) => {
+    if (direction === null) {
+      // Reset to default sort
+      setSortField('timestamp');
+      setSortDirection('desc');
+      return;
     }
-  };
-
-  const formatAmount = (amount: string) => {
-    try {
-      const num = parseFloat(amount);
-      if (Math.abs(num) < 0.00001) {
-        return num.toExponential(4);
-      }
-      return num.toLocaleString(undefined, {
-        minimumFractionDigits: 4,
-        maximumFractionDigits: 6
-      });
-    } catch (err) {
-      return amount;
-    }
-  };
-
-  const formatAddress = (addr: string) => {
-    if (!addr) return '-';
-    if (addr === address) return '(Current Account)';
-    return `${addr.slice(0, 4)}...${addr.slice(-4)}`;
-  };
-
-  const updateQueryParams = useCallback((newParams: Partial<QueryParams>) => {
-    const params = new URLSearchParams(searchParams.toString());
     
-    Object.entries(newParams).forEach(([key, value]) => {
-      if (value === undefined) {
-        params.delete(key);
-      } else {
-        params.set(key, String(value));
-      }
-    });
+    setSortField(field as keyof Transfer);
+    setSortDirection(direction);
+  };
 
-    router.push(`?${params.toString()}`);
-  }, [searchParams, router]);
-
-  const fetchTransfers = useCallback(async () => {
-    if (isFetchingRef.current) return;
-
-    try {
-      // Cancel any ongoing requests
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-      abortControllerRef.current = new AbortController();
-
-      setLoading(true);
-      isFetchingRef.current = true;
-
-      // Build query params with only string values
-      const queryParams: Record<string, string> = {
-        limit: String(currentParams.limit),
-        ...(currentParams.before && { before: currentParams.before }),
-        ...(currentParams.sortBy && { sortBy: currentParams.sortBy }),
-        ...(currentParams.sortOrder && { sortOrder: currentParams.sortOrder }),
-        ...(currentParams.filterType && { filterType: currentParams.filterType })
-      };
-
-      if (currentParams.minAmount !== undefined) {
-        queryParams.minAmount = String(currentParams.minAmount);
-      }
-      if (currentParams.maxAmount !== undefined) {
-        queryParams.maxAmount = String(currentParams.maxAmount);
-      }
-      if (currentParams.tokenSymbol) {
-        queryParams.tokenSymbol = currentParams.tokenSymbol;
-      }
-
-      const queryString = new URLSearchParams(queryParams).toString();
-      const cacheKey = `${address}:${queryString}`;
-      
-      // Check cache first
-      if (transfersCache.current[cacheKey]) {
-        setTransfers(transfersCache.current[cacheKey]);
-        setLoading(false);
-        return;
-      }
-
-      const response = await fetch(
-        `/api/account-transfers/${addressRef.current}?${queryString}`,
-        { 
-          signal: abortControllerRef.current.signal,
-          cache: 'no-store' 
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-
-      if (Array.isArray(data.transfers)) {
-        // Update cache
-        transfersCache.current[cacheKey] = data.transfers;
-        
-        setTransfers(data.transfers);
-        setHasMore(data.hasMore || false);
-      } else {
-        console.error('Invalid transfers data format:', data);
-        setError('Invalid data format received from server');
-      }
-    } catch (err) {
-      if (err instanceof Error && err.name === 'AbortError') {
-        // Ignore abort errors
-        return;
-      }
-      console.error('Error fetching transfers:', err);
-      setError('Failed to load transfers');
-    } finally {
-      isFetchingRef.current = false;
-      setLoading(false);
-    }
-  }, [address, currentParams]);
-
-  // Debounced fetch for filter changes
-  const debouncedFetch = useMemo(
-    () => debounce(fetchTransfers, 300),
-    [fetchTransfers]
-  );
-
-  const handleSort = useCallback((column: string) => {
-    const newSortOrder = 
-      currentParams.sortBy === column && currentParams.sortOrder === 'desc' 
-        ? 'asc' 
-        : 'desc';
-    
-    updateQueryParams({
-      sortBy: column,
-      sortOrder: newSortOrder,
-      before: undefined // Reset pagination when sorting changes
-    });
-  }, [currentParams.sortBy, currentParams.sortOrder, updateQueryParams]);
-
-  const handleFilterChange = useCallback((type: 'IN' | 'OUT' | 'ALL') => {
-    updateQueryParams({
-      filterType: type,
-      before: undefined // Reset pagination when filter changes
-    });
-  }, [updateQueryParams]);
-
-  const handleLoadMore = useCallback(() => {
-    if (!loading && hasMore && !isFetchingRef.current && transfers.length > 0) {
-      const lastTransfer = transfers[transfers.length - 1];
-      updateQueryParams({
-        before: lastTransfer.txId
-      });
-    }
-  }, [loading, hasMore, transfers, updateQueryParams]);
-
-  const tableColumns = [
+  const columns = useMemo(() => [
     {
-      field: 'txId',
-      key: 'txId',
-      header: 'Tx ID',
-      title: 'Tx ID',
-      width: 120,
-      sortable: true,
-      onSort: () => handleSort('txId'),
-      render: (row: Transfer) => (
-        <a
-          href={`/tx/${row.txId}`}
-          className="text-blue-500 hover:text-blue-600"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          {row.txId.slice(0, 8)}...
-        </a>
-      ),
-    },
-    {
-      field: 'date',
-      key: 'date',
-      header: 'Date',
-      title: 'Date',
+      field: 'timestamp',
+      title: 'Time',
       width: 180,
       sortable: true,
-      onSort: () => handleSort('date'),
-      render: (row: Transfer) => formatDate(row.date),
+      render: (row: Transfer) => {
+        const date = new Date(row.timestamp);
+        return (
+          <div className="whitespace-nowrap">
+            <time dateTime={date.toISOString()}>{date.toLocaleDateString()} {date.toLocaleTimeString()}</time>
+          </div>
+        );
+      }
     },
     {
-      field: 'from',
-      key: 'from',
-      header: 'From',
-      title: 'From',
-      width: 150,
-      sortable: false,
-      render: (row: Transfer) => (
-        row.from ? (
-          <a
-            href={`/account/${row.from}`}
-            className="text-blue-500 hover:text-blue-600"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            {formatAddress(row.from)}
-          </a>
-        ) : '-'
-      ),
-    },
-    {
-      field: 'to',
-      key: 'to',
-      header: 'To',
-      title: 'To',
-      width: 150,
-      sortable: false,
-      render: (row: Transfer) => (
-        row.to ? (
-          <a
-            href={`/account/${row.to}`}
-            className="text-blue-500 hover:text-blue-600"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            {formatAddress(row.to)}
-          </a>
-        ) : '-'
-      ),
-    },
-    {
-      field: 'tokenSymbol',
-      key: 'tokenSymbol',
-      header: 'Token',
-      title: 'Token',
-      width: 80,
-      sortable: false,
-      align: 'center' as const,
-    },
-    {
-      field: 'tokenAmount',
-      key: 'tokenAmount',
-      header: 'Amount',
-      title: 'Amount',
-      width: 140,
+      field: 'type',
+      title: 'Type',
+      width: 100,
       sortable: true,
-      onSort: () => handleSort('tokenAmount'),
-      align: 'right' as const,
-      render: (row: Transfer) => formatAmount(row.tokenAmount),
+      render: (row: Transfer) => (
+        <div className="capitalize">{row.type}</div>
+      )
+    },
+    {
+      field: 'amount',
+      title: 'Amount',
+      width: 120,
+      sortable: true,
+      render: (row: Transfer) => (
+        <div className="text-right font-mono">
+          {formatNumber(row.amount)}
+        </div>
+      )
+    },
+    {
+      field: 'token',
+      title: 'Token',
+      width: 100,
+      sortable: true,
+      render: (row: Transfer) => (
+        <div>{row.tokenSymbol || row.token}</div>
+      )
     },
     {
       field: 'usdValue',
-      key: 'usdValue',
-      header: 'USD Value',
       title: 'USD Value',
       width: 120,
       sortable: true,
-      onSort: () => handleSort('usdValue'),
-      align: 'right' as const,
-      render: (row: Transfer) => row.usdValue !== '0' ? `$${formatAmount(row.usdValue)}` : '-',
-    },
-    {
-      field: 'currentUsdValue',
-      key: 'currentUsdValue',
-      header: 'Current USD',
-      title: 'Current USD',
-      width: 120,
-      sortable: true,
-      onSort: () => handleSort('currentUsdValue'),
-      align: 'right' as const,
-      render: (row: Transfer) => row.currentUsdValue !== '0' ? `$${formatAmount(row.currentUsdValue)}` : '-',
-    },
-    {
-      field: 'transferType',
-      key: 'transferType',
-      header: 'Type',
-      title: 'Type',
-      width: 80,
-      sortable: true,
-      onSort: () => handleSort('transferType'),
-      align: 'center' as const,
       render: (row: Transfer) => (
-        <span
-          className={
-            row.transferType === 'IN'
-              ? 'text-green-500 font-medium'
-              : 'text-red-500 font-medium'
-          }
-        >
-          {row.transferType === 'IN' ? '⬇️ IN' : '⬆️ OUT'}
-        </span>
-      ),
+        <div className="text-right font-mono">
+          {row.usdValue ? `$${formatNumber(row.usdValue)}` : '-'}
+        </div>
+      )
     },
-  ];
-
-  // Reset data when address changes
-  useEffect(() => {
-    if (addressRef.current !== address) {
-      addressRef.current = address;
-      setTransfers([]);
-      setHasMore(true);
-      initialLoadRef.current = false;
-      transfersCache.current = {}; // Clear cache
-      updateQueryParams({
-        before: undefined,
-        sortBy: 'date',
-        sortOrder: 'desc',
-        filterType: 'ALL'
-      });
+    {
+      field: 'from',
+      title: 'From',
+      width: 200,
+      sortable: true,
+      render: (row: Transfer) => (
+        <Tooltip content={row.from} side="top">
+          <div className="truncate font-mono text-xs">
+            <a
+              href={`/account/${row.from}`}
+              className="hover:underline hover:text-blue-400 text-blue-500 transition-colors"
+              title={row.from}
+              aria-label={`View account ${row.from}`}
+              rel="noopener"
+            >
+              {row.from}
+            </a>
+          </div>
+        </Tooltip>
+      )
+    },
+    {
+      field: 'to',
+      title: 'To',
+      width: 200,
+      sortable: true,
+      render: (row: Transfer) => (
+        <Tooltip content={row.to} side="top">
+          <div className="truncate font-mono text-xs">
+            <a
+              href={`/account/${row.to}`}
+              className="hover:underline hover:text-blue-400 text-blue-500 transition-colors"
+              title={row.to}
+              aria-label={`View account ${row.to}`}
+              rel="noopener"
+            >
+              {row.to}
+            </a>
+          </div>
+        </Tooltip>
+      )
+    },
+    {
+      field: 'signature',
+      title: 'Transaction',
+      width: 200,
+      sortable: false,
+      render: (row: Transfer) => (
+        <Tooltip content={row.signature} side="top">
+          <div className="truncate font-mono text-xs">
+            <a
+              href={`/tx/${row.signature}`}
+              className="hover:underline hover:text-blue-400 text-blue-500 transition-colors"
+              title={row.signature}
+              aria-label={`View transaction ${row.signature}`}
+              rel="noopener"
+            >
+              {row.signature}
+            </a>
+          </div>
+        </Tooltip>
+      )
     }
-  }, [address, updateQueryParams]);
+  ], []);
 
-  // Fetch when params change
-  useEffect(() => {
-    if (!initialLoadRef.current) {
-      initialLoadRef.current = true;
-      fetchTransfers();
-    } else {
-      debouncedFetch();
-    }
+  const sortedTransfers = useMemo(() => {
+    if (!transfers.length) return [];
 
-    return () => {
-      debouncedFetch.cancel();
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
+    const sorted = [...transfers].sort((a, b) => {
+      const aValue = a[sortField];
+      const bValue = b[sortField];
+
+      if (aValue === undefined || bValue === undefined) return 0;
+
+      // Handle different types of values
+      if (typeof aValue === 'string' && typeof bValue === 'string') {
+        if (sortField === 'timestamp') {
+          // For timestamps, convert to Date objects for comparison
+          const aDate = new Date(aValue).getTime();
+          const bDate = new Date(bValue).getTime();
+          return sortDirection === 'asc' ? aDate - bDate : bDate - aDate;
+        }
+        return sortDirection === 'asc' 
+          ? aValue.localeCompare(bValue) 
+          : bValue.localeCompare(aValue);
       }
-    };
-  }, [fetchTransfers, debouncedFetch]);
+
+      if (typeof aValue === 'number' && typeof bValue === 'number') {
+        return sortDirection === 'asc' ? aValue - bValue : bValue - aValue;
+      }
+
+      return 0;
+    });
+    
+    return sorted;
+  }, [transfers, sortField, sortDirection]);
+
+  if (error) {
+    return (
+      <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg" role="alert" aria-live="assertive">
+        <p className="text-red-600 dark:text-red-400">{error}</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="w-full h-full">
-      <div className="mb-4 flex gap-2">
-        <button
-          onClick={() => handleFilterChange('ALL')}
-          className={`px-3 py-1 rounded ${
-            currentParams.filterType === 'ALL'
-              ? 'bg-blue-500 text-white'
-              : 'bg-gray-200 text-gray-700'
-          }`}
-        >
-          All
-        </button>
-        <button
-          onClick={() => handleFilterChange('IN')}
-          className={`px-3 py-1 rounded ${
-            currentParams.filterType === 'IN'
-              ? 'bg-green-500 text-white'
-              : 'bg-gray-200 text-gray-700'
-          }`}
-        >
-          Incoming
-        </button>
-        <button
-          onClick={() => handleFilterChange('OUT')}
-          className={`px-3 py-1 rounded ${
-            currentParams.filterType === 'OUT'
-              ? 'bg-red-500 text-white'
-              : 'bg-gray-200 text-gray-700'
-          }`}
-        >
-          Outgoing
-        </button>
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <h2 className="text-xl font-semibold" id="transfers-heading">
+          Transfers
+          {totalCount !== undefined && (
+            <span className="ml-2 text-sm text-muted-foreground">
+              ({totalCount.toLocaleString()})
+            </span>
+          )}
+        </h2>
       </div>
-      
-      <div className="vtable-container">
-        {loading && !transfers.length ? (
-          <div className="flex items-center justify-center h-full">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-          </div>
-        ) : error ? (
-          <div className="text-red-500">{error}</div>
-        ) : (
-          <VTableWrapper
-            columns={tableColumns}
-            onSort={handleSort}
-            data={transfers}
-            loading={loading}
-            error={error}
-            onLoadMore={handleLoadMore}
-            hasMore={hasMore}
-          />
-        )}
+
+      <div className="border border-border rounded-lg overflow-hidden" role="region" aria-labelledby="transfers-heading" aria-live="polite">
+        <VTableWrapper
+          columns={columns}
+          data={sortedTransfers}
+          loading={loading}
+          onSort={handleSort}
+          emptyMessage="No transfers found"
+          height={500}
+          aria-busy={loading ? 'true' : 'false'}
+        />
       </div>
+
+      {hasMore && (
+        <div className="flex justify-center mt-4">
+          <Button
+            onClick={loadMore}
+            disabled={loading}
+            variant="outline"
+            className="w-full md:w-auto hover:bg-primary/10"
+          >
+            {loading ? 'Loading...' : 'Load More'}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

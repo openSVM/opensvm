@@ -1,6 +1,6 @@
 'use client';
 
-import { DetailedTransactionInfo } from '@/lib/solana';
+import type { DetailedTransactionInfo } from '@/lib/solana';
 import dynamic from 'next/dynamic';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import React, { Suspense, useEffect, useState } from 'react';

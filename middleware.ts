@@ -1,139 +1,166 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-export async function middleware(request: NextRequest) {
-  const startTime = Date.now();
+// In-memory store for rate limiting
+// Note: This will be reset on deployment or server restart
+// For production, use a persistent store like Redis
+const rateLimit = new Map<string, { count: number; timestamp: number }>();
 
-  // Add CORS headers to all responses
+// Rate limit configuration
+const RATE_LIMIT = {
+  window: 60 * 1000, // 1 minute in milliseconds
+  max: 60, // Maximum requests per window
+  apiOnly: true, // Only apply rate limiting to API routes
+};
+
+// Security headers to add to all responses
+const securityHeaders = {
+  'X-DNS-Prefetch-Control': 'on',
+  'Strict-Transport-Security': 'max-age=63072000; includeSubDomains; preload',
+  'X-XSS-Protection': '1; mode=block',
+  'X-Frame-Options': 'SAMEORIGIN',
+  'X-Content-Type-Options': 'nosniff',
+  'Referrer-Policy': 'origin-when-cross-origin',
+  'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
+};
+
+// Legacy path redirects
+const REDIRECTS: Record<string, string> = {
+  '/tx-explorer': '/tx',
+  '/block-explorer': '/blocks',
+  '/token-explorer': '/tokens',
+};
+
+// Regex patterns for paths that should be handled by middleware
+const STATIC_ASSET_REGEX = /\.(jpe?g|png|svg|gif|ico|webp|mp4|webm|woff2?|ttf|eot)$/i;
+
+export function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+  const url = request.nextUrl.clone();
+
+  // Skip middleware for excluded paths
+  if (STATIC_ASSET_REGEX.test(pathname)) {
+    return NextResponse.next();
+  }
+
+  // Create response to modify
   const response = NextResponse.next();
-  response.headers.set('Access-Control-Allow-Origin', '*');
-  response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
-  // Handle favicon request
-  if (request.nextUrl.pathname === '/favicon.ico') {
-    return NextResponse.rewrite(new URL('/api/favicon', request.url));
-  }
+  // Add security headers to all responses
+  Object.entries(securityHeaders).forEach(([key, value]) => {
+    response.headers.set(key, value);
+  });
+  
+  // Add Content Security Policy for enhanced security
+  response.headers.set(
+    'Content-Security-Policy',
+    "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https://*.solana.com https://*.helius-rpc.com;"
+  );
 
-  // Handle OPTIONS request
-  if (request.method === 'OPTIONS') {
-    return new NextResponse(null, {
-      status: 200,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-        'Access-Control-Max-Age': '86400'
-      }
-    });
-  }
-
-  // Handle public assets
-  if (request.nextUrl.pathname.startsWith('/public/') || 
-      request.nextUrl.pathname.startsWith('/_next/') ||
-      request.nextUrl.pathname.endsWith('.svg') ||
-      request.nextUrl.pathname.endsWith('.ico')) {
-    return NextResponse.next({
-      headers: {
-        'Cache-Control': 'public, max-age=31536000, immutable',
-        'Access-Control-Allow-Origin': '*'
-      }
-    });
-  }
-
-  // Handle admin route protection
-  if (request.nextUrl.pathname.startsWith('/admin')) {
-    const authHeader = request.headers.get('authorization');
+  // Handle API rate limiting
+  if (pathname.startsWith('/api/')) {
+    const ip = request.ip || 'anonymous';
+    const now = Date.now();
     
-    if (!authHeader || !authHeader.startsWith('Basic ')) {
-      return new NextResponse('Authentication required', {
-        status: 401,
-        headers: {
-          'WWW-Authenticate': 'Basic realm="Admin Access"',
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type, Authorization'
-        }
-      });
+    // Get existing rate limit data for this IP
+    const rateData = rateLimit.get(ip) || { count: 0, timestamp: now };
+    
+    // Reset count if outside the current window
+    if (now - rateData.timestamp > RATE_LIMIT.window) {
+      rateData.count = 0;
+      rateData.timestamp = now;
     }
-
-    try {
-      const credentials = atob(authHeader.split(' ')[1]);
-      const [username, password] = credentials.split(':');
-
-      if (
-        username !== process.env.ADMIN_USERNAME ||
-        password !== process.env.ADMIN_PASSWORD
-      ) {
-        return new NextResponse('Invalid credentials', { 
-          status: 401,
+    
+    // Increment request count
+    rateData.count++;
+    rateLimit.set(ip, rateData);
+    
+    // Set rate limit headers
+    response.headers.set('X-RateLimit-Limit', RATE_LIMIT.max.toString());
+    response.headers.set('X-RateLimit-Remaining', Math.max(0, RATE_LIMIT.max - rateData.count).toString());
+    response.headers.set('X-RateLimit-Reset', (rateData.timestamp + RATE_LIMIT.window).toString());
+    
+    // Return 429 if rate limit exceeded
+    if (rateData.count > RATE_LIMIT.max) {
+      return NextResponse.json(
+        { error: 'Too many requests, please try again later.' },
+        { 
+          status: 429, 
           headers: {
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+            ...Object.fromEntries(response.headers),
+            'Retry-After': Math.ceil((rateData.timestamp + RATE_LIMIT.window - now) / 1000).toString(),
           }
-        });
-      }
-    } catch {
-      return new NextResponse('Invalid credentials', { 
-        status: 401,
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type, Authorization'
         }
-      });
+      );
     }
   }
 
-  // Add default security headers
-  response.headers.set('X-Content-Type-Options', 'nosniff');
-  response.headers.set('X-Frame-Options', 'DENY');
-  response.headers.set('X-XSS-Protection', '1; mode=block');
-  response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
-  response.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
-
-  // Add custom headers for better error handling
-  response.headers.set('X-Error-Message', 'Please try again later if you encounter any issues');
-  response.headers.set('X-Rate-Limit-Retry-After', '60');
-  response.headers.set('X-Rate-Limit-Limit', '100');
-
-  // Add request timing headers
-  response.headers.set('X-Request-Start', startTime.toString());
-  response.headers.set('X-Request-Id', crypto.randomUUID());
-
-  // Set appropriate timeouts and cache headers based on route
-  if (request.nextUrl.pathname.startsWith('/tx/')) {
-    // Transaction pages get longer timeout and more aggressive caching
-    response.headers.set('Cache-Control', 'public, max-age=30, stale-while-revalidate=60');
-    response.headers.set('X-Response-Timeout', '15000'); // 15 seconds
-    response.headers.set('X-Cache-Status', 'dynamic');
-  } else if (request.nextUrl.pathname.startsWith('/account/')) {
-    // Account pages get medium timeout and moderate caching
-    response.headers.set('Cache-Control', 'public, max-age=10, stale-while-revalidate=30');
-    response.headers.set('X-Response-Timeout', '10000'); // 10 seconds
-    response.headers.set('X-Cache-Status', 'dynamic');
-  } else {
-    // Other dynamic routes get shorter timeout and minimal caching
-    response.headers.set('Cache-Control', 'public, max-age=5, stale-while-revalidate=15');
-    response.headers.set('X-Response-Timeout', '5000'); // 5 seconds
-    response.headers.set('X-Cache-Status', 'dynamic');
+  // Handle redirects for legacy paths
+  if (pathname in REDIRECTS) {
+    url.pathname = REDIRECTS[pathname];
+    return NextResponse.redirect(url);
   }
 
-  // Add response timing header
-  response.headers.set('X-Response-Time', `${Date.now() - startTime}ms`);
+  // Handle specific redirects or rewrites
+  if (pathname === '/tx' && !url.search) {
+    // Redirect bare /tx to the homepage
+    return NextResponse.redirect(new URL('/', request.url));
+  }
+
+  if (pathname === '/account' && !url.search) {
+    // Redirect bare /account to the homepage
+    return NextResponse.redirect(new URL('/', request.url));
+  }
+
+  if (pathname === '/token' && !url.search) {
+    // Redirect bare /token to the tokens page
+    return NextResponse.redirect(new URL('/tokens', request.url));
+  }
+
+  if (pathname === '/program' && !url.search) {
+    // Redirect bare /program to the programs page
+    return NextResponse.redirect(new URL('/programs', request.url));
+  }
+
+  if (pathname === '/nft' || pathname === '/nfts/collection') {
+    // Redirect NFT-related paths without parameters to the NFTs page
+    return NextResponse.redirect(new URL('/nfts', request.url));
+  }
+
+  if (pathname === '/block' && !url.search) {
+    // Redirect bare /block to the blocks page
+    return NextResponse.redirect(new URL('/blocks', request.url));
+  }
+
+  // Handle legacy URL redirects
+  if (pathname.startsWith('/tx/') && pathname.includes('?')) {
+    // Convert query param style to path style: /tx?sig=abc123 -> /tx/abc123
+    const signature = url.searchParams.get('sig') || url.searchParams.get('signature');
+    if (signature) {
+      const newUrl = new URL(`/tx/${signature}`, request.url);
+      return NextResponse.redirect(newUrl);
+    }
+  }
+
+  // Handle block redirects
+  if (pathname.startsWith('/block') && pathname.includes('?')) {
+    // Convert query param style to path style: /block?slot=123 -> /block/123
+    const slot = url.searchParams.get('slot');
+    if (slot) {
+      const newUrl = new URL(`/block/${slot}`, request.url);
+      return NextResponse.redirect(newUrl);
+    }
+  }
 
   return response;
 }
 
+// Configure which paths the middleware should run on
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     */
-    '/((?!_next/static|_next/image|favicon.ico).*)',
+    // Apply to all API routes
+    '/api/:path*',
+    // Apply to all pages except static assets
+    '/((?!_next/static|_next/image|favicon.ico|fonts|images).*)',
   ],
 };

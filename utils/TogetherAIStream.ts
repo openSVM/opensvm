@@ -1,4 +1,4 @@
-import { createParser } from "eventsource-parser";
+import { createParser, ParsedEvent, ReconnectInterval } from "eventsource-parser";
 
 export type ChatGPTAgent = "user" | "system";
 
@@ -13,80 +13,141 @@ export interface TogetherAIStreamPayload {
   stream: boolean;
 }
 
+interface StreamChoice {
+  delta: {
+    content?: string;
+  };
+  index: number;
+  finish_reason: string | null;
+}
+
+interface StreamResponse {
+  id: string;
+  object: string;
+  created: number;
+  model: string;
+  choices: StreamChoice[];
+}
+
+const STREAM_TIMEOUT = 30000; // 30 seconds timeout
+
 export async function TogetherAIStream(payload: TogetherAIStreamPayload) {
+  if (!process.env.TOGETHER_API_KEY) {
+    throw new Error('TOGETHER_API_KEY environment variable is not set');
+  }
+
+  if (!process.env.HELICONE_API_KEY) {
+    throw new Error('HELICONE_API_KEY environment variable is not set');
+  }
+
   const encoder = new TextEncoder();
   const decoder = new TextDecoder();
 
-  const res = await fetch("https://together.helicone.ai/v1/chat/completions", {
-    headers: {
-      "Content-Type": "application/json",
-      "Helicone-Auth": `Bearer ${process.env.HELICONE_API_KEY}`,
-      Authorization: `Bearer ${process.env.TOGETHER_API_KEY ?? ""}`,
-    },
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), STREAM_TIMEOUT);
 
-  const readableStream = new ReadableStream({
-    async start(controller) {
-      // optimistic error handling
-      if (res.status !== 200) {
-        const data = {
-          status: res.status,
-          statusText: res.statusText,
-          body: await res.text(),
-        };
-        console.log(
-          `Error: received non-200 status code, ${JSON.stringify(data)}`,
-        );
-        controller.close();
-        return;
-      }
+  try {
+    const res = await fetch("https://together.helicone.ai/v1/chat/completions", {
+      headers: {
+        "Content-Type": "application/json",
+        "Helicone-Auth": `Bearer ${process.env.HELICONE_API_KEY}`,
+        Authorization: `Bearer ${process.env.TOGETHER_API_KEY}`,
+      },
+      method: "POST",
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
 
-      // stream response (SSE) from OpenAI may be fragmented into multiple chunks
-      // this ensures we properly read chunks and invoke an event for each SSE event stream
-      const parser = createParser({
-        onEvent(event) {
-          controller.enqueue(encoder.encode(event.data));
-        },
-      });
+    clearTimeout(timeoutId);
 
-      // https://web.dev/streams/#asynchronous-iteration
-      for await (const chunk of res.body as any) {
-        parser.feed(decoder.decode(chunk));
-      }
-    },
-  });
-
-  let counter = 0;
-  const transformStream = new TransformStream({
-    async transform(chunk, controller) {
-      const data = decoder.decode(chunk);
-      // https://beta.openai.com/docs/api-reference/completions/create#completions/create-stream
-      if (data === "[DONE]") {
-        controller.terminate();
-        return;
-      }
-      try {
-        const json = JSON.parse(data);
-        const text = json.choices[0].delta?.content || "";
-        if (counter < 2 && (text.match(/\n/) || []).length) {
-          // this is a prefix character (i.e., "\n\n"), do nothing
+    const readableStream = new ReadableStream({
+      async start(controller) {
+        if (!res.ok) {
+          const errorData = {
+            status: res.status,
+            statusText: res.statusText,
+            body: await res.text(),
+          };
+          console.error(
+            `Stream Error: received ${res.status} status code`,
+            JSON.stringify(errorData, null, 2)
+          );
+          controller.error(new Error(`HTTP ${res.status}: ${res.statusText}`));
           return;
         }
-        // stream transformed JSON response as SSE
-        const payload = { text: text };
-        // https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#event_stream_format
-        controller.enqueue(
-          encoder.encode(`data: ${JSON.stringify(payload)}\n\n`),
-        );
-        counter++;
-      } catch (e) {
-        // maybe parse error
-        controller.error(e);
-      }
-    },
-  });
 
-  return readableStream.pipeThrough(transformStream);
+        if (!res.body) {
+          controller.error(new Error('No response body received'));
+          return;
+        }
+
+        const parser = createParser({
+          onParse(event: ParsedEvent | ReconnectInterval) {
+            if (event.type === 'event') {
+              try {
+                controller.enqueue(encoder.encode(event.data));
+              } catch (e) {
+                console.error('Error processing event:', e);
+                controller.error(e);
+              }
+            }
+          }
+        });
+
+        try {
+          const reader = res.body.getReader();
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            parser.feed(decoder.decode(value));
+          }
+          controller.close();
+        } catch (e) {
+          console.error('Error reading stream:', e);
+          controller.error(e);
+        }
+      },
+    });
+
+    let counter = 0;
+    const transformStream = new TransformStream({
+      async transform(chunk, controller) {
+        const data = decoder.decode(chunk);
+
+        if (data === "[DONE]") {
+          controller.terminate();
+          return;
+        }
+
+        try {
+          const json = JSON.parse(data) as StreamResponse;
+          const text = json.choices[0]?.delta?.content || "";
+
+          // Skip prefix newlines
+          if (counter < 2 && (text.match(/\n/) || []).length) {
+            return;
+          }
+
+          const payload = { text };
+          controller.enqueue(
+            encoder.encode(`data: ${JSON.stringify(payload)}\n\n`)
+          );
+          counter++;
+        } catch (e) {
+          console.error('Error transforming chunk:', e);
+          if (e instanceof Error) {
+            controller.error(new Error(`Transform error: ${e.message}`));
+          } else {
+            controller.error(new Error('Unknown transform error'));
+          }
+        }
+      },
+    });
+
+    return readableStream.pipeThrough(transformStream);
+  } catch (e) {
+    clearTimeout(timeoutId);
+    console.error('Stream creation error:', e);
+    throw e;
+  }
 }

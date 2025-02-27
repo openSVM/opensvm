@@ -1,5 +1,5 @@
 import { Loader, Mic, Send, Trash2 } from 'lucide-react';
-import { Message, Note, AgentAction } from '@/lib/ai/types';
+import type { Message, Note, AgentAction } from '@/lib/ai/types';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useState } from 'react';
@@ -236,4 +236,4 @@ export function ChatUI({
       </div>
     </div>
   );
-} 
+}

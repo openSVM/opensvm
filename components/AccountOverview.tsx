@@ -8,8 +8,8 @@ interface Props {
   address: string;
   solBalance: number;
   tokenAccounts: TokenAccount[];
-  isSystemProgram: boolean;
-  parsedOwner: string;
+  isSystemProgram?: boolean;
+  parsedOwner?: string;
 }
 
 export default function AccountOverview({ 
@@ -17,7 +17,7 @@ export default function AccountOverview({
   solBalance, 
   tokenAccounts,
   isSystemProgram,
-  parsedOwner 
+  parsedOwner
 }: Props) {
   const [accountStats, setAccountStats] = useState<{
     totalTransactions: string | number | null;
@@ -67,17 +67,17 @@ export default function AccountOverview({
               <div className="text-lg">{tokenAccounts.length} Tokens</div>
               <div className="text-sm text-neutral-400">($0.00)</div>
             </div>
-            {tokenAccounts.length > 0 && (
+            {tokenAccounts && tokenAccounts.length > 0 && (
               <div className="mt-2">
                 <button className="w-full flex items-center justify-between bg-neutral-900 rounded-lg p-3 hover:bg-neutral-900/80">
                   <div className="text-sm font-mono">
-                    {tokenAccounts[0].mint.slice(0, 8)}...
+                    {tokenAccounts[0]?.mint?.slice(0, 8)}...
                   </div>
                   <div className="text-sm">
-                    {tokenAccounts[0].uiAmount.toLocaleString()}
+                    {tokenAccounts[0]?.uiAmount?.toLocaleString()}
                   </div>
                   <div className="text-xs text-neutral-400">
-                    {tokenAccounts[0].symbol || 'Unknown'}
+                    {tokenAccounts[0]?.symbol || 'Unknown'}
                   </div>
                 </button>
                 {tokenAccounts.length > 1 && (
@@ -118,6 +118,20 @@ export default function AccountOverview({
               <div className="text-lg">{accountStats.tokenTransfers.toLocaleString()}</div>
             )}
           </div>
+
+          {parsedOwner && (
+            <div>
+              <div className="text-sm text-neutral-400">Owner</div>
+              <div className="text-sm font-mono break-all">{parsedOwner}</div>
+            </div>
+          )}
+
+          {isSystemProgram !== undefined && (
+            <div>
+              <div className="text-sm text-neutral-400">Type</div>
+              <div className="text-sm">{isSystemProgram ? 'System Program' : 'User Account'}</div>
+            </div>
+          )}
         </div>
       </div>
     </div>

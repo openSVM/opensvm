@@ -1,4 +1,4 @@
-import { Metadata } from 'next';
+import type { Metadata } from 'next';
 
 export async function generateMetadata({
   params,
@@ -9,4 +9,4 @@ export async function generateMetadata({
     title: `Block #${params.slot} | OPENSVM`,
     description: `View details of Solana block #${params.slot} on OPENSVM`,
   };
-} 
+}

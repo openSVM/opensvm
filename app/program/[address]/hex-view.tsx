@@ -58,7 +58,7 @@ export default function HexView({
   }, [handleScroll]);
 
   useEffect(() => {
-    if (selectedByte === null || !containerRef.current) return;
+    if (selectedByte === null || selectedByte === undefined || !containerRef.current) return;
     
     const row = Math.floor(selectedByte / 16);
     const container = containerRef.current;

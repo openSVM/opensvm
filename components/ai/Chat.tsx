@@ -1,10 +1,10 @@
 'use client';
 
-import { Message, Note, AgentAction } from '@/lib/ai/types';
+import type { Message, Note, AgentAction } from '@/lib/ai/types';
 import { ChatUI } from './ChatUI';
 import { ChatLayout } from './layouts/ChatLayout';
 
-interface ChatProps {
+export interface ChatProps {
   variant?: 'inline' | 'sidebar' | 'dialog';
   isOpen?: boolean;
   onClose?: () => void;
@@ -100,4 +100,4 @@ export function Chat({
       />
     </ChatLayout>
   );
-} 
+}

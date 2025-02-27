@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PublicKey } from '@solana/web3.js';
+import type { ParsedTransactionWithMeta, TokenBalance } from '@solana/web3.js';
 import { getMint } from '@solana/spl-token';
 import { getConnection } from '@/lib/solana';
 import { rateLimiter, RateLimitError } from '@/lib/rate-limit';
@@ -31,7 +32,7 @@ export async function OPTIONS() {
 }
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   context: { params: Promise<{ mint: string }> }
 ) {
   const baseHeaders = {
@@ -130,7 +131,7 @@ export async function GET(
     const metadataAccount = await connection.getAccountInfo(metadataAddress);
     let metadata: { name: string; symbol: string; uri: string; description?: string; image?: string } | null = null;
 
-    if (metadataAccount) {
+    if (metadataAccount?.data) {
       const data = metadataAccount.data;
       
       // Skip discriminator and feature flags (1 byte each)
@@ -144,83 +145,89 @@ export async function GET(
       
       // Read name
       const nameLength = data[offset];
-      offset += 1;
-      const name = new TextDecoder().decode(data.slice(offset, offset + nameLength)).replace(/\0/g, '');
-      offset += nameLength;
-      
-      // Read symbol
-      const symbolLength = data[offset];
-      offset += 1;
-      const symbol = new TextDecoder().decode(data.slice(offset, offset + symbolLength)).replace(/\0/g, '');
-      offset += symbolLength;
-      
-      // Read uri
-      const uriLength = data[offset];
-      offset += 1;
-      const uri = new TextDecoder().decode(data.slice(offset, offset + uriLength)).replace(/\0/g, '');
+      if (typeof nameLength === 'number' && nameLength > 0 && offset + 1 + nameLength <= data.length) {
+        offset += 1;
+        const name = new TextDecoder().decode(data.slice(offset, offset + nameLength)).replace(/\0/g, '');
+        offset += nameLength;
+        
+        // Read symbol
+        const symbolLength = data[offset];
+        if (typeof symbolLength === 'number' && symbolLength > 0 && offset + 1 + symbolLength <= data.length) {
+          offset += 1;
+          const symbol = new TextDecoder().decode(data.slice(offset, offset + symbolLength)).replace(/\0/g, '');
+          offset += symbolLength;
+          
+          // Read uri
+          const uriLength = data[offset];
+          if (typeof uriLength === 'number' && uriLength > 0 && offset + 1 + uriLength <= data.length) {
+            offset += 1;
+            const uri = new TextDecoder().decode(data.slice(offset, offset + uriLength)).replace(/\0/g, '');
 
-      metadata = {
-        name,
-        symbol,
-        uri,
-      };
+            metadata = {
+              name,
+              symbol,
+              uri,
+            };
 
-      // Fetch metadata JSON if uri exists
-      if (uri.startsWith('http')) {
-        try {
-          const response = await fetch(uri, {
-            mode: 'cors',
-            headers: {
-              'User-Agent': 'OpenSVM/1.0'
-            }
-          });
-          if (!response.ok) throw new Error('Failed to fetch metadata');
-          const json = await response.json();
-          metadata.description = json.description;
-          metadata.image = json.image;
-        } catch (error) {
-          console.error('Error fetching metadata JSON:', error);
-          // Enhanced retry logic with exponential backoff
-          let delay = METADATA_FETCH_CONFIG.initialDelay;
-          for (let attempt = 1; attempt <= METADATA_FETCH_CONFIG.maxRetries; attempt++) {
-            try {
-              // Add jitter to prevent thundering herd
-              const jitter = Math.random() * 200;
-              await new Promise(resolve => setTimeout(resolve, delay + jitter));
-              
-              const retryResponse = await fetch(uri, {
-                mode: 'cors',
-                headers: {
-                  'User-Agent': 'OpenSVM/1.0'
-                }
-              });
-              
-              if (retryResponse.ok) {
-                const json = await retryResponse.json();
+            // Fetch metadata JSON if uri exists
+            if (uri.startsWith('http')) {
+              try {
+                const response = await fetch(uri, {
+                  mode: 'cors',
+                  headers: {
+                    'User-Agent': 'OpenSVM/1.0'
+                  }
+                });
+                if (!response.ok) throw new Error('Failed to fetch metadata');
+                const json = await response.json();
                 metadata.description = json.description;
                 metadata.image = json.image;
-                break;
-              }
-              
-              // If we get a rate limit response, honor the Retry-After header
-              if (retryResponse.status === 429) {
-                const retryAfter = retryResponse.headers.get('Retry-After');
-                if (retryAfter) {
-                  delay = Math.min(
-                    parseInt(retryAfter) * 1000,
-                    METADATA_FETCH_CONFIG.maxDelay
-                  );
+              } catch (error) {
+                console.error('Error fetching metadata JSON:', error);
+                // Enhanced retry logic with exponential backoff
+                let delay = METADATA_FETCH_CONFIG.initialDelay;
+                for (let attempt = 1; attempt <= METADATA_FETCH_CONFIG.maxRetries; attempt++) {
+                  try {
+                    // Add jitter to prevent thundering herd
+                    const jitter = Math.random() * 200;
+                    await new Promise(resolve => setTimeout(resolve, delay + jitter));
+                    
+                    const retryResponse = await fetch(uri, {
+                      mode: 'cors',
+                      headers: {
+                        'User-Agent': 'OpenSVM/1.0'
+                      }
+                    });
+                    
+                    if (retryResponse.ok) {
+                      const json = await retryResponse.json();
+                      metadata.description = json.description;
+                      metadata.image = json.image;
+                      break;
+                    }
+                    
+                    // If we get a rate limit response, honor the Retry-After header
+                    if (retryResponse.status === 429) {
+                      const retryAfter = retryResponse.headers.get('Retry-After');
+                      if (retryAfter) {
+                        delay = Math.min(
+                          parseInt(retryAfter) * 1000,
+                          METADATA_FETCH_CONFIG.maxDelay
+                        );
+                      }
+                    }
+                  } catch (retryError) {
+                    console.error(
+                      `Metadata fetch retry failed (${attempt}/${METADATA_FETCH_CONFIG.maxRetries}):`,
+                      retryError
+                    );
+                  }
+                  
+                  // Exponential backoff
+                  delay = Math.min(delay * 2, METADATA_FETCH_CONFIG.maxDelay);
                 }
               }
-            } catch (retryError) {
-              console.error(
-                `Metadata fetch retry failed (${attempt}/${METADATA_FETCH_CONFIG.maxRetries}):`,
-                retryError
-              );
             }
-            
-            // Exponential backoff
-            delay = Math.min(delay * 2, METADATA_FETCH_CONFIG.maxDelay);
           }
         }
       }
@@ -239,16 +246,19 @@ export async function GET(
 
     // Calculate 24h volume from recent transactions
     const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
-    const volume24h = recentTransactions.reduce((total, tx) => {
-      if (tx?.blockTime && tx.blockTime * 1000 > oneDayAgo) {
-        return total + (tx.meta?.postTokenBalances?.reduce((txTotal, balance) => {
-          if (balance.mint === mintAddress && balance.uiTokenAmount) {
-            return txTotal + Number(balance.uiTokenAmount.uiAmount || 0);
-          }
-          return txTotal;
-        }, 0) || 0);
+    const volume24h = (recentTransactions || []).reduce((total: number, tx: ParsedTransactionWithMeta | null): number => {
+      if (!tx?.blockTime || tx.blockTime * 1000 <= oneDayAgo) {
+        return total;
       }
-      return total;
+
+      const txVolume = tx.meta?.postTokenBalances?.reduce((txTotal: number, balance: TokenBalance): number => {
+        if (balance.mint === mintAddress && balance.uiTokenAmount?.uiAmount) {
+          return txTotal + Number(balance.uiTokenAmount.uiAmount);
+        }
+        return txTotal;
+      }, 0) || 0;
+
+      return total + txVolume;
     }, 0);
 
     const tokenData = {

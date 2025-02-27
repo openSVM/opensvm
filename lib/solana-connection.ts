@@ -203,18 +203,15 @@ class ConnectionPool {
   }
 
   public updateEndpoint(endpoint: string): void {
-    if (endpoint === 'opensvm') {
-      this.isOpenSvmMode = true;
-      this.failedEndpoints.clear();
-      this.initializeConnections();
-      this.currentIndex = 0;
-    } else {
-      this.isOpenSvmMode = false;
-      this.connections = [new ProxyConnection(endpoint, this.config)];
-      this.currentIndex = 0;
-      this.failedEndpoints.clear();
+    // Always use OpenSVM RPC servers regardless of the provided endpoint
+    console.log(`Endpoint update requested to ${endpoint}, enforcing OpenSVM RPC servers`);
+    
+    // Reset the connection pool to use OpenSVM endpoints
+    this.isOpenSvmMode = true;
+    this.failedEndpoints.clear();
+    this.initializeConnections();
+    this.currentIndex = 0;
     }
-  }
 
   private async testConnection(connection: ProxyConnection): Promise<boolean> {
     try {
@@ -333,7 +330,7 @@ export async function getConnection(): Promise<Connection> {
   return ConnectionPool.getInstance().getConnection();
 }
 
-export function updateRpcEndpoint(endpoint: string): void {
+export async function updateRpcEndpoint(endpoint: string): Promise<void> {
   ConnectionPool.getInstance().updateEndpoint(endpoint);
 }
 

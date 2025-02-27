@@ -1,20 +1,19 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback, memo } from 'react';
-import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Chat } from './Chat';
 import { useAIChatTabs } from '@/lib/ai/hooks/useAIChatTabs';
 import { createSolanaAgent } from '@/lib/ai/core/factory';
 import { Connection } from '@solana/web3.js';
-import { Message } from '@/lib/ai/types';
+import type { Message } from '@/lib/ai/types';
 import { generateAndShareScreenshot } from '@/lib/ai/utils/screenshot';
 
 const connection = new Connection(
   process.env.NEXT_PUBLIC_RPC_URL || 'https://api.mainnet-beta.solana.com'
 );
 
-interface Props {
+export interface AIChatSidebarProps {
   isOpen: boolean;
   onClose: () => void;
   onWidthChange: (width: number) => void;
@@ -30,7 +29,7 @@ export const AIChatSidebar = memo(function AIChatSidebar({
   onResizeStart,
   onResizeEnd,
   initialWidth = 400 
-}: Props) {
+}: AIChatSidebarProps) {
   const sidebarRef = useRef<HTMLDivElement>(null);
   const [isResizing, setIsResizing] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(initialWidth);
@@ -252,4 +251,4 @@ To get started, just ask me anything about Solana blockchain data or PumpFun tra
       className="transition-transform duration-200"
     />
   );
-}); 
+});

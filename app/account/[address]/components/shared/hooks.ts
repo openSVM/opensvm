@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Transfer } from './types';
+import type { Transfer } from './types';
 
 interface TransferResponse {
   data: Transfer[];
@@ -144,7 +144,7 @@ export function useTransfers(address: string): UseTransfersResult {
       }
       fetchTransfers(0);
     }
-// eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [address]);
 
   const loadMore = () => {

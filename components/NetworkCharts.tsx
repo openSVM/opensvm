@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { NetworkTPSChart } from './NetworkTPSChart';
-import { NetworkResponseChart } from './NetworkResponseChart';
+import NetworkResponseChart from './NetworkResponseChart';
 import { getNetworkStats, getRPCLatency } from '@/lib/solana';
 
 interface ChartData {

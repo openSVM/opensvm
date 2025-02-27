@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getConnection } from '@/lib/solana';
 
 export async function GET(
-  request: NextRequest,
+  _: NextRequest,
   context: { params: Promise<{ slot: string }> }
 ) {
   try {

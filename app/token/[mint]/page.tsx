@@ -1,4 +1,4 @@
-import { Metadata } from 'next';
+import type { Metadata } from 'next';
 import TokenDetails from '@/components/TokenDetails';
 
 interface PageProps {
@@ -20,4 +20,4 @@ export default async function TokenPage({
 }: PageProps) {
   const resolvedParams = await params;
   return <TokenDetails mint={resolvedParams.mint} />;
-} 
+}

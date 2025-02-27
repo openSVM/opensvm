@@ -48,7 +48,7 @@ function TabContainerComponent({ address, activeTab, solBalance, tokenBalances }
   const renderContent = () => {
     switch (activeTab) {
       case 'tokens':
-        return <TokensTab address={address} tokenBalances={tokenBalances} />;
+        return <TokensTab solBalance={solBalance} tokenBalances={tokenBalances} />;
       case 'transfers':
         return (
           <div className="w-full">

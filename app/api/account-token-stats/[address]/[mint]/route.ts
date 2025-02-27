@@ -3,7 +3,7 @@ import { PublicKey } from '@solana/web3.js';
 import { getConnection } from '@/lib/solana-connection';
 
 export async function GET(
-  request: NextRequest,
+  _: NextRequest,
   context: { params: Promise<{ address: string; mint: string }> }
 ) {
   try {

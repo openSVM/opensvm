@@ -1,9 +1,10 @@
-import { ReactNode, useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import type { ReactNode } from 'react';
 import { Maximize2, RotateCcw, Plus, MoreHorizontal, X, Settings, HelpCircle, Download, Share2 } from 'lucide-react';
 import { SettingsModal } from '../modals/SettingsModal';
 import { generateAndShareScreenshot } from '@/lib/ai/utils/screenshot';
 
-interface ChatLayoutProps {
+export interface ChatLayoutProps {
   children: ReactNode;
   variant: 'inline' | 'sidebar' | 'dialog';
   isOpen: boolean;
@@ -43,7 +44,7 @@ export function ChatLayout({
   onExpand,
 }: ChatLayoutProps) {
   const [width, setWidth] = useState(() => 
-    window.innerWidth < 640 ? window.innerWidth : 480
+    typeof window !== 'undefined' ? (window.innerWidth < 640 ? window.innerWidth : 480) : 480
   );
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -97,6 +98,8 @@ export function ChatLayout({
   }, []);
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
 
@@ -290,4 +293,4 @@ export function ChatLayout({
         </div>
       );
   }
-} 
+}

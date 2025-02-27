@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getConnection } from '@/lib/solana-connection';
-import { PublicKey } from '@solana/web3.js';
+import { PublicKey, Connection } from '@solana/web3.js';
+import type { ConfirmedSignatureInfo } from '@solana/web3.js';
 import { memoryCache } from '@/lib/cache';
 import { queryFlipside } from '@/lib/flipside';
 
@@ -21,7 +22,7 @@ type TransferCount = {
   transfer_count: number;
 }
 
-async function getSignatureCount(pubkey: PublicKey, connection: any): Promise<string | number> {
+async function getSignatureCount(pubkey: PublicKey, connection: Connection): Promise<string | number> {
   const cacheKey = `signatures-${pubkey.toBase58()}`;
   const cachedData = memoryCache.get<number>(cacheKey);
   if (cachedData !== null) {
@@ -29,19 +30,23 @@ async function getSignatureCount(pubkey: PublicKey, connection: any): Promise<st
   }
 
   const batches = [];
-  let before = undefined;
+  let before: string | null = null;
 
   for (let i = 0; i < MAX_BATCHES; i++) {
+    const options: { limit: number; before?: string } = { limit: BATCH_SIZE };
+    if (before !== null) {
+      options.before = before;
+    }
+
     batches.push(
-      connection.getSignaturesForAddress(pubkey, {
-        before,
-        limit: BATCH_SIZE
-      }).then(signatures => {
-        if (signatures.length > 0) {
-          before = signatures[signatures.length - 1].signature;
-        }
-        return signatures;
-      })
+      connection.getSignaturesForAddress(pubkey, options)
+        .then((signatures: ConfirmedSignatureInfo[]) => {
+          const lastSignature = signatures[signatures.length - 1];
+          if (lastSignature && lastSignature.signature) {
+            before = lastSignature.signature;
+          }
+          return signatures;
+        })
     );
   }
 
@@ -62,14 +67,6 @@ async function getTokenTransfers(address: string): Promise<number> {
     return cachedData;
   }
 
-  // Add timeout to prevent hanging
-  let timeoutId: NodeJS.Timeout;
-  const timeoutPromise = new Promise<number>((_, reject) => {
-    timeoutId = setTimeout(() => {
-      reject(new Error('Flipside query timeout'));
-    }, QUERY_TIMEOUT);
-  });
-
   const query = `
     WITH recent_transfers AS (
       SELECT 
@@ -84,6 +81,14 @@ async function getTokenTransfers(address: string): Promise<number> {
     FROM recent_transfers
   `;
 
+  // Add timeout to prevent hanging
+  let timeoutId: NodeJS.Timeout | undefined;
+  const timeoutPromise = new Promise<number>((_, reject) => {
+    timeoutId = setTimeout(() => {
+      reject(new Error('Flipside query timeout'));
+    }, QUERY_TIMEOUT);
+  });
+
   try {
     // Race between query and timeout
     const results = await Promise.race([
@@ -91,7 +96,9 @@ async function getTokenTransfers(address: string): Promise<number> {
       timeoutPromise
     ]);
 
-    clearTimeout(timeoutId!);
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
 
     if (Array.isArray(results) && results.length > 0) {
       const transferCount = Number(results[0]?.transfer_count) || 0;
@@ -111,11 +118,15 @@ async function getTokenTransfers(address: string): Promise<number> {
     // Return 0 and cache it to prevent repeated timeouts
     memoryCache.set(cacheKey, 0, CACHE_ERROR_TTL);
     return 0;
+  } finally {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
   }
 }
 
 export async function GET(
-  request: NextRequest,
+  _: NextRequest,
   context: { params: Promise<{ address: string }> }
 ) {
   try {
@@ -124,7 +135,7 @@ export async function GET(
     const { address } = await params;
     
     // Add overall API timeout
-    let timeoutId: NodeJS.Timeout;
+    let timeoutId: NodeJS.Timeout | undefined;
     const timeoutPromise = new Promise((_, reject) => {
       timeoutId = setTimeout(() => {
         reject(new Error('API timeout'));
@@ -141,7 +152,9 @@ export async function GET(
         // Refresh in background if cache is stale
         refreshAccountStats(address, cacheKey).catch(console.error);
       }
-      clearTimeout(timeoutId!);
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
       return NextResponse.json(cachedStats, {
         headers: {
           'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=60'
@@ -161,7 +174,9 @@ export async function GET(
       timeoutPromise
     ]) as [string | number, number];
 
-    clearTimeout(timeoutId!);
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
 
     const stats: AccountStats = {
       totalTransactions,

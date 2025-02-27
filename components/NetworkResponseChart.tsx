@@ -1,5 +1,6 @@
 'use client';
 
+import { useRef } from 'react';
 import { Line } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -11,7 +12,9 @@ import {
   Tooltip,
   Legend,
 } from 'chart.js';
+import type { ChartData, ChartOptions } from 'chart.js';
 
+// Register Chart.js components
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -22,61 +25,82 @@ ChartJS.register(
   Legend
 );
 
-interface NetworkResponseData {
+interface NetworkData {
   timestamp: number;
   successRate: number;
   latency: number;
 }
 
-interface NetworkResponseChartProps {
-  data: NetworkResponseData[];
+interface Props {
+  data: NetworkData[];
 }
 
-export function NetworkResponseChart({ data }: NetworkResponseChartProps) {
-  const labels = data.map(d => new Date(d.timestamp).toLocaleTimeString());
-  const latencyData = data.map(d => d.latency);
+export default function NetworkResponseChart({ data }: Props) {
+  const chartData: ChartData<'line'> = {
+    labels: data.map(d => new Date(d.timestamp).toLocaleTimeString()),
+    datasets: [
+      {
+        label: 'Success Rate',
+        data: data.map(d => d.successRate),
+        borderColor: 'rgb(75, 192, 192)',
+        backgroundColor: 'rgba(75, 192, 192, 0.5)',
+        yAxisID: 'y',
+      },
+      {
+        label: 'Latency (ms)',
+        data: data.map(d => d.latency),
+        borderColor: 'rgb(255, 99, 132)',
+        backgroundColor: 'rgba(255, 99, 132, 0.5)',
+        yAxisID: 'y1',
+      }
+    ]
+  };
+
+  const options: ChartOptions<'line'> = {
+    responsive: true,
+    interaction: {
+      mode: 'index' as const,
+      intersect: false,
+    },
+    scales: {
+      y: {
+        type: 'linear' as const,
+        display: true,
+        position: 'left' as const,
+        title: {
+          display: true,
+          text: 'Success Rate (%)'
+        },
+        min: 0,
+        max: 100
+      },
+      y1: {
+        type: 'linear' as const,
+        display: true,
+        position: 'right' as const,
+        title: {
+          display: true,
+          text: 'Latency (ms)'
+        },
+        min: 0,
+        grid: {
+          drawOnChartArea: false,
+        },
+      },
+    },
+    plugins: {
+      legend: {
+        position: 'top' as const,
+      },
+      title: {
+        display: false
+      }
+    }
+  };
 
   return (
-    <div className="rounded-lg bg-black/20 backdrop-blur-sm p-6">
-      <h2 className="text-xl font-semibold mb-4">Network Response Time</h2>
-      <div className="h-64">
-        <Line
-          data={{
-            labels,
-            datasets: [
-              {
-                data: latencyData,
-                borderColor: '#44ccff',
-                backgroundColor: 'rgba(68, 204, 255, 0.1)',
-                fill: true,
-              },
-            ],
-          }}
-          options={{
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-              legend: {
-                display: false,
-              },
-            },
-            scales: {
-              x: {
-                display: false,
-              },
-              y: {
-                beginAtZero: true,
-                grid: {
-                  color: 'rgba(255, 255, 255, 0.1)',
-                },
-                ticks: {
-                  color: '#888',
-                },
-              },
-            },
-          }}
-        />
-      </div>
+    <div className="w-full h-full">
+      <Line data={chartData} options={options} />
     </div>
   );
 }

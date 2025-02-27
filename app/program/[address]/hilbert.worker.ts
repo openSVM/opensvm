@@ -123,14 +123,17 @@ self.onmessage = (e: MessageEvent<WorkerMessage>) => {
         continue;
       }
       
-      const hilbertIndex = hilbertLookup[y * gridSize + x];
+      const hilbertIndex = hilbertLookup[y * gridSize + x] || 0;
       const dataOffset = Math.min(Math.floor(hilbertIndex * dataScale), uint8Data.length - 1);
       
-      const byte = uint8Data[dataOffset];
+      // Ensure byte is defined, default to 0 if undefined
+      const byte = uint8Data[dataOffset] || 0;
       const rgbOffset = byte * 3;
-      imageData[i] = rgbTable[rgbOffset];
-      imageData[i+1] = rgbTable[rgbOffset + 1];
-      imageData[i+2] = rgbTable[rgbOffset + 2];
+      
+      // Use default black color (0,0,0) if rgbTable values are undefined
+      imageData[i] = rgbTable[rgbOffset] || 0;
+      imageData[i+1] = rgbTable[rgbOffset + 1] || 0;
+      imageData[i+2] = rgbTable[rgbOffset + 2] || 0;
       imageData[i+3] = 255;
     }
 

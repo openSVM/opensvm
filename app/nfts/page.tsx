@@ -10,14 +10,6 @@ interface NFTCollection {
   image: string;
 }
 
-const fetchNFTCollections = async (): Promise<NFTCollection[]> => {
-  const response = await fetch('/api/nft-collections');
-  if (!response.ok) {
-    throw new Error(await response.text());
-  }
-  return response.json();
-};
-
 export default function NFTsPage() {
   const [collections, setCollections] = useState<NFTCollection[]>([]);
   const [loading, setLoading] = useState(true);

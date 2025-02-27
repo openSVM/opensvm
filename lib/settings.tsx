@@ -1,7 +1,8 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { updateRpcEndpoint } from './solana-connection';
+import { getRpcEndpoints } from './opensvm-rpc';
 
 export type Theme = 'paper' | 'high-contrast' | 'dos' | 'cyberpunk' | 'solarized';
 export type FontFamily = 'berkeley' | 'inter' | 'jetbrains';
@@ -13,14 +14,33 @@ export interface RpcEndpoint {
   network: 'mainnet' | 'devnet' | 'testnet' | 'custom';
 }
 
+// Define the OpenSVM endpoint as the primary endpoint
+const OPENSVM_ENDPOINT: RpcEndpoint = {
+  name: 'OpenSVM',
+  url: 'https://api.opensvm.com',
+  network: 'mainnet'
+};
+
+const DEFAULT_MAINNET_ENDPOINT: RpcEndpoint = { name: 'Mainnet', url: 'https://api.mainnet-beta.solana.com', network: 'mainnet' };
+
+// Define the Serum endpoint as a fallback endpoint
+const SERUM_ENDPOINT: RpcEndpoint = {
+  name: 'Serum',
+  url: 'https://solana-api.projectserum.com',
+  network: 'mainnet'
+};
+
 const defaultRpcEndpoints: RpcEndpoint[] = [
-  { name: 'Mainnet (Default)', url: 'https://api.mainnet-beta.solana.com', network: 'mainnet' },
-  { name: 'OpenSVM RPC', url: 'opensvm', network: 'mainnet' },
-  { name: 'Serum', url: 'https://solana-api.projectserum.com', network: 'mainnet' },
+  OPENSVM_ENDPOINT,
+  SERUM_ENDPOINT,
   { name: 'Ankr', url: 'https://rpc.ankr.com/solana', network: 'mainnet' },
+  { name: 'ExtrNode', url: 'https://solana-mainnet.rpc.extrnode.com', network: 'mainnet' },
+  DEFAULT_MAINNET_ENDPOINT,
   { name: 'Devnet', url: 'https://api.devnet.solana.com', network: 'devnet' },
   { name: 'Testnet', url: 'https://api.testnet.solana.com', network: 'testnet' },
 ];
+
+const initialRpcEndpoint = OPENSVM_ENDPOINT;
 
 interface Settings {
   theme: Theme;
@@ -33,11 +53,11 @@ interface Settings {
 
 interface SettingsContextType extends Settings {
   setTheme: (theme: Theme) => void;
-  setFontFamily: (font: FontFamily) => void;
-  setFontSize: (size: FontSize) => void;
-  setRpcEndpoint: (endpoint: RpcEndpoint) => void;
+  setFontFamily: (fontFamily: FontFamily) => void;
+  setFontSize: (fontSize: FontSize) => void;
+  setRpcEndpoint: (endpoint: RpcEndpoint) => Promise<void>;
   setCustomRpcEndpoint: (url: string) => void;
-  addCustomRpcEndpoint: (name: string, url: string) => void;
+  addCustomRpcEndpoint: (name: string, url: string) => Promise<void>;
 }
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
@@ -46,9 +66,18 @@ const defaultSettings: Settings = {
   theme: 'cyberpunk',
   fontFamily: 'berkeley',
   fontSize: 'medium',
-  rpcEndpoint: defaultRpcEndpoints[1], // OpenSVM RPC
+  rpcEndpoint: initialRpcEndpoint,
   availableRpcEndpoints: defaultRpcEndpoints,
   customRpcEndpoint: '',
+};
+
+// Helper function to safely access localStorage
+const getLocalStorage = () => {
+  try {
+    return typeof window !== 'undefined' ? window.localStorage : null;
+  } catch {
+    return null;
+  }
 };
 
 export function SettingsProvider({ children }: { children: React.ReactNode }) {
@@ -57,16 +86,21 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
 
   // Initialize settings from localStorage
   useEffect(() => {
-    const savedSettings = localStorage.getItem('settings');
-    if (savedSettings) {
+    const storage = getLocalStorage();
+    if (storage) {
       try {
-        const parsed = JSON.parse(savedSettings);
-        // Ensure availableRpcEndpoints is always set to defaultRpcEndpoints
-        parsed.availableRpcEndpoints = defaultRpcEndpoints;
-        setSettings(parsed);
-        // Update RPC endpoint in connection pool
-        if (parsed.rpcEndpoint) {
-          updateRpcEndpoint(parsed.rpcEndpoint.url);
+        const savedSettings = storage.getItem('settings');
+        if (savedSettings) {
+          const parsed = JSON.parse(savedSettings);
+          // Ensure availableRpcEndpoints is always set to defaultRpcEndpoints
+          parsed.availableRpcEndpoints = defaultRpcEndpoints;
+          // Ensure rpcEndpoint is valid
+          // Always use OpenSVM endpoint regardless of saved settings
+          parsed.rpcEndpoint = OPENSVM_ENDPOINT;
+          
+          setSettings(parsed);
+          // Update RPC endpoint in connection pool
+          updateRpcEndpoint(parsed.rpcEndpoint.url).catch(console.error);
         }
       } catch (error) {
         console.error('Error parsing settings:', error);
@@ -80,50 +114,71 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!mounted) return;
 
-    // Save to localStorage
-    localStorage.setItem('settings', JSON.stringify(settings));
+    const storage = getLocalStorage();
+    if (storage) {
+      // Save to localStorage
+      try {
+        storage.setItem('settings', JSON.stringify(settings));
+      } catch (error) {
+        console.error('Error saving settings:', error);
+      }
+    }
 
     // Apply theme
-    document.documentElement.classList.remove(
-      'theme-paper',
-      'theme-high-contrast',
-      'theme-dos',
-      'theme-cyberpunk',
-      'theme-solarized'
-    );
-    document.documentElement.classList.add(`theme-${settings.theme}`);
+    if (typeof document !== 'undefined') {
+      document.documentElement.classList.remove(
+        'theme-paper',
+        'theme-high-contrast',
+        'theme-dos',
+        'theme-cyberpunk',
+        'theme-solarized'
+      );
+      document.documentElement.classList.add(`theme-${settings.theme}`);
 
-    // Apply font family
-    document.documentElement.style.setProperty('--font-family', `var(--font-${settings.fontFamily})`);
+      // Apply font family
+      document.documentElement.style.setProperty('--font-family', `var(--font-${settings.fontFamily})`);
 
-    // Apply font size
-    const fontSizes = { small: '14px', medium: '16px', large: '18px' };
-    document.documentElement.style.setProperty('--base-font-size', fontSizes[settings.fontSize]);
-
-    // Update RPC endpoint
-    updateRpcEndpoint(settings.rpcEndpoint.url);
+      // Apply font size
+      const fontSizes = { small: '14px', medium: '16px', large: '18px' };
+      document.documentElement.style.setProperty('--base-font-size', fontSizes[settings.fontSize]);
+    }
 
   }, [settings, mounted]);
 
   const contextValue: SettingsContextType = {
     ...settings,
-    setTheme: (theme) => setSettings((s) => ({ ...s, theme })),
-    setFontFamily: (fontFamily) => setSettings((s) => ({ ...s, fontFamily })),
-    setFontSize: (fontSize) => setSettings((s) => ({ ...s, fontSize })),
-    setRpcEndpoint: (rpcEndpoint) => {
-      setSettings((s) => ({ ...s, rpcEndpoint }));
-      updateRpcEndpoint(rpcEndpoint.url);
-    },
-    setCustomRpcEndpoint: (url) => setSettings((s) => ({ ...s, customRpcEndpoint: url })),
-    addCustomRpcEndpoint: (name, url) => {
+    setTheme: (theme: Theme) => setSettings((s) => ({ ...s, theme })),
+    setFontFamily: (fontFamily: FontFamily) => setSettings((s) => ({ ...s, fontFamily })),
+    setFontSize: (fontSize: FontSize) => setSettings((s) => ({ ...s, fontSize })),
+    // Always use OpenSVM endpoint and ignore any attempts to change it
+    setRpcEndpoint: useCallback(async (endpoint: RpcEndpoint) => {
+      console.log(`Attempt to change RPC endpoint to ${endpoint.name} ignored. Using OpenSVM endpoint.`);
+      await updateRpcEndpoint(OPENSVM_ENDPOINT.url);
+      setSettings((s) => ({ ...s, rpcEndpoint: OPENSVM_ENDPOINT }));
+      return Promise.resolve(); // Return resolved promise to maintain API compatibility
+    }, []),
+    setCustomRpcEndpoint: useCallback((url) => setSettings((s) => ({ ...s, customRpcEndpoint: url })), []),
+    addCustomRpcEndpoint: async (name: string, url: string) => {
       const newEndpoint: RpcEndpoint = { name, url, network: 'custom' };
-      setSettings((s) => ({
-        ...s,
-        availableRpcEndpoints: [...s.availableRpcEndpoints, newEndpoint],
-        rpcEndpoint: newEndpoint,
-      }));
+      try {
+        await updateRpcEndpoint(url);
+        setSettings((s) => ({
+          ...s,
+          // Add to available endpoints but force using OpenSVM
+          availableRpcEndpoints: [...s.availableRpcEndpoints, newEndpoint], 
+          // Override with OpenSVM endpoint to ensure it's always used
+          rpcEndpoint: OPENSVM_ENDPOINT,
+        }));
+      } catch (error) {
+        console.error('Failed to add custom RPC endpoint:', error);
+        throw error;
+      }
     },
-  };
+  } as SettingsContextType;
+
+  if (!mounted) {
+    return null;
+  }
 
   return (
     <SettingsContext.Provider value={contextValue}>
@@ -132,7 +187,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function useSettings() {
+export function useSettings(): SettingsContextType {
   const context = useContext(SettingsContext);
   if (context === undefined) {
     throw new Error('useSettings must be used within a SettingsProvider');

@@ -18,7 +18,8 @@ interface Props {
   block: Block | null;
 }
 
-export function TransactionsInBlock({ block }: Props) {
+// Changed to default export
+export default function TransactionsInBlock({ block }: Props) {
   if (!block || !block.transactions) {
     return (
       <div>
@@ -68,4 +69,4 @@ export function TransactionsInBlock({ block }: Props) {
       </div>
     </div>
   );
-} 
+}

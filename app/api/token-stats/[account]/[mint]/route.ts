@@ -21,7 +21,7 @@ type TokenTransfers = {
 }
 
 // Background refresh function
-async function refreshTokenStats(account: string, mint: string, cacheKey: string) {
+async function refreshTokenStats(account: string, mint: string, cacheKey: string): Promise<void> {
   try {
     const stats = await getTokenStats(account, mint);
     memoryCache.set(cacheKey, stats, CACHE_TTL);
@@ -135,9 +135,9 @@ async function getTokenStats(account: string, mint: string): Promise<TokenStats>
 }
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   context: { params: Promise<{ account: string; mint: string }> }
-) {
+): Promise<NextResponse> {
   try {
     const params = await context.params;
     const { account, mint } = await params;

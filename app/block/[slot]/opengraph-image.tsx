@@ -1,4 +1,4 @@
-import { ImageResponse } from 'next/og';
+import { ImageResponse } from '@vercel/og';
 import { getConnection } from '@/lib/solana';
 import { formatNumber } from '@/lib/utils';
 
@@ -23,7 +23,9 @@ export default async function Image({ params }: { params: { slot: string } }) {
       throw new Error('Block not found');
     }
 
-    const totalRewards = block.rewards.reduce((acc, r) => acc + r.lamports, 0) / 1e9;
+    // Calculate total rewards with null check
+    const totalRewards = block.rewards?.reduce((acc, r) => acc + r.lamports, 0) ?? 0;
+    const rewardsInSol = totalRewards / 1e9;
 
     return new ImageResponse(
       (
@@ -122,7 +124,7 @@ export default async function Image({ params }: { params: { slot: string } }) {
                 maxWidth: '600px',
               }}
             >
-              {formatNumber(block.transactions.length)} Transactions • {formatNumber(totalRewards)} SOL in Rewards
+              {formatNumber(block.transactions.length)} Transactions • {formatNumber(rewardsInSol)} SOL in Rewards
             </div>
             <div
               style={{
@@ -168,4 +170,4 @@ export default async function Image({ params }: { params: { slot: string } }) {
       status: 500,
     });
   }
-} 
+}

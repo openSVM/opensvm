@@ -2,7 +2,6 @@ import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { PublicKey } from '@solana/web3.js';
 import { getConnection } from './solana-connection';
-import { getMint } from '@solana/spl-token';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -51,7 +50,7 @@ export function isValidTransactionSignature(signature: string): boolean {
   return isValid;
 }
 
-// Check if address is a token by verifying mint info
+// Check if address is a token by verifying account info
 export async function isTokenMint(address: string): Promise<boolean> {
   if (!isValidSolanaAddress(address)) {
     console.log('Invalid Solana address format:', address);
@@ -63,21 +62,26 @@ export async function isTokenMint(address: string): Promise<boolean> {
     const connection = await getConnection();
     const pubkey = new PublicKey(address);
     
-    // Try to get mint info - this will throw if not a valid mint
-    const mintInfo = await getMint(connection, pubkey);
-    console.log('Successfully got mint info:', {
-      supply: mintInfo.supply.toString(),
-      decimals: mintInfo.decimals,
-      isInitialized: mintInfo.isInitialized
-    });
-    return mintInfo.isInitialized;
-  } catch (error) {
-    // If error is not related to invalid mint, log it
-    if (!(error instanceof Error) || !error.message.includes('Invalid mint')) {
-      console.error('Error checking token mint:', error);
-    } else {
-      console.log('Not a valid token mint:', address);
+    // Get account info
+    const accountInfo = await connection.getAccountInfo(pubkey);
+    if (!accountInfo) {
+      console.log('Account not found:', address);
+      return false;
     }
+
+    // Check if account is owned by Token Program
+    const TOKEN_PROGRAM_ID = new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA');
+    const isToken = accountInfo.owner.equals(TOKEN_PROGRAM_ID);
+    
+    if (isToken) {
+      console.log('Found token mint:', address);
+    } else {
+      console.log('Not a token mint:', address);
+    }
+    
+    return isToken;
+  } catch (error) {
+    console.error('Error checking token mint:', error);
     return false;
   }
 }

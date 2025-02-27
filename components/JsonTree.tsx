@@ -5,82 +5,70 @@ import React, { useState } from 'react';
 interface JsonTreeProps {
   data: any;
   level?: number;
-  expandAll?: boolean;
+  expanded?: boolean;
 }
 
-const JsonTree: React.FC<JsonTreeProps> = ({ data, level = 0, expandAll = false }) => {
-  const [isExpanded, setIsExpanded] = useState(expandAll);
-  const indent = level * 20;
+interface JsonNodeProps {
+  value: any;
+  level: number;
+  expanded?: boolean;
+}
 
-  const getDataType = (value: any): string => {
-    if (Array.isArray(value)) return 'array';
-    if (value === null) return 'null';
-    return typeof value;
-  };
+function JsonNode({ value, level, expanded = true }: JsonNodeProps) {
+  const [isExpanded, setIsExpanded] = useState(expanded);
+  const indent = '  '.repeat(level);
+  const isObject = value !== null && typeof value === 'object';
+  const isArray = Array.isArray(value);
 
-  const renderValue = (value: any): React.ReactElement => {
-    const type = getDataType(value);
-
-    switch (type) {
-      case 'string':
-        return <span className="text-green-400">"{value}"</span>;
-      case 'number':
-        return <span className="text-blue-400">{value}</span>;
-      case 'boolean':
-        return <span className="text-yellow-400">{value.toString()}</span>;
-      case 'null':
-        return <span className="text-red-400">null</span>;
-      case 'object':
-      case 'array':
-        return (
-          <JsonTree
-            data={value}
-            level={level + 1}
-            expandAll={expandAll}
-          />
-        );
-      default:
-        return <span>{String(value)}</span>;
-    }
-  };
-
-  if (typeof data !== 'object' || data === null) {
-    return renderValue(data);
+  if (!isObject) {
+    return (
+      <span className={`
+        ${typeof value === 'string' ? 'text-green-400' : ''}
+        ${typeof value === 'number' ? 'text-blue-400' : ''}
+        ${typeof value === 'boolean' ? 'text-yellow-400' : ''}
+        ${value === null ? 'text-red-400' : ''}
+      `}>
+        {JSON.stringify(value)}
+      </span>
+    );
   }
 
-  const isArray = Array.isArray(data);
-  const isEmpty = Object.keys(data).length === 0;
-
-  if (isEmpty) {
-    return <span>{isArray ? '[]' : '{}'}</span>;
-  }
+  const toggleExpand = () => setIsExpanded(!isExpanded);
+  const entries = Object.entries(value);
 
   return (
-    <div style={{ marginLeft: indent }}>
-      <span
-        className="cursor-pointer select-none"
-        onClick={() => setIsExpanded(!isExpanded)}
+    <div className="font-mono">
+      <span 
+        onClick={toggleExpand}
+        className="cursor-pointer hover:text-blue-400"
       >
-        {isExpanded ? '▼' : '▶'} {isArray ? '[' : '{'}
+        {isArray ? '[' : '{'}
+        {!isExpanded && '...'}
+        {!isExpanded && (isArray ? ']' : '}')}
       </span>
       
       {isExpanded && (
-        <div className="ml-4">
-          {Object.entries(data).map(([key, value], index) => (
-            <div key={key} className="my-1">
-              <span className="text-neutral-400">{isArray ? '' : `"${key}": `}</span>
-              {renderValue(value)}
-              {index < Object.keys(data).length - 1 && <span>,</span>}
-            </div>
-          ))}
-        </div>
+        <>
+          <div style={{ marginLeft: '1rem' }}>
+            {entries.map(([key, val], i) => (
+              <div key={key}>
+                <span className="text-gray-400">{key}: </span>
+                <JsonNode value={val} level={level + 1} />
+                {i < entries.length - 1 && <span className="text-gray-500">,</span>}
+              </div>
+            ))}
+          </div>
+          <div>{isArray ? ']' : '}'}</div>
+        </>
       )}
-      
-      <div style={{ marginLeft: isExpanded ? 0 : 8 }} className="inline-block">
-        {isExpanded && (isArray ? ']' : '}')}
-      </div>
     </div>
   );
-};
+}
 
-export default JsonTree;
+export default function JsonTree({ data, level = 0, expanded = true }: JsonTreeProps) {
+  return (
+    <div className="bg-black/50 p-4 rounded-lg overflow-x-auto">
+      <JsonNode value={data} level={level} expanded={expanded} />
+    </div>
+  );
+}

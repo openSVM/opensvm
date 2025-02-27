@@ -4,10 +4,16 @@ interface LoadingSpinnerProps {
   className?: string;
 }
 
-export default function LoadingSpinner({ className }: LoadingSpinnerProps) {
+export default function LoadingSpinner({ className = '' }: LoadingSpinnerProps) {
   return (
-    <div className="flex items-center justify-center p-8">
-      <div className={`animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 ${className || ''}`}></div>
+    <div className="flex items-center justify-center p-4">
+      <div
+        className={`animate-spin rounded-full h-8 w-8 border-b-2 border-primary ${className}`}
+        role="status"
+        aria-label="Loading"
+      >
+        <span className="sr-only">Loading...</span>
+      </div>
     </div>
   );
 }

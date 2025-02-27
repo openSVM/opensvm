@@ -16,13 +16,21 @@ const together = process.env.TOGETHER_API_KEY ? new Together({
   } : {},
 }) : null;
 
+interface ChatCompletion {
+  choices: Array<{
+    message: {
+      content: string;
+    };
+  }>;
+}
+
 export async function POST(request: Request) {
   if (!together) {
     return NextResponse.json({ error: "Similar questions feature is not configured" }, { status: 503 });
   }
 
   try {
-    let { question } = await request.json();
+    const { question } = await request.json();
 
     const schema = z.array(z.string()).length(3);
     const jsonSchema = zodToJsonSchema(schema, "mySchema");
@@ -44,11 +52,26 @@ export async function POST(request: Request) {
       // @ts-ignore
       response_format: { type: "json_object", schema: jsonSchema },
       model: "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo",
-    });
+    }) as ChatCompletion;
 
-    let questions = similarQuestions.choices?.[0].message?.content || "[]";
+    // Safely access the response with proper null checks
+    const content = similarQuestions?.choices?.[0]?.message?.content;
+    if (!content) {
+      console.error('No content in response:', similarQuestions);
+      return NextResponse.json([], { status: 200 });
+    }
 
-    return NextResponse.json(JSON.parse(questions));
+    try {
+      const parsedQuestions = JSON.parse(content);
+      if (!Array.isArray(parsedQuestions) || parsedQuestions.length !== 3) {
+        console.error('Invalid response format:', parsedQuestions);
+        return NextResponse.json([], { status: 200 });
+      }
+      return NextResponse.json(parsedQuestions);
+    } catch (parseError) {
+      console.error('Error parsing response:', parseError);
+      return NextResponse.json([], { status: 200 });
+    }
   } catch (error) {
     console.error("Error in POST function:", error);
     return NextResponse.json({ error: "An error occurred" }, { status: 500 });

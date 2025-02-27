@@ -1,17 +1,29 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Connection, PublicKey, Commitment, AccountInfo } from '@solana/web3.js';
-import DisassemblyView from './disassembly-view';
-import HexView from './hex-view';
+import { Connection, PublicKey } from '@solana/web3.js';
+import type { Commitment, AccountInfo } from '@solana/web3.js';
+import DisassemblyView from './components/disassembly-view';
 
 // Use reliable RPC endpoints with fallback
 const RPC_ENDPOINTS = [
-  'https://solana-mainnet.core.chainstack.com/263c9f53f4e4cdb897c0edc4a64cd007',
   'https://api.mainnet-beta.solana.com',
   'https://solana-api.projectserum.com',
-];
+  'https://rpc.ankr.com/solana'
+] as const;
+
+type RpcEndpoint = (typeof RPC_ENDPOINTS)[number];
+
 let currentEndpointIndex = 0;
+
+// Ensure currentEndpointIndex stays within bounds and always returns a valid endpoint
+const getCurrentEndpoint = (): RpcEndpoint => {
+  // Ensure index wraps around
+  const index = currentEndpointIndex % RPC_ENDPOINTS.length;
+  // Return the current endpoint (type is guaranteed to be RpcEndpoint due to modulo)
+  return RPC_ENDPOINTS[index]!;
+};
+
 const COMMITMENT: Commitment = 'processed';
 
 // BPF Upgradeable Loader program ID
@@ -41,13 +53,12 @@ async function getProgramData(
 ): Promise<ProgramInfo> {
   const { retries = 5, signal } = options;
   try {
-    const endpoint = RPC_ENDPOINTS[currentEndpointIndex];
+    const endpoint = getCurrentEndpoint();
     console.log(`Trying endpoint ${currentEndpointIndex + 1}/${RPC_ENDPOINTS.length}: ${endpoint}`);
     
     const connection = new Connection(endpoint, {
       commitment: COMMITMENT,
       confirmTransactionInitialTimeout: 30000,
-      // Don't disable WebSocket - needed for Next.js HMR
     });
     
     const programId = new PublicKey(address);
@@ -148,10 +159,7 @@ export default function ProgramContentClient({ address }: Props) {
   const [programInfo, setProgramInfo] = useState<ProgramInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [selectedByte, setSelectedByte] = useState<number | null>(null);
-  const [selectionRange, setSelectionRange] = useState<[number, number] | null>(null);
-      const [activeView, setActiveView] = useState<'disassembly'>('disassembly');
-      const [showHexView, setShowHexView] = useState(false);
+  const [activeView, setActiveView] = useState<'disassembly'>('disassembly');
 
   useEffect(() => {
     let isMounted = true;
@@ -236,14 +244,6 @@ export default function ProgramContentClient({ address }: Props) {
     return null;
   }
 
-  const handleSelectionChange = (start: number, end: number) => {
-    setSelectionRange([start, end]);
-  };
-
-  const handleByteSelect = (offset: number | null) => {
-    setSelectedByte(offset);
-  };
-
   return (
     <div className="space-y-8 max-w-[1920px] mx-auto px-4 pb-8">
       {/* Program Info */}
@@ -314,7 +314,7 @@ export default function ProgramContentClient({ address }: Props) {
             </div>
           </div>
           <div className="h-[calc(100%-3rem)] overflow-auto">
-            <DisassemblyView data={programInfo?.data || []} />
+            <DisassemblyView data={programInfo?.data || []} address={address} />
           </div>
         </div>
       )}

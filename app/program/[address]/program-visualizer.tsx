@@ -5,9 +5,7 @@ import { decodeInstruction, type DecodedInstruction } from '@/lib/bpf';
 
 interface ProgramVisualizerProps {
   data: number[];
-  selectedInstruction?: number | null;
   onInstructionSelect?: (offset: number | null) => void;
-  onSelectionChange?: (start: number, end: number) => void;
 }
 
 // Updated color scheme with better contrast and consistency
@@ -25,9 +23,7 @@ const InstructionColors = {
 
 const ProgramVisualizer: React.FC<ProgramVisualizerProps> = ({
   data,
-  selectedInstruction,
-  onInstructionSelect,
-  onSelectionChange
+  onInstructionSelect
 }) => {
   const [decodedInstructions, setDecodedInstructions] = useState<DecodedInstruction[]>([]);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);

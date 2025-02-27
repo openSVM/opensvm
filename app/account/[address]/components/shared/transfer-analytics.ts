@@ -1,4 +1,3 @@
-import { Transfer } from './types';
 
 interface TransferAnalytics {
   totalVolume: number;
@@ -24,48 +23,76 @@ interface TransferAnalytics {
 interface GroupedTransfer {
   signature: string;
   timestamp: string;
-  transfers: Transfer[];
+  transfers: any[];
   totalValue: number;
 }
 
-export function groupTransfersByTx(transfers: Transfer[]): GroupedTransfer[] {
+interface UnusualActivity {
+  type: string;
+  details: string;
+  timestamp: string;
+  signature: string;
+}
+
+function ensureString(value: string | undefined): string {
+  return value || '';
+}
+
+function getDateString(timestamp: string | undefined): string {
+  if (!timestamp) {
+    return new Date().toISOString().split('T')[0]!;
+  }
+  try {
+    return new Date(timestamp).toISOString().split('T')[0]!;
+  } catch (error) {
+    return new Date().toISOString().split('T')[0]!;
+  }
+}
+
+export function groupTransfersByTx(transfers: any[]): any[] {
   const grouped = transfers.reduce((acc, transfer) => {
     if (!acc[transfer.signature]) {
       acc[transfer.signature] = {
         signature: transfer.signature,
-        timestamp: transfer.timestamp,
+        timestamp: ensureString(transfer.timestamp),
         transfers: [],
         totalValue: 0
       };
     }
-    acc[transfer.signature].transfers.push(transfer);
-    acc[transfer.signature].totalValue += transfer.usdValue || 0;
+    const group = acc[transfer.signature];
+    if (group) {
+      group.transfers.push(transfer);
+      group.totalValue += transfer.usdValue || 0;
+    }
     return acc;
   }, {} as Record<string, GroupedTransfer>);
 
-  return Object.values(grouped).sort((a, b) => 
+  return Object.values(grouped).sort((a: any, b: any) => 
     new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
   );
 }
 
-export function analyzeTransfers(transfers: Transfer[]): TransferAnalytics {
+export function analyzeTransfers(transfers: any[]): TransferAnalytics {
   const tokenMap = new Map<string, { volume: number; count: number }>();
   const dayVolumes = new Map<string, number>();
-  const unusualActivity = [];
+  const unusualActivity: UnusualActivity[] = [];
 
   // Calculate volumes and counts
   transfers.forEach(transfer => {
-    const symbol = transfer.tokenSymbol || transfer.token;
+    // Ensure we have a valid symbol by using token as fallback
+    const symbol = transfer.token;
     const value = transfer.usdValue || 0;
-    const day = new Date(transfer.timestamp).toISOString().split('T')[0];
+    const day = getDateString(transfer.timestamp);
 
     // Token stats
     if (!tokenMap.has(symbol)) {
       tokenMap.set(symbol, { volume: 0, count: 0 });
     }
-    const tokenStats = tokenMap.get(symbol)!;
-    tokenStats.volume += value;
-    tokenStats.count += 1;
+    const tokenStats = tokenMap.get(symbol);
+    if (tokenStats) {
+      tokenStats.volume += value;
+      tokenStats.count += 1;
+    }
 
     // Daily volumes
     dayVolumes.set(day, (dayVolumes.get(day) || 0) + value);
@@ -75,7 +102,7 @@ export function analyzeTransfers(transfers: Transfer[]): TransferAnalytics {
       unusualActivity.push({
         type: 'Large Transfer',
         details: `${symbol} transfer worth $${value.toLocaleString()}`,
-        timestamp: transfer.timestamp,
+        timestamp: ensureString(transfer.timestamp),
         signature: transfer.signature
       });
     }
@@ -106,7 +133,7 @@ export function analyzeTransfers(transfers: Transfer[]): TransferAnalytics {
   };
 }
 
-export function transfersToCSV(transfers: Transfer[]): string {
+export function transfersToCSV(transfers: any[]): string {
   const headers = [
     'Timestamp',
     'Transaction ID',
@@ -120,11 +147,11 @@ export function transfersToCSV(transfers: Transfer[]): string {
   ];
 
   const rows = transfers.map(t => [
-    t.timestamp,
+    ensureString(t.timestamp),
     t.signature,
     t.from,
     t.to,
-    t.tokenSymbol || t.token,
+    t.token,
     t.amount.toString(),
     (t.usdValue || '').toString(),
     (t.currentUsdValue || '').toString(),

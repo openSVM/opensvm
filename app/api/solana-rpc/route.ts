@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Connection } from '@solana/web3.js';
 import { getConnection } from '@/lib/solana-connection';
 
 // Simple in-memory cache
@@ -85,7 +84,7 @@ export async function POST(request: NextRequest) {
       // For getTransaction method, try direct connection first
       if (body.method === 'getTransaction') {
         try {
-          const [signature, config] = body.params;
+          const [signature] = body.params;
           result = await connection.getParsedTransaction(signature, {
             maxSupportedTransactionVersion: 0,
             commitment: 'confirmed'
@@ -149,11 +148,12 @@ export async function POST(request: NextRequest) {
             jsonrpc: '2.0',
             error: {
               code: -32000,
-              message: `Transaction not found`
+              message: 'Transaction not found'
             },
             id: body.id
           }, { status: 404 });
-        } else if (errorMessage.includes('rate limit')) {
+        }
+        if (errorMessage.includes('rate limit')) {
           return NextResponse.json({
             jsonrpc: '2.0',
             error: {
@@ -180,16 +180,13 @@ export async function POST(request: NextRequest) {
       status = 429;
     }
     
-    return NextResponse.json(
-      {
-        jsonrpc: '2.0',
-        error: {
-          code: -32000,
-          message
-        },
-        id: 1
+    return NextResponse.json({
+      jsonrpc: '2.0',
+      error: {
+        code: -32000,
+        message
       },
-      { status }
-    );
+      id: 1
+    }, { status });
   }
 }
