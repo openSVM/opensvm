@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rdf:RDF
+  xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+  xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
+  xmlns:opensvm="https://opensvm.org/schema#"
+  xmlns:solana="https://solana.com/schema#"
+  xmlns:nextjs="https://nextjs.org/schema#">
+
+  <rdf:Description rdf:about="opensvm:Application">
+    <rdf:type rdf:resource="http://schema.org/SoftwareApplication"/>
+    <rdfs:label>OpenSVM</rdfs:label>
+    <rdfs:comment>Solana blockchain visualization and monitoring platform</rdfs:comment>
+    
+    <!-- Core Components -->
+    <opensvm:hasComponent rdf:resource="opensvm:SolanaIntegration"/>
+    <opensvm:hasComponent rdf:resource="opensvm:KnowledgeGraph"/>
+    <opensvm:hasComponent rdf:resource="opensvm:Visualization"/>
+    
+    <!-- Technical Stack -->
+    <opensvm:usesTechnology>
+      <rdf:Bag>
+        <rdf:li>TypeScript</rdf:li>
+        <rdf:li>Next.js</rdf:li>
+        <rdf:li>React</rdf:li>
+        <rdf:li>D3.js</rdf:li>
+        <rdf:li>Qdrant</rdf:li>
+      </rdf:Bag>
+    </opensvm:usesTechnology>
+  </rdf:Description>
+
+  <!-- Solana Integration Component -->
+  <rdf:Description rdf:about="opensvm:SolanaIntegration">
+    <rdf:type rdf:resource="opensvm:Component"/>
+    <rdfs:label>Solana Integration</rdfs:label>
+    <opensvm:implements>
+      <rdf:Bag>
+        <rdf:li>Transaction parsing</rdf:li>
+        <rdf:li>Account management</rdf:li>
+        <rdf:li>Token operations</rdf:li>
+        <rdf:li>RPC communication</rdf:li>
+      </rdf:Bag>
+    </opensvm:implements>
+    <opensvm:sourceFile>lib/solana.ts</opensvm:sourceFile>
+    <opensvm:sourceFile>lib/solana-connection.ts</opensvm:sourceFile>
+  </rdf:Description>
+
+  <!-- Knowledge Graph Component -->
+  <rdf:Description rdf:about="opensvm:KnowledgeGraph">
+    <rdf:type rdf:resource="opensvm:Component"/>
+    <rdfs:label>Knowledge Graph Engine</rdfs:label>
+    <opensvm:implements>
+      <rdf:Bag>
+        <rdf:li>Graph construction</rdf:li>
+        <rdf:li>Vector embeddings</rdf:li>
+        <rdf:li>Relationship analysis</rdf:li>
+        <rdf:li>Similarity search</rdf:li>
+      </rdf:Bag>
+    </opensvm:implements>
+    <opensvm:sourceFile>lib/server/qdrant.ts</opensvm:sourceFile>
+    <opensvm:dependsOn>@qdrant/js-client-rest</opensvm:dependsOn>
+  </rdf:Description>
+
+  <!-- Visualization Component -->
+  <rdf:Description rdf:about="opensvm:Visualization">
+    <rdf:type rdf:resource="opensvm:Component"/>
+    <rdfs:label>Data Visualization</rdfs:label>
+    <opensvm:implements>
+      <rdf:Bag>
+        <rdf:li>Transaction flows</rdf:li>
+        <rdf:li>Account relationships</rdf:li>
+        <rdf:li>Network metrics</rdf:li>
+        <rdf:li>Token analytics</rdf:li>
+      </rdf:Bag>
+    </opensvm:implements>
+    <opensvm:sourceFile>components/TransactionFlowChart.tsx</opensvm:sourceFile>
+    <opensvm:sourceFile>components/NetworkCharts.tsx</opensvm:sourceFile>
+    <opensvm:dependsOn>d3</opensvm:dependsOn>
+  </rdf:Description>
+
+  <!-- Application Routes -->
+  <rdf:Description rdf:about="opensvm:Routes">
+    <rdf:type rdf:resource="nextjs:AppRouter"/>
+    <opensvm:route>/account/[address]</opensvm:route>
+    <opensvm:route>/analytics</opensvm:route>
+    <opensvm:route>/blocks</opensvm:route>
+    <opensvm:route>/networks</opensvm:route>
+    <opensvm:route>/nfts</opensvm:route>
+    <opensvm:route>/tokens</opensvm:route>
+    <opensvm:route>/tx/[signature]</opensvm:route>
+  </rdf:Description>
+
+  <!-- API Endpoints -->
+  <rdf:Description rdf:about="opensvm:API">
+    <rdf:type rdf:resource="opensvm:APILayer"/>
+    <opensvm:endpoint>/api/account-stats</opensvm:endpoint>
+    <opensvm:endpoint>/api/token-stats</opensvm:endpoint>
+    <opensvm:endpoint>/api/historical-data</opensvm:endpoint>
+    <opensvm:endpoint>/api/solana-rpc</opensvm:endpoint>
+  </rdf:Description>
+
+  <!-- Quality Attributes -->
+  <rdf:Description rdf:about="opensvm:QualityAttributes">
+    <opensvm:performance>
+      <rdf:Bag>
+        <rdf:li>Caching layer</rdf:li>
+        <rdf:li>Vector similarity search</rdf:li>
+        <rdf:li>Batch processing</rdf:li>
+      </rdf:Bag>
+    </opensvm:performance>
+    <opensvm:scalability>
+      <rdf:Bag>
+        <rdf:li>Distributed vector storage</rdf:li>
+        <rdf:li>Rate limiting</rdf:li>
+        <rdf:li>Connection pooling</rdf:li>
+      </rdf:Bag>
+    </opensvm:scalability>
+    <opensvm:maintainability>
+      <rdf:Bag>
+        <rdf:li>TypeScript type safety</rdf:li>
+        <rdf:li>Component modularity</rdf:li>
+        <rdf:li>Comprehensive testing</rdf:li>
+      </rdf:Bag>
+    </opensvm:maintainability>
+  </rdf:Description>
+
+</rdf:RDF>
