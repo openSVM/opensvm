@@ -176,7 +176,7 @@ export function Navbar({ children }: NavbarProps) {
               />
             </div>
             <SettingsMenu />
-            <Button className="bg-gray-300 text-gray-800 hover:bg-gray-400 shadow-[0_0_5px_rgba(255,255,255,0.7)] backdrop-blur-[0.5px] border-t border-gray-200 border-opacity-50">
+            <Button className="bg-gray-300 text-gray-800 hover:bg-gray-400">
               Connect Wallet
             </Button>
           </div>
@@ -204,7 +204,7 @@ export function Navbar({ children }: NavbarProps) {
                 Analytics
               </Link>
               <SettingsMenu />
-              <Button className="bg-gray-300 text-gray-800 hover:bg-gray-400 shadow-[0_0_5px_rgba(255,255,255,0.7)] backdrop-blur-[0.5px] border-t border-gray-200 border-opacity-50">
+              <Button className="bg-gray-300 text-gray-800 hover:bg-gray-400">
                 Connect Wallet
               </Button>
             </div>
