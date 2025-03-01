@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Search } from 'lucide-react';
 import { getConnection, getRPCLatency } from '@/lib/solana';
-import { AIChatSidebar, type AIChatSidebarProps } from '@/components/ai/AIChatSidebar';
+import { AIChatSidebar } from '@/components/ai/AIChatSidebar';
 import { RecentBlocks } from '@/components/RecentBlocks';
 import TransactionsInBlock from '@/components/TransactionsInBlock';
 import NetworkResponseChart from '@/components/NetworkResponseChart';

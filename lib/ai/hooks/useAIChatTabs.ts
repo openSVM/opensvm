@@ -1,10 +1,31 @@
 import { useState } from 'react';
-import { Message, Note, AgentAction } from '../types';
+import type { Message, Note, AgentAction } from '../types';
 import { SolanaAgent } from '../core/agent';
 import { SOLANA_RPC_KNOWLEDGE, PUMPFUN_KNOWLEDGE } from '../core/knowledge';
 
 interface UseAIChatTabsProps {
   agent: SolanaAgent;
+}
+
+interface SpeechRecognitionEvent {
+  results: {
+    [index: number]: {
+      [index: number]: {
+        transcript: string;
+      };
+    };
+  };
+}
+
+interface SpeechRecognitionErrorEvent {
+  error: string;
+}
+
+declare global {
+  interface Window {
+    SpeechRecognition: any;
+    webkitSpeechRecognition: any;
+  }
 }
 
 const createSystemNotes = (): Note[] => ([
@@ -21,6 +42,17 @@ const createSystemNotes = (): Note[] => ([
     timestamp: Date.now()
   }
 ]);
+
+const formatActionResponse = (response: Message, action: AgentAction): Message => {
+  if (response?.metadata?.data) {
+    return {
+      role: 'assistant',
+      content: `Action completed: ${action.description}\n\`\`\`json\n${JSON.stringify(response.metadata.data, null, 2)}\n\`\`\``,
+      metadata: response.metadata
+    };
+  }
+  return response;
+};
 
 export function useAIChatTabs({ agent }: UseAIChatTabsProps) {
   const [activeTab, setActiveTab] = useState('agent');
@@ -75,10 +107,9 @@ export function useAIChatTabs({ agent }: UseAIChatTabsProps) {
         const actions = extractActionsFromResponse(planResponse.content);
         
         if (actions.length === 0) {
-          setAgentMessages(prev => [...prev, {
-            role: 'assistant',
-            content: `I need more specific information about what you would like me to check on Solana. Please provide details like transaction signatures, wallet addresses, or token mints.`
-          }]);
+          // Try direct execution if no actions were generated
+          const response = await agent.processMessage(userMessage);
+          setAgentMessages(prev => [...prev, response]);
           setIsProcessing(false);
           return;
         }
@@ -121,14 +152,14 @@ export function useAIChatTabs({ agent }: UseAIChatTabsProps) {
             console.error(`Error executing action ${action.description}:`, error);
             results.push({
               action,
-              error: error.message,
+              error: error instanceof Error ? error.message : String(error),
               status: 'failed' as const
             });
 
             // Update action status
             setAgentActions(prev => 
               prev.map(a => a.id === action.id 
-                ? { ...a, status: 'failed' as const, error: error.message }
+                ? { ...a, status: 'failed' as const, error: error instanceof Error ? error.message : String(error) }
                 : a
               )
             );
@@ -137,16 +168,8 @@ export function useAIChatTabs({ agent }: UseAIChatTabsProps) {
 
         // Add results to messages
         for (const result of results) {
-          if (result.status === 'completed') {
-            const response = result.response;
-            if (response.metadata?.data) {
-              setAgentMessages(prev => [...prev, {
-                role: 'assistant',
-                content: `Action completed: ${result.action.description}\n\`\`\`json\n${JSON.stringify(response.metadata.data, null, 2)}\n\`\`\``
-              }]);
-            } else {
-              setAgentMessages(prev => [...prev, response]);
-            }
+          if (result.status === 'completed' && result.response) {
+            setAgentMessages(prev => [...prev, formatActionResponse(result.response, result.action)]);
           } else {
             setAgentMessages(prev => [...prev, {
               role: 'assistant',
@@ -167,7 +190,7 @@ export function useAIChatTabs({ agent }: UseAIChatTabsProps) {
         console.error('Error in agent execution:', error);
         setAgentMessages(prev => [...prev, {
           role: 'assistant',
-          content: `**Error:** ${error.message}. Please try again with more specific information.`
+          content: `**Error:** ${error instanceof Error ? error.message : String(error)}. Please try again with more specific information.`
         }]);
       }
     } else if (activeTab === 'assistant') {
@@ -198,12 +221,18 @@ export function useAIChatTabs({ agent }: UseAIChatTabsProps) {
   const extractActionsFromResponse = (response: string): AgentAction[] => {
     const actionMatches = response.match(/\[ACTION\](.*?)\[\/ACTION\]/g) || [];
     return actionMatches.map(match => {
-      const [type, description] = match.replace('[ACTION]', '').replace('[/ACTION]', '').split(':');
+      const actionContent = match.replace('[ACTION]', '').replace('[/ACTION]', '').trim();
+      const firstColonIndex = actionContent.indexOf(':');
+      if (firstColonIndex === -1) {
+        throw new Error('Invalid action format: missing type delimiter');
+      }
+      const type = actionContent.slice(0, firstColonIndex).trim();
+      const description = actionContent.slice(firstColonIndex + 1).trim();
       return {
         id: `action_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         type: type.toLowerCase() as AgentAction['type'],
         status: 'pending' as const,
-        description: description.trim()
+        description
       };
     });
   };
@@ -215,13 +244,15 @@ export function useAIChatTabs({ agent }: UseAIChatTabsProps) {
       recognition.interimResults = false;
       recognition.maxAlternatives = 1;
 
-      recognition.onresult = (event) => {
-        const speechResult = event.results[0][0].transcript;
-        setInput(speechResult);
+      recognition.onresult = (event: SpeechRecognitionEvent) => {
+        if (event.results[0] && event.results[0][0]) {
+          const speechResult = event.results[0][0].transcript;
+          setInput(speechResult);
+        }
         setIsRecording(false);
       };
 
-      recognition.onerror = (event) => {
+      recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
         console.error('Speech recognition error:', event.error);
         setIsRecording(false);
       };
@@ -322,26 +353,19 @@ export function useAIChatTabs({ agent }: UseAIChatTabsProps) {
       ));
 
       // Add the response to messages
-      if (executionResponse.metadata?.data) {
-        setAgentMessages(prev => [...prev, {
-          role: 'assistant',
-          content: `Retried action completed successfully:\n\`\`\`json\n${JSON.stringify(executionResponse.metadata.data, null, 2)}\n\`\`\``
-        }]);
-      } else {
-        setAgentMessages(prev => [...prev, executionResponse]);
-      }
+      setAgentMessages(prev => [...prev, formatActionResponse(executionResponse, action)]);
 
     } catch (error) {
       console.error('Error retrying action:', error);
       // Update action status to failed
       setAgentActions(prev => prev.map(a => 
         a.id === actionId 
-          ? { ...a, status: 'failed' as const, error: error.message }
+          ? { ...a, status: 'failed' as const, error: error instanceof Error ? error.message : String(error) }
           : a
       ));
       setAgentMessages(prev => [...prev, {
         role: 'assistant',
-        content: `**Error retrying action:** ${error.message}`
+        content: `**Error retrying action:** ${error instanceof Error ? error.message : String(error)}`
       }]);
     }
   };
@@ -368,4 +392,4 @@ export function useAIChatTabs({ agent }: UseAIChatTabsProps) {
     startRecording,
     isRecording
   };
-} 
+}

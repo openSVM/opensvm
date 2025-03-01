@@ -31,6 +31,21 @@ const REDIRECTS: Record<string, string> = {
   '/token-explorer': '/tokens',
 };
 
+// Helper functions
+const getHeaderValue = (headers: Headers, ...keys: string[]): string => {
+  const value = keys
+    .map(key => headers.get(key))
+    .find(value => typeof value === 'string' && value.length > 0);
+  return value || 'anonymous';
+};
+
+const getQueryParam = (params: URLSearchParams, ...keys: string[]): string => {
+  const value = keys
+    .map(key => params.get(key))
+    .find(value => typeof value === 'string' && value.length > 0);
+  return value || '';
+};
+
 // Regex patterns for paths that should be handled by middleware
 const STATIC_ASSET_REGEX = /\.(jpe?g|png|svg|gif|ico|webp|mp4|webm|woff2?|ttf|eot)$/i;
 
@@ -54,12 +69,12 @@ export function middleware(request: NextRequest) {
   // Add Content Security Policy for enhanced security
   response.headers.set(
     'Content-Security-Policy',
-    "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https://*.solana.com https://*.helius-rpc.com;"
+    "default-src 'self' data:; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https://*.solana.com https://*.helius-rpc.com https://*.chainstack.com; object-src 'self' data:;"
   );
 
   // Handle API rate limiting
   if (pathname.startsWith('/api/')) {
-    const ip = request.ip || 'anonymous';
+    const ip = getHeaderValue(request.headers, 'x-forwarded-for', 'x-real-ip');
     const now = Date.now();
     
     // Get existing rate limit data for this IP
@@ -135,9 +150,9 @@ export function middleware(request: NextRequest) {
   // Handle legacy URL redirects
   if (pathname.startsWith('/tx/') && pathname.includes('?')) {
     // Convert query param style to path style: /tx?sig=abc123 -> /tx/abc123
-    const signature = url.searchParams.get('sig') || url.searchParams.get('signature');
-    if (signature) {
-      const newUrl = new URL(`/tx/${signature}`, request.url);
+    const txSignature = getQueryParam(url.searchParams, 'sig', 'signature');
+    if (txSignature) {
+      const newUrl = new URL(`/tx/${txSignature}`, request.url);
       return NextResponse.redirect(newUrl);
     }
   }
@@ -145,8 +160,9 @@ export function middleware(request: NextRequest) {
   // Handle block redirects
   if (pathname.startsWith('/block') && pathname.includes('?')) {
     // Convert query param style to path style: /block?slot=123 -> /block/123
-    const slot = url.searchParams.get('slot');
+    const slot = getQueryParam(url.searchParams, 'slot');
     if (slot) {
+      // The slot is a string since we checked it's not empty above
       const newUrl = new URL(`/block/${slot}`, request.url);
       return NextResponse.redirect(newUrl);
     }

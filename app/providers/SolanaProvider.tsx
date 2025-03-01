@@ -1,34 +1,35 @@
 'use client';
 
 import { ConnectionProvider } from '@solana/wallet-adapter-react';
-import { useSettings } from '@/lib/settings';
-import { useEffect, useState } from 'react';
 import { Connection } from '@solana/web3.js';
-import { connectionPool, updateRpcEndpoint } from '@/lib/solana-connection';
+import { useEffect, useState } from 'react';
+import { connectionPool } from '@/lib/solana-connection';
+
+// Use a default endpoint to allow rendering while the real connection initializes
+const DEFAULT_ENDPOINT = 'https://api.mainnet-beta.solana.com';
 
 export function SolanaProvider({ children }: { children: React.ReactNode }) {
-  const { rpcEndpoint } = useSettings();
-  const [endpoint, setEndpoint] = useState<string>('');
+  const [connection, setConnection] = useState<Connection | null>(null);
   
   useEffect(() => {
-    // Update the connection pool when endpoint changes
-    updateRpcEndpoint(rpcEndpoint.url);
-    
-    // Get connection from pool and extract endpoint
+    // Initialize connection pool
     const init = async () => {
-      const conn = await connectionPool.getConnection();
-      setEndpoint(conn.rpcEndpoint);
+      try {
+        const conn = await connectionPool.getConnection();
+        setConnection(conn);
+      } catch (error) {
+        console.error('Failed to initialize connection:', error);
+      }
     };
-    
     init();
-  }, [rpcEndpoint.url]);
+  }, []); // Only initialize once
 
-  if (!endpoint) {
-    return null; // Or loading state
-  }
-
+  // Always render children, use default or actual connection when available
   return (
-    <ConnectionProvider endpoint={endpoint} config={{ commitment: 'confirmed' }}>
+    <ConnectionProvider 
+      endpoint={connection?.rpcEndpoint || DEFAULT_ENDPOINT} 
+      config={{ commitment: 'confirmed' }}
+    >
       {children}
     </ConnectionProvider>
   );

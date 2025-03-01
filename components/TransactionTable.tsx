@@ -2,7 +2,6 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { type BaseTransactionInfo } from '@/lib/solana';
-import Link from 'next/link';
 import * as VTable from '@visactor/vtable';
 import type { ListTableConstructorOptions, ColumnDefine } from '@visactor/vtable';
 
@@ -59,7 +58,7 @@ export default function TransactionTable({ transactions, isLoading, hasMore, onL
   ]);
 
   useEffect(() => {
-    if (!tableRef.current || !transactions.length) return;
+    if (!tableRef.current || !transactions.length) return undefined;
 
     const option: ListTableConstructorOptions = {
       records: transactions,
@@ -101,8 +100,9 @@ export default function TransactionTable({ transactions, isLoading, hasMore, onL
     };
 
     // Initialize table
-    if (tableRef.current) {
-      const rect = tableRef.current.getBoundingClientRect();
+    if (!tableRef.current) return undefined;
+    
+    {
       tableInstanceRef.current = new VTable.ListTable({
         ...option,
         container: tableRef.current,

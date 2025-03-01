@@ -35,24 +35,22 @@ const tutorialSteps: TutorialStep[] = [
 export function TutorialGuide() {
   const [isVisible, setIsVisible] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
-  const [hasSeenTutorial, setHasSeenTutorial] = useState(false);
-
   useEffect(() => {
     const seen = localStorage.getItem('hasSeenTransactionTutorial');
     if (!seen) {
       setIsVisible(true);
-      setHasSeenTutorial(false);
-    } else {
-      setHasSeenTutorial(true);
     }
   }, []);
 
   const handleNext = () => {
     if (currentStep < tutorialSteps.length - 1) {
       setCurrentStep(currentStep + 1);
-      const element = document.getElementById(tutorialSteps[currentStep + 1].targetId);
-      if (element) {
+      const nextStep = tutorialSteps[currentStep + 1];
+      if (nextStep) {
+        const element = document.getElementById(nextStep.targetId);
+        if (element) {
         element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
       }
     } else {
       handleClose();
@@ -67,9 +65,12 @@ export function TutorialGuide() {
   const handleRestart = () => {
     setCurrentStep(0);
     setIsVisible(true);
-    const element = document.getElementById(tutorialSteps[0].targetId);
-    if (element) {
+    const firstStep = tutorialSteps[0];
+    if (firstStep) {
+      const element = document.getElementById(firstStep.targetId);
+      if (element) {
       element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
     }
   };
 
@@ -87,6 +88,9 @@ export function TutorialGuide() {
   }
 
   const currentTutorialStep = tutorialSteps[currentStep];
+  if (!currentTutorialStep) {
+    return null;
+  }
 
   return (
     <div className="fixed bottom-4 right-4 w-80 bg-background border border-border rounded-lg shadow-lg p-4">

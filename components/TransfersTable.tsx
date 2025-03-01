@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { useTransfers } from '@/app/account/[address]/components/shared/hooks';
-import { Transfer } from '@/app/account/[address]/components/shared/types';
+import type { Transfer } from '@/app/account/[address]/components/shared/types';
 import { VTableWrapper } from '@/components/vtable';
 import { Button } from '@/components/ui/button';
 import { formatNumber } from '@/lib/utils';
@@ -90,7 +90,7 @@ export function TransfersTable({ address }: TransfersTableProps) {
       width: 200,
       sortable: true,
       render: (row: Transfer) => (
-        <Tooltip content={row.from} side="top">
+        <Tooltip content={row.from}>
           <div className="truncate font-mono text-xs">
             <a
               href={`/account/${row.from}`}
@@ -111,7 +111,7 @@ export function TransfersTable({ address }: TransfersTableProps) {
       width: 200,
       sortable: true,
       render: (row: Transfer) => (
-        <Tooltip content={row.to} side="top">
+        <Tooltip content={row.to}>
           <div className="truncate font-mono text-xs">
             <a
               href={`/account/${row.to}`}
@@ -132,7 +132,7 @@ export function TransfersTable({ address }: TransfersTableProps) {
       width: 200,
       sortable: false,
       render: (row: Transfer) => (
-        <Tooltip content={row.signature} side="top">
+        <Tooltip content={row.signature}>
           <div className="truncate font-mono text-xs">
             <a
               href={`/tx/${row.signature}`}
@@ -202,14 +202,12 @@ export function TransfersTable({ address }: TransfersTableProps) {
         </h2>
       </div>
 
-      <div className="border border-border rounded-lg overflow-hidden" role="region" aria-labelledby="transfers-heading" aria-live="polite">
+      <div className="border border-border rounded-lg overflow-hidden h-[500px]" role="region" aria-labelledby="transfers-heading" aria-live="polite">
         <VTableWrapper
           columns={columns}
           data={sortedTransfers}
           loading={loading}
           onSort={handleSort}
-          emptyMessage="No transfers found"
-          height={500}
           aria-busy={loading ? 'true' : 'false'}
         />
       </div>

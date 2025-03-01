@@ -1,5 +1,5 @@
 import { Connection } from '@solana/web3.js';
-import { AgentCapability, CapabilityType, Message, Tool } from '../types';
+import type { AgentCapability, CapabilityType, Message, Tool } from '../types';
 
 export abstract class BaseCapability implements AgentCapability {
   abstract type: CapabilityType;
@@ -39,4 +39,4 @@ export abstract class BaseCapability implements AgentCapability {
       execute: executor
     };
   }
-} 
+}

@@ -38,7 +38,7 @@ export function TopPrograms() {
                 .filter(log => log.includes('Program') && log.includes('invoke'))
                 .forEach(log => {
                   const match = log.match(/Program (\w+) invoke/);
-                  if (!match) return;
+                  if (!match || !match[1]) return;
                   
                   const program = match[1];
                   programCounts.set(program, (programCounts.get(program) || 0) + 1);

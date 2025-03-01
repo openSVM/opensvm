@@ -116,7 +116,7 @@ const DropdownMenuSubContent = React.forwardRef<
       data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2
       data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2
       origin-[var(--radix-dropdown-menu-content-transform-origin)]
-      duration-200 ease-out
+      transition-all duration-300 ease-out
       ${className}
     `}
     {...props}

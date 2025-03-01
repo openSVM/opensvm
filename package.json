@@ -4,12 +4,14 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build --debug",
     "start": "next start",
     "lint": "next lint",
     "test": "jest",
     "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui"
+    "test:e2e:ui": "playwright test --ui",
+    "dev:test": "NODE_ENV=test next dev",
+    "build:test": "NODE_ENV=test next build"
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.30.1",

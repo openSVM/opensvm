@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
 interface NFTCollection {
@@ -43,6 +43,25 @@ export default function TrendingNFTs() {
   const [collections, setCollections] = useState<NFTCollection[]>(EXAMPLE_COLLECTIONS);
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
+
+  useEffect(() => {
+    const fetchCollections = async () => {
+      try {
+        setIsLoading(true);
+        const response = await fetch('/api/nft-collections/trending');
+        if (response.ok) {
+          const data = await response.json();
+          setCollections(data);
+        }
+      } catch (error) {
+        console.error('Error fetching collections:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchCollections();
+  }, []);
 
   const handleCollectionClick = (address: string) => {
     router.push(`/collection/${address}`);
@@ -104,4 +123,4 @@ export default function TrendingNFTs() {
       </div>
     </div>
   );
-} 
+}

@@ -1,4 +1,4 @@
-import { 
+import type { 
   AgentConfig, 
   AgentContext, 
   Message, 
@@ -8,6 +8,7 @@ import {
   AgentAction,
   AgentCapability
 } from '../types';
+import { NETWORK_PERFORMANCE_KNOWLEDGE } from './knowledge';
 
 export class SolanaAgent {
   private config: AgentConfig;
@@ -71,7 +72,7 @@ export class SolanaAgent {
       // Get the last assistant message which should contain the action plan
       const lastAssistantMessage = [...this.context.messages]
         .reverse()
-        .find(m => m.role === 'assistant');
+        .find(m => m.role === 'assistant') || null;
       
       // Extract actions from the last assistant message if it exists
       const actions = lastAssistantMessage 
@@ -91,18 +92,73 @@ export class SolanaAgent {
       
       return response;
     } catch (error) {
-      console.error('Error processing message:', error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error('Error processing message:', errorMessage);
       return this.createErrorResponse('I encountered an error while processing your request.');
     }
   }
 
   private async generateActionPlan(prompt: string): Promise<string> {
-    // TODO: In a real implementation, this would use an LLM to generate the action plan
-    // For now, we'll use a simple implementation that extracts RPC method names
-    // and creates corresponding actions
-    const methods = prompt.match(/available methods: (.*?)(?:\.|$)/i)?.[1] || '';
-    const actionsList = methods.split(', ')
-      .filter(Boolean)
+    // Extract the user's request from the prompt
+    const requestMatch = prompt.match(/handle this request: "(.*?)" using available methods/i);
+    if (!requestMatch?.[1]) return 'No actions needed';
+    
+    const request = requestMatch[1].toLowerCase();
+    
+    // Define action patterns with type safety
+    interface ActionPattern {
+      keywords: string[];
+      actions: string[];
+    }
+
+    const patterns: ActionPattern[] = [
+      {
+        keywords: ['tps', 'transactions per second', 'performance'],
+        actions: [
+          '[ACTION]network.analyzeNetworkLoad:Get current TPS and network load metrics[/ACTION]'
+        ]
+      },
+      {
+        keywords: ['network status', 'network health'],
+        actions: [
+          '[ACTION]network.getNetworkStatus:Get current network status[/ACTION]',
+          '[ACTION]network.analyzeNetworkLoad:Get network performance metrics[/ACTION]'
+        ]
+      },
+      {
+        keywords: ['validator', 'validators'],
+        actions: [
+          '[ACTION]network.getValidatorInfo:Get validator information[/ACTION]'
+        ]
+      },
+      {
+        keywords: ['transaction', 'tx'],
+        actions: [
+          '[ACTION]transaction.getTransaction:Get transaction details[/ACTION]'
+        ]
+      },
+      {
+        keywords: ['balance', 'account'],
+        actions: [
+          '[ACTION]account.getAccountInfo:Get account information[/ACTION]',
+          '[ACTION]account.getBalance:Get account balance[/ACTION]'
+        ]
+      }
+    ];
+    
+    // Find matching pattern
+    const matchingPattern = patterns.find(pattern =>
+      pattern.keywords.some(keyword => request.includes(keyword))
+    );
+    
+    if (matchingPattern) {
+      return matchingPattern.actions.join('\n');
+    }
+    
+    // If no specific pattern matches, extract methods from prompt
+    const methodsMatch = prompt.match(/available methods: (.*?)(?:\.|$)/i);
+    const methods = methodsMatch?.[1]?.split(', ').filter(Boolean) ?? [];
+    const actionsList = methods
       .map(method => `[ACTION]${method}:Execute ${method}[/ACTION]`)
       .join('\n');
     
@@ -115,7 +171,7 @@ export class SolanaAgent {
       try {
         // Parse action type to extract capability
         const capabilityInfo = this.parseActionType(action.type);
-        if (!capabilityInfo) {
+        if (!capabilityInfo?.capabilityType) {
           throw new Error(`Invalid action type: ${action.type}`);
         }
 
@@ -142,9 +198,10 @@ export class SolanaAgent {
           capabilityType: capability.type 
         });
       } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
         results.push({ 
           action, 
-          error: error.message, 
+          error: errorMessage,
           status: 'failed' as const
         });
       }
@@ -154,30 +211,48 @@ export class SolanaAgent {
 
   private parseActionType(actionType: string): { capabilityType: string } | null {
     // Handle various action type formats:
-    // 1. simple_action
-    // 2. capability.action
-    // 3. capability/action
-    // 4. capabilityAction
+    // 1. capability.action (e.g., network.getStatus)
+    // 2. capability/action (e.g., network/getStatus)
+    // 3. capability_action (e.g., network_getStatus)
+    // 4. capabilityAction (e.g., networkGetStatus)
+    // 5. simple_action (e.g., getStatus)
     
-    const formats = [
-      // Format: simple_action or capability_action
-      /^(?:([a-z]+)_)?([a-z]+)$/i,
-      // Format: capability.action
-      /^([a-z]+)\.([a-z]+)$/i,
-      // Format: capability/action
-      /^([a-z]+)\/([a-z]+)$/i,
-      // Format: camelCase (e.g., transactionFetch)
-      /^([a-z]+)([A-Z][a-z]+)$/
-    ];
+    // First try to match capability.action format
+    const dotMatch = actionType.match(/^([a-z]+)\.([a-z]+)/i);
+    if (dotMatch?.[1]) {
+      return { capabilityType: dotMatch[1].toLowerCase() };
+    }
 
-    for (const format of formats) {
-      const match = actionType.match(format);
-      if (match) {
-        // The capability type is either the first capture group or the second,
-        // depending on the format
-        const capabilityType = match[1] || match[2];
-        return { capabilityType: capabilityType.toLowerCase() };
-      }
+    // Try capability/action format
+    const slashMatch = actionType.match(/^([a-z]+)\/([a-z]+)/i);
+    if (slashMatch?.[1]) {
+      return { capabilityType: slashMatch[1].toLowerCase() };
+    }
+
+    // Try capability_action format
+    const underscoreMatch = actionType.match(/^([a-z]+)_([a-z]+)/i);
+    if (underscoreMatch?.[1]) {
+      return { capabilityType: underscoreMatch[1].toLowerCase() };
+    }
+
+    // Try camelCase format (e.g., networkGetStatus)
+    const camelMatch = actionType.match(/^([a-z]+)([A-Z][a-z]+)/);
+    if (camelMatch?.[1]) {
+      return { capabilityType: camelMatch[1].toLowerCase() };
+    }
+
+    // For simple actions, try to infer capability from the action
+    const simpleMatch = actionType.match(/^([a-z]+)$/i);
+    if (simpleMatch?.[1]) {
+      const action = simpleMatch[1].toLowerCase();
+      // Map common actions to capabilities
+      const actionToCapability: Record<string, string> = {
+        'analyze': 'network',
+        'get': 'network',
+        'fetch': 'network',
+        'monitor': 'network'
+      };
+      return { capabilityType: actionToCapability[action] || action };
     }
 
     return null;
@@ -198,9 +273,15 @@ export class SolanaAgent {
       return true;
     }
 
-    // Add more matching rules as needed
+    // Handle common capability aliases
+    const capabilityAliases: Record<string, string[]> = {
+      'network': ['net', 'performance', 'status', 'metrics'],
+      'transaction': ['tx', 'transactions'],
+      'account': ['accounts', 'wallet', 'balance']
+    };
 
-    return false;
+    // Check if the action type matches any alias for the capability
+    return capabilityAliases[normalizedCapability]?.includes(normalizedAction) || false;
   }
 
   private async executeCapability(capability: AgentCapability, message: Message): Promise<any> {
@@ -276,7 +357,8 @@ export class SolanaAgent {
         result
       };
     } catch (error) {
-      console.error(`Error executing tool ${tool.name}:`, error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error(`Error executing tool ${tool.name}:`, errorMessage);
       throw error;
     }
   }
@@ -308,33 +390,6 @@ export class SolanaAgent {
       return "I wasn't able to get any results for your request.";
     }
 
-    // Generate LLM overview based on result type and content
-    const generateOverview = (data: any): string => {
-      // Analyze the data structure and content
-      const dataType = Array.isArray(data) ? 'array' : typeof data;
-      const hasError = data.error || (Array.isArray(data) && data.some(item => item.status === 'failed'));
-      
-      // Generate appropriate overview based on data characteristics
-      if (hasError) {
-        return "⚠️ There were some issues processing your request. Here are the details:";
-      }
-      
-      if (dataType === 'array') {
-        const successCount = data.filter(item => item.status === 'completed').length;
-        return `✅ Successfully completed ${successCount} operation${successCount !== 1 ? 's' : ''}. Here's what I found:`;
-      }
-      
-      if (dataType === 'object') {
-        const keys = Object.keys(data).filter(key => !['id', '_id', 'type', 'status'].includes(key));
-        if (data.message) {
-          return `📝 ${data.message}`;
-        }
-        return `📊 I've retrieved the following information (${keys.length} fields):`;
-      }
-      
-      return "Here's what I found:";
-    };
-
     // Handle array of results from multiple tools
     if (Array.isArray(result)) {
       if (result.length === 0) {
@@ -342,16 +397,22 @@ export class SolanaAgent {
       }
 
       // Process each result and combine into a coherent response
-      const responses = result.map(item => {
+      const responses = result.map((item: any) => {
         if (item.status === 'failed') {
-          return `I encountered an error while ${item.action?.description || 'processing your request'}: ${item.error}`;
+          return `Error: ${item.error}`;
         }
 
         // Extract the actual result data
         const data = item.result?.result || item.result;
         
         if (!data) {
-          return `I completed ${item.tool || 'the operation'} successfully.`;
+          return null;
+        }
+
+        // Handle network performance data
+        if (item.tool === 'analyzeNetworkLoad' && typeof data === 'object') {
+          const { averageTps, maxTps, load, loadDescription, tpsRange } = data;
+          return `The current TPS is ${averageTps} (${tpsRange}). Peak TPS: ${maxTps}. Network load is ${load} (${loadDescription}).`;
         }
 
         // Handle different types of data
@@ -363,33 +424,30 @@ export class SolanaAgent {
           const details = Object.entries(data)
             .filter(([key]) => !['id', '_id', 'type', 'status'].includes(key))
             .map(([key, value]) => `${key.replace(/_/g, ' ')}: ${value}`)
-            .join(', ');
-          return details || `I completed ${item.tool || 'the operation'} successfully.`;
+            .join('\n');
+          return details || null;
         }
 
         return String(data);
-      });
+      }).filter(Boolean);
 
-      // Combine overview with detailed responses
-      return `${generateOverview(result)}\n\n${responses.join('\n')}`;
+      return responses.join('\n');
     }
 
     // Handle single result
     if (typeof result === 'object') {
-      let details = '';
       if (result.message) {
-        details = result.message;
+        return result.message;
       } else if (result.error) {
-        details = `I encountered an error: ${result.error}`;
+        return `Error: ${result.error}`;
       } else {
         // Convert object to readable text
-        details = Object.entries(result)
+        const details = Object.entries(result)
           .filter(([key]) => !['id', '_id', 'type', 'status'].includes(key))
           .map(([key, value]) => `${key.replace(/_/g, ' ')}: ${value}`)
-          .join(', ');
+          .join('\n');
+        return details || 'Operation completed successfully.';
       }
-      
-      return details ? `${generateOverview(result)}\n\n${details}` : 'The operation completed successfully.';
     }
 
     return String(result);
@@ -408,4 +466,4 @@ export class SolanaAgent {
       }]
     };
   }
-} 
+}

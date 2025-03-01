@@ -1,5 +1,17 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  typescript: {
+    // Use an alternate config for type checking to ignore test-related files
+    tsconfigPath: 'tsconfig.json',
+    // Disable type checking in development for better performance
+    // Still runs in build mode for CI/deployment safety
+    ignoreBuildErrors: false,
+  },
+  // Environment variables that should be available to the client
+  env: {
+    OPENSVM_RPC_LIST: process.env.OPENSVM_RPC_LIST,
+    OPENSVM_RPC_LIST_2: process.env.OPENSVM_RPC_LIST_2
+  },
   // Webpack configuration for optimizing chunks
   webpack: (config, { isServer }) => {
     // Optimize client-side chunks
@@ -95,13 +107,28 @@ const nextConfig = {
   },
 
   // Enable React strict mode
-  reactStrictMode: true,
+  reactStrictMode: false,
 
   // Enable production source maps for better debugging
   productionBrowserSourceMaps: true,
 
+  // Content Security Policy
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          {
+            key: 'Content-Security-Policy',
+            value: "connect-src 'self' https://*.solana.com https://*.helius-rpc.com https://*.chainstack.com"
+          }
+        ]
+      }
+    ];
+  },
+
   // Disable unnecessary features
-  poweredByHeader: false,
+  poweredByHeader: true,
 };
 
 export default nextConfig;

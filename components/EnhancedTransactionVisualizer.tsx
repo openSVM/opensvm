@@ -1,8 +1,25 @@
 'use client';
 
-import { DetailedTransactionInfo, InstructionWithAccounts } from '@/lib/solana';
+import type { DetailedTransactionInfo } from '@/lib/solana';
 import { useEffect, useRef } from 'react';
 import * as d3 from 'd3';
+
+interface ParsedInstruction {
+  program: string;
+  accounts: number[];
+}
+
+interface UnparsedInstruction {
+  programId: { toString(): string };
+  accounts: number[];
+}
+
+interface TransactionAccount {
+  pubkey: { toString(): string };
+  signer: boolean;
+}
+
+type InstructionWithAccounts = ParsedInstruction | UnparsedInstruction;
 
 interface EnhancedTransactionVisualizerProps {
   tx: DetailedTransactionInfo;
@@ -24,11 +41,23 @@ interface Link {
   type: 'execution' | 'interaction';
 }
 
+function isParsedInstruction(ix: InstructionWithAccounts): ix is ParsedInstruction {
+  return 'program' in ix;
+}
+
+function isValidAccount(account: any): account is TransactionAccount {
+  return account && typeof account === 'object' && 'pubkey' in account && 'signer' in account;
+}
+
 export default function EnhancedTransactionVisualizer({ tx }: EnhancedTransactionVisualizerProps) {
   const svgRef = useRef<SVGSVGElement>(null);
 
   useEffect(() => {
-    if (!svgRef.current || !tx.details) return;
+    if (!svgRef.current) return;
+    if (!tx.details?.instructions || !tx.details.accounts) {
+      console.warn('Transaction details are missing');
+      return;
+    }
 
     // Clear previous content
     d3.select(svgRef.current).selectAll('*').remove();
@@ -38,7 +67,8 @@ export default function EnhancedTransactionVisualizer({ tx }: EnhancedTransactio
     const links: Link[] = [];
 
     // Add instruction nodes
-    tx.details.instructions.forEach((ix: InstructionWithAccounts, index: number) => {
+    const details = tx.details; // Store in local variable to avoid non-null assertions
+    details.instructions.forEach((ix: InstructionWithAccounts, index: number) => {
       const instructionId = `instruction-${index}`;
       nodes.push({
         id: instructionId,
@@ -49,23 +79,28 @@ export default function EnhancedTransactionVisualizer({ tx }: EnhancedTransactio
       // Link instruction to program
       links.push({
         source: instructionId,
-        target: 'parsed' in ix ? ix.program : ix.programId.toString(),
+        target: isParsedInstruction(ix) ? ix.program : ix.programId.toString(),
         type: 'execution'
       });
 
       // Link instruction to accounts
       ix.accounts.forEach((accountIndex: number) => {
-        links.push({
-          source: instructionId,
-          target: tx.details.accounts[accountIndex].pubkey.toString(),
-          type: 'interaction'
-        });
+        if (accountIndex < details.accounts.length) {
+          const account = details.accounts[accountIndex];
+          if (isValidAccount(account)) {
+            links.push({
+              source: instructionId,
+              target: account.pubkey.toString(),
+              type: 'interaction'
+            });
+          }
+        }
       });
     });
 
     // Add program nodes
-    const programs = new Set(tx.details.instructions.map(ix => 
-      'parsed' in ix ? ix.program : ix.programId.toString()
+    const programs = new Set(details.instructions.map(ix => 
+      isParsedInstruction(ix) ? ix.program : ix.programId.toString()
     ));
     programs.forEach(programId => {
       nodes.push({
@@ -75,12 +110,14 @@ export default function EnhancedTransactionVisualizer({ tx }: EnhancedTransactio
     });
 
     // Add account nodes
-    tx.details.accounts.forEach(account => {
-      nodes.push({
-        id: account.pubkey.toString(),
-        type: account.signer ? 'signer' : 'account',
-        data: account
-      });
+    details.accounts.forEach(account => {
+      if (isValidAccount(account)) {
+        nodes.push({
+          id: account.pubkey.toString(),
+          type: account.signer ? 'signer' : 'account',
+          data: account
+        });
+      }
     });
 
     // Setup SVG
@@ -209,7 +246,7 @@ export default function EnhancedTransactionVisualizer({ tx }: EnhancedTransactio
         case 'instruction': {
           const ix = node.data as InstructionWithAccounts;
           return `Instruction ${node.id.split('-')[1]}\nProgram: ${
-            'parsed' in ix ? ix.program : ix.programId.toString()
+            isParsedInstruction(ix) ? ix.program : ix.programId.toString()
           }`;
         }
         case 'program':

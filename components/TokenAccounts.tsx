@@ -1,5 +1,6 @@
-import { AccountInfo, PublicKey } from '@solana/web3.js';
-import { AccountLayout, TOKEN_PROGRAM_ID } from '@solana/spl-token';
+import type { AccountInfo } from '@solana/web3.js';
+import { PublicKey } from '@solana/web3.js';
+import { AccountLayout } from '@solana/spl-token';
 import { getConnection } from '@/lib/solana';
 import { useEffect, useState } from 'react';
 

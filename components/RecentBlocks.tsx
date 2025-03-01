@@ -1,7 +1,5 @@
 'use client';
 
-import Link from 'next/link';
-
 interface Block {
   slot: number;
 }
@@ -49,4 +47,4 @@ export function RecentBlocks({ blocks, onBlockSelect, isLoading }: Props) {
       </div>
     </div>
   );
-} 
+}

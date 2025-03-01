@@ -7,16 +7,7 @@ import TransactionsInBlock from '@/components/TransactionsInBlock';
 import Link from 'next/link';
 import { Copy } from 'lucide-react';
 
-// Known program names
-const PROGRAM_NAMES: Record<string, string> = {
-  'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA': 'Token Program',
-  '11111111111111111111111111111111': 'System Program',
-  'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb': 'Token-2022',
-  // Add more known programs here
-};
-
 // Helper functions
-const getProgramName = (address: string) => PROGRAM_NAMES[address];
 const copyToClipboard = async (text: string) => {
   try {
     await navigator.clipboard.writeText(text);

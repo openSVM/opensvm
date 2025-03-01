@@ -1,8 +1,7 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import dynamic from 'next/dynamic';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -10,143 +9,180 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-
-// Lazy load components
-const SettingsMenu = dynamic(
-  () => import('./SettingsMenu').then(mod => ({ default: mod.SettingsMenu })),
-  { 
-    loading: () => null,
-    ssr: false
-  }
-);
-
-const WalletButton = dynamic(
-  () => import('./WalletButton').then(mod => ({ default: mod.WalletButton })),
-  {
-    loading: () => null,
-    ssr: false
-  }
-);
-
-// Lazy load AI Chat with more aggressive code splitting
-const AIChatSidebar = dynamic(
-  () => import('./ai/AIChatSidebar').then(mod => ({ default: mod.AIChatSidebar })),
-  { 
-    loading: () => null,
-    ssr: false
-  }
-);
+import { SettingsMenu } from './SettingsMenu';
+import { WalletButton } from './WalletButton';
+import { AIChatSidebar } from './ai/AIChatSidebar';
 
 export function NavbarInteractive() {
   const router = useRouter();
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isAIChatOpen, setIsAIChatOpen] = useState(false);
-  const [showInteractiveElements, setShowInteractiveElements] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
 
-  // Delay loading interactive elements
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setShowInteractiveElements(true);
-    }, 1000);
-    return () => clearTimeout(timer);
-  }, []);
-
-  // Handle search
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     const query = searchQuery.trim();
-    if (!query) return;
-    router.push(`/search?q=${encodeURIComponent(query)}`);
+    if (query) {
+      router.push(`/search?q=${encodeURIComponent(query)}`);
+    }
   };
 
-  // Handle outside clicks for menu
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setIsMenuOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  if (!showInteractiveElements) {
-    return null;
-  }
-
   return (
-    <>
+    <div className="flex w-full items-center">
+      {/* Logo area placeholder to maintain alignment */}
+      <div className="flex items-center gap-2 invisible">
+        <span className="font-bold text-lg">OPENSVM</span>
+        <span className="text-sm">[AI]</span>
+      </div>
+      
       {/* Interactive search form */}
-      <form onSubmit={handleSearch} className="flex-1 max-w-xl px-4">
-        <input
-          type="text"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full bg-background border border-border hover:border-foreground/20 focus:border-foreground/40 pl-10 h-9 transition-colors rounded-md"
-          placeholder="Search accounts, tokens, or programs..."
-        />
+      <form onSubmit={handleSearch} className="flex-1 max-w-xl mx-4">
+        <div className="relative">
+          <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground">
+            <svg 
+              width="18" 
+              height="18" 
+              viewBox="0 0 24 24" 
+              fill="none" 
+              stroke="currentColor" 
+              strokeWidth="2" 
+              strokeLinecap="round" 
+              strokeLinejoin="round"
+              className="opacity-70"
+            >
+              <path d="M19 19l-4.35-4.35M11 5a6 6 0 100 12 6 6 0 000-12z" />
+            </svg>
+          </div>
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full bg-background/50 border border-border hover:border-foreground/20 focus:border-foreground/40 pl-10 h-9 transition-colors rounded-md"
+            placeholder="Search accounts, tokens, or programs..."
+          />
+        </div>
       </form>
 
       {/* Interactive navigation */}
-      <div className="hidden sm:flex items-center gap-4">
+      <div className="flex items-center gap-2">
         {/* Explore Dropdown */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="gap-2">
+            <Button variant="ghost" size="sm" className="gap-1 px-2">
               Explore
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <svg width="10" height="10" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => router.push('/networks')}>Networks</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => router.push('/blocks')}>Blocks</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => router.push('/programs')}>Programs</DropdownMenuItem>
+          <DropdownMenuContent align="end" className="animate-duration-300">
+            <DropdownMenuItem 
+              onClick={(e) => {
+                e.stopPropagation();
+                router.push('/networks');
+              }}
+            >
+              Networks
+            </DropdownMenuItem>
+            <DropdownMenuItem 
+              onClick={(e) => {
+                e.stopPropagation();
+                router.push('/blocks');
+              }}
+            >
+              Blocks
+            </DropdownMenuItem>
+            <DropdownMenuItem 
+              onClick={(e) => {
+                e.stopPropagation();
+                router.push('/programs');
+              }}
+            >
+              Programs
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
 
         {/* Tokens Dropdown */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="gap-2">
+            <Button variant="ghost" size="sm" className="gap-1 px-2">
               Tokens
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <svg width="10" height="10" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => router.push('/tokens')}>All Tokens</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => router.push('/tokens/gainers')}>Top Gainers</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => router.push('/tokens/new')}>New Listings</DropdownMenuItem>
+          <DropdownMenuContent align="end" className="animate-duration-300">
+            <DropdownMenuItem 
+              onClick={(e) => {
+                e.stopPropagation();
+                router.push('/tokens');
+              }}
+            >
+              All Tokens
+            </DropdownMenuItem>
+            <DropdownMenuItem 
+              onClick={(e) => {
+                e.stopPropagation();
+                router.push('/tokens/gainers');
+              }}
+            >
+              Top Gainers
+            </DropdownMenuItem>
+            <DropdownMenuItem 
+              onClick={(e) => {
+                e.stopPropagation();
+                router.push('/tokens/new');
+              }}
+            >
+              New Listings
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
 
         {/* NFTs Dropdown */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="gap-2">
+            <Button variant="ghost" size="sm" className="gap-1 px-2">
               NFTs
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <svg width="10" height="10" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => router.push('/nfts')}>Collections</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => router.push('/nfts/trending')}>Trending</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => router.push('/nfts/new')}>New Mints</DropdownMenuItem>
+          <DropdownMenuContent align="end" className="animate-duration-300">
+            <DropdownMenuItem 
+              onClick={(e) => {
+                e.stopPropagation();
+                router.push('/nfts');
+              }}
+            >
+              Collections
+            </DropdownMenuItem>
+            <DropdownMenuItem 
+              onClick={(e) => {
+                e.stopPropagation();
+                router.push('/nfts/trending');
+              }}
+            >
+              Trending
+            </DropdownMenuItem>
+            <DropdownMenuItem 
+              onClick={(e) => {
+                e.stopPropagation();
+                router.push('/nfts/new');
+              }}
+            >
+              New Mints
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
 
-        <WalletButton />
         <SettingsMenu />
+        <WalletButton />
         <Button 
-          className="bg-[#00DC82] text-black hover:bg-[#00DC82]/90"
+          size="sm"
+          className="bg-[#00DC82] text-black hover:bg-[#00DC82]/90 ml-2"
           onClick={() => setIsAIChatOpen(true)}
         >
           AI Assistant
@@ -164,6 +200,6 @@ export function NavbarInteractive() {
           initialWidth={400}
         />
       )}
-    </>
+    </div>
   );
 }

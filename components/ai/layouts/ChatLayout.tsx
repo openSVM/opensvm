@@ -2,7 +2,6 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import type { ReactNode } from 'react';
 import { Maximize2, RotateCcw, Plus, MoreHorizontal, X, Settings, HelpCircle, Download, Share2 } from 'lucide-react';
 import { SettingsModal } from '../modals/SettingsModal';
-import { generateAndShareScreenshot } from '@/lib/ai/utils/screenshot';
 
 export interface ChatLayoutProps {
   children: ReactNode;

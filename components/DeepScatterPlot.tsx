@@ -43,9 +43,11 @@ export default function DeepScatterPlot({
     ctx.fillRect(0, 0, width, height);
 
     // Get data ranges
-    const xValues = data.map(d => d[xField]);
-    const yValues = data.map(d => d[yField]);
-    const colorValues = colorField ? data.map(d => d[colorField]) : null;
+    const xValues = data.map(d => d[xField]).filter((x): x is number => x !== undefined);
+    const yValues = data.map(d => d[yField]).filter((y): y is number => y !== undefined);
+    const colorValues = colorField ? data.map(d => d[colorField]).filter((c): c is number => c !== undefined) : null;
+
+    if (xValues.length === 0 || yValues.length === 0) return;
 
     const xMin = Math.min(...xValues);
     const xMax = Math.max(...xValues);
@@ -58,17 +60,19 @@ export default function DeepScatterPlot({
 
     // Draw points
     const pointRadius = 3;
-    data.forEach((point, i) => {
+    data.forEach(point => {
       const x = point[xField];
       const y = point[yField];
+      if (x === undefined || y === undefined) return;
+
       const scaledX = xScale(x);
       const scaledY = yScale(y);
 
       ctx.beginPath();
       ctx.arc(scaledX, scaledY, pointRadius, 0, Math.PI * 2);
 
-      if (colorValues) {
-        const colorValue = colorValues[i];
+      if (colorValues && colorField && point[colorField] !== undefined) {
+        const colorValue = point[colorField];
         const maxColorValue = Math.max(...colorValues);
         const hue = (colorValue / maxColorValue) * 360;
         ctx.fillStyle = `hsl(${hue}, 70%, 50%)`;
@@ -92,8 +96,12 @@ export default function DeepScatterPlot({
       let closestPoint: DataPoint | null = null;
 
       data.forEach(point => {
-        const scaledX = xScale(point[xField]);
-        const scaledY = yScale(point[yField]);
+        const px = point[xField];
+        const py = point[yField];
+        if (px === undefined || py === undefined) return;
+
+        const scaledX = xScale(px);
+        const scaledY = yScale(py);
         const dist = Math.sqrt(Math.pow(x - scaledX, 2) + Math.pow(y - scaledY, 2));
 
         if (dist < minDist && dist < pointRadius * 2) {

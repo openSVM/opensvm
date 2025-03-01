@@ -1,4 +1,4 @@
-import { AgentCapability, Tool, CapabilityType } from '../types';
+import type { AgentCapability, Tool, CapabilityType, ToolParams } from '../types';
 import { TokenEstimator } from '../utils/token-estimator';
 
 export class TokenEstimationCapability implements AgentCapability {
@@ -6,21 +6,19 @@ export class TokenEstimationCapability implements AgentCapability {
 
   tools: Tool[] = [
     {
-      name: 'estimate_token_usage',
-      description: 'Estimate token usage and cost for AI models',
-      execute: async (params: { message: { content: string } }) => {
-        return TokenEstimator.estimateTokens(params.message.content);
+      name: 'estimateTokens',
+      description: 'Estimates the number of tokens that will be used by a prompt',
+      execute: async (params: ToolParams) => {
+        // Extract the prompt from the message content
+        const prompt = params.message.content;
+        return TokenEstimator.estimateTokens(prompt);
       }
     }
   ];
 
-  /**
-   * Determines if this capability can handle the given message
-   * @param message Message to check
-   * @returns Boolean indicating if the capability can handle the message
-   */
   canHandle(message: { content: string }): boolean {
-    // Handle messages that explicitly ask about token estimation or contain keywords
-    return /token(s)?(\s+)?(estimate|count|usage|spending)/i.test(message.content);
+    const content = message.content.toLowerCase();
+    return content.includes('token') && 
+           (content.includes('estimate') || content.includes('count'));
   }
 }

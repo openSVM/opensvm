@@ -3,41 +3,20 @@
 import { SettingsProvider } from '@/lib/settings';
 import { ThemeProvider } from '@/lib/theme';
 import { SolanaProvider } from '@/app/providers/SolanaProvider';
-import { WalletProvider } from '@/app/providers/WalletProvider';
-import { useState, useEffect } from 'react';
-
-// Defer wallet initialization until after settings and connection are ready
-function DeferredWalletProvider({ children }: { children: React.ReactNode }) {
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    // Small delay to ensure settings and connection are initialized
-    const timer = setTimeout(() => {
-      setMounted(true);
-    }, 100);
-
-    return () => clearTimeout(timer);
-  }, []);
-
-  if (!mounted) {
-    return null;
-  }
-
-  return (
-    <WalletProvider>
-      {children}
-    </WalletProvider>
-  );
-}
+import { WalletProvider } from '@solana/wallet-adapter-react';
+import { PhantomWalletAdapter } from '@solana/wallet-adapter-phantom';
+import { useMemo } from 'react';
 
 export function Providers({ children }: { children: React.ReactNode }) {
+  const wallets = useMemo(() => [new PhantomWalletAdapter()], []);
+
   return (
     <ThemeProvider>
       <SettingsProvider>
         <SolanaProvider>
-          <DeferredWalletProvider>
+          <WalletProvider wallets={wallets} autoConnect>
             {children}
-          </DeferredWalletProvider>
+          </WalletProvider>
         </SolanaProvider>
       </SettingsProvider>
     </ThemeProvider>

@@ -2,7 +2,7 @@ import { Loader, Mic, Send, Trash2 } from 'lucide-react';
 import type { Message, Note, AgentAction } from '@/lib/ai/types';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { useState } from 'react';
+import { useEffect, useRef } from 'react';
 
 interface ChatUIProps {
   messages: Message[];
@@ -23,10 +23,6 @@ interface ChatUIProps {
   isRecording?: boolean;
 }
 
-interface VoiceInputProps {
-  onInputChange: (value: string) => void;
-}
-
 export function ChatUI({
   messages,
   input,
@@ -42,11 +38,43 @@ export function ChatUI({
   onVoiceRecord,
   isRecording
 }: ChatUIProps) {
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  const scrollToBottom = () => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
+  // Scroll to bottom when messages change
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, agentActions]);
+
+  // Auto-scroll when content changes
+  useEffect(() => {
+    const scrollContainer = scrollContainerRef.current;
+    if (!scrollContainer) return;
+
+    const observer = new MutationObserver(() => {
+      scrollToBottom();
+    });
+
+    observer.observe(scrollContainer, {
+      childList: true,
+      subtree: true,
+      characterData: true
+    });
+
+    return () => observer.disconnect();
+  }, []);
+
   const renderContent = () => {
     switch (activeTab) {
       case 'notes':
         return (
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          <div className="flex-1 overflow-y-auto p-4 space-y-4" ref={scrollContainerRef}>
             {notes.length === 0 ? (
               <div className="text-center text-white/50 mt-8">
                 No knowledge entries yet. Start typing to add knowledge.
@@ -98,6 +126,7 @@ export function ChatUI({
                 ))}
               </>
             )}
+            <div ref={messagesEndRef} />
           </div>
         );
 
@@ -105,7 +134,7 @@ export function ChatUI({
       case 'assistant':
       default:
         return (
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          <div className="flex-1 overflow-y-auto p-4 space-y-4" ref={scrollContainerRef}>
             {messages.map((message, index) => (
               <div
                 key={index}
@@ -130,6 +159,12 @@ export function ChatUI({
                         ),
                         p: ({ node, ...props }) => (
                           <p className="my-1" {...props} />
+                        ),
+                        ul: ({ node, ...props }) => (
+                          <ul className="list-disc pl-4 space-y-1" {...props} />
+                        ),
+                        li: ({ node, ...props }) => (
+                          <li className="text-[12px]" {...props} />
                         )
                       }}
                     >
@@ -200,6 +235,7 @@ export function ChatUI({
                 </div>
               </div>
             )}
+            <div ref={messagesEndRef} />
           </div>
         );
     }
@@ -209,30 +245,61 @@ export function ChatUI({
     <div className={`flex flex-col h-full ${className}`}>
       {renderContent()}
       <div className="p-4 border-t border-white/20">
-        <form onSubmit={onSubmit} className="relative">
-          <textarea
-            value={input}
-            onChange={(e) => onInputChange(e.target.value)}
-            placeholder={isProcessing ? "Processing..." : activeTab === 'notes' ? "Add knowledge..." : "Ask a question..."}
-            disabled={isProcessing}
-            className="w-full bg-black text-white text-[12px] px-4 py-3 pr-16 rounded-lg border border-white/20 focus:outline-none focus:border-white/40 placeholder-white/50 disabled:opacity-50"
-          />
+        <div className="relative">
+          <div className="relative">
+            <textarea
+              value={input}
+              onChange={(e) => {
+                const value = e.target.value;
+                console.log('Input changed:', value);
+                try {
+                  onInputChange(value);
+                } catch (error) {
+                  console.error('Error in input change:', error);
+                }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  console.log('Enter pressed, submitting form');
+                  try {
+                    onSubmit(e);
+                  } catch (error) {
+                    console.error('Error in Enter key submission:', error);
+                  }
+                }
+              }}
+              placeholder={isProcessing ? "Processing..." : activeTab === 'notes' ? "Add knowledge..." : "Ask a question..."}
+              disabled={isProcessing}
+              className="w-full bg-black text-white text-[12px] px-4 py-3 pr-16 rounded-lg border border-white/20 focus:outline-none focus:border-white/40 placeholder-white/50 disabled:opacity-50"
+            />
+          </div>
           <button
             onClick={onVoiceRecord}
             disabled={isRecording}
             className={`absolute right-10 top-1/2 -translate-y-1/2 text-white disabled:opacity-50 p-1 hover:bg-white/10 rounded-smz`}
             title={isRecording ? 'Recording...' : 'Start Voice Input'}
+            type="button"
           >
             {isRecording ? <Loader className="animate-spin" size={20} /> : <Mic size={20} />}
           </button>
           <button
-            type="submit"
+            onClick={(e) => {
+              e.preventDefault();
+              console.log('Send button clicked with input:', input);
+              try {
+                onSubmit(e);
+              } catch (error) {
+                console.error('Error in send button click:', error);
+              }
+            }}
             disabled={isProcessing}
             className="absolute right-3 top-1/2 -translate-y-1/2 text-white disabled:opacity-50 p-1 hover:bg-white/10 rounded-sm"
+            type="button"
           >
             <Send size={16} />
           </button>
-        </form>
+        </div>
       </div>
     </div>
   );

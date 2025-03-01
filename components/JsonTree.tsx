@@ -16,7 +16,6 @@ interface JsonNodeProps {
 
 function JsonNode({ value, level, expanded = true }: JsonNodeProps) {
   const [isExpanded, setIsExpanded] = useState(expanded);
-  const indent = '  '.repeat(level);
   const isObject = value !== null && typeof value === 'object';
   const isArray = Array.isArray(value);
 

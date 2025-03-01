@@ -1,37 +1,95 @@
 import '@testing-library/jest-dom';
-import { TextDecoder, TextEncoder } from 'util';
-import { Connection } from '@solana/web3.js';
+import { TextDecoder as NodeTextDecoder, TextEncoder as NodeTextEncoder } from 'util';
+import { jest, expect } from '@jest/globals';
 
 // Polyfills for Next.js and Web APIs
-global.TextEncoder = TextEncoder;
-global.TextDecoder = TextDecoder;
+global.TextEncoder = NodeTextEncoder;
+global.TextDecoder = NodeTextDecoder as typeof global.TextDecoder;
 
 // Mock Response, Request, and Headers for fetch API
 export class MockResponse {
-  private body: string;
+  private bodyContent: string;
   public status: number;
   public statusText: string;
   public headers: Headers;
   public ok: boolean;
+  public redirected: boolean;
+  public type: ResponseType;
+  public url: string;
+  public bodyUsed: boolean;
+  public readable: ReadableStream<Uint8Array> | null;
+  public body: ReadableStream<Uint8Array> | null;
+  public bytes: () => Promise<Uint8Array>;
 
-  constructor(body: string | object, init?: { status?: number; statusText?: string; headers?: Record<string, string> }) {
-    this.body = typeof body === 'string' ? body : JSON.stringify(body);
+  constructor(body: string | object, init?: { status?: number; statusText?: string; headers?: Record<string, string>, url?: string }) {
+    this.bodyContent = typeof body === 'string' ? body : JSON.stringify(body);
     this.status = init?.status ?? 200;
     this.statusText = init?.statusText ?? '';
     this.headers = new Headers(init?.headers);
     this.ok = this.status >= 200 && this.status < 300;
+    this.redirected = false;
+    this.type = 'default';
+    this.url = init?.url ?? '';
+    this.bodyUsed = false;
+    this.readable = null;
+    this.body = null;
+    this.bytes = () => {
+      const encoder = new TextEncoder();
+      const encoded = encoder.encode(this.bodyContent);
+      return Promise.resolve(encoded);
+    };
   }
 
-  json() {
-    return Promise.resolve(JSON.parse(this.body));
+  json(): Promise<any> {
+    this.bodyUsed = true;
+    return Promise.resolve(JSON.parse(this.bodyContent));
   }
 
-  text() {
-    return Promise.resolve(this.body);
+  text(): Promise<string> {
+    this.bodyUsed = true;
+    return Promise.resolve(this.bodyContent);
+  }
+
+  arrayBuffer(): Promise<ArrayBuffer> {
+    this.bodyUsed = true;
+    const encoder = new TextEncoder();
+    const uint8Array = encoder.encode(this.bodyContent);
+    const arrayBuffer = uint8Array.buffer.slice(uint8Array.byteOffset, uint8Array.byteOffset + uint8Array.byteLength);
+    return Promise.resolve(arrayBuffer as ArrayBuffer);
+  }
+
+  blob(): Promise<Blob> {
+    this.bodyUsed = true;
+    return Promise.resolve(new Blob([this.bodyContent]));
+  }
+
+  formData(): Promise<FormData> {
+    this.bodyUsed = true;
+    const formData = new FormData();
+    try {
+      const json = JSON.parse(this.bodyContent);
+      for (const key in json) {
+        if (Object.prototype.hasOwnProperty.call(json, key)) {
+          formData.append(key, json[key]);
+        }
+      }
+    } catch (e) {
+      // If body is not JSON, append the entire body as a single field
+      formData.append('body', this.bodyContent);
+    }
+    return Promise.resolve(formData);
+  }
+
+  clone(): MockResponse {
+    return new MockResponse(this.bodyContent, {
+      status: this.status,
+      statusText: this.statusText,
+      headers: Object.fromEntries(this.headers.entries())
+    });
   }
 }
 
-global.Response = MockResponse as any;
+global.Response = MockResponse as unknown as typeof Response;
 global.Headers = class Headers {
   private headers: Record<string, string>;
   
@@ -46,37 +104,57 @@ global.Headers = class Headers {
   set(name: string, value: string): void {
     this.headers[name.toLowerCase()] = value;
   }
-} as any;
+
+  entries(): IterableIterator<[string, string]> {
+    return Object.entries(this.headers)[Symbol.iterator]();
+  }
+} as unknown as typeof Headers;
 
 // Mock Next.js router
+type RouterFunction = (...args: any[]) => void;
+const mockRouter = {
+  push: jest.fn<RouterFunction>(),
+  replace: jest.fn<RouterFunction>(),
+  prefetch: jest.fn<RouterFunction>(),
+  back: jest.fn<RouterFunction>(),
+};
+
 jest.mock('next/navigation', () => ({
-  useRouter: () => ({
-    push: jest.fn(),
-    replace: jest.fn(),
-    prefetch: jest.fn(),
-    back: jest.fn(),
-  }),
+  useRouter: () => mockRouter,
   useSearchParams: () => new URLSearchParams(),
   usePathname: () => '',
 }));
 
 // Mock Solana Connection
+type AsyncFunction<T> = (...args: any[]) => Promise<T>;
+const mockConnection = {
+  getBlockHeight: jest.fn<AsyncFunction<number>>().mockResolvedValue(100),
+  getProgramAccounts: jest.fn<AsyncFunction<any[]>>().mockResolvedValue([]),
+};
+
+// Type for PublicKey mock
+type PublicKeyMock = {
+  toString: () => string;
+  toBase58: () => string;
+};
+
+type PublicKeyConstructor = (key: string) => PublicKeyMock;
+
 jest.mock('@solana/web3.js', () => ({
-  Connection: jest.fn().mockImplementation(() => ({
-    getBlockHeight: jest.fn().mockResolvedValue(100),
-    getProgramAccounts: jest.fn().mockResolvedValue([]),
-  })),
-  PublicKey: jest.fn().mockImplementation((key) => ({
+  Connection: jest.fn().mockImplementation(() => mockConnection),
+  PublicKey: jest.fn<PublicKeyConstructor>().mockImplementation((key: string) => ({
     toString: () => key,
     toBase58: () => key,
   })),
 }));
 
 // Mock rate limiter
+const mockRateLimit = {
+  check: jest.fn<AsyncFunction<boolean>>().mockResolvedValue(true),
+};
+
 jest.mock('@/lib/rate-limit', () => ({
-  rateLimit: () => ({
-    check: jest.fn().mockResolvedValue(true),
-  }),
+  rateLimit: () => mockRateLimit,
 }));
 
 // Test utilities
@@ -84,7 +162,7 @@ export const TEST_ENDPOINTS = {
   local: 'http://localhost:8899',
   devnet: 'https://api.devnet.solana.com',
   mockRPC: 'mock://solana',
-};
+} as const;
 
 export const fixtures = {
   nftCollections: [
@@ -108,38 +186,48 @@ export const fixtures = {
     supply: '1000000000',
     volume: '50000',
   },
-};
+} as const;
 
 // Mock fetch globally
-global.fetch = jest.fn() as jest.MockedFunction<typeof fetch>;
+type FetchFunction = typeof fetch;
+const mockFetch = jest.fn<FetchFunction>();
+global.fetch = mockFetch;
 
 export const mockNetworkConditions = {
   offline: () => {
-    (global.fetch as jest.Mock).mockRejectedValue(new Error('Network error'));
+    mockFetch.mockRejectedValue(new Error('Network error'));
   },
   slow: () => {
-    (global.fetch as jest.Mock).mockImplementation(
-      () => new Promise((resolve) => setTimeout(() => {
-        resolve(new MockResponse({}, {
+    mockFetch.mockImplementation(
+      () => new Promise<Response>((resolve) => setTimeout(() => {
+        resolve(new MockResponse("{}", {
           status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        }));
+          headers: { 'Content-Type': 'application/json', url: '' }
+        }) as any);
       }, 2000))
     );
   },
   normal: () => {
-    (global.fetch as jest.Mock).mockResolvedValue(
-      new MockResponse({}, {
+    mockFetch.mockResolvedValue(
+      new MockResponse("{}", {
         status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      })
+        headers: { 'Content-Type': 'application/json', url: '' }
+      }) as any
     );
   },
 };
 
 // Custom matchers
+declare global {
+  namespace jest {
+    interface Matchers<R> {
+      toMatchPerformanceMetrics: (expected: number, tolerance?: number) => R;
+    }
+  }
+}
+
 expect.extend({
-  toMatchPerformanceMetrics(received, expected, tolerance = 0.05) {
+  toMatchPerformanceMetrics(received: number, expected: number, tolerance = 0.05) {
     const pass = Math.abs(received - expected) <= expected * tolerance;
     return {
       pass,

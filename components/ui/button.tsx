@@ -8,8 +8,6 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
   size?: 'default' | 'sm' | 'lg' | 'icon';
 }
 
-const destructiveStyles = "bg-destructive text-destructive-foreground hover:bg-destructive/90";
-
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant = 'default', size = 'default', ...props }, ref) => {
     return (
@@ -21,6 +19,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
             "border border-border bg-background hover:bg-accent hover:text-accent-foreground": variant === 'outline',
             "hover:bg-accent hover:text-accent-foreground": variant === 'ghost',
             "text-primary underline-offset-4 hover:underline": variant === 'link',
+            "bg-destructive text-destructive-foreground hover:bg-destructive/90": variant === 'destructive',
             "h-9 px-3": size === 'sm',
             "h-10 px-4 py-2": size === 'default',
             "h-11 px-8": size === 'lg',

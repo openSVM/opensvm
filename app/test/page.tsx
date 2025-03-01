@@ -40,10 +40,6 @@ export default function TestPage() {
     setData(sortedData);
   };
 
-  const handleSelectionChange = (selection: any) => {
-    console.log('Selection:', selection);
-  };
-
   return (
     <div className="container mx-auto p-4">
       <h1 className="text-2xl font-bold mb-4">VTable Test</h1>
@@ -52,7 +48,6 @@ export default function TestPage() {
           columns={columns}
           data={data}
           onSort={handleSort}
-          onSelectionChange={handleSelectionChange}
         />
       </div>
     </div>

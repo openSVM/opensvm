@@ -1,6 +1,6 @@
 'use client';
 
-import { DetailedTransactionInfo, InstructionWithAccounts } from '@/lib/solana';
+import type { DetailedTransactionInfo, InstructionWithAccounts } from '@/lib/solana';
 import { useState } from 'react';
 import AccountLink from './AccountLink';
 import JsonTree from './JsonTree';
@@ -15,14 +15,14 @@ export default function TransactionNodeDetails({ tx }: TransactionNodeDetailsPro
 
   if (!tx.details) return null;
 
-  const instruction = tx.details.instructions[selectedInstruction] as InstructionWithAccounts;
+  const instruction = tx.details?.instructions?.[selectedInstruction] as InstructionWithAccounts;
   if (!instruction) return null;
 
   // Process program ID once
   const programId = String('parsed' in instruction ? instruction.program : instruction.programId);
 
   // Calculate CU efficiency
-  const cuEfficiency = instruction.computeUnitsConsumed 
+  const cuEfficiency = instruction.computeUnitsConsumed && instruction.computeUnits
     ? Math.round((instruction.computeUnitsConsumed / instruction.computeUnits) * 100)
     : null;
 
@@ -47,7 +47,7 @@ export default function TransactionNodeDetails({ tx }: TransactionNodeDetailsPro
     <div className="space-y-6">
       {/* Instruction Selector */}
       <div className="flex gap-2 overflow-x-auto pb-2">
-        {tx.details.instructions.map((_, index) => (
+        {tx.details?.instructions?.map((_, index) => (
           <button
             key={index}
             onClick={() => setSelectedInstruction(index)}
@@ -78,7 +78,9 @@ export default function TransactionNodeDetails({ tx }: TransactionNodeDetailsPro
         <h3 className="text-lg font-medium mb-2">Accounts</h3>
         <div className="space-y-2">
           {instruction.accounts.map((accountIndex: number, i: number) => {
-            const account = tx.details.accounts[accountIndex];
+            const account = tx.details?.accounts?.[accountIndex];
+            if (!account?.pubkey) return null;
+            
             const address = account.pubkey.toString();
             return (
               <div key={i} className="bg-neutral-900 rounded p-3">
@@ -88,12 +90,12 @@ export default function TransactionNodeDetails({ tx }: TransactionNodeDetailsPro
                     className="font-mono text-sm break-all text-neutral-400 hover:text-neutral-200 transition-colors"
                   />
                   <div className="flex gap-2">
-                    {account.signer && (
+                    {account?.signer && (
                       <span className="px-2 py-0.5 text-xs rounded bg-green-900 text-green-300">
                         Signer
                       </span>
                     )}
-                    {account.writable && (
+                    {account?.writable && (
                       <span className="px-2 py-0.5 text-xs rounded bg-blue-900 text-blue-300">
                         Writable
                       </span>
@@ -152,18 +154,18 @@ export default function TransactionNodeDetails({ tx }: TransactionNodeDetailsPro
           <div className="bg-neutral-900 rounded p-3">
             <JsonTree 
               data={parseInstructionData(instruction.data)}
-              expandAll={false}
+              expanded={false}
             />
           </div>
         </div>
       )}
 
       {/* Inner Instructions */}
-      {tx.details.innerInstructions?.length > 0 && (
+      {tx.details?.innerInstructions && tx.details.innerInstructions.length > 0 && (
         <div>
           <h3 className="text-lg font-medium mb-2">Inner Instructions</h3>
           <div className="space-y-2">
-            {tx.details.innerInstructions
+            {tx.details?.innerInstructions
               .filter(inner => inner.index === selectedInstruction)
               .map((inner, i) => (
                 <div key={i} className="bg-neutral-900 rounded p-3">

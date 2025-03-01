@@ -30,7 +30,9 @@ export const CyberpunkPerlin = ({
   }), []);
 
   // Memoize characters array
-  const characters = useMemo(() => ['@', '%', '#', '*', '+', '=', '-', ':', '.', ' '], []);
+  const characters = useMemo(() => 
+    ['@', '%', '#', '*', '+', '=', '-', ':', '.', ' '] as const,
+  []);
 
   // Optimized noise function
   const noise = useCallback((nx: number, ny: number, nz: number) => {
@@ -79,8 +81,6 @@ export const CyberpunkPerlin = ({
     const canvas = canvasRef.current;
     const currentQuality = qualitySettings[quality];
     
-    // Calculate delta time and update time
-    const deltaTime = timestamp - lastTimeRef.current;
     lastTimeRef.current = timestamp;
 
     // Skip frames based on quality setting
@@ -113,12 +113,14 @@ export const CyberpunkPerlin = ({
         const nx = i * scaleInv;
         const ny = j * scaleInv;
         const value = noise(nx, ny, time);
-        const characterIndex = Math.floor(value * characters.length);
+        // Ensure characterIndex is within bounds and get character
+        const index = Math.min(Math.floor(value * characters.length), characters.length - 1);
+        const char = characters[index] as string;
         
         // Optimize color calculation
         const brightness = 255 - (value * 200) | 0;
         ctx.fillStyle = `rgb(${brightness},${brightness},${brightness})`;
-        ctx.fillText(characters[characterIndex], x + charSize / 2, y + charSize / 2);
+        ctx.fillText(char, x + charSize / 2, y + charSize / 2);
 
         // Draw connection lines only when necessary
         if (value > 0.7 && i < cols - 1 && j < rows - 1) {
@@ -205,4 +207,4 @@ export const CyberpunkPerlin = ({
       </div>
     </div>
   );
-}; 
+};

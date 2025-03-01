@@ -19,7 +19,7 @@ function parseRpcList(envVar: string | undefined): string[] {
   try {
     const parsed = JSON.parse(envVar);
     if (!Array.isArray(parsed)) return [];
-    return parsed.map(id => `https://solana-mainnet.core.chainstack.com/${id}`);
+    return parsed.map((id: string) => `https://solana-mainnet.core.chainstack.com/${id}`);
   } catch (e) {
     console.error('Error parsing RPC list:', e);
     return [];

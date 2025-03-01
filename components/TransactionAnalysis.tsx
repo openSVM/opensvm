@@ -1,6 +1,6 @@
 'use client';
 
-import { DetailedTransactionInfo, InstructionWithAccounts } from '@/lib/solana';
+import type { DetailedTransactionInfo, InstructionWithAccounts } from '@/lib/solana';
 import { useEffect, useState } from 'react';
 import AccountLink from './AccountLink';
 
@@ -38,7 +38,7 @@ export default function TransactionAnalysis({ tx }: TransactionAnalysisProps) {
   });
 
   useEffect(() => {
-    if (!tx.details) return;
+    if (!tx.details || !tx.details.accounts) return;
 
     // Analyze program stats
     const programMap = new Map<string, ProgramStats>();
@@ -47,7 +47,7 @@ export default function TransactionAnalysis({ tx }: TransactionAnalysisProps) {
     let totalDataSize = 0;
 
     // Process main instructions
-    tx.details.instructions.forEach((ix: InstructionWithAccounts) => {
+    tx.details?.instructions?.forEach((ix: InstructionWithAccounts) => {
       const programId = String('parsed' in ix ? ix.program : ix.programId);
       
       // Update program stats
@@ -64,7 +64,8 @@ export default function TransactionAnalysis({ tx }: TransactionAnalysisProps) {
 
       // Update account stats
       ix.accounts.forEach((accountIndex: number) => {
-        const account = tx.details.accounts[accountIndex];
+        const account = tx.details?.accounts?.[accountIndex];
+        if (!account) return;
         const address = String(account.pubkey);
         const accountStats = accountMap.get(address) || {
           address,
@@ -84,7 +85,7 @@ export default function TransactionAnalysis({ tx }: TransactionAnalysisProps) {
     });
 
     // Process inner instructions
-    tx.details.innerInstructions?.forEach(inner => {
+    tx.details?.innerInstructions?.forEach(inner => {
       inner.instructions.forEach((ix: InstructionWithAccounts) => {
         const programId = String('parsed' in ix ? ix.program : ix.programId);
         
@@ -102,7 +103,8 @@ export default function TransactionAnalysis({ tx }: TransactionAnalysisProps) {
 
         // Update account stats
         ix.accounts.forEach((accountIndex: number) => {
-          const account = tx.details.accounts[accountIndex];
+          const account = tx.details?.accounts?.[accountIndex];
+        if (!account) return;
           const address = String(account.pubkey);
           const accountStats = accountMap.get(address) || {
             address,
@@ -127,8 +129,8 @@ export default function TransactionAnalysis({ tx }: TransactionAnalysisProps) {
         .sort((a, b) => b.count - a.count),
       accountStats: Array.from(accountMap.values())
         .sort((a, b) => (b.writeCount + b.readCount) - (a.writeCount + a.readCount)),
-      totalInstructions: tx.details.instructions.length + 
-        (tx.details.innerInstructions?.reduce((sum, inner) => sum + inner.instructions.length, 0) || 0),
+      totalInstructions: tx.details?.instructions?.length || 0 + 
+        (tx.details?.innerInstructions?.reduce((sum, inner) => sum + inner.instructions.length, 0) || 0),
       totalDataSize
     });
   }, [tx]);

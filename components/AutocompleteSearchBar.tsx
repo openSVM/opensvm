@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { getSearchRoute, isValidTransactionSignature, isValidSolanaAddress } from '@/lib/utils';
+import { isValidTransactionSignature, isValidSolanaAddress } from '@/lib/utils';
 import { Card } from './ui/card';
 
 interface SearchSuggestion {
@@ -29,6 +29,7 @@ export default function AutocompleteSearchBar() {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [filters, setFilters] = useState<AdvancedSearchFilters>({});
+  const [dateRange, setDateRange] = useState({ start: '', end: '' });
   const router = useRouter();
   const suggestionsRef = useRef<HTMLDivElement>(null);
 
@@ -65,6 +66,19 @@ export default function AutocompleteSearchBar() {
     const debounceTimeout = setTimeout(fetchSuggestions, 300);
     return () => clearTimeout(debounceTimeout);
   }, [query]);
+
+  // Update filters when dateRange changes
+  useEffect(() => {
+    if (dateRange.start && dateRange.end) {
+      setFilters(prev => ({
+        ...prev,
+        dateRange: {
+          start: dateRange.start,
+          end: dateRange.end
+        }
+      }));
+    }
+  }, [dateRange]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -190,18 +204,14 @@ export default function AutocompleteSearchBar() {
                 <div className="flex gap-2">
                   <input
                     type="date"
-                    onChange={(e) => setFilters({
-                      ...filters,
-                      dateRange: { ...filters.dateRange, start: e.target.value }
-                    })}
+                    value={dateRange.start}
+                    onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))}
                     className="w-full rounded border border-gray-200 px-2 py-1 text-sm"
                   />
                   <input
                     type="date"
-                    onChange={(e) => setFilters({
-                      ...filters,
-                      dateRange: { ...filters.dateRange, end: e.target.value }
-                    })}
+                    value={dateRange.end}
+                    onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))}
                     className="w-full rounded border border-gray-200 px-2 py-1 text-sm"
                   />
                 </div>

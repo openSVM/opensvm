@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { getSearchRoute, isValidTransactionSignature, isValidSolanaAddress } from '@/lib/utils';
+import { isValidTransactionSignature, isValidSolanaAddress } from '@/lib/utils';
 
 export default function SearchBar() {
   const [query, setQuery] = useState('');

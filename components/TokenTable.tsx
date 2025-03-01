@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import * as VTable from '@visactor/vtable';
 import type { ListTableConstructorOptions, ColumnDefine } from '@visactor/vtable';
-import { TokenAccount } from '@/lib/solana';
+import type { TokenAccount } from '@/lib/solana';
 
 interface TokenTableProps {
   tokens: TokenAccount[];
@@ -13,7 +13,7 @@ export default function TokenTable({ tokens, onTokenClick }: TokenTableProps) {
   const tableInstanceRef = useRef<any>(null);
 
   useEffect(() => {
-    if (!containerRef.current || !tokens.length) return;
+    if (!containerRef.current || !tokens.length) return undefined;
 
     // Create VTable instance
     const option: ListTableConstructorOptions = {
@@ -103,7 +103,6 @@ export default function TokenTable({ tokens, onTokenClick }: TokenTableProps) {
 
     // Initialize table
     if (containerRef.current) {
-      const rect = containerRef.current.getBoundingClientRect();
       tableInstanceRef.current = new VTable.ListTable({
         ...option,
         container: containerRef.current,
@@ -117,7 +116,7 @@ export default function TokenTable({ tokens, onTokenClick }: TokenTableProps) {
       tableInstanceRef.current.on('click_cell', (args: any) => {
         const rowData = tokens[args.row];
         if (rowData) {
-          onTokenClick(rowData.address);
+          onTokenClick(rowData.address || '');
         }
       });
 
@@ -139,6 +138,7 @@ export default function TokenTable({ tokens, onTokenClick }: TokenTableProps) {
         }
       };
     }
+    return undefined;
   }, [tokens, onTokenClick]);
 
   return (

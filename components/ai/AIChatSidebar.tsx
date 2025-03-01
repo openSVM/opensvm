@@ -1,17 +1,13 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback, memo } from 'react';
-import { Button } from '@/components/ui/button';
+import { useEffect, useState, useCallback, memo, useRef } from 'react';
 import { Chat } from './Chat';
 import { useAIChatTabs } from '@/lib/ai/hooks/useAIChatTabs';
 import { createSolanaAgent } from '@/lib/ai/core/factory';
-import { Connection } from '@solana/web3.js';
 import type { Message } from '@/lib/ai/types';
+import { SolanaAgent } from '@/lib/ai/core/agent';
 import { generateAndShareScreenshot } from '@/lib/ai/utils/screenshot';
-
-const connection = new Connection(
-  process.env.NEXT_PUBLIC_RPC_URL || 'https://api.mainnet-beta.solana.com'
-);
+import { connectionPool } from '@/lib/solana-connection';
 
 export interface AIChatSidebarProps {
   isOpen: boolean;
@@ -30,11 +26,26 @@ export const AIChatSidebar = memo(function AIChatSidebar({
   onResizeEnd,
   initialWidth = 400 
 }: AIChatSidebarProps) {
-  const sidebarRef = useRef<HTMLDivElement>(null);
   const [isResizing, setIsResizing] = useState(false);
-  const [sidebarWidth, setSidebarWidth] = useState(initialWidth);
-  const agent = createSolanaAgent(connection);
-  
+  const [width, setWidth] = useState(initialWidth);
+  const [agent, setAgent] = useState<SolanaAgent | null>(null);
+  const [isInitializing, setIsInitializing] = useState(true);
+
+  useEffect(() => {
+    const init = async () => {
+      try {
+        const connection = await connectionPool.getConnection();
+        const newAgent = createSolanaAgent(connection);
+        setAgent(newAgent);
+      } catch (error) {
+        console.error('Failed to initialize agent:', error);
+      } finally {
+        setIsInitializing(false);
+      }
+    };
+    init();
+  }, []);
+
   const {
     activeTab,
     setActiveTab,
@@ -42,7 +53,7 @@ export const AIChatSidebar = memo(function AIChatSidebar({
     input,
     isProcessing,
     setInput,
-    handleSubmit,
+    handleSubmit: originalHandleSubmit,
     handleNewChat,
     notes,
     agentActions,
@@ -52,10 +63,19 @@ export const AIChatSidebar = memo(function AIChatSidebar({
     setAgentMessages,
     startRecording,
     isRecording
-  } = useAIChatTabs({ agent });
+  } = useAIChatTabs({ agent: agent || createSolanaAgent({} as any) });
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    try {
+      console.log('Submitting message:', input);
+      await originalHandleSubmit(e);
+    } catch (error) {
+      console.error('Error in handleSubmit:', error);
+    }
+  };
 
   const handleWidthChange = useCallback((newWidth: number) => {
-    setSidebarWidth(newWidth);
+    setWidth(newWidth);
     onWidthChange(newWidth);
   }, [onWidthChange]);
 
@@ -198,7 +218,7 @@ To get started, just ask me anything about Solana blockchain data or PumpFun tra
       
       const newWidth = window.innerWidth - e.clientX;
       if (newWidth > 300 && newWidth < 800) {
-        setSidebarWidth(newWidth);
+        setWidth(newWidth);
         onWidthChange(newWidth);
       }
     };
@@ -220,35 +240,53 @@ To get started, just ask me anything about Solana blockchain data or PumpFun tra
   }, [isResizing, onWidthChange, onResizeEnd]);
 
   if (!isOpen) return null;
+  
+  if (isInitializing) {
+    return (
+      <div style={{ width: `${width}px` }} className="bg-black text-white p-4">
+        Initializing AI Assistant...
+      </div>
+    );
+  }
+
+  if (!agent) {
+    return (
+      <div style={{ width: `${width}px` }} className="bg-black text-white p-4">
+        Failed to initialize AI Assistant. Please try again.
+      </div>
+    );
+  }
 
   return (
-    <Chat 
-      variant="sidebar" 
-      isOpen={isOpen}
-      onClose={onClose}
-      onWidthChange={handleWidthChange}
-      onResizeStart={onResizeStart}
-      onResizeEnd={onResizeEnd}
-      activeTab={activeTab}
-      onTabChange={setActiveTab}
-      onReset={handleReset}
-      onNewChat={handleNewChat}
-      messages={messages}
-      input={input}
-      isProcessing={isProcessing}
-      onInputChange={setInput}
-      onSubmit={handleSubmit}
-      notes={notes}
-      onClearNotes={clearNotes}
-      agentActions={agentActions}
-      onRetryAction={handleRetryAction}
-      onExport={handleExport}
-      onShare={handleShare}
-      onSettings={handleSettings}
-      onHelp={handleHelp}
-      onVoiceRecord={startRecording}
-      isRecording={isRecording}
-      className="transition-transform duration-200"
-    />
+    <div style={{ width: `${width}px` }}>
+      <Chat 
+        variant="sidebar" 
+        isOpen={isOpen}
+        onClose={onClose}
+        onWidthChange={handleWidthChange}
+        onResizeStart={onResizeStart}
+        onResizeEnd={onResizeEnd}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        onReset={handleReset}
+        onNewChat={handleNewChat}
+        messages={messages}
+        input={input}
+        isProcessing={isProcessing}
+        onInputChange={setInput}
+        onSubmit={handleSubmit}
+        notes={notes}
+        onClearNotes={clearNotes}
+        agentActions={agentActions}
+        onRetryAction={handleRetryAction}
+        onExport={handleExport}
+        onShare={handleShare}
+        onSettings={handleSettings}
+        onHelp={handleHelp}
+        onVoiceRecord={startRecording}
+        isRecording={isRecording}
+        className="transition-transform duration-200"
+      />
+    </div>
   );
 });

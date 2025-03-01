@@ -1,5 +1,5 @@
 import { PublicKey } from '@solana/web3.js';
-import { Message, ToolParams } from '../types';
+import type { Message, ToolParams } from '../types';
 import { BaseCapability } from './base';
 
 export class AccountCapability extends BaseCapability {
@@ -98,8 +98,35 @@ export class AccountCapability extends BaseCapability {
   }
 
   private analyzeActivityPattern(signatures: any[]): string {
-    // TODO: Implement activity pattern analysis
-    // e.g., "frequent small transfers", "large periodic transactions", etc.
-    return 'normal activity';
+    if (signatures.length === 0) {
+      return 'no recent activity';
+    }
+
+    // Sort signatures by blockTime
+    const sortedSigs = [...signatures].sort((a, b) => 
+      (b.blockTime || 0) - (a.blockTime || 0)
+    );
+
+    // Calculate time between transactions
+    const timeDiffs = sortedSigs.slice(1).map((sig, i) => 
+      ((sortedSigs[i].blockTime || 0) - (sig.blockTime || 0)) / 60 // Convert to minutes
+    );
+
+    // Calculate average time between transactions
+    const avgTimeDiff = timeDiffs.reduce((sum, diff) => sum + diff, 0) / timeDiffs.length;
+
+    // Count errors
+    const errorCount = signatures.filter(sig => sig.err).length;
+
+    // Determine pattern
+    if (errorCount > signatures.length / 2) {
+      return 'high error rate activity';
+    } else if (avgTimeDiff < 5) {
+      return 'frequent transactions';
+    } else if (avgTimeDiff > 60) {
+      return 'infrequent transactions';
+    } else {
+      return 'moderate activity';
+    }
   }
-} 
+}

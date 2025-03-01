@@ -3,6 +3,8 @@ import { Inter, JetBrains_Mono } from 'next/font/google';
 import "./globals.css";
 import dynamic from 'next/dynamic';
 import { Suspense } from 'react';
+// Import Navbar directly
+import { Navbar } from '@/components/Navbar';
 
 // Load fonts
 const inter = Inter({
@@ -20,11 +22,6 @@ const jetbrains = JetBrains_Mono({
 // Dynamic imports with loading fallbacks
 const Providers = dynamic(() => import('./providers').then(mod => mod.Providers), {
   loading: () => <div className="min-h-screen bg-background" />
-});
-
-const Navbar = dynamic(() => import('@/components/Navbar').then(mod => mod.Navbar), {
-  loading: () => null,
-  ssr: true // Keep SSR for shell
 });
 
 export const metadata: Metadata = {
@@ -80,6 +77,7 @@ export default function RootLayout({
           href="/favicon.svg"
           as="image"
           type="image/svg+xml"
+          fetchPriority="high"
         />
         
         {/* Meta tags for performance monitoring */}
@@ -90,13 +88,13 @@ export default function RootLayout({
         <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
       </head>
       <body className={inter.className}>
-        <Suspense fallback={<div className="min-h-screen bg-background" />}>
-          <Providers>
+        <Providers>
+          <Suspense fallback={<div className="min-h-screen bg-background" />}>
             <Navbar>
               {children}
             </Navbar>
-          </Providers>
-        </Suspense>
+          </Suspense>
+        </Providers>
       </body>
     </html>
   );

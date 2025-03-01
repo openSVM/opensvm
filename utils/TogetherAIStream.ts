@@ -1,4 +1,4 @@
-import { createParser, ParsedEvent, ReconnectInterval } from "eventsource-parser";
+import { createParser } from "eventsource-parser";
 
 export type ChatGPTAgent = "user" | "system";
 
@@ -82,7 +82,7 @@ export async function TogetherAIStream(payload: TogetherAIStreamPayload) {
         }
 
         const parser = createParser({
-          onParse(event: ParsedEvent | ReconnectInterval) {
+          onEvent(event: any) {
             if (event.type === 'event') {
               try {
                 controller.enqueue(encoder.encode(event.data));

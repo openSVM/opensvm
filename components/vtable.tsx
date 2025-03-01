@@ -19,11 +19,8 @@ interface VTableProps {
   data: any[];
   loading?: boolean;
   error?: string;
-  onSelectionChange?: (selectedRows: any[]) => void;
-  onSort?: (field: string, order: 'asc' | 'desc') => void;
+  onSort?: (field: string, order: 'asc' | 'desc' | null) => void;
   onLoadMore?: () => void;
-  hasMore?: boolean;
-  handleScroll?: (e: any) => void;
 }
 
 export function VTableWrapper({
@@ -31,11 +28,8 @@ export function VTableWrapper({
   data,
   loading,
   error,
-  onSelectionChange,
   onSort,
-  onLoadMore,
-  hasMore,
-  handleScroll
+  onLoadMore
 }: VTableProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const tableRef = useRef<any>(null);
@@ -116,6 +110,15 @@ export function VTableWrapper({
           });
         }
 
+        if (onSort) {
+          // Use any to bypass type checking for now
+          (table as any).on('sortClick', (args: any) => {
+            const field = args.field;
+            const order = args.order;
+            onSort(field, order);
+          });
+        }
+
         tableRef.current = table;
       } catch (err) {
         console.error('Failed to initialize table:', err);
@@ -137,7 +140,7 @@ export function VTableWrapper({
         }
       }
     };
-  }, [columns, data, mounted, onLoadMore]);
+  }, [columns, data, mounted, onLoadMore, onSort]);
 
   if (error) {
     return (

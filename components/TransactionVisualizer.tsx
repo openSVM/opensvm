@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import rough from 'roughjs';
-import { ParsedInstruction } from '@/lib/transaction-parser';
+import type { ParsedInstruction } from '@/lib/transaction-parser';
 
 interface TransactionVisualizerProps {
   instructions: ParsedInstruction[];

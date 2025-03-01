@@ -1,6 +1,6 @@
 'use client';
 
-import { DetailedTransactionInfo } from '@/lib/solana';
+import type { DetailedTransactionInfo } from '@/lib/solana';
 import { useEffect, useRef } from 'react';
 import * as d3 from 'd3';
 
@@ -25,7 +25,7 @@ export default function TransactionFlowChart({ tx }: TransactionFlowChartProps) 
   const svgRef = useRef<SVGSVGElement>(null);
 
   useEffect(() => {
-    if (!svgRef.current || !tx.details) return;
+    if (!svgRef.current || !tx.details?.accounts || !tx.details?.instructions) return;
 
     // Clear previous content
     d3.select(svgRef.current).selectAll('*').remove();
@@ -35,7 +35,7 @@ export default function TransactionFlowChart({ tx }: TransactionFlowChartProps) 
     const links: Link[] = [];
 
     // Add account nodes
-    tx.details.accounts.forEach((account: any, i: number) => {
+    tx.details?.accounts.forEach((account: any, i: number) => {
       nodes.push({
         id: account.pubkey.toString(),
         type: account.signer ? 'signer' : 'account',
@@ -44,7 +44,7 @@ export default function TransactionFlowChart({ tx }: TransactionFlowChartProps) 
     });
 
     // Add program nodes and links
-    tx.details.instructions.forEach((ix: any) => {
+    tx.details?.instructions.forEach((ix: any) => {
       const programId = ix.programId.toString();
       if (!nodes.some(n => n.id === programId)) {
         nodes.push({
@@ -58,7 +58,7 @@ export default function TransactionFlowChart({ tx }: TransactionFlowChartProps) 
       ix.accounts.forEach((accountIndex: number) => {
         links.push({
           source: programId,
-          target: tx.details.accounts[accountIndex].pubkey.toString()
+          target: tx.details?.accounts?.[accountIndex]?.pubkey.toString() || ''
         });
       });
     });
@@ -92,7 +92,7 @@ export default function TransactionFlowChart({ tx }: TransactionFlowChartProps) 
       .selectAll('g')
       .data(nodes)
       .join('g')
-      .call(d3.drag<SVGGElement, Node>()
+      .call(d3.drag<any, Node>()
         .on('start', dragstarted)
         .on('drag', dragged)
         .on('end', dragended));

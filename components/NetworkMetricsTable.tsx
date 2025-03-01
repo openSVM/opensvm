@@ -30,8 +30,6 @@ interface FilterState {
 
 export function NetworkMetricsTable({ endpoint = 'https://api.mainnet-beta.solana.com' }: NetworkMetricsTableProps) {
   const { theme } = useTheme();
-  const [sortField, setSortField] = useState<keyof BlockMetrics>('timestamp');
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [filters, setFilters] = useState<FilterState>({
     tps: { min: 0, max: Infinity },
     blockTime: { min: 0, max: Infinity },
@@ -128,20 +126,12 @@ export function NetworkMetricsTable({ endpoint = 'https://api.mainnet-beta.solan
     item.successRate >= filters.successRate.min && item.successRate <= filters.successRate.max &&
     item.fees >= filters.fees.min && item.fees <= filters.fees.max &&
     item.cuOverpaid >= filters.cuOverpaid.min && item.cuOverpaid <= filters.cuOverpaid.max
-  ).sort((a, b) => {
-    const aValue = a[sortField];
-    const bValue = b[sortField];
-    return sortDirection === 'asc' ? 
-      (aValue > bValue ? 1 : -1) :
-      (aValue < bValue ? 1 : -1);
-  });
+  );
 
   // Draw visualizations
-// eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     Object.keys(filters).forEach(field => {
       const canvas = cellRefs.current[`latest-${field}`];
-// sourcery skip: use-braces
       if (!canvas) return;
 
       const ctx = canvas.getContext('2d');
@@ -255,9 +245,9 @@ export function NetworkMetricsTable({ endpoint = 'https://api.mainnet-beta.solan
             const x = padding.left + i * pointWidth;
             const y = getY(point[field as keyof BlockMetrics]);
             
-            if (i > 0) {
+            if (i > 0 && points[i-1]) {
               const prevX = padding.left + (i-1) * pointWidth;
-              const prevY = getY(points[i-1][field as keyof BlockMetrics]);
+              const prevY = getY(points[i-1]![field as keyof BlockMetrics]);
               rc.line(prevX, prevY, x, y, {
                 stroke: '#FF4B4B',
                 strokeWidth: 1.5,
@@ -300,9 +290,9 @@ export function NetworkMetricsTable({ endpoint = 'https://api.mainnet-beta.solan
             const x = padding.left + i * pointWidth;
             const y = getY(point[field as keyof BlockMetrics]);
             
-            if (i > 0) {
+            if (i > 0 && points[i-1]) {
               const prevX = padding.left + (i-1) * pointWidth;
-              const prevY = getY(points[i-1][field as keyof BlockMetrics]);
+              const prevY = getY(points[i-1]![field as keyof BlockMetrics]);
               rc.line(prevX, prevY, x, y, {
                 stroke: '#4B7BFF',
                 strokeWidth: 1.5,
@@ -314,17 +304,7 @@ export function NetworkMetricsTable({ endpoint = 'https://api.mainnet-beta.solan
         }
       }
     });
-// eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filteredMetrics, theme]);
-
-  const handleSort = (field: keyof BlockMetrics) => {
-    if (field === sortField) {
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortField(field);
-      setSortDirection('desc');
-    }
-  };
+  }, [filteredMetrics, theme, filters]);
 
   const handleFilterChange = (field: keyof FilterState, type: 'min' | 'max', value: string) => {
     const numValue = value === '' ? (type === 'min' ? 0 : Infinity) : Number(value);
