@@ -1,24 +1,34 @@
-import type { AgentCapability, Tool, CapabilityType, ToolParams } from '../types';
-import { TokenEstimator } from '../utils/token-estimator';
+import { Connection } from '@solana/web3.js';
+import { BaseCapability } from './base';
+import type { Message, ToolParams, CapabilityType } from '../types';
+import { ExecutionMode } from '../types';
 
-export class TokenEstimationCapability implements AgentCapability {
-  type: CapabilityType = 'general';
+export class TokenEstimationCapability extends BaseCapability {
+  type: CapabilityType = 'network';
+  executionMode = ExecutionMode.Sequential;
 
-  tools: Tool[] = [
-    {
-      name: 'estimateTokens',
-      description: 'Estimates the number of tokens that will be used by a prompt',
-      execute: async (params: ToolParams) => {
-        // Extract the prompt from the message content
-        const prompt = params.message.content;
-        return TokenEstimator.estimateTokens(prompt);
+  constructor() {
+    // We're using a nullish connection here since this capability
+    // doesn't actually need to interact with the blockchain
+    super(null as unknown as Connection);
+  }
+
+  tools = [
+    this.createToolExecutor(
+      'estimateTokenUsage',
+      'Estimates token usage for AI models',
+      async ({ message }: ToolParams) => {
+        // Simple placeholder implementation
+        const textLength = message.content.length;
+        const tokens = Math.ceil(textLength / 4); // Very rough approximation
+        
+        return `Estimated token usage: ${tokens} tokens`;
       }
-    }
+    ),
   ];
 
-  canHandle(message: { content: string }): boolean {
-    const content = message.content.toLowerCase();
-    return content.includes('token') && 
-           (content.includes('estimate') || content.includes('count'));
+  canHandle(message: Message): boolean {
+    return message.content.toLowerCase().includes('token usage') ||
+           message.content.toLowerCase().includes('estimate tokens');
   }
 }

@@ -3,6 +3,8 @@ import type { DetailedTransactionInfo } from '@/lib/solana';
 import { getConnection } from '@/lib/solana-connection';
 import type { ParsedTransactionWithMeta } from '@solana/web3.js';
 
+const DEBUG = true; // Set to true to enable detailed logging
+
 const defaultHeaders = {
   'Content-Type': 'application/json',
   'Access-Control-Allow-Origin': '*',
@@ -32,8 +34,15 @@ export async function GET(
     const params = await context.params;
     const { signature } = await params;
 
+    if (DEBUG) {
+      console.log(`[API] Processing transaction request for signature: ${signature}`);
+    }
+
     if (!signature) {
-      console.error('Transaction signature is missing');
+      const error = 'Transaction signature is missing';
+      if (DEBUG) {
+        console.error(`[API] ${error}`);
+      }
       return new Response(
         JSON.stringify({ error: 'Transaction signature is required' }),
         { 
@@ -45,6 +54,9 @@ export async function GET(
 
     // Get connection from pool
     const connection = await getConnection();
+    if (DEBUG) {
+      console.log(`[API] Using OpenSVM RPC connection to fetch transaction data`);
+    }
 
     // Fetch transaction with timeout
     const tx = await Promise.race([
@@ -59,7 +71,11 @@ export async function GET(
 
     clearTimeout(timeoutId);
 
+    if (DEBUG) {
+      console.log(`[API] Transaction data received: ${tx ? 'YES' : 'NO'}`);
+    }
     if (!tx) {
+      console.error(`[API] Transaction not found for signature: ${signature}`);
       return new Response(
         JSON.stringify({ error: 'Transaction not found' }),
         { 
@@ -70,6 +86,9 @@ export async function GET(
     }
 
     // Transform transaction data
+    if (DEBUG) {
+      console.log(`[API] Transforming transaction data for UI presentation`);
+    }
     const transactionInfo: DetailedTransactionInfo = {
       signature,
       timestamp: tx.blockTime ? tx.blockTime * 1000 : Date.now(),
@@ -195,6 +214,9 @@ export async function GET(
       }
     }
 
+    if (DEBUG) {
+      console.log(`[API] Successfully processed transaction data, returning to client`);
+    }
     return new Response(
       JSON.stringify(transactionInfo),
       {
@@ -204,7 +226,9 @@ export async function GET(
     );
   } catch (error) {
     clearTimeout(timeoutId);
-    console.error('Transaction error:', error);
+    if (DEBUG) {
+      console.error('[API] Transaction error:', error);
+    }
     
     let status = 500;
     let message = 'Failed to fetch transaction';

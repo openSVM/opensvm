@@ -6,7 +6,7 @@ import { useAIChatTabs } from '@/lib/ai/hooks/useAIChatTabs';
 import { createSolanaAgent } from '@/lib/ai/core/factory';
 import type { Message } from '@/lib/ai/types';
 import { SolanaAgent } from '@/lib/ai/core/agent';
-import { generateAndShareScreenshot } from '@/lib/ai/utils/screenshot';
+import { generateAndShareScreenshot } from '@/lib/ai/utils/screenshot'; 
 import { connectionPool } from '@/lib/solana-connection';
 
 export interface AIChatSidebarProps {
@@ -35,7 +35,10 @@ export const AIChatSidebar = memo(function AIChatSidebar({
     const init = async () => {
       try {
         const connection = await connectionPool.getConnection();
-        const newAgent = createSolanaAgent(connection);
+        const newAgent = createSolanaAgent(connection, {
+          enableSonicKit: true,
+          enableSolanaAgentKit: true
+        });
         setAgent(newAgent);
       } catch (error) {
         console.error('Failed to initialize agent:', error);
@@ -63,7 +66,11 @@ export const AIChatSidebar = memo(function AIChatSidebar({
     setAgentMessages,
     startRecording,
     isRecording
-  } = useAIChatTabs({ agent: agent || createSolanaAgent({} as any) });
+  } = useAIChatTabs({ 
+    agent: agent || createSolanaAgent({} as any, {
+      enableSonicKit: true,
+      enableSolanaAgentKit: true
+    }) });
 
   const handleSubmit = async (e: React.FormEvent) => {
     try {
@@ -207,7 +214,19 @@ Here are some things I can help you with:
    - Execute trades
    - Listen for price updates
 
-To get started, just ask me anything about Solana blockchain data or PumpFun trading!`
+5. **Sonic Protocol Integration**
+   - Interact with Sonic pools
+   - Query Sonic protocol data
+   - Explore Sonic protocol features
+
+6. **Advanced Solana Operations**
+   - Trade tokens
+   - Launch new tokens
+   - Lend assets
+   - Send compressed airdrops
+   - Execute blinks
+
+To get started, just ask me anything about Solana blockchain data, Sonic protocols, or PumpFun trading!`
     };
     setAgentMessages(prev => [...prev, helpMessage]);
   }, [setAgentMessages]);
