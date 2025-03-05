@@ -1,0 +1,69 @@
+# OpenSVM UI Enhancements Demo Video
+
+## Video File Information
+
+**Filename:** opensvm-ui-enhancements-demo.mp4
+**Format:** MP4 with H.264 encoding
+**Resolution:** 1920x1080 (16:9)
+**Duration:** 7-8 minutes
+**Framerate:** 30fps
+
+## Video Content
+
+This MP4 file would contain a complete walkthrough of the UI enhancements implemented in the OpenSVM application, following the structure outlined in `demo-video-script.md`.
+
+## How to Generate This Video
+
+The actual MP4 file can be generated using the recording script we've created:
+
+```bash
+# Ensure dev server is running
+npm run dev
+
+# In a separate terminal
+node scripts/record-demo.js
+```
+
+The recording script uses Puppeteer and Puppeteer Screen Recorder to:
+1. Navigate through the enhanced UI components
+2. Demonstrate interactive elements like sliders and graphs
+3. Add explanatory text overlays
+4. Show the transaction graph visualization
+5. Demonstrate error handling and demo data support
+6. Present the future development roadmap
+
+## Video Content Structure
+
+1. **Introduction** (0:00-0:30)
+   - OpenSVM logo and title card
+   - Brief overview of the UI enhancements
+
+2. **Enhanced UI Design Showcase** (0:30-2:00)
+   - Card-based layout demonstration
+   - Interactive sliders with visual feedback
+   - Loading indicators with percentage displays
+
+3. **Data Visualization Enhancements** (2:00-3:30)
+   - Performance metrics visualization
+   - Testimonials section
+   - Statistics grid
+
+4. **Transaction Graph Demo** (3:30-5:00)
+   - Graph visualization with different node types
+   - Interactive features
+   - Streaming data progress
+
+5. **Transaction Details with Demo Data** (5:00-6:30)
+   - Transaction overview
+   - Error handling
+   - Demo transaction support
+
+6. **Future Development Roadmap** (6:30-7:30)
+   - Upcoming features and enhancements
+
+7. **Conclusion** (7:30-8:00)
+   - Summary and website information
+
+## Note
+
+This README file serves as a placeholder for the actual MP4 video file that would be generated through the recording process. The video file itself would be approximately 30-50MB in size depending on compression settings.

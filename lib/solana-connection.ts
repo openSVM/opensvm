@@ -16,9 +16,22 @@ class ProxyConnection extends Connection {
   private readonly maxConcurrentRequests = 12; // Increased from 8
   private readonly maxRetries = 12; // Increased from 8
   private activeRequests = 0;
+  private readonly isClient: boolean;
 
   constructor(endpoint: string, config?: ConnectionConfig) {
-    super(endpoint, {
+    // Determine if we're running in the client and prepare the endpoint
+    const isClient = typeof window !== 'undefined';
+    let finalEndpoint = endpoint;
+    
+    // If this is a client and the endpoint contains opensvm.com, use the proxy instead
+    if (isClient && endpoint.includes('opensvm.com')) {
+      const idMatch = endpoint.match(/\/api\/([^\/]+)$/);
+      if (idMatch && idMatch[1]) {
+        finalEndpoint = `/api/proxy/rpc/${idMatch[1]}`;
+      }
+    }
+
+    super(finalEndpoint, {
       ...config,
       commitment: 'confirmed',
       disableRetryOnRateLimit: false,
@@ -28,6 +41,9 @@ class ProxyConnection extends Connection {
         const headers = getRpcHeaders(endpoint);
         const maxRetries = 12; // Increased from 8
         let lastError;
+
+    // Initialize after super() call
+    this.isClient = isClient;
 
         for (let i = 0; i < maxRetries; i++) {
           try {
@@ -185,6 +201,10 @@ class ConnectionPool {
 
     this.isOpenSvmMode = true;
     this.initializeConnections();
+  }
+  
+  public getConnectionCount(): number {
+    return this.connections.length;
   }
 
   private initializeConnections() {

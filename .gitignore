@@ -2,7 +2,7 @@
 vtable_docs/
 agent_notes/vtable_docs
 agent_notes/vtable_study
-
+.cline/ 
 
 # dependencies
 /node_modules

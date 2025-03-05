@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenSVM UI Enhancements Demo</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f9f9f9;
+        }
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            color: #1a1a1a;
+        }
+        .subtitle {
+            font-size: 1.2rem;
+            color: #666;
+            margin-bottom: 30px;
+        }
+        .video-container {
+            position: relative;
+            width: 100%;
+            padding-bottom: 56.25%; /* 16:9 aspect ratio */
+            background-color: #000;
+            margin-bottom: 40px;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        }
+        .video-container video {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+        .video-placeholder {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background-color: #f0f0f0;
+            color: #333;
+            text-align: center;
+            padding: 20px;
+        }
+        .video-placeholder h2 {
+            font-size: 1.8rem;
+            margin-bottom: 20px;
+        }
+        .video-placeholder p {
+            font-size: 1.1rem;
+            max-width: 600px;
+            margin-bottom: 30px;
+        }
+        .timeline {
+            margin-bottom: 40px;
+        }
+        .timeline-item {
+            display: flex;
+            margin-bottom: 30px;
+        }
+        .timeline-time {
+            flex: 0 0 80px;
+            font-weight: bold;
+            color: #0066cc;
+        }
+        .timeline-content {
+            flex: 1;
+            padding-left: 20px;
+            border-left: 2px solid #ddd;
+        }
+        .timeline-content h3 {
+            margin-top: 0;
+            margin-bottom: 10px;
+            color: #333;
+        }
+        .timeline-content p {
+            margin-bottom: 10px;
+        }
+        .timeline-content ul {
+            padding-left: 20px;
+        }
+        .timeline-content li {
+            margin-bottom: 5px;
+        }
+        .screenshot {
+            width: 100%;
+            max-width: 800px;
+            height: auto;
+            margin: 20px 0;
+            border-radius: 4px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+        .feature-card {
+            background-color: #fff;
+            border-radius: 8px;
+            padding: 25px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+        }
+        .feature-card h3 {
+            margin-top: 0;
+            margin-bottom: 15px;
+            color: #0066cc;
+        }
+        .feature-card p {
+            margin-bottom: 0;
+        }
+        .cta {
+            text-align: center;
+            margin-top: 50px;
+            padding: 30px;
+            background-color: #f0f7ff;
+            border-radius: 8px;
+        }
+        .cta h2 {
+            margin-top: 0;
+            margin-bottom: 20px;
+        }
+        .button {
+            display: inline-block;
+            padding: 12px 24px;
+            background-color: #0066cc;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            font-weight: bold;
+            transition: background-color 0.2s;
+        }
+        .button:hover {
+            background-color: #0052a3;
+        }
+        footer {
+            margin-top: 50px;
+            text-align: center;
+            color: #666;
+            font-size: 0.9rem;
+        }
+        
+        /* Animation for simulating video frames */
+        @keyframes slideshow {
+            0%, 20% { opacity: 1; }
+            25%, 45% { opacity: 0; }
+            50%, 70% { opacity: 0; }
+            75%, 95% { opacity: 0; }
+            100% { opacity: 1; }
+        }
+        
+        @keyframes slideshow2 {
+            0%, 20% { opacity: 0; }
+            25%, 45% { opacity: 1; }
+            50%, 70% { opacity: 0; }
+            75%, 95% { opacity: 0; }
+            100% { opacity: 0; }
+        }
+        
+        @keyframes slideshow3 {
+            0%, 20% { opacity: 0; }
+            25%, 45% { opacity: 0; }
+            50%, 70% { opacity: 1; }
+            75%, 95% { opacity: 0; }
+            100% { opacity: 0; }
+        }
+        
+        @keyframes slideshow4 {
+            0%, 20% { opacity: 0; }
+            25%, 45% { opacity: 0; }
+            50%, 70% { opacity: 0; }
+            75%, 95% { opacity: 1; }
+            100% { opacity: 0; }
+        }
+        
+        .slideshow-container {
+            position: relative;
+            width: 100%;
+            height: 500px;
+            background-color: #000;
+            margin-bottom: 40px;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        .slide {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background-color: #f0f0f0;
+            color: #333;
+            text-align: center;
+            padding: 20px;
+        }
+        
+        .slide1 {
+            background-color: #f8f9fa;
+            animation: slideshow 20s infinite;
+        }
+        
+        .slide2 {
+            background-color: #e9ecef;
+            animation: slideshow2 20s infinite;
+        }
+        
+        .slide3 {
+            background-color: #dee2e6;
+            animation: slideshow3 20s infinite;
+        }
+        
+        .slide4 {
+            background-color: #ced4da;
+            animation: slideshow4 20s infinite;
+        }
+        
+        .slide-content {
+            max-width: 800px;
+            text-align: center;
+        }
+        
+        .slide h2 {
+            font-size: 2rem;
+            margin-bottom: 20px;
+            color: #0066cc;
+        }
+        
+        .slide-image {
+            width: 80%;
+            height: 300px;
+            background-color: #fff;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        .slide1 .slide-image {
+            background-color: #fff;
+            position: relative;
+        }
+        
+        .slide2 .slide-image {
+            background-color: #f8f9fa;
+            position: relative;
+        }
+        
+        .slide3 .slide-image {
+            background-color: #e9ecef;
+            position: relative;
+        }
+        
+        .slide4 .slide-image {
+            background-color: #dee2e6;
+            position: relative;
+        }
+        
+        /* UI Elements */
+        .card {
+            width: 80%;
+            background-color: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+        
+        .card-title {
+            font-size: 1.2rem;
+            font-weight: bold;
+            margin-bottom: 15px;
+            color: #333;
+        }
+        
+        .slider {
+            width: 100%;
+            height: 8px;
+            background-color: #e9ecef;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            position: relative;
+        }
+        
+        .slider-progress {
+            position: absolute;
+            height: 100%;
+            background-color: #0066cc;
+            border-radius: 4px;
+            width: 70%;
+        }
+        
+        .slider-thumb {
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            background-color: #0066cc;
+            border-radius: 50%;
+            top: -4px;
+            left: 70%;
+            margin-left: -8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        }
+        
+        .slider-labels {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.8rem;
+            color: #666;
+        }
+        
+        .loading-indicator {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .loading-text {
+            font-size: 0.9rem;
+            color: #666;
+        }
+        
+        .loading-percentage {
+            font-size: 0.9rem;
+            font-weight: bold;
+            color: #0066cc;
+        }
+        
+        .graph-container {
+            width: 100%;
+            height: 200px;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            position: relative;
+            margin-bottom: 20px;
+        }
+        
+        .node {
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background-color: #6c5ce7;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-size: 0.8rem;
+            font-weight: bold;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        }
+        
+        .node-diamond {
+            width: 30px;
+            height: 30px;
+            background-color: #e74c3c;
+            transform: rotate(45deg);
+            position: absolute;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        }
+        
+        .node-diamond span {
+            transform: rotate(-45deg);
+            color: white;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+        
+        .node-hexagon {
+            width: 30px;
+            height: 26px;
+            background-color: #f1c40f;
+            position: absolute;
+            clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-size: 0.8rem;
+            font-weight: bold;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        }
+        
+        .edge {
+            position: absolute;
+            height: 2px;
+            background-color: #ddd;
+            transform-origin: 0 0;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>OpenSVM UI Enhancements Demo</h1>
+        <p class="subtitle">A comprehensive walkthrough of our modern interface design</p>
+    </header>
+
+    <div class="slideshow-container">
+        <!-- Slide 1: Card-Based Interface -->
+        <div class="slide slide1">
+            <div class="slide-content">
+                <h2>Clean Card-Based Interface</h2>
+                <div class="slide-image">
+                    <div class="card" style="width: 80%;">
+                        <div class="card-title">Storage Settings</div>
+                        <div class="slider">
+                            <div class="slider-progress"></div>
+                            <div class="slider-thumb"></div>
+                        </div>
+                        <div class="slider-labels">
+                            <span>0.5</span>
+                            <span>5.0</span>
+                        </div>
+                        <div style="font-size: 0.8rem; color: #666; margin-bottom: 15px;">per 1M docs</div>
+                        
+                        <div class="slider" style="margin-top: 20px;">
+                            <div class="slider-progress" style="width: 45%;"></div>
+                            <div class="slider-thumb" style="left: 45%;"></div>
+                        </div>
+                        <div class="slider-labels">
+                            <span>1</span>
+                            <span>15</span>
+                        </div>
+                        <div style="font-size: 0.8rem; color: #666;">per 1M docs</div>
+                    </div>
+                </div>
+                <p>Each content section has its own card with consistent styling for better organization and readability.</p>
+            </div>
+        </div>
+        
+        <!-- Slide 2: Loading Indicators -->
+        <div class="slide slide2">
+            <div class="slide-content">
+                <h2>Real-time Progress Indicators</h2>
+                <div class="slide-image">
+                    <div class="card" style="width: 80%;">
+                        <div class="card-title">Data Visualization</div>
+                        <div class="loading-indicator">
+                            <span class="loading-text">Loading data...</span>
+                            <span class="loading-percentage">55%</span>
+                        </div>
+                        <div class="slider" style="height: 4px;">
+                            <div class="slider-progress" style="width: 55%; background-color: #00b894;"></div>
+                        </div>
+                        
+                        <div class="loading-indicator" style="margin-top: 30px;">
+                            <span class="loading-text">Processing transactions...</span>
+                            <span class="loading-percentage">78%</span>
+                        </div>
+                        <div class="slider" style="height: 4px;">
+                            <div class="slider-progress" style="width: 78%; background-color: #00b894;"></div>
+                        </div>
+                    </div>
+                </div>
+                <p>Loading states with percentage feedback keep users informed during data retrieval.</p>
+            </div>
+        </div>
+        
+        <!-- Slide 3: Transaction Graph -->
+        <div class="slide slide3">
+            <div class="slide-content">
+                <h2>Enhanced Transaction Graph</h2>
+                <div class="slide-image">
+                    <div class="card" style="width: 80%;">
+                        <div class="card-title">Transaction Graph Visualization</div>
+                        <div class="graph-container">
+                            <!-- Nodes -->
+                            <div class="node" style="top: 80px; left: 150px;">W</div>
+                            <div class="node-diamond" style="top: 40px; left: 250px;"><span>P</span></div>
+                            <div class="node-hexagon" style="top: 120px; left: 350px;">T</div>
+                            <div class="node" style="top: 150px; left: 250px;">U</div>
+                            
+                            <!-- Edges -->
+                            <div class="edge" style="top: 95px; left: 165px; width: 90px; transform: rotate(20deg);"></div>
+                            <div class="edge" style="top: 95px; left: 165px; width: 90px; transform: rotate(-20deg);"></div>
+                            <div class="edge" style="top: 55px; left: 265px; width: 90px; transform: rotate(20deg);"></div>
+                            <div class="edge" style="top: 135px; left: 265px; width: 90px; transform: rotate(-20deg);"></div>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; margin-top: 10px;">
+                            <div style="display: flex; align-items: center;">
+                                <div style="width: 12px; height: 12px; border-radius: 50%; background-color: #6c5ce7; margin-right: 5px;"></div>
+                                <span style="font-size: 0.8rem;">Wallet</span>
+                            </div>
+                            <div style="display: flex; align-items: center;">
+                                <div style="width: 12px; height: 12px; background-color: #e74c3c; transform: rotate(45deg); margin-right: 5px;"></div>
+                                <span style="font-size: 0.8rem;">Program</span>
+                            </div>
+                            <div style="display: flex; align-items: center;">
+                                <div style="width: 12px; height: 10px; background-color: #f1c40f; clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%); margin-right: 5px;"></div>
+                                <span style="font-size: 0.8rem;">Token</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <p>Color-coded nodes and edges with shape differentiation for clearer visualization of transaction relationships.</p>
+            </div>
+        </div>
+        
+        <!-- Slide 4: Performance Metrics -->
+        <div class="slide slide4">
+            <div class="slide-content">
+                <h2>Adaptive Performance Metrics</h2>
+                <div class="slide-image">
+                    <div class="card" style="width: 80%;">
+                        <div style="font-weight: bold; margin-bottom: 15px; color: #666; font-size: 0.9rem; letter-spacing: 0.05em; text-transform: uppercase; border-bottom: 1px dashed #ddd; padding-bottom: 5px;">Warm namespace</div>
+                        
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 10px; align-items: center;">
+                            <div style="width: 40px;">p50</div>
+                            <div style="flex: 1; height: 16px; background-color: #f0f0f0; margin: 0 15px; position: relative;">
+                                <div style="position: absolute; height: 100%; width: 16%; background-color: #e74c3c;"></div>
+                            </div>
+                            <div style="width: 40px; text-align: right;">16ms</div>
+                        </div>
+                        
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 10px; align-items: center;">
+                            <div style="width: 40px;">p90</div>
+                            <div style="flex: 1; height: 16px; background-color: #f0f0f0; margin: 0 15px; position: relative;">
+                                <div style="position: absolute; height: 100%; width: 21%; background-color: #e74c3c;"></div>
+                            </div>
+                            <div style="width: 40px; text-align: right;">21ms</div>
+                        </div>
+                        
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 20px; align-items: center;">
+                            <div style="width: 40px;">p99</div>
+                            <div style="flex: 1; height: 16px; background-color: #f0f0f0; margin: 0 15px; position: relative;">
+                                <div style="position: absolute; height: 100%; width: 33%; background-color: #e74c3c;"></div>
+                            </div>
+                            <div style="width: 40px; text-align: right;">33ms</div>
+                        </div>
+                        
+                        <div style="font-weight: bold; margin-bottom: 15px; margin-top: 25px; color: #666; font-size: 0.9rem; letter-spacing: 0.05em; text-transform: uppercase; border-bottom: 1px dashed #ddd; padding-bottom: 5px;">Cold namespace</div>
+                        
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 10px; align-items: center;">
+                            <div style="width: 40px;">p50</div>
+                            <div style="flex: 1; height: 16px; background-color: #f0f0f0; margin: 0 15px; position: relative;">
+                                <div style="position: absolute; height: 100%; width: 40%; background-color: #3498db;"></div>
+                            </div>
+                            <div style="width: 40px; text-align: right;">402ms</div>
+                        </div>
+                    </div>
+                </div>
+                <p>Visual bars for comparing metrics between warm and cold namespaces with intuitive color coding.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="timeline">
+        <h2>Video Timeline</h2>
+        
+        <div class="timeline-item">
+            <div class="timeline-time">0:00-0:30</div>
+            <div class="timeline-content">
+                <h3>Introduction</h3>
+                <p>Overview of the UI enhancement project and what will be demonstrated.</p>
+            </div>
+        </div>
+        
+        <div class="timeline-item">
+            <div class="timeline-time">0:30-2:00</div>
+            <div class="timeline-content">
+                <h3>Enhanced UI Design Showcase</h3>
+                <ul>
+                    <li>Card-based layout with clean organization</li>
+                    <li>Interactive sliders with visual feedback</li>
+                    <li>Loading indicators with percentage displays</li>
+                </ul>
+            </div>
+        </div>
+        
+        <div class="timeline-item">
+            <div class="timeline-time">2:00-3:30</div>
+            <div class="timeline-content">
+                <h3>Data Visualization Enhancements</h3>
+                <ul>
+                    <li>Performance metrics visualization</li>
+                    <li>Testimonials section with clean design</li>
+                    <li>Statistics grid for organized numeric data</li>
+                </ul>
+            </div>
+        </div>
+        
+        <div class="timeline-item">
+            <div class="timeline-time">3:30-5:00</div>
+            <div class="timeline-content">
+                <h3>Transaction Graph Demo</h3>
+                <ul>
+                    <li>Node shape and color differentiation</li>
+                    <li>Interactive features for exploring transactions</li>
+                    <li>Streaming data with progress indicators</li>
+                </ul>
+            </div>
+        </div>
+        
+        <div class="timeline-item">
+            <div class="timeline-time">5:00-6:30</div>
+            <div class="timeline-content">
+                <h3>Transaction Details with Demo Data</h3>
+                <ul>
+                    <li>Transaction overview with card-based organization</li>
+                    <li>Error handling with informative feedback</li>
+                    <li>Demo transaction support for reliable testing</li>
+                </ul>
+            </div>
+        </div>
+        
+        <div class="timeline-item">
+            <div class="timeline-time">6:30-7:30</div>
+            <div class="timeline-content">
+                <h3>Future Development Roadmap</h3>
+                <ul>
+                    <li>Advanced transaction graph animations</li>
+                    <li>Enhanced data visualization for complex transactions</li>
+                    <li>Real-time data streaming improvements</li>
+                    <li>Accessibility enhancements</li>
+                    <li>Mobile responsiveness optimizations</li>
+                </ul>
+            </div>
+        </div>
+        
+        <div class="timeline-item">
+            <div class="timeline-time">7:30-8:00</div>
+            <div class="timeline-content">
+                <h3>Conclusion</h3>
+                <p>Summary of improvements and benefits for users.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="features">
+        <div class="feature-card">
+            <h3>Card-Based Interface</h3>
+            <p>Each content section has its own card with consistent styling for better organization and readability, improving the overall user experience.</p>
+        </div>
+        
+        <div class="feature-card">
+            <h3>Interactive Controls</h3>
+            <p>Sliders, toggles, and buttons with visual feedback provide a more intuitive experience for users interacting with the application.</p>
+        </div>
+        
+        <div class="feature-card">
+            <h3>Transaction Graph</h3>
+            <p>Color-coded nodes and edges with shape differentiation create clearer visualization of transaction relationships and data flow.</p>
+        </div>
+        
+        <div class="feature-card">
+            <h3>Progress Indicators</h3>
+            <p>Loading states with percentage feedback keep users informed during data retrieval, enhancing transparency and reducing perceived wait times.</p>
+        </div>
+        
+        <div class="feature-card">
+            <h3>Performance Metrics</h3>
+            <p>Visual bars for comparing metrics between different states make performance data more accessible and easier to understand at a glance.</p>
+        </div>
+        
+        <div class="feature-card">
+            <h3>Error Handling</h3>
+            <p>Informative error states with fallback demo data ensure a smooth experience even when network issues occur, improving reliability.</p>
+        </div>
+    </div>
+
+    <div class="cta">
+        <h2>Experience the Enhanced Interface</h2>
+        <p>The UI enhancements create a more intuitive and visually appealing experience while maintaining the powerful capabilities you rely on.</p>
+        <a href="#" class="button">Explore the Demo</a>
+    </div>
+
+    <footer>
+        <p>© 2025 OpenSVM. All rights reserved.</p>
+    </footer>
+
+    <script>
+        // This script would normally control video playback
+        // For this demo, we're using CSS animations instead
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('OpenSVM UI Enhancements Demo loaded');
+        });
+    </script>
+</body>
+</html>

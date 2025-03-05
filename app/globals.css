@@ -5,6 +5,15 @@
 /* Import VTable styles */
 @import './styles/vtable.css';
 
+/* Import Paper Theme Enhancements */
+@import './styles/paper-theme-enhancements.css';
+
+/* Import UI enhancements based on design concept */
+@import './styles/ui-enhancements.css';
+
+/* Import Transaction Graph specific styles */
+@import './styles/transaction-graph.css';
+
 /* Optimize font loading for LCP */
 @font-face {
   font-family: 'Berkeley Mono';
@@ -163,5 +172,114 @@
     will-change: transform;
     transform: translateZ(0);
     backface-visibility: hidden;
+  }
+
+  /* UI Enhancement components based on design concept */
+  .content-card {
+    border: 1px solid hsl(var(--border));
+    padding: 24px;
+    margin-bottom: 16px;
+    background: hsl(var(--card));
+  }
+
+  .two-column-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+  }
+
+  @media (max-width: 768px) {
+    .two-column-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  /* Typography styles for metrics */
+  .metric-value {
+    font-size: 24px;
+    font-weight: 700;
+    line-height: 1.2;
+  }
+
+  .metric-unit {
+    font-size: 14px;
+    color: hsl(var(--muted-foreground));
+    margin-left: 4px;
+  }
+
+  .section-heading {
+    font-size: 18px;
+    font-weight: 500;
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid hsl(var(--border));
+  }
+
+  /* Warm and cold section styles */
+  .warm-section {
+    background-color: hsl(45 100% 98%);
+    border-left: 3px solid hsl(45 100% 50%);
+    padding-left: 16px;
+  }
+
+  .cold-section {
+    background-color: hsl(210 100% 98%);
+    border-left: 3px solid hsl(210 100% 50%);
+    padding-left: 16px;
+  }
+
+  /* Horizontal metric bar */
+  .metric-bar-container {
+    margin: 12px 0;
+  }
+
+  .metric-bar-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 4px;
+  }
+
+  .metric-bar {
+    height: 24px;
+    background: hsl(var(--primary));
+    position: relative;
+  }
+
+  .metric-bar-label {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: hsl(var(--primary-foreground));
+    font-weight: 500;
+  }
+
+  /* Slider component styling */
+  .slider-container {
+    width: 100%;
+    margin: 24px 0;
+  }
+
+  .slider-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+
+  .slider-value {
+    font-weight: 700;
+  }
+
+  .slider-track {
+    position: relative;
+    height: 8px;
+    background: hsl(var(--secondary));
+    margin: 16px 0;
+  }
+
+  .slider-ticks {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 4px;
   }
 }

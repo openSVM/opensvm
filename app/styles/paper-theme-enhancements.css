@@ -1,0 +1,315 @@
+/**
+ * Paper Theme Enhancements CSS
+ * Implements a clean, minimal interface design with sophisticated metrics display
+ */
+
+.theme-paper {
+  --card-bg: #ffffff;
+  --card-border: #f0f0f0;
+  --slider-track: #e8e8e8;
+  --slider-progress: #000000;
+  --slider-thumb: #000000;
+  --warm-metric: #000000;
+  --cold-metric: #000000;
+  --text-primary: #000000;
+  --text-secondary: #555555;
+  --text-muted: #888888;
+}
+
+.dark .theme-paper {
+  --card-bg: #1a1a1a;
+  --card-border: #2a2a2a;
+  --slider-track: #2a2a2a;
+  --slider-progress: #ffffff;
+  --slider-thumb: #ffffff;
+  --warm-metric: #ffffff;
+  --cold-metric: #ffffff;
+  --text-primary: #ffffff;
+  --text-secondary: #bbbbbb;
+  --text-muted: #888888;
+}
+
+/* Section Headers */
+.section-heading {
+  font-size: 1.25rem;
+  font-weight: 500;
+  margin-bottom: 1.25rem;
+  letter-spacing: -0.025em;
+  color: var(--text-primary);
+}
+
+/* Modern Card Layout */
+.card-modern {
+  background-color: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 0.5rem;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  transition: all 0.2s ease;
+}
+
+.card-modern-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.card-modern-title {
+  font-size: 1rem;
+  font-weight: 500;
+  letter-spacing: -0.025em;
+  color: var(--text-primary);
+}
+
+/* Slider Components */
+.slider-container {
+  margin-bottom: 1.25rem;
+}
+
+.slider-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.25rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.slider-value {
+  font-weight: 400;
+  color: var(--text-secondary);
+}
+
+.subsection-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-bottom: 0.75rem;
+}
+
+.slider-track {
+  position: relative;
+  height: 4px;
+  background-color: var(--slider-track);
+  border-radius: 2px;
+  margin-bottom: 0.75rem;
+}
+
+.slider-progress {
+  position: absolute;
+  height: 100%;
+  background-color: var(--slider-progress);
+  border-radius: 2px;
+}
+
+.slider-thumb {
+  position: absolute;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  background-color: var(--slider-thumb);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  cursor: pointer;
+}
+
+.slider-ticks {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+/* Price Items */
+.price-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.price-label {
+  color: var(--text-secondary);
+}
+
+.price-value {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.price-breakdown {
+  margin-top: 1.5rem;
+  border-top: 1px solid var(--card-border);
+  padding-top: 1rem;
+}
+
+.price-breakdown-header {
+  display: flex;
+  justify-content: space-between;
+  cursor: pointer;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.price-total {
+  display: flex;
+  justify-content: space-between;
+  font-weight: 500;
+  margin-top: 1rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--card-border);
+  color: var(--text-primary);
+}
+
+/* Performance Metrics */
+.performance-metrics {
+  margin-top: 1rem;
+}
+
+.performance-metric {
+  display: flex;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.metric-label {
+  width: 2.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.metric-bar-container {
+  flex: 1;
+  position: relative;
+  margin-left: 1rem;
+  display: flex;
+  align-items: center;
+}
+
+.metric-bar {
+  height: 12px;
+  border-radius: 6px;
+}
+
+.warm-metric {
+  background-color: var(--warm-metric);
+  opacity: 0.8;
+}
+
+.cold-metric {
+  background-color: var(--cold-metric);
+  opacity: 0.8;
+}
+
+.metric-bar-label {
+  margin-left: 0.75rem;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+/* Grid Layouts */
+.two-column-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+}
+
+@media (min-width: 768px) {
+  .two-column-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* Quote Cards */
+.quote-card {
+  background-color: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 0.5rem;
+  padding: 1.5rem;
+}
+
+.quote-text {
+  font-size: 1rem;
+  line-height: 1.5;
+  font-style: italic;
+  margin-bottom: 1.5rem;
+  color: var(--text-primary);
+}
+
+.quote-author {
+  display: flex;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.author-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  margin-right: 0.75rem;
+}
+
+.author-info {
+  flex: 1;
+}
+
+.author-name {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.author-title {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.company-logo {
+  font-weight: 700;
+  font-size: 0.875rem;
+  letter-spacing: -0.025em;
+  color: var(--text-primary);
+}
+
+/* Stats Grid */
+.stats-grid {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.grid-cols-1 {
+  grid-template-columns: 1fr;
+}
+
+.grid-cols-2 {
+  grid-template-columns: 1fr 1fr;
+}
+
+.stat-card {
+  background-color: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 0.25rem;
+  padding: 0.75rem;
+  text-align: center;
+}
+
+.stat-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-bottom: 0.25rem;
+}
+
+.stat-value {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+/* Links */
+a.text-primary {
+  color: #ff6b00;
+  text-decoration: none;
+}
+
+a.text-primary:hover {
+  text-decoration: underline;
+}

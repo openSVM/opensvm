@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { getConnection } from '@/lib/solana-connection';
+import { connectionPool, getConnection } from '@/lib/solana-connection';
 import { PublicKey } from '@solana/web3.js';
 
 const defaultHeaders = {
@@ -59,81 +59,83 @@ export async function GET(
 
     // Get connection from pool
     const connection = await getConnection();
-    
-    // Fetch transaction signatures for the account
-    const signatures = await connection.getSignaturesForAddress(
-      new PublicKey(address),
-      {
-        limit,
-        before,
-        until
-      },
-      'confirmed'
-    );
+
+    // Fetch signatures for the account
+    const signatures = await connection.getSignaturesForAddress(new PublicKey(address), {
+      limit,
+      before,
+      until
+    }, 'confirmed');
 
     // Fetch full transaction details
-    const transactionDetails = await Promise.all(
-      signatures.map(async (sigInfo) => {
-        try {
-          const tx = await connection.getParsedTransaction(
-            sigInfo.signature, 
-            {
-              maxSupportedTransactionVersion: 0,
-              commitment: 'confirmed'
-            }
-          );
+    // Use multiple connections for parallel processing
+    const fetchTransactionDetails = async (signature: string, index: number) => {
+      // Get a separate connection for each transaction to maximize parallelism
+      const txConnection = await getConnection();
+      
+      try {
+        const tx = await txConnection.getParsedTransaction(signature, {
+          maxSupportedTransactionVersion: 0,
+          commitment: 'confirmed'
+        });
 
-          // Get accounts involved in this transaction
-          const accounts = tx?.transaction.message.accountKeys.map(key => ({
-            pubkey: key.pubkey.toString(),
-            isSigner: key.signer,
-            isWritable: key.writable
-          })) || [];
+        // Get accounts involved in this transaction
+        const accounts = tx?.transaction.message.accountKeys.map(key => ({
+          pubkey: key.pubkey.toString(),
+          isSigner: key.signer,
+          isWritable: key.writable
+        })) || [];
 
-          // Calculate transaction flow
-          const transfers = [];
-          if (tx?.meta) {
-            // Look at pre/post balances to determine transfers
-            if (tx.meta.preBalances && tx.meta.postBalances) {
-              for (let i = 0; i < tx.meta.preBalances.length; i++) {
-                const pre = tx.meta.preBalances[i];
-                const post = tx.meta.postBalances[i];
-                const change = post - pre;
-                
-                if (change !== 0 && accounts[i]) {
-                  transfers.push({
-                    account: accounts[i].pubkey,
-                    change
-                  });
-                }
+        // Calculate transaction flow
+        const transfers = [];
+        if (tx?.meta) {
+          // Look at pre/post balances to determine transfers
+          if (tx.meta.preBalances && tx.meta.postBalances) {
+            for (let i = 0; i < tx.meta.preBalances.length; i++) {
+              const pre = tx.meta.preBalances[i];
+              const post = tx.meta.postBalances[i];
+              const change = post - pre;
+              
+              if (change !== 0 && accounts[i]) {
+                transfers.push({
+                  account: accounts[i].pubkey,
+                  change
+                });
               }
             }
           }
-
-          return {
-            signature: sigInfo.signature,
-            timestamp: tx?.blockTime ? tx.blockTime * 1000 : sigInfo.blockTime ? sigInfo.blockTime * 1000 : Date.now(),
-            slot: sigInfo.slot,
-            err: sigInfo.err, 
-            success: !sigInfo.err,
-            accounts,
-            transfers,
-            memo: sigInfo.memo
-          };
-        } catch (error) {
-          console.error(`Error fetching transaction ${sigInfo.signature}:`, error);
-          return {
-            signature: sigInfo.signature,
-            timestamp: sigInfo.blockTime ? sigInfo.blockTime * 1000 : Date.now(),
-            slot: sigInfo.slot,
-            err: sigInfo.err || error.message,
-            success: false,
-            accounts: [],
-            transfers: [],
-            memo: sigInfo.memo
-          };
         }
-      })
+
+        const sigInfo = signatures[index];
+        return {
+          signature: sigInfo.signature,
+          timestamp: tx?.blockTime ? tx.blockTime * 1000 : sigInfo.blockTime ? sigInfo.blockTime * 1000 : Date.now(),
+          slot: sigInfo.slot,
+          err: sigInfo.err, 
+          success: !sigInfo.err,
+          accounts,
+          transfers,
+          memo: sigInfo.memo
+        };
+      } catch (error) {
+        console.error(`Error fetching transaction ${signature}:`, error);
+        const sigInfo = signatures[index];
+        return {
+          signature: sigInfo.signature,
+          timestamp: sigInfo.blockTime ? sigInfo.blockTime * 1000 : Date.now(),
+          slot: sigInfo.slot,
+          err: sigInfo.err || error.message,
+          success: false,
+          accounts: [],
+          transfers: [],
+          memo: sigInfo.memo
+        };
+      }
+    };
+
+    // Process all transactions in parallel using Promise.all
+    const transactionDetails = await Promise.all(
+      signatures.map((sigInfo, index) => fetchTransactionDetails(sigInfo.signature, index))
     );
 
     clearTimeout(timeoutId);
@@ -141,7 +143,8 @@ export async function GET(
     return new Response(
       JSON.stringify({
         address,
-        transactions: transactionDetails
+        transactions: transactionDetails,
+        rpcCount: connectionPool.getConnectionCount()
       }),
       {
         status: 200,

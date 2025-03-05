@@ -51,31 +51,34 @@ export default function TransactionNodeDetails({ tx }: TransactionNodeDetailsPro
           <button
             key={index}
             onClick={() => setSelectedInstruction(index)}
-            className={`px-3 py-1 rounded text-sm ${
+            className={`px-3 py-1.5 rounded-md text-xs sm:text-sm transition-colors ${
               selectedInstruction === index
-                ? 'bg-neutral-700 text-white'
-                : 'bg-neutral-900 text-neutral-400 hover:bg-neutral-800'
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-muted text-muted-foreground hover:bg-muted/80'
             }`}
           >
-            IX {index}
+            {index === 0 
+              ? "TX Overview" 
+              : `IX ${index}`
+            }
           </button>
         ))}
       </div>
 
       {/* Program Info */}
       <div>
-        <h3 className="text-lg font-medium mb-2">Program</h3>
-        <div className="bg-neutral-900 rounded p-3">
+        <h3 className="text-lg font-medium mb-2 text-foreground">Program</h3>
+        <div className="bg-muted rounded-md p-3 border border-border">
           <AccountLink 
             address={programId}
-            className="font-mono text-sm break-all text-neutral-400 hover:text-neutral-200 transition-colors"
+            className="font-mono text-sm break-all text-muted-foreground hover:text-foreground transition-colors"
           />
         </div>
       </div>
 
       {/* Account List */}
       <div>
-        <h3 className="text-lg font-medium mb-2">Accounts</h3>
+        <h3 className="text-lg font-medium mb-2 text-foreground">Accounts</h3>
         <div className="space-y-2">
           {instruction.accounts.map((accountIndex: number, i: number) => {
             const account = tx.details?.accounts?.[accountIndex];
@@ -83,20 +86,20 @@ export default function TransactionNodeDetails({ tx }: TransactionNodeDetailsPro
             
             const address = account.pubkey.toString();
             return (
-              <div key={i} className="bg-neutral-900 rounded p-3">
-                <div className="flex justify-between items-start">
+              <div key={i} className="bg-muted rounded-md p-3 border border-border">
+                <div className="flex flex-col sm:flex-row justify-between items-start gap-2">
                   <AccountLink 
                     address={address}
-                    className="font-mono text-sm break-all text-neutral-400 hover:text-neutral-200 transition-colors"
+                    className="font-mono text-xs sm:text-sm break-all text-muted-foreground hover:text-foreground transition-colors"
                   />
                   <div className="flex gap-2">
                     {account?.signer && (
-                      <span className="px-2 py-0.5 text-xs rounded bg-green-900 text-green-300">
+                      <span className="px-2 py-0.5 text-xs rounded-md bg-green-700/20 text-green-500 border border-green-700/30">
                         Signer
                       </span>
                     )}
                     {account?.writable && (
-                      <span className="px-2 py-0.5 text-xs rounded bg-blue-900 text-blue-300">
+                      <span className="px-2 py-0.5 text-xs rounded-md bg-blue-700/20 text-blue-500 border border-blue-700/30">
                         Writable
                       </span>
                     )}
@@ -111,19 +114,19 @@ export default function TransactionNodeDetails({ tx }: TransactionNodeDetailsPro
       {/* Compute Units */}
       {(instruction.computeUnits || instruction.computeUnitsConsumed) && (
         <div>
-          <h3 className="text-lg font-medium mb-2">Compute Units</h3>
-          <div className="bg-neutral-900 rounded p-3">
+          <h3 className="text-lg font-medium mb-2 text-foreground">Compute Units</h3>
+          <div className="bg-muted rounded-md p-3 border border-border">
             <div className="flex justify-between items-center mb-2">
-              <span className="text-neutral-400">Allocated</span>
-              <span>{instruction.computeUnits?.toLocaleString()}</span>
+              <span className="text-muted-foreground">Allocated</span>
+              <span className="text-foreground">{instruction.computeUnits?.toLocaleString()}</span>
             </div>
             <div className="flex justify-between items-center mb-2">
-              <span className="text-neutral-400">Consumed</span>
-              <span>{instruction.computeUnitsConsumed?.toLocaleString()}</span>
+              <span className="text-muted-foreground">Consumed</span>
+              <span className="text-foreground">{instruction.computeUnitsConsumed?.toLocaleString()}</span>
             </div>
             {cuEfficiency !== null && (
               <div className="flex justify-between items-center mb-2">
-                <span className="text-neutral-400">Efficiency</span>
+                <span className="text-muted-foreground">Efficiency</span>
                 <Tooltip content="Lower efficiency means higher potential for CU optimization">
                   <span className={`${
                     cuEfficiency < 50 ? 'text-red-400' :
@@ -137,7 +140,7 @@ export default function TransactionNodeDetails({ tx }: TransactionNodeDetailsPro
             )}
             {cuSavings && cuSavings > 0 && (
               <div className="flex justify-between items-center">
-                <span className="text-neutral-400">Potential Savings</span>
+                <span className="text-muted-foreground">Potential Savings</span>
                 <Tooltip content="CUs that could be saved with optimization">
                   <span className="text-blue-400">{cuSavings.toLocaleString()} CU</span>
                 </Tooltip>
@@ -150,8 +153,8 @@ export default function TransactionNodeDetails({ tx }: TransactionNodeDetailsPro
       {/* Data */}
       {instruction.data && (
         <div>
-          <h3 className="text-lg font-medium mb-2">Instruction Data</h3>
-          <div className="bg-neutral-900 rounded p-3">
+          <h3 className="text-lg font-medium mb-2 text-foreground">Instruction Data</h3>
+          <div className="bg-muted rounded-md p-3 border border-border">
             <JsonTree 
               data={parseInstructionData(instruction.data)}
               expanded={false}
@@ -163,14 +166,14 @@ export default function TransactionNodeDetails({ tx }: TransactionNodeDetailsPro
       {/* Inner Instructions */}
       {tx.details?.innerInstructions && tx.details.innerInstructions.length > 0 && (
         <div>
-          <h3 className="text-lg font-medium mb-2">Inner Instructions</h3>
+          <h3 className="text-lg font-medium mb-2 text-foreground">Inner Instructions</h3>
           <div className="space-y-2">
             {tx.details?.innerInstructions
               .filter(inner => inner.index === selectedInstruction)
               .map((inner, i) => (
-                <div key={i} className="bg-neutral-900 rounded p-3">
-                  <div className="text-sm text-neutral-400">
-                    {inner.instructions.length} instruction{inner.instructions.length !== 1 ? 's' : ''}
+                <div key={i} className="bg-muted rounded-md p-3 border border-border">
+                  <div className="text-sm text-muted-foreground">
+                    {inner.instructions.length} instruction{inner.instructions.length !== 1 ? 's' : ''} executed
                   </div>
                   <div className="mt-2 text-xs text-neutral-500">
                     Programs: {Array.from(new Set(inner.instructions.map(ix => 
@@ -179,7 +182,7 @@ export default function TransactionNodeDetails({ tx }: TransactionNodeDetailsPro
                       <span key={id}>
                         <AccountLink 
                           address={id}
-                          className="hover:text-neutral-300 transition-colors"
+                          className="hover:text-foreground transition-colors"
                         >
                           {`${id.slice(0, 4)}...${id.slice(-4)}`}
                         </AccountLink>
