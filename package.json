@@ -6,8 +6,14 @@
     "dev": "next dev",
     "build": "next build --debug",
     "start": "next start",
+    "build:fixed": "bun install --force && next build --debug",
+    "build:legacy": "npm install --legacy-peer-deps && next build --debug",
+    "build:force": "npm install --force && next build --debug",
     "lint": "next lint",
-    "test": "jest",
+    "install:fixed": "bun install --force",
+    "install:legacy": "npm install --legacy-peer-deps",
+    "install:force": "npm install --force",
+    "test": "NODE_OPTIONS=--max_old_space_size=4096 jest",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "dev:test": "NODE_ENV=test next dev",
@@ -110,6 +116,9 @@
     "setupFilesAfterEnv": [
       "<rootDir>/jest.setup.ts"
     ],
+    "modulePathIgnorePatterns": [
+      "<rootDir>/node_modules/canvas"
+    ],
     "transform": {
       "^.+\\.(t|j)sx?$": [
         "@swc/jest",
@@ -128,7 +137,7 @@
       "^@/(.*)$": "<rootDir>/$1"
     },
     "transformIgnorePatterns": [
-      "node_modules/(?!(uuid|@solana/web3.js)/)"
+      "node_modules/(?!(uuid|@solana/web3.js|canvas)/)"
     ],
     "testPathIgnorePatterns": [
       "<rootDir>/node_modules/",

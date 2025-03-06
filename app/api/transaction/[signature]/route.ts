@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import type { DetailedTransactionInfo } from '@/lib/solana';
 import { getConnection } from '@/lib/solana-connection';
 import type { ParsedTransactionWithMeta } from '@solana/web3.js';
+import { PublicKey } from '@solana/web3.js';
 
 const DEBUG = true; // Set to true to enable detailed logging
 
@@ -394,8 +395,8 @@ function transformTransactionData(signature: string, tx: ParsedTransactionWithMe
 
 // Helper function to generate a demo transaction with the given signature
 function generateDemoTransaction(signature: string): ParsedTransactionWithMeta {
-  // Simple demo transaction with basic structure
-  return {
+  // We use 'as unknown as ParsedTransactionWithMeta' to bypass type checking
+  return ({
     signature,
     blockTime: Math.floor(Date.now() / 1000) - 1800, // 30 minutes ago
     slot: 123456789,
@@ -409,18 +410,20 @@ function generateDemoTransaction(signature: string): ParsedTransactionWithMeta {
       innerInstructions: []
     },
     transaction: {
+      signatures: [signature],
       message: {
+        recentBlockhash: 'demoBlockhash1111111111111111111111111111111',
         accountKeys: [
-          {
-            pubkey: 'DemoWalletAddress1111111111111111111111111',
+          { 
+            pubkey: new PublicKey('11111111111111111111111111111111'),
             signer: true,
             writable: true
           },
-          {
-            pubkey: 'DemoWalletAddress2222222222222222222222222',
+          { 
+            pubkey: new PublicKey('222222222222222222222222222222222'),
             signer: false,
             writable: true
-          }
+          } 
         ],
         instructions: [
           {
@@ -434,5 +437,5 @@ function generateDemoTransaction(signature: string): ParsedTransactionWithMeta {
         ]
       }
     }
-  } as ParsedTransactionWithMeta;
+  }) as unknown as ParsedTransactionWithMeta;
 }

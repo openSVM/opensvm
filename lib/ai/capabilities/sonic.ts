@@ -68,10 +68,6 @@ export class SonicCapability extends BaseCapability {
       getPool: async (id: string) => {
         return await this.getPoolById(id);
       },
-      getPool: async (id: string) => {
-        const pools = await this.sonic.getPools();
-        return pools.find(pool => pool.id === id);
-      },
       swap: async (params: SonicSwapParams) => {
         return {
           success: true,

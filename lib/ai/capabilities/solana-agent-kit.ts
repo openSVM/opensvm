@@ -59,53 +59,7 @@ export class SolanaAgentKitCapability extends BaseCapability {
       },
       sendAirdrop: async (params: AirdropParams) => {
         return this.mockSendAirdrop(params);
-      },
-      tradeTokens: async (params: TokenSwapParams) => {
-        return {
-          success: true,
-          txId: 'simulated-tx-' + Math.random().toString(36).substr(2, 9),
-          fromToken: params.fromToken,
-          toToken: params.toToken,
-          fromAmount: params.amount,
-          toAmount: params.amount * executionPrice,
-          executionPrice,
-          fee: params.amount * 0.0035,
-          slippage: params.slippage || 0.01
-        };
-      },
-      
-      launchToken: async (params: TokenLaunchParams) => {
-        // Simulate token launch
-        const tokenAddress = new PublicKey(
-          Array.from({ length: 32 }, () => Math.floor(Math.random() * 256))
-        ).toBase58();
-        
-        return {
-          success: true,
-          txId: 'simulated-tx-' + Math.random().toString(36).substr(2, 9),
-          tokenAddress,
-          mint: tokenAddress,
-          name: params.name,
-          symbol: params.symbol,
-          decimals: params.decimals,
-          initialSupply: params.initialSupply,
-          createdAt: new Date().toISOString()
-        };
-      },
-      
-      sendAirdrop: async (params: AirdropParams) => {
-        // Simulate airdrop
-        return {
-          success: true,
-          txId: 'simulated-tx-' + Math.random().toString(36).substr(2, 9),
-          token: params.token,
-          recipientCount: params.recipients.length,
-          totalAmount: params.amount * params.recipients.length,
-          status: 'completed',
-          completedAt: new Date().toISOString()
-        };
-      },
-      
+      },      
       getTokenPrice: async (token: string) => {
         // Simulate getting token price
         const mockPrices: Record<string, number> = {
@@ -117,7 +71,6 @@ export class SolanaAgentKitCapability extends BaseCapability {
           'BONK': 0.000025,
           'JTO': 3.78
         };
-        
         return {
           token,
           priceUsd: mockPrices[token] || Math.random() * 10,
@@ -179,13 +132,13 @@ export class SolanaAgentKitCapability extends BaseCapability {
   private getSimulatedPrice(fromToken: string, toToken: string): number {
     // Simulated exchange rates
     const mockPrices: Record<string, number> = {
-      'SOL': 150.75 || 1,
-      'USDC': 1.0 || 1,
-      'SVMAI': 4.32 || 1,
-      'BTC': 65750.25 || 1,
-      'ETH': 3250.50 || 1,
-      'BONK': 0.000025 || 1,
-      'JTO': 3.78 || 1
+      'SOL': 150.75,
+      'USDC': 1.0,
+      'SVMAI': 4.32,
+      'BTC': 65750.25,
+      'ETH': 3250.50,
+      'BONK': 0.000025,
+      'JTO': 3.78
     };
     
     const fromPrice = mockPrices[fromToken] || 1;

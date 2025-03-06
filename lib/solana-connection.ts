@@ -16,7 +16,7 @@ class ProxyConnection extends Connection {
   private readonly maxConcurrentRequests = 12; // Increased from 8
   private readonly maxRetries = 12; // Increased from 8
   private activeRequests = 0;
-  private readonly isClient: boolean;
+  private isClient: boolean;
 
   constructor(endpoint: string, config?: ConnectionConfig) {
     // Determine if we're running in the client and prepare the endpoint

@@ -384,8 +384,12 @@ export default function TransactionGraph({
   // Incremental layout that preserves existing positions
   const runIncrementalLayout = (cy: cytoscape.Core) => {
     cy.layout({
-      name: 'dagre',
-      rankDir: 'LR',
+      name: 'dagre' as any,
+      // Cast to any to allow dagre-specific options
+      // @ts-ignore - rankDir is a valid option for dagre layout
+      rankDir: 'LR', // Left to right layout
+      ranker: 'network-simplex',
+      rankSep: 75,
       padding: 50,
       spacingFactor: 1.5,
       animate: true,
@@ -403,8 +407,12 @@ export default function TransactionGraph({
   const runLayout = (cy: cytoscape.Core) => {
     // Cast to any to accommodate dagre-specific options
     cy.layout({
-      name: 'dagre',
-      rankDir: 'LR',
+      name: 'dagre' as any,
+      // Cast to any to allow dagre-specific options
+      // @ts-ignore - rankDir is a valid option for dagre layout
+      rankDir: 'LR', // Left to right layout
+      ranker: 'network-simplex',
+      rankSep: 75,
       padding: 50,
       spacingFactor: 1.5,
       animate: true,
@@ -566,8 +574,12 @@ export default function TransactionGraph({
       ],
       // Cast to any to accommodate dagre-specific options
       layout: {
-        name: 'dagre',
-        rankDir: 'LR',
+        name: 'dagre' as any,
+        // Cast to any to allow dagre-specific options 
+        // @ts-ignore - rankDir is a valid option for dagre layout
+        rankDir: 'LR', // Left to right layout
+        ranker: 'network-simplex',
+        rankSep: 75,
         padding: 50
       },
       minZoom: 0.2,

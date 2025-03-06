@@ -1,5 +1,4 @@
 import { NextRequest } from 'next/server';
-import { type NextFetchEvent } from 'next/server';
 
 const defaultHeaders = {
   'Content-Type': 'application/json',
@@ -18,20 +17,20 @@ export async function OPTIONS() {
   });
 }
 
+// Next.js 15.1.7 App Router route handler with correct type signature
 export async function POST(
   request: NextRequest,
-  { params }: { params: Record<string, string | string[]> }
+  context: { params: Promise<{ id: string }> }
 ) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
 
   try {
-    // Extract the ID from the URL path directly
-    const url = request.url;
-    const pathParts = url.split('/');
-    const endpointId = pathParts[pathParts.length - 1];
-
-    // Forward the request body to the OpenSVM API
+    // Get the endpoint ID from route params - properly awaited
+    const params = await context.params;
+    const { id: endpointId } = await params;
+    
+    // Parse the request body
     const body = await request.json();
     
     console.log(`Proxying RPC request to OpenSVM API, ID: ${endpointId}`);
@@ -66,30 +65,27 @@ export async function POST(
       }
       
       if (!response.ok) {
-      console.error(`Error from OpenSVM API: ${response.status} ${response.statusText}`);
-      return new Response(
-        JSON.stringify({ 
-          error: `RPC request failed with status ${response.status}`,
-          code: response.status
-        }),
-        { 
-          status: response.status,
-          headers: new Headers(defaultHeaders)
-        }
-      );
+        console.error(`Error from OpenSVM API: ${response.status} ${response.statusText}`);
+        return Response.json(
+          { 
+            error: `RPC request failed with status ${response.status}`,
+            code: response.status
+          },
+          { 
+            status: response.status,
+            headers: defaultHeaders
+          }
+        );
       }
     }
 
     // Forward the response from the OpenSVM API back to the client
     const data = await response.json();
     
-    return new Response(
-      JSON.stringify(data),
-      {
-        status: 200,
-        headers: new Headers(defaultHeaders)
-      }
-    );
+    return Response.json(data, {
+      status: 200,
+      headers: defaultHeaders
+    });
   } catch (error) {
     clearTimeout(timeoutId);
     console.error('RPC proxy error:', error);
@@ -107,14 +103,14 @@ export async function POST(
       }
     }
     
-    return new Response(
-      JSON.stringify({ 
+    return Response.json(
+      { 
         error: message,
         details: error instanceof Error ? { message: error.message } : error
-      }),
+      },
       { 
         status,
-        headers: new Headers(defaultHeaders)
+        headers: defaultHeaders
       }
     );
   }

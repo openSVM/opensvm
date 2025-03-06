@@ -257,7 +257,7 @@ async function getTransactionDetails(signature: string): Promise<DetailedTransac
               program: 'Token Program',
               programId: 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
               parsed: { type: 'transfer', amount: '1000000000' },
-              accounts: ['WaLLeTaS7qTaSnKFTYJNGAeu7VzoLMUV9QCMfKxFsgt', 'RecipienTEKQQQQQQQQQQQQQQQQQQQQQQQQQQFrThs'],
+              accounts: [0, 1] as number[],
               data: 'Transfer 1000000000' as any,
               computeUnits: undefined as unknown as number,
               computeUnitsConsumed: undefined as unknown as number
@@ -307,8 +307,8 @@ async function getTransactionDetails(signature: string): Promise<DetailedTransac
                 {
                   programId: 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
                   accounts: [
-                    'WaLLeTaS7qTaSnKFTYJNGAeu7VzoLMUV9QCMfKxFsgt',
-                    'RecipienTEKQQQQQQQQQQQQQQQQQQQQQQQQQQFrThs'
+                    0,
+                    1
                   ],
                   data: 'Transfer 1000000000',
                 computeUnits: undefined as unknown as number,
@@ -372,7 +372,7 @@ function getDemoTransactionData(signature: string): DetailedTransactionInfo {
           program: 'Token Program',
           programId: 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
           parsed: { type: 'transfer', amount: '1000000000' },
-          accounts: ['WaLLeTaS7qTaSnKFTYJNGAeu7VzoLMUV9QCMfKxFsgt', 'RecipienTEKQQQQQQQQQQQQQQQQQQQQQQQQQQFrThs'] as any,
+          accounts: [0, 1] as number[],
           data: 'Transfer 1000000000',
           computeUnits: undefined as unknown as number,
           computeUnitsConsumed: undefined as unknown as number
@@ -422,8 +422,8 @@ function getDemoTransactionData(signature: string): DetailedTransactionInfo {
             {
               programId: 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
               accounts: [
-                'WaLLeTaS7qTaSnKFTYJNGAeu7VzoLMUV9QCMfKxFsgt',
-                'RecipienTEKQQQQQQQQQQQQQQQQQQQQQQQQQQFrThs'
+                0,
+                1
               ],
               data: 'Transfer 1000000000' as any as any,
               computeUnits: undefined as unknown as number,  
