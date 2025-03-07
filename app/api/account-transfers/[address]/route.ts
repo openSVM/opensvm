@@ -119,7 +119,7 @@ export async function GET(
 
     const searchParams = request.nextUrl.searchParams;
     const offset = parseInt(searchParams.get('offset') || '0');
-    const limit = Math.min(parseInt(searchParams.get('limit') || '1000'), 1000);
+    const limit = Math.min(parseInt(searchParams.get('limit') || '1000000'), 1000);
 
     // Validate address
     if (!isValidSolanaAddress(address)) {

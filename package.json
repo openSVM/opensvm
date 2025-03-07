@@ -81,6 +81,7 @@
     "three": "^0.173.0",
     "together-ai": "^0.13.0",
     "whatwg-url": "^5.0.0",
+    "xstate": "^5.19.2",
     "zod": "^3.24.1",
     "zod-to-json-schema": "^3.23.0"
   },

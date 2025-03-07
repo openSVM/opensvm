@@ -1,175 +1,151 @@
-/* VTable container */
+/* VTable Styles */
 .vtable-container {
   position: relative;
   width: 100%;
-  height: 600px;
+  height: 100%;
+  font-family: inherit;
   overflow: hidden;
   background: var(--background);
 }
 
 .vtable {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
   width: 100%;
   height: 100%;
+  cursor: pointer;
+  position: relative;
+}
+
+/* Base table styles */
+.vtable .vc-table {
+  width: 100%;
+  height: 100%;
+  border-collapse: collapse;
   background: transparent;
 }
 
-/* Canvas container */
-.vtable canvas {
-  position: absolute !important;
-  top: 0 !important;
-  left: 0 !important;
-  width: 100% !important;
-  height: 100% !important;
-  background: transparent !important;
+/* Header styling */
+.vtable .vc-table-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background-color: var(--background);
 }
 
-/* Cell content */
+.vtable .vc-table-header-cell {
+  padding: 12px 16px;
+  font-weight: 600;
+  text-align: left;
+  border-bottom: 1px solid rgba(200, 200, 200, 0.2);
+  background-color: var(--secondary-background, rgba(0, 0, 0, 0.02));
+  transition: background-color 0.2s ease;
+}
+
+/* Cell styling */
+.vtable .vc-table-cell {
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(200, 200, 200, 0.1);
+  transition: background-color 0.2s ease;
+}
+
 .vtable-cell {
   display: flex;
   align-items: center;
-  height: 100%;
-  padding: 8px 12px;
-  font-family: var(--font-family);
-  font-size: var(--base-font-size);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-height: 24px;
   line-height: 1.5;
-  color: var(--foreground);
 }
 
-/* Links */
-.vtable-cell a {
-  color: hsl(var(--primary));
+/* Row styling */
+.vtable .vc-table-row {
+  transition: background-color 0.2s ease;
+}
+
+.vtable .vc-table-row:hover {
+  background-color: var(--row-hover-background, rgba(0, 0, 0, 0.02));
+}
+
+/* Hover and selected row styling */
+.vtable-row-selected {
+  background-color: rgba(59, 130, 246, 0.1) !important;
+  border-color: rgba(59, 130, 246, 0.4);
+}
+
+.vtable-row-pinned {
+  background-color: rgba(250, 204, 21, 0.1) !important;
+  border-color: rgba(250, 204, 21, 0.4);
+}
+
+/* Floating pin button */
+.vtable-floating-action {
+  position: absolute;
+  z-index: 100;
+  top: 0;
+  right: 0;
+  padding: 4px;
+  animation: fadeIn 0.2s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Link styling within cells */
+.vtable a, .vtable [data-href] {
+  color: rgb(59, 130, 246);
   text-decoration: none;
+  transition: color 0.2s ease-in-out;
 }
 
-.vtable-cell a:hover {
+.vtable a:hover, .vtable [data-href]:hover {
+  color: rgb(37, 99, 235);
   text-decoration: underline;
-}
-
-/* Headers */
-.vtable-header {
-  font-weight: 600;
-  background-color: var(--secondary);
-  border-bottom: 1px solid var(--border);
-}
-
-/* Rows */
-.vtable-row {
-  border-bottom: 1px solid var(--border);
-}
-
-.vtable-row:hover {
-  background-color: var(--muted);
-}
-
-/* Cells */
-.vtable-cell {
-  padding: 8px 12px;
-  border-right: 1px solid var(--border);
-}
-
-.vtable-cell:last-child {
-  border-right: none;
 }
 
 /* Loading state */
 .vtable-loading {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(var(--background), 0.8);
-}
-
-.vtable-loading-spinner {
-  width: 32px;
-  height: 32px;
-  border: 3px solid var(--border);
-  border-top-color: var(--primary);
-  border-radius: 50%;
-  animation: vtable-spin 1s linear infinite;
-}
-
-@keyframes vtable-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-/* Error state */
-.vtable-error {
-  padding: 16px;
-  color: var(--destructive);
-  text-align: center;
+  opacity: 0.6;
+  pointer-events: none;
 }
 
 /* Empty state */
 .vtable-empty {
-  padding: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
   color: var(--muted-foreground);
-  text-align: center;
+  font-size: 0.9em;
 }
 
-/* Theme-specific styles */
-.theme-cyberpunk .vtable,
-.theme-high-contrast .vtable,
-.theme-dos .vtable,
-.theme-paper .vtable,
-.theme-solarized .vtable {
-  --vtable-foreground: var(--foreground);
-  --vtable-background: var(--background);
-  --vtable-border: var(--border);
-  --vtable-header: var(--secondary);
-  --vtable-hover: var(--muted);
-}
+/* Dark mode adjustments */
+@media (prefers-color-scheme: dark) {
+  .vtable-row-selected {
+    background-color: rgba(59, 130, 246, 0.2) !important;
+  }
+  
+  .vtable-row-pinned {
+    background-color: rgba(250, 204, 21, 0.2) !important;
+  }
+  
+  .vtable .vc-table-header-cell {
+    border-bottom: 1px solid rgba(100, 100, 100, 0.3);
+    background-color: var(--secondary-background, rgba(255, 255, 255, 0.02));
+  }
+  
+  .vtable .vc-table-cell {
+    border-bottom: 1px solid rgba(100, 100, 100, 0.2);
+  }
 
-/* Table styles */
-.vtable [class*="vtable-cell"] {
-  color: var(--vtable-foreground) !important;
-  background-color: var(--vtable-background) !important;
-  border-color: var(--vtable-border) !important;
-}
-
-.vtable [class*="vtable-header-cell"] {
-  color: var(--vtable-foreground) !important;
-  background-color: var(--vtable-header) !important;
-  border-color: var(--vtable-border) !important;
-}
-
-.vtable [class*="vtable-cell"]:hover {
-  background-color: var(--vtable-hover) !important;
-}
-
-/* Force theme colors */
-.vtable [style*="background"],
-.vtable [style*="background-color"] {
-  background-color: var(--vtable-background) !important;
-}
-
-.vtable [style*="color"]:not(a) {
-  color: var(--vtable-foreground) !important;
-}
-
-.vtable [style*="border-color"] {
-  border-color: var(--vtable-border) !important;
-}
-
-/* Header override */
-.vtable [class*="vtable-header"] [style*="background"],
-.vtable [class*="vtable-header"] [style*="background-color"] {
-  background-color: var(--vtable-header) !important;
-}
-
-/* Hover override */
-.vtable [class*="vtable-cell"]:hover [style*="background"],
-.vtable [class*="vtable-cell"]:hover [style*="background-color"] {
-  background-color: var(--vtable-hover) !important;
+  .vtable .vc-table-row:hover {
+    background-color: var(--row-hover-background, rgba(255, 255, 255, 0.02));
+  }
 }

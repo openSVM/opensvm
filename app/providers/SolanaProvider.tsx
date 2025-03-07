@@ -2,7 +2,7 @@
 
 import { ConnectionProvider } from '@solana/wallet-adapter-react';
 import { Connection } from '@solana/web3.js';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { connectionPool } from '@/lib/solana-connection';
 
 // Use a default endpoint to allow rendering while the real connection initializes
@@ -24,11 +24,17 @@ export function SolanaProvider({ children }: { children: React.ReactNode }) {
     init();
   }, []); // Only initialize once
 
+  // Memoize endpoint to avoid unnecessary re-renders
+  const endpoint = useMemo(() => connection?.rpcEndpoint || DEFAULT_ENDPOINT, [connection]);
+
+  // Memoize config so it doesn't change on every render
+  const config = useMemo(() => ({ commitment: 'confirmed' as const }), []);
+
   // Always render children, use default or actual connection when available
   return (
     <ConnectionProvider 
-      endpoint={connection?.rpcEndpoint || DEFAULT_ENDPOINT} 
-      config={{ commitment: 'confirmed' }}
+      endpoint={endpoint} 
+      config={config}
     >
       {children}
     </ConnectionProvider>

@@ -1,8 +1,20 @@
 import { useState, useEffect } from 'react';
 import type { Transfer } from './types';
 
+interface ApiTransfer {
+  txId: string;
+  date: string;
+  from: string;
+  to: string;
+  tokenSymbol: string;
+  tokenAmount: string;
+  usdValue: string;
+  currentUsdValue: string;
+  transferType: string;
+}
+
 interface TransferResponse {
-  data: Transfer[];
+  data: ApiTransfer[];
   hasMore: boolean;
   total?: number;
   error?: string;
@@ -95,6 +107,8 @@ export function useTransfers(address: string): UseTransfersResult {
       
       const result: TransferResponse = await response.json();
       
+      let newTransfers: Transfer[] = [];
+
       if (!response.ok) {
         throw new Error(result.error || 'Failed to fetch transfers');
       }
@@ -106,8 +120,23 @@ export function useTransfers(address: string): UseTransfersResult {
       if (result.data.length === 0) {
         setHasMore(false);
         saveToCache(address, transfers, false, pageToFetch);
-      } else {
-        const newTransfers = [...transfers, ...result.data];
+      } else {        
+        // Map API response fields to Transfer interface
+        const mappedTransfers = result.data.map(item => ({
+          signature: item.txId,
+          timestamp: item.date,
+          type: item.transferType.toLowerCase(),
+          amount: parseFloat(item.tokenAmount),
+          token: item.tokenSymbol,
+          tokenSymbol: item.tokenSymbol,
+          from: item.from,
+          to: item.to,
+          usdValue: parseFloat(item.usdValue),
+          currentUsdValue: parseFloat(item.currentUsdValue),
+          tokenName: item.tokenSymbol === 'SOL' ? 'Solana' : undefined
+        }));
+
+        newTransfers = [...transfers, ...mappedTransfers];
         setTransfers(newTransfers);
         const newPage = pageToFetch + 1;
         setPage(newPage);

@@ -1,21 +1,81 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { useTransfers } from '@/app/account/[address]/components/shared/hooks';
 import type { Transfer } from '@/app/account/[address]/components/shared/types';
 import { VTableWrapper } from '@/components/vtable';
 import { Button } from '@/components/ui/button';
-import { formatNumber } from '@/lib/utils';
+import { formatNumber, truncateMiddle } from '@/lib/utils';
 import { Tooltip } from '@/components/ui/tooltip';
+import { useRouter, usePathname } from 'next/navigation';
+import { PinIcon } from 'lucide-react';
+import { useCallback as useStableCallback } from 'react';
+import Link from 'next/link';
 
 interface TransfersTableProps {
   address: string;
 }
 
 export function TransfersTable({ address }: TransfersTableProps) {
-  const { transfers, loading, error, hasMore, loadMore, totalCount } = useTransfers(address);
+  const { transfers: rawTransfers, loading, error, hasMore, loadMore, totalCount } = useTransfers(address);
+  const router = useRouter();
   const [sortField, setSortField] = useState<keyof Transfer>('timestamp');
+  const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
+  const [pinnedRowIds, setPinnedRowIds] = useState<Set<string>>(new Set());
+
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+
+  // Handle client-side navigation to account/transaction pages
+  const handleAddressClick = useStableCallback((e: React.MouseEvent<HTMLAnchorElement>, targetAddress: string) => {
+    if (!targetAddress) return;
+    
+    e.preventDefault();
+    
+    // Use router.push with scroll: false to prevent page reload
+    router.push(`/account/${targetAddress}?tab=transactions`, { 
+      scroll: false 
+    });
+  }, [router]);
+
+  // Map API data to the expected Transfer format
+  const transfers = useMemo(() => {
+    return rawTransfers.map(item => {
+      // Handle different field names between API and component
+      return {
+        signature: item.txId || '',
+        timestamp: item.date || '',
+        type: item.transferType || 'transfer',
+        amount: parseFloat(item.tokenAmount || '0'),
+        token: item.tokenSymbol || 'SOL',
+        tokenSymbol: item.tokenSymbol || 'SOL',
+        from: item.from || '',
+        to: item.to || '',
+        usdValue: parseFloat(item.usdValue || '0'),
+        currentUsdValue: parseFloat(item.currentUsdValue || '0'),
+        tokenName: 'Solana', // Default for SOL
+        ...(item as any) // Keep any other fields that might be present
+      };
+    });
+  }, [rawTransfers]);
+
+  // Handle row selection
+  const handleRowSelect = useCallback((rowId: string) => {
+    setSelectedRowId(prevId => prevId === rowId ? null : rowId);
+  }, []);
+  
+  // Handle row pinning
+  const handlePinRow = useCallback((rowId: string) => {
+    setPinnedRowIds(prevIds => {
+      const newIds = new Set(prevIds);
+      if (newIds.has(rowId)) {
+        newIds.delete(rowId);
+      } else {
+        newIds.add(rowId);
+      }
+      return newIds;
+    });
+    setSelectedRowId(null);
+  }, []);
 
   const handleSort = (field: string, direction: 'asc' | 'desc' | null) => {
     if (direction === null) {
@@ -37,9 +97,13 @@ export function TransfersTable({ address }: TransfersTableProps) {
       sortable: true,
       render: (row: Transfer) => {
         const date = new Date(row.timestamp);
+        if (isNaN(date.getTime())) {
+          return <div className="whitespace-nowrap" data-test="timestamp">-</div>;
+        }
+        
         return (
-          <div className="whitespace-nowrap">
-            <time dateTime={date.toISOString()}>{date.toLocaleDateString()} {date.toLocaleTimeString()}</time>
+          <div className="whitespace-nowrap" data-test="timestamp">
+            <time dateTime={date.toISOString()}>{date.toLocaleDateString() || '-'} {date.toLocaleTimeString() || '-'}</time>
           </div>
         );
       }
@@ -50,7 +114,7 @@ export function TransfersTable({ address }: TransfersTableProps) {
       width: 100,
       sortable: true,
       render: (row: Transfer) => (
-        <div className="capitalize">{row.type}</div>
+        <div className="capitalize" data-test="type">{row.type || 'transfer'}</div>
       )
     },
     {
@@ -59,8 +123,8 @@ export function TransfersTable({ address }: TransfersTableProps) {
       width: 120,
       sortable: true,
       render: (row: Transfer) => (
-        <div className="text-right font-mono">
-          {formatNumber(row.amount)}
+        <div className="text-right font-mono" data-test="amount" title={row.amount?.toString() || '0'}>
+          {row.amount !== undefined && row.amount !== null ? formatNumber(row.amount) : '0'}
         </div>
       )
     },
@@ -70,7 +134,27 @@ export function TransfersTable({ address }: TransfersTableProps) {
       width: 100,
       sortable: true,
       render: (row: Transfer) => (
-        <div>{row.tokenSymbol || row.token}</div>
+        <div data-test="token" title={(row.tokenSymbol || row.token || 'SOL')}>{row.tokenSymbol || row.token || 'SOL'}</div>
+      )
+    },
+    {
+      field: 'tokenName',
+      title: 'Token Name',
+      width: 120,
+      sortable: true,
+      render: (row: Transfer) => (
+        <div data-test="tokenName" title={(row.tokenName || 'Solana')}>{row.tokenName || 'Solana'}</div>
+      )
+    },
+    {
+      field: 'currentUsdValue',
+      title: 'Current Value',
+      width: 120,
+      sortable: true,
+      render: (row: Transfer) => (
+        <div className="text-right font-mono" data-test="currentUsdValue" title={row.currentUsdValue?.toString() || '0'}>
+          {row.currentUsdValue !== undefined && row.currentUsdValue !== null ? `$${formatNumber(row.currentUsdValue)}` : '-'}
+        </div>
       )
     },
     {
@@ -79,8 +163,8 @@ export function TransfersTable({ address }: TransfersTableProps) {
       width: 120,
       sortable: true,
       render: (row: Transfer) => (
-        <div className="text-right font-mono">
-          {row.usdValue ? `$${formatNumber(row.usdValue)}` : '-'}
+        <div className="text-right font-mono" data-test="usdValue" title={row.usdValue?.toString() || '0'}>
+          {row.usdValue !== undefined && row.usdValue !== null ? `$${formatNumber(row.usdValue)}` : '-'}
         </div>
       )
     },
@@ -90,17 +174,16 @@ export function TransfersTable({ address }: TransfersTableProps) {
       width: 200,
       sortable: true,
       render: (row: Transfer) => (
-        <Tooltip content={row.from}>
-          <div className="truncate font-mono text-xs">
-            <a
-              href={`/account/${row.from}`}
+        <Tooltip content={row.from || ''}>
+          <div className="truncate font-mono text-xs" data-test="from">
+            <Link
+              href={row.from ? `/account/${row.from}?tab=transactions` : '#'}
               className="hover:underline hover:text-blue-400 text-blue-500 transition-colors"
-              title={row.from}
-              aria-label={`View account ${row.from}`}
-              rel="noopener"
+              onClick={(e) => handleAddressClick(e, row.from || '')}
+              data-address={row.from || ''}
             >
               {row.from}
-            </a>
+            </Link> 
           </div>
         </Tooltip>
       )
@@ -111,17 +194,16 @@ export function TransfersTable({ address }: TransfersTableProps) {
       width: 200,
       sortable: true,
       render: (row: Transfer) => (
-        <Tooltip content={row.to}>
-          <div className="truncate font-mono text-xs">
-            <a
-              href={`/account/${row.to}`}
+        <Tooltip content={row.to || ''}>
+          <div className="truncate font-mono text-xs" data-test="to">
+            <Link
+              href={row.to ? `/account/${row.to}?tab=transactions` : '#'}
               className="hover:underline hover:text-blue-400 text-blue-500 transition-colors"
-              title={row.to}
-              aria-label={`View account ${row.to}`}
-              rel="noopener"
+              onClick={(e) => handleAddressClick(e, row.to || '')}
+              data-address={row.to || ''}
             >
               {row.to}
-            </a>
+            </Link>
           </div>
         </Tooltip>
       )
@@ -132,22 +214,26 @@ export function TransfersTable({ address }: TransfersTableProps) {
       width: 200,
       sortable: false,
       render: (row: Transfer) => (
-        <Tooltip content={row.signature}>
-          <div className="truncate font-mono text-xs">
-            <a
-              href={`/tx/${row.signature}`}
-              className="hover:underline hover:text-blue-400 text-blue-500 transition-colors"
-              title={row.signature}
-              aria-label={`View transaction ${row.signature}`}
-              rel="noopener"
-            >
-              {row.signature}
-            </a>
+        <Tooltip content={row.signature || ''}>
+          <div className="truncate font-mono text-xs" data-test="signature">
+            {row.signature ? (
+              <Link
+                href={`/tx/${row.signature}`}
+                className="hover:underline hover:text-blue-400 text-blue-500 transition-colors"
+                prefetch={false}
+                data-signature={row.signature}
+              >
+                {row.signature}
+              </Link>
+            ) : (
+              <span className="text-muted-foreground">-</span>
+            )}
           </div>
         </Tooltip>
       )
     }
-  ], []);
+  ], [handleAddressClick]);
+
 
   const sortedTransfers = useMemo(() => {
     if (!transfers.length) return [];
@@ -156,7 +242,7 @@ export function TransfersTable({ address }: TransfersTableProps) {
       const aValue = a[sortField];
       const bValue = b[sortField];
 
-      if (aValue === undefined || bValue === undefined) return 0;
+      if (aValue === undefined || aValue === null || bValue === undefined || bValue === null) return sortDirection === 'asc' ? -1 : 1;
 
       // Handle different types of values
       if (typeof aValue === 'string' && typeof bValue === 'string') {
@@ -181,6 +267,24 @@ export function TransfersTable({ address }: TransfersTableProps) {
     return sorted;
   }, [transfers, sortField, sortDirection]);
 
+  // Row identity function for selection
+  const getRowId = useCallback((row: Transfer) => row.signature || '', []);
+
+  // Pin button UI
+  const renderPinButton = useCallback((rowId: string) => {
+    const isPinned = pinnedRowIds.has(rowId);
+    
+    return (
+      <Button
+        variant="ghost"
+        size="sm"
+        className={`absolute right-2 top-1/2 transform -translate-y-1/2 z-10 ${isPinned ? 'text-yellow-500' : 'text-gray-500'}`}
+        onClick={() => handlePinRow(rowId)}
+      >
+        <PinIcon className={`h-4 w-4 ${isPinned ? 'fill-yellow-500' : ''}`} />
+      </Button>
+    );
+  }, [pinnedRowIds, handlePinRow]);
   if (error) {
     return (
       <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg" role="alert" aria-live="assertive">
@@ -206,8 +310,13 @@ export function TransfersTable({ address }: TransfersTableProps) {
         <VTableWrapper
           columns={columns}
           data={sortedTransfers}
+          rowKey={getRowId}
           loading={loading}
           onSort={handleSort}
+          selectedRowId={selectedRowId}
+          onRowSelect={handleRowSelect}
+          renderRowAction={renderPinButton}
+          pinnedRowIds={pinnedRowIds}
           aria-busy={loading ? 'true' : 'false'}
         />
       </div>

@@ -6,20 +6,22 @@ import { Suspense } from 'react';
 // Import Navbar directly
 import { Navbar } from '@/components/Navbar';
 
-// Load fonts
+// Load fonts with preload
 const inter = Inter({
   subsets: ['latin'],
   display: 'swap',
   variable: '--font-inter',
+  preload: true,
 });
 
 const jetbrains = JetBrains_Mono({
   subsets: ['latin'],
   display: 'swap',
   variable: '--font-jetbrains',
+  preload: true,
 });
 
-// Dynamic imports with loading fallbacks
+// Dynamic imports with loading fallbacks and error boundary
 const Providers = dynamic(() => import('./providers').then(mod => mod.Providers), {
   loading: () => <div className="min-h-screen bg-background" />
 });
@@ -88,12 +90,12 @@ export default function RootLayout({
         <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
       </head>
       <body className={inter.className}>
-        <Providers>
+          <Providers>
           <Suspense fallback={<div className="min-h-screen bg-background" />}>
             <Navbar>
-              {children}
+                {children}
             </Navbar>
-          </Suspense>
+        </Suspense>
         </Providers>
       </body>
     </html>

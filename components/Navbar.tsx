@@ -11,7 +11,7 @@ import { Button } from './ui/button';
 import { AIChatSidebar } from './ai/AIChatSidebar';
 
 interface NavbarProps {
-  children: React.ReactNode;
+  children?: React.ReactNode;
 }
 
 export function Navbar({ children }: NavbarProps) {

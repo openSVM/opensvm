@@ -2,15 +2,15 @@
 
 import type { DetailedTransactionInfo } from '@/lib/solana';
 import dynamic from 'next/dynamic';
+import { useRouter, usePathname } from 'next/navigation';
+import { useRef, Suspense, useEffect, useState, useCallback, useTransition, useMemo } from 'react';
 import LoadingSpinner from '@/components/LoadingSpinner';
-import React, { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
-import ErrorBoundaryWrapper from '@/components/ErrorBoundaryWrapper';
+import ErrorBoundaryWrapper from '@/components/ErrorBoundaryWrapper'; 
 import { formatNumber } from '@/lib/utils';
 
 // Dynamically import components with no SSR and proper loading states
 // Using a ref for the tooltip positioning and timer
-const { useRef } = React;
 
 const TransactionNodeDetails = dynamic(
   () => import('@/components/TransactionNodeDetails').catch(err => {
@@ -186,7 +186,7 @@ const TransactionOverview = ({ tx, signature, className = '' }: { tx: DetailedTr
   </div>
 );
 
-async function getTransactionDetails(signature: string): Promise<DetailedTransactionInfo> {
+async function getTransactionDetails(signature: string, signal?: AbortSignal): Promise<DetailedTransactionInfo> {
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
@@ -198,7 +198,7 @@ async function getTransactionDetails(signature: string): Promise<DetailedTransac
         'Content-Type': 'application/json',
         'Accept': 'application/json'
       },
-      signal: controller.signal
+      signal: signal || controller.signal
     });
 
     clearTimeout(timeoutId);
@@ -601,14 +601,130 @@ export default function TransactionContent({ signature }: { signature: string })
   const [tx, setTx] = useState<DetailedTransactionInfo | null>(null);
   const [error, setError] = useState<Error | null>(null);
   const [loading, setLoading] = useState(true);
-  const [initialAccount, setInitialAccount] = useState<string | null>(null);
+  const [currentSignature, setCurrentSignature] = useState<string>(signature);
+  const [initialAccount, setInitialAccount] = useState<string | null>(null); 
+  const [transitionState, setTransitionState] = useState<'idle' | 'loading' | 'success'>('idle');
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const [preloadedAccounts, setPreloadedAccounts] = useState<string[]>([]);
+  
+  // Enhanced cache with Map for better performance and key management
+  const transactionDataCache = useRef<Map<string, DetailedTransactionInfo>>(new Map());
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const currentSignatureRef = useRef<string>(signature);
+  const isProgrammaticNavRef = useRef(false);
 
+  const pathname = usePathname();
+
+  useEffect(() => {
+    isProgrammaticNavRef.current = false;
+  }, [pathname]);
+
+  // Update ref when state changes to avoid stale closures
+  useEffect(() => {
+    currentSignatureRef.current = currentSignature;
+  }, [currentSignature]);
+
+  // Client-side transaction selection handler - FIXED to prevent circular updates
+  const handleTransactionSelect = useCallback(async (newSignature: string) => {
+    if (newSignature === currentSignatureRef.current || !newSignature) return;
+
+    setTransitionState('loading');
+    isProgrammaticNavRef.current = true;
+    router.replace(`/tx/${newSignature}`);
+
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
+    startTransition(() => {
+      if (transactionDataCache.current.has(newSignature)) {
+        const data = transactionDataCache.current.get(newSignature);
+        setTx(data);
+        if (data?.details?.accounts && data.details.accounts.length > 0) {
+          setInitialAccount(data.details.accounts[0].pubkey);
+        }
+        document.title = `Transaction ${newSignature.slice(0, 8)}... | OpenSVM`;
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        setTransitionState('success');
+        return;
+      }
+
+      setLoading(true);
+
+      getTransactionDetails(newSignature, controller.signal)
+        .then(data => {
+          transactionDataCache.current.set(newSignature, data);
+          setTx(data);
+          if (data?.details?.accounts && data.details.accounts.length > 0) {
+            setInitialAccount(data.details.accounts[0].pubkey);
+          }
+          document.title = `Transaction ${newSignature.slice(0, 8)}... | OpenSVM`;
+          setTransitionState('success');
+        })
+        .catch(err => setError(err as Error))
+        .finally(() => setLoading(false));
+    });
+  }, [router]);
+
+  // Only sync signature to state on initial render and external navigation - FIXED
+  const initialRenderRef = useRef(true);
+  
+  useEffect(() => {
+    const handlePopState = () => {
+      const pathParts = window.location.pathname.split('/tx/');
+      if (pathParts.length > 1) {
+        const newSignature = pathParts[1];
+        if (newSignature && newSignature !== currentSignatureRef.current) {
+          setCurrentSignature(newSignature);
+        }
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  useEffect(() => {
+    const isProgrammaticNavigation = sessionStorage.getItem('programmatic_nav') === 'true';
+
+    if (initialRenderRef.current) {
+      initialRenderRef.current = false;
+      setCurrentSignature(signature);
+    } else if (!isProgrammaticNavigation && signature !== currentSignatureRef.current) {
+      setCurrentSignature(signature);
+    }
+
+    sessionStorage.removeItem('programmatic_nav');
+  }, [signature]);
+  
+  // FIXED: Separate data fetching effect that triggers only when currentSignature changes
+  // and specifically not from the URL signature prop
   useEffect(() => {
     const fetchTransaction = async () => {
       try {
-        const data = await getTransactionDetails(signature);
+        // Check if we already have this data in cache
+        if (transactionDataCache.current.has(currentSignature)) {
+          const data = transactionDataCache.current.get(currentSignature)!;
+          setTx(data);
+          if (data?.details?.accounts && data.details.accounts.length > 0) {
+            setInitialAccount(data.details.accounts[0].pubkey);
+          }
+          setLoading(false);
+          return;
+        }
+        
+        const data = await getTransactionDetails(currentSignature);
         setTx(data);
+        
         // Set the initial account for the graph
+        // Cache for future use
+        transactionDataCache.current.set(currentSignature, data);
+        
         if (data?.details?.accounts && data.details.accounts.length > 0) {
           setInitialAccount(data.details.accounts[0].pubkey);
         }
@@ -619,22 +735,96 @@ export default function TransactionContent({ signature }: { signature: string })
       }
     };
 
-    fetchTransaction();
-  }, [signature]);
+    // Listen for popstate events (browser back/forward)
+    const handlePopState = (event: PopStateEvent) => {
+      // Skip if this is a programmatic navigation we initiated
+      if (sessionStorage.getItem('programmatic_nav')) {
+        return;
+      }
+      
+      const pathParts = window.location.pathname.split('/tx/');
+      if (pathParts.length > 1) {
+        const newSignature = pathParts[1];
+        // Only update if there's an actual change and not a duplicated event
+        if (newSignature && newSignature !== currentSignatureRef.current) {
+          // Reset navigation flags to treat this as an external navigation
+          setTransitionState('loading');
+          setCurrentSignature(newSignature);
+        }
+      }
+    };
+    
+    window.addEventListener('popstate', handlePopState);
+    
+    // Only fetch if we have a valid signature
+    if (currentSignature) {
+      fetchTransaction();
+    }
+    
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+      if (abortControllerRef.current) abortControllerRef.current.abort();
+    };
+  }, [currentSignature]); // Only depend on our internal state, not the URL parameter
+  
+  // Preload probable transactions for improved UX
+  useEffect(() => {
+    if (!tx?.details?.accounts) return;
+    
+    // Get a list of connected accounts from the current transaction
+    const accounts = tx.details.accounts.slice(0, 10); // Limit to first 3 for efficiency
+    
+    // In the background, we could preload transactions for these accounts
+    // This would be implemented as a low-priority background task
+    // to improve perceived performance when clicking through transactions
+  }, [tx]);
+
+  // Preload connected transactions to improve UX
+  useEffect(() => {
+    // Skip if we don't have tx data yet
+    if (!tx?.details?.accounts) return;
+    
+    // Preload transactions for first 2 accounts to speed up future navigation
+    const preloadAccounts = tx.details.accounts.slice(0, 2);
+    setPreloadedAccounts(preloadAccounts.map(account => account.pubkey).filter(Boolean));
+    
+    preloadAccounts.forEach(account => {
+      if (!account.pubkey) return;
+      
+      // Low priority background fetch - won't block UI
+      const controller = new AbortController();
+      fetch(`/api/account-transactions/${account.pubkey}?limit=5`, { signal: controller.signal })
+        .catch(() => {}); // Silently handle errors - this is just prefetching 
+    });
+  }, [tx]);
 
   if (loading) {
     return <LoadingState signature={signature} />;
   }
 
-  if (error || !tx) {
-    return <ErrorDisplay error={error || new Error('Failed to load transaction')} signature={signature} />;
+  if (error || !tx) { 
+    return <ErrorDisplay error={error || new Error('Failed to load transaction')} signature={signature} />; 
   }
-
+  
   return (
     <ErrorBoundaryWrapper>
       <div className="space-y-6 w-full">
+        {/* Loading overlay for transitions */}
+        {(isPending || transitionState === 'loading') && (
+          <div className="fixed inset-0 bg-background/50 backdrop-blur-sm z-50 flex items-center justify-center pointer-events-none transition-all duration-300 ease-in-out">
+            <div className="bg-background/90 p-4 rounded-lg shadow-lg flex items-center space-x-3">
+              <LoadingSpinner />
+              <span>
+                {transitionState === 'loading' 
+                  ? 'Updating transaction view...' 
+                  : 'Loading transaction data...'}
+              </span>
+            </div>
+          </div>
+        )}
+        
         {/* Transaction Overview and Graph in responsive grid layout */}
-        <div className="transaction-content-grid min-h-[400px] lg:min-h-[500px]">
+        <div className="transaction-content-grid min-h-[400px] lg:min-h-[500px] transition-all duration-300 ease-in-out">
           <div className="transaction-overview-card h-full">
             <TransactionOverview tx={tx} signature={signature} className="h-full" />
           </div>
@@ -645,13 +835,15 @@ export default function TransactionContent({ signature }: { signature: string })
               <Suspense fallback={<div className="h-full min-h-[300px] flex items-center justify-center"><LoadingSpinner /></div>}>
                 <div className="bg-background rounded-lg p-4 shadow-lg border border-border h-full flex flex-col">
                 <h2 className="text-xl font-semibold mb-4 text-foreground">Transaction Graph</h2>
-                <div className="transaction-graph-container flex-1 relative">
+                <div className="transaction-graph-container flex-1 relative min-h-[400px]">
                   <TransactionGraph
-                    initialSignature={signature} 
+                    initialSignature={currentSignature} 
                     initialAccount={initialAccount || ''}
-                    onTransactionSelect={(sig) => sig !== signature && (window.location.href = `/tx/${sig}`)}
+                    onTransactionSelect={handleTransactionSelect}
+                    clientSideNavigation={true}
                     height="100%" 
                     width="100%"
+                    maxDepth={3}
                   /> 
                 </div>
                 </div>
