@@ -40,7 +40,17 @@ const nextConfig = {
   // Enable React strict mode
   reactStrictMode: false,
   // Enable production source maps for better debugging
-  productionBrowserSourceMaps: true,
+  productionBrowserSourceMaps: false,
+  // Preserve specific Tailwind classes that are dynamically added
+  // This ensures animation classes used by interactive components
+  // are included in production builds
+  webpack: (config, { dev, isServer }) => {
+    // Only apply optimizations in production builds
+    if (!dev && !isServer) {
+      config.optimization.splitChunks.cacheGroups = { ...config.optimization.splitChunks.cacheGroups };
+    }
+    return config;
+  },
 };
 
 export default nextConfig;

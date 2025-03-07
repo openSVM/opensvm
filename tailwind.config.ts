@@ -15,6 +15,28 @@ const config: Config = {
     'theme-cyberpunk',
     'theme-solarized'
   ],
+  // Safelist critical classes used for animations
+  // This ensures they won't be purged in production
+  safelist: [
+    'theme-paper',
+    'theme-high-contrast',
+    'theme-dos-blue',
+    'theme-cyberpunk',
+    'theme-solarized',
+    // Animation classes used by dropdown menus
+    'animate-in',
+    'animate-out',
+    'fade-in-0',
+    'fade-out-0',
+    'zoom-in-95',
+    'zoom-out-95',
+    'slide-in-from-top-2',
+    'slide-in-from-right-2',
+    'slide-in-from-left-2', 
+    'slide-in-from-bottom-2',
+    'data-[state=open]:animate-in',
+    'data-[state=closed]:animate-out'
+  ],
   theme: {
     container: {
       center: true,
