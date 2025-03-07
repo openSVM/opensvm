@@ -86,7 +86,7 @@ export const createWalletPathFindingMachine = () => {
       }
     },
     actors: {
-      fetchTransfersByWallet: fromPromise(async ({ input }) => {
+      fetchTransfersByWallet: fromPromise(async ({ input }: { input: { wallet: string } }) => {
         if (!input.wallet || !isValidSolanaAddress(input.wallet)) {
           throw new Error(`Invalid wallet address: ${input.wallet}`);
         }

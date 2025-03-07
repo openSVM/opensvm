@@ -326,20 +326,51 @@ return result;
         }
       }
       
-      const result = await focusOnTransactionUtil(
-        signature,
-        cyRef,
-        focusSignatureRef,
-        setCurrentSignature,
-        viewportState,
-        setViewportState,
-        expandTransactionGraph,
-        onTransactionSelect,
-        router,
-        clientSideNavigation,
-        incrementalLoad,
-        preserveViewport
-      );
+      // Only update state without navigation when within the graph component
+      if (onTransactionSelect) {
+        // Call the onTransactionSelect callback to update other components
+        onTransactionSelect(signature);
+        
+        // Update local state
+        setCurrentSignature(signature);
+        
+        // Expand the transaction in the graph without navigation
+        await expandTransactionGraph(signature);
+        
+        // Highlight the selected node
+        if (cyRef.current) {
+          // Remove highlight from all nodes
+          cyRef.current.elements().removeClass('highlight-transaction highlight-account');
+          
+          // Add highlight to the selected node
+          cyRef.current.getElementById(signature).addClass('highlight-transaction');
+          
+          // Center on the selected node if not preserving viewport
+          if (!preserveViewport) {
+            const node = cyRef.current.getElementById(signature);
+            cyRef.current.center(node);
+            cyRef.current.zoom(0.8);
+          }
+        }
+      } else {
+        // If no onTransactionSelect handler provided, use the utility function
+        // but prevent navigation to avoid page reload
+        const useNavigation = false; // Override to prevent navigation
+        const result = await focusOnTransactionUtil(
+          signature,
+          cyRef,
+          focusSignatureRef,
+          setCurrentSignature,
+          viewportState,
+          setViewportState,
+          expandTransactionGraph,
+          onTransactionSelect,
+          router,
+          useNavigation, // Force client-side navigation to false
+          incrementalLoad,
+          preserveViewport
+        );
+      }
       
       // Add to navigation history if requested and not already navigating through history
       if (addToHistory && !isNavigatingHistory && signature) {
@@ -367,8 +398,6 @@ return result;
           });
         }
       }
-
-      return result;
     } finally {
       pendingFetchesRef.current.delete(loadingKey);
     }

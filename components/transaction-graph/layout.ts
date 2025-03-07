@@ -3,12 +3,12 @@
 import cytoscape from 'cytoscape';
 
 // Define custom layout options for dagre
-interface DagreLayoutOptions extends cytoscape.LayoutOptions {
+type DagreLayoutOptions = cytoscape.LayoutOptions & {
   rankDir?: string;
   ranker?: string;
   rankSep?: number;
   nodeDimensionsIncludeLabels?: boolean;
-}
+};
 
 /**
  * Run incremental layout that preserves existing positions
@@ -43,7 +43,6 @@ export const runIncrementalLayout = (cy: cytoscape.Core, newElementIds: string[]
       padding: 50,
       spacingFactor: 2.0,
       animate: false,
-      fit: true,
       animationDuration: 300,
       fit: false,
       randomize: false,
@@ -107,7 +106,7 @@ export const runLayout = (cy: cytoscape.Core): void => {
 export const createGraphStyle = (): cytoscape.StylesheetCSS[] => [
   { 
     selector: 'node',
-    style: {
+    css: {
       'label': 'data(label)', 
       'text-valign': 'center', 
       'text-halign': 'center',
@@ -122,7 +121,7 @@ export const createGraphStyle = (): cytoscape.StylesheetCSS[] => [
   },
   {
     selector: 'node[status="pending"]',
-    style: {
+    css: {
       'border-width': 2,
       'border-style': 'dashed',
       'border-color': '#cbd5e0',
@@ -131,7 +130,7 @@ export const createGraphStyle = (): cytoscape.StylesheetCSS[] => [
   },
   {
     selector: 'node[status="loading"]',
-    style: {
+    css: {
       'border-width': 2,
       'border-style': 'dotted',
       'border-color': '#cbd5e0',
@@ -140,7 +139,7 @@ export const createGraphStyle = (): cytoscape.StylesheetCSS[] => [
   },
   {
     selector: 'node.account',
-    style: {
+    css: {
       'shape': 'round-rectangle',
       'background-color': '#2c5282',
       'width': '160px',
@@ -149,7 +148,7 @@ export const createGraphStyle = (): cytoscape.StylesheetCSS[] => [
   },
   {
     selector: 'node.transaction',
-    style: {
+    css: {
       'shape': 'diamond',
       'background-color': '#4299e1',
       'width': '45px',
@@ -158,31 +157,31 @@ export const createGraphStyle = (): cytoscape.StylesheetCSS[] => [
   },
   {
     selector: 'node.transaction.success',
-    style: {
+    css: {
       'background-color': '#48bb78',
     }
   },
   {
     selector: 'node.transaction.error',
-    style: {
+    css: {
       'background-color': '#f56565',
     }
   },
   {
     selector: 'node.highlighted',
-    style: {
+    css: {
       'border-width': 4,
       'border-color': '#f6ad55',
       'background-color': '#f6e05e',
       'text-outline-color': '#000',
       'text-outline-width': 2,
       'z-index': 100,
-      'transition-duration': '300ms'
+      'transition-duration': 300
     }
   },
   {
     selector: 'node.active',
-    style: {
+    css: {
       'border-width': 4,
       'border-color': '#4fd1c5',
       'background-color': '#38b2ac', 
@@ -193,7 +192,7 @@ export const createGraphStyle = (): cytoscape.StylesheetCSS[] => [
   },
   {
     selector: 'edge',
-    style: {
+    css: {
       'width': 2,
       'line-color': '#718096',
       'target-arrow-color': '#718096',
@@ -205,13 +204,13 @@ export const createGraphStyle = (): cytoscape.StylesheetCSS[] => [
   },
   {
     selector: 'edge.hover',
-    style: {
+    css: {
       'width': 2
     }
   },
   {
     selector: 'edge[type="transfer"]',
-    style: {
+    css: {
       'width': 3,
       'line-color': '#68d391',
       'target-arrow-color': '#9ae6b4',
@@ -225,18 +224,18 @@ export const createGraphStyle = (): cytoscape.StylesheetCSS[] => [
   },
   { 
     selector: 'edge.highlighted',
-    style: {
+    css: {
       'width': 4,
       'line-color': '#f6ad55',
       'target-arrow-color': '#f6ad55', 
       'z-index': 999,
       'arrow-scale': 1.5,
-      'transition-duration': '300ms'
+      'transition-duration': 300
     }
   },
   {
     selector: '.hover',
-    style: { 
+    css: { 
       'border-width': 2,
       'line-color': '#90cdf4',
       'target-arrow-color': '#90cdf4',
@@ -246,10 +245,10 @@ export const createGraphStyle = (): cytoscape.StylesheetCSS[] => [
   {
     // Add style for newly added elements that will fade in
     selector: '.fade-in',
-    style: {
+    css: {
       'opacity': 0,
       'transition-property': 'opacity',
-      'transition-duration': '500ms'
+      'transition-duration': 500
     }
   }
 ];
@@ -263,7 +262,7 @@ export const initializeCytoscape = (container: HTMLElement): cytoscape.Core => {
   return cytoscape({
     container: container,
     style: createGraphStyle(),
-    layout: {
+    layout: <DagreLayoutOptions>{
       name: 'dagre' as any,
       rankDir: 'LR',
       ranker: 'network-simplex',

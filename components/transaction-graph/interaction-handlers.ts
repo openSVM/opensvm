@@ -64,18 +64,19 @@ export const focusOnTransaction = async (
       });
     }
     
-    // Handle navigation and callbacks
+    // Handle state updates and callbacks without navigation
     if (clientSideNavigation) {
       const isProgrammaticNavigation = typeof window !== 'undefined' && 
         window.sessionStorage && window.sessionStorage.getItem('programmatic_nav') === 'true';
       
       if (!isProgrammaticNavigation) {
-        onTransactionSelect(signature);
-        
-        const hasTransactionSelectHandler = typeof onTransactionSelect === 'function';
-        if (typeof window !== 'undefined' && !hasTransactionSelectHandler) {
-          router.replace(`/tx/${signature}`);
+        // Always call the transaction select handler if provided
+        if (typeof onTransactionSelect === 'function') {
+          onTransactionSelect(signature);
         }
+        
+        // No longer use router.replace to avoid page reload
+        // This allows state-only updates
       }
     }
     
@@ -163,6 +164,12 @@ export const setupGraphInteractions = (
   
   // Add click handler for all nodes (transactions and accounts)
   cy.on('tap', 'node', (event) => {
+    // Always prevent default browser behavior to avoid page reload
+    if (event.originalEvent) {
+      event.originalEvent.preventDefault();
+      event.originalEvent.stopPropagation();
+    }
+    
     const node = event.target;
     const signature = node.id();
     const nodeType = node.data('type');
@@ -173,9 +180,7 @@ export const setupGraphInteractions = (
     
     if (nodeType === 'transaction' && signature !== focusSignatureRef.current) { 
       node.flashClass('active', 300);
-      
-      event.originalEvent.preventDefault();
-      event.originalEvent.stopPropagation();
+      // Pass false as second parameter to avoid unnecessary reload in some cases
       focusOnTransaction(signature, true);
     }
     else if (nodeType === 'account') {
@@ -212,6 +217,12 @@ export const setupGraphInteractions = (
 
   // Add click handler for edges
   cy.on('tap', 'edge', (event) => {
+    // Always prevent default browser behavior to avoid page reload
+    if (event.originalEvent) {
+      event.originalEvent.preventDefault();
+      event.originalEvent.stopPropagation();
+    }
+    
     const edge = event.target;
     
     // Highlight the edge and its connected nodes
@@ -219,7 +230,14 @@ export const setupGraphInteractions = (
     edge.addClass('highlighted');
     edge.connectedNodes().addClass('highlighted');
     
-    event.originalEvent.stopPropagation();
+    // If one of the connected nodes is a transaction, focus on it
+    const connectedTxs = edge.connectedNodes().filter(node => node.data('type') === 'transaction');
+    if (connectedTxs.length > 0) {
+      const txSignature = connectedTxs[0].id();
+      if (txSignature !== focusSignatureRef.current) {
+        focusOnTransaction(txSignature, true);
+      }
+    }
   });
   
   // Track viewport changes

@@ -3,6 +3,7 @@ import type { Message, Note, AgentAction } from '@/lib/ai/types';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useEffect, useRef } from 'react';
+import { VantaBackground } from './VantaBackground';
 
 interface ChatUIProps {
   messages: Message[];
@@ -242,63 +243,68 @@ export function ChatUI({
   };
 
   return (
-    <div className={`flex flex-col h-full ${className}`}>
-      {renderContent()}
-      <div className="p-4 border-t border-white/20">
-        <div className="relative">
+    <div className="relative h-full">
+      <VantaBackground />
+      <div className={`flex flex-col h-full relative z-10 ${className}`}>
+        <div className="flex-1 overflow-hidden bg-black/30 backdrop-blur-[2px]">
+          {renderContent()}
+        </div>
+        <div className="p-4 border-t border-white/20 bg-black/50 backdrop-blur-sm">
           <div className="relative">
-            <textarea
-              value={input}
-              onChange={(e) => {
-                const value = e.target.value;
-                console.log('Input changed:', value);
-                try {
-                  onInputChange(value);
-                } catch (error) {
-                  console.error('Error in input change:', error);
-                }
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  console.log('Enter pressed, submitting form');
+            <div className="relative">
+              <textarea
+                value={input}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  console.log('Input changed:', value);
                   try {
-                    onSubmit(e);
+                    onInputChange(value);
                   } catch (error) {
-                    console.error('Error in Enter key submission:', error);
+                    console.error('Error in input change:', error);
                   }
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    console.log('Enter pressed, submitting form');
+                    try {
+                      onSubmit(e);
+                    } catch (error) {
+                      console.error('Error in Enter key submission:', error);
+                    }
+                  }
+                }}
+                placeholder={isProcessing ? "Processing..." : activeTab === 'notes' ? "Add knowledge..." : "Ask a question..."}
+                disabled={isProcessing}
+                className="w-full bg-black text-white text-[12px] px-4 py-3 pr-16 rounded-lg border border-white/20 focus:outline-none focus:border-white/40 placeholder-white/50 disabled:opacity-50"
+              />
+            </div>
+            <button
+              onClick={onVoiceRecord}
+              disabled={isRecording}
+              className={`absolute right-10 top-1/2 -translate-y-1/2 text-white disabled:opacity-50 p-1 hover:bg-white/10 rounded-smz`}
+              title={isRecording ? 'Recording...' : 'Start Voice Input'}
+              type="button"
+            >
+              {isRecording ? <Loader className="animate-spin" size={20} /> : <Mic size={20} />}
+            </button>
+            <button
+              onClick={(e) => {
+                e.preventDefault();
+                console.log('Send button clicked with input:', input);
+                try {
+                  onSubmit(e);
+                } catch (error) {
+                  console.error('Error in send button click:', error);
                 }
               }}
-              placeholder={isProcessing ? "Processing..." : activeTab === 'notes' ? "Add knowledge..." : "Ask a question..."}
               disabled={isProcessing}
-              className="w-full bg-black text-white text-[12px] px-4 py-3 pr-16 rounded-lg border border-white/20 focus:outline-none focus:border-white/40 placeholder-white/50 disabled:opacity-50"
-            />
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-white disabled:opacity-50 p-1 hover:bg-white/10 rounded-sm"
+              type="button"
+            >
+              <Send size={16} />
+            </button>
           </div>
-          <button
-            onClick={onVoiceRecord}
-            disabled={isRecording}
-            className={`absolute right-10 top-1/2 -translate-y-1/2 text-white disabled:opacity-50 p-1 hover:bg-white/10 rounded-smz`}
-            title={isRecording ? 'Recording...' : 'Start Voice Input'}
-            type="button"
-          >
-            {isRecording ? <Loader className="animate-spin" size={20} /> : <Mic size={20} />}
-          </button>
-          <button
-            onClick={(e) => {
-              e.preventDefault();
-              console.log('Send button clicked with input:', input);
-              try {
-                onSubmit(e);
-              } catch (error) {
-                console.error('Error in send button click:', error);
-              }
-            }}
-            disabled={isProcessing}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-white disabled:opacity-50 p-1 hover:bg-white/10 rounded-sm"
-            type="button"
-          >
-            <Send size={16} />
-          </button>
         </div>
       </div>
     </div>

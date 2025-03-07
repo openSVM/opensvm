@@ -42,17 +42,17 @@ export function TransfersTable({ address }: TransfersTableProps) {
     return rawTransfers.map(item => {
       // Handle different field names between API and component
       return {
-        signature: item.txId || '',
-        timestamp: item.date || '',
-        type: item.transferType || 'transfer',
-        amount: parseFloat(item.tokenAmount || '0'),
+        signature: item.signature || '',
+        timestamp: item.timestamp || '',
+        type: item.type || 'transfer',
+        amount: item.amount || 0,
         token: item.tokenSymbol || 'SOL',
         tokenSymbol: item.tokenSymbol || 'SOL',
         from: item.from || '',
         to: item.to || '',
-        usdValue: parseFloat(item.usdValue || '0'),
-        currentUsdValue: parseFloat(item.currentUsdValue || '0'),
-        tokenName: 'Solana', // Default for SOL
+        usdValue: item.usdValue || 0,
+        currentUsdValue: item.currentUsdValue || 0,
+        tokenName: item.tokenName, // Default for SOL
         ...(item as any) // Keep any other fields that might be present
       };
     });
