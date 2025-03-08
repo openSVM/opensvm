@@ -12,7 +12,7 @@ export default function SearchBar() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmedQuery = query.trim();
-    if (!trimmedQuery || isLoading) return;
+    if (!trimmedQuery || isLoading) { return; }
     
     try {
       setIsLoading(true);

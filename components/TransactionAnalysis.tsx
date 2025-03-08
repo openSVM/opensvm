@@ -38,7 +38,9 @@ export default function TransactionAnalysis({ tx }: TransactionAnalysisProps) {
   });
 
   useEffect(() => {
-    if (!tx.details || !tx.details.accounts) return;
+    if (!tx.details || !tx.details.accounts) {
+      return;
+    }
 
     // Analyze program stats
     const programMap = new Map<string, ProgramStats>();

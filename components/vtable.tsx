@@ -69,10 +69,10 @@ export function VTableWrapper({
   }, []);
 
   useEffect(() => {
-    if (!mounted || !containerRef.current || !data.length) return;
+    if (!mounted || !containerRef.current || !data.length) { return; }
 
     const initTable = () => {
-      if (!containerRef.current) return;
+      if (!containerRef.current) { return; }
 
       try {
         // Dispose existing table if any
@@ -143,8 +143,7 @@ export function VTableWrapper({
                 if (rendered && typeof rendered === 'object' && 'type' in rendered) {
                   // Handle Next.js Link components
                   if (rendered.type?.displayName === 'Link' || rendered.type === 'a') {
-                    const href = rendered.props.href;
-                    const content = rendered.props.children;
+                    const { href, children: content } = rendered.props;
                     
                     // Extract the text to display in the cell
                     const text = typeof content === 'string' ? content : 
@@ -245,8 +244,7 @@ export function VTableWrapper({
         if (onSort) {
           // Use any to bypass type checking for now
           (table as any).on('sortClick', (args: any) => {
-            const field = args.field;
-            const order = args.order;
+            const { field, order } = args;
             onSort(field, order);
           });
         }
@@ -300,7 +298,9 @@ export function VTableWrapper({
   
   // Render the floating pin button for selected row
   const renderFloatingButton = () => {
-    if (!selectedRowId || !renderRowAction) return null;
+    if (!selectedRowId || !renderRowAction) {
+      return null;
+    }
     
     return (
       <div className="vtable-floating-action">

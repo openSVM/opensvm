@@ -4,7 +4,7 @@ import "./globals.css";
 import dynamic from 'next/dynamic';
 import { Suspense } from 'react';
 // Import Navbar directly
-import { Navbar } from '@/components/Navbar';
+import { NavbarInteractive } from '@/components/NavbarInteractive';
 
 // Load fonts with preload
 const inter = Inter({
@@ -92,9 +92,9 @@ export default function RootLayout({
       <body className={inter.className}>
           <Providers>
           <Suspense fallback={<div className="min-h-screen bg-background" />}>
-            <Navbar>
+            <NavbarInteractive>
                 {children}
-            </Navbar>
+            </NavbarInteractive>
         </Suspense>
         </Providers>
       </body>

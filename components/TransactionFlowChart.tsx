@@ -25,7 +25,9 @@ export default function TransactionFlowChart({ tx }: TransactionFlowChartProps) 
   const svgRef = useRef<SVGSVGElement>(null);
 
   useEffect(() => {
-    if (!svgRef.current || !tx.details?.accounts || !tx.details?.instructions) return;
+    if (!svgRef.current || !tx.details?.accounts || !tx.details?.instructions) {
+      return;
+    }
 
     // Clear previous content
     d3.select(svgRef.current).selectAll('*').remove();

@@ -54,7 +54,7 @@ export default function AutocompleteSearchBar() {
       try {
         // Fetch recent addresses and transactions matching the query
         const response = await fetch(`/api/search/suggestions?q=${encodeURIComponent(query)}`);
-        if (!response.ok) throw new Error('Failed to fetch suggestions');
+        if (!response.ok) { throw new Error('Failed to fetch suggestions'); }
         const data = await response.json();
         setSuggestions(data);
       } catch (error) {
@@ -83,7 +83,9 @@ export default function AutocompleteSearchBar() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmedQuery = query.trim();
-    if (!trimmedQuery || isLoading) return;
+    if (!trimmedQuery || isLoading) {
+      return;
+    }
     
     try {
       setIsLoading(true);
