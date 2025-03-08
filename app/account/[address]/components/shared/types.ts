@@ -14,8 +14,6 @@ export interface Transfer {
   signature: string;
   tokenName?: string;
   tokenSymbol?: string;
-  usdValue?: number;
-  currentUsdValue?: number;
 }
 
 export type Tab = 'transfers' | 'activity' | 'tokens' | 'nfts' | 'transactions';

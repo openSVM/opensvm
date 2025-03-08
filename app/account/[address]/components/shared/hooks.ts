@@ -131,8 +131,6 @@ export function useTransfers(address: string): UseTransfersResult {
           tokenSymbol: item.tokenSymbol,
           from: item.from,
           to: item.to,
-          usdValue: parseFloat(item.usdValue),
-          currentUsdValue: parseFloat(item.currentUsdValue),
           tokenName: item.tokenSymbol === 'SOL' ? 'Solana' : undefined
         }));
 

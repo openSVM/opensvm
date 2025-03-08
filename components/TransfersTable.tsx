@@ -50,9 +50,7 @@ export function TransfersTable({ address }: TransfersTableProps) {
         tokenSymbol: item.tokenSymbol || 'SOL',
         from: item.from || '',
         to: item.to || '',
-        usdValue: item.usdValue || 0,
-        currentUsdValue: item.currentUsdValue || 0,
-        tokenName: item.tokenName, // Default for SOL
+        tokenName: item.tokenName || 'Solana', // Default for SOL
         ...(item as any) // Keep any other fields that might be present
       };
     });
@@ -144,28 +142,6 @@ export function TransfersTable({ address }: TransfersTableProps) {
       sortable: true,
       render: (row: Transfer) => (
         <div data-test="tokenName" title={(row.tokenName || 'Solana')}>{row.tokenName || 'Solana'}</div>
-      )
-    },
-    {
-      field: 'currentUsdValue',
-      title: 'Current Value',
-      width: 120,
-      sortable: true,
-      render: (row: Transfer) => (
-        <div className="text-right font-mono" data-test="currentUsdValue" title={row.currentUsdValue?.toString() || '0'}>
-          {row.currentUsdValue !== undefined && row.currentUsdValue !== null ? `$${formatNumber(row.currentUsdValue)}` : '-'}
-        </div>
-      )
-    },
-    {
-      field: 'usdValue',
-      title: 'USD Value',
-      width: 120,
-      sortable: true,
-      render: (row: Transfer) => (
-        <div className="text-right font-mono" data-test="usdValue" title={row.usdValue?.toString() || '0'}>
-          {row.usdValue !== undefined && row.usdValue !== null ? `$${formatNumber(row.usdValue)}` : '-'}
-        </div>
       )
     },
     {
