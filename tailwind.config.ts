@@ -8,13 +8,6 @@ const config: Config = {
     './app/**/*.{js,ts,jsx,tsx,mdx}',
   ],
   darkMode: ['class', '[data-theme="high-contrast"]'],
-  safelist: [
-    'theme-paper',
-    'theme-high-contrast',
-    'theme-dos-blue',
-    'theme-cyberpunk',
-    'theme-solarized'
-  ],
   // Safelist critical classes used for animations
   // This ensures they won't be purged in production
   safelist: [
