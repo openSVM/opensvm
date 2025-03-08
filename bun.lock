@@ -65,6 +65,7 @@
         "three": "^0.173.0",
         "together-ai": "^0.13.0",
         "whatwg-url": "^5.0.0",
+        "xstate": "^5.19.2",
         "zod": "^3.24.1",
         "zod-to-json-schema": "^3.23.0",
       },
@@ -4619,6 +4620,8 @@
     "xmlhttprequest-ssl": ["xmlhttprequest-ssl@2.1.2", "", {}, "sha512-TEU+nJVUUnA4CYJFLvK5X9AOeH4KvDvhIfm0vV1GaQRtchnG0hgK5p8hw/xjv8cunWYCsiPCSDzObPyhEwq3KQ=="],
 
     "xsalsa20": ["xsalsa20@1.2.0", "", {}, "sha512-FIr/DEeoHfj7ftfylnoFt3rAIRoWXpx2AoDfrT2qD2wtp7Dp+COajvs/Icb7uHqRW9m60f5iXZwdsJJO3kvb7w=="],
+
+    "xstate": ["xstate@5.19.2", "", {}, "sha512-B8fL2aP0ogn5aviAXFzI5oZseAMqN00fg/TeDa3ZtatyDcViYLIfuQl4y8qmHCiKZgGEzmnTyNtNQL9oeJE2gw=="],
 
     "xtend": ["xtend@4.0.2", "", {}, "sha512-LKYU1iAXJXUgAXn9URjiu+MWhyUXHsvfp7mcuYm9dSUKK0/CjtrUwFAxD82/mCWbtLsGjFIad0wIsod4zrTAEQ=="],
 
