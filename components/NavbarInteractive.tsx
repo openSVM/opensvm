@@ -13,10 +13,16 @@ import { SettingsMenu } from './SettingsMenu';
 import { WalletButton } from './WalletButton';
 import { AIChatSidebar } from './ai/AIChatSidebar';
 
-export function NavbarInteractive() {
+interface NavbarInteractiveProps {
+  children?: React.ReactNode;
+}
+
+export function NavbarInteractive({ children }: NavbarInteractiveProps) {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
   const [isAIChatOpen, setIsAIChatOpen] = useState(false);
+  const [sidebarWidth, setSidebarWidth] = useState(400);
+  const [isResizing, setIsResizing] = useState(false);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,10 +32,24 @@ export function NavbarInteractive() {
     }
   };
 
+  const handleWidthChange = (newWidth: number) => {
+    setSidebarWidth(newWidth);
+  };
+
+  const handleResizeStart = () => {
+    setIsResizing(true);
+    document.body.style.cursor = 'col-resize';
+  };
+
+  const handleResizeEnd = () => {
+    setIsResizing(false);
+    document.body.style.cursor = 'default';
+  };
+
   return (
     <div className="flex w-full items-center">
-      {/* Logo area placeholder to maintain alignment */}
-      <div className="flex items-center gap-2 invisible">
+      {/* Logo area */}
+      <div className="flex items-center gap-2">
         <span className="font-bold text-lg">OPENSVM</span>
         <span className="text-sm">[AI]</span>
       </div>
@@ -64,10 +84,15 @@ export function NavbarInteractive() {
 
       {/* Interactive navigation */}
       <div className="flex items-center gap-2">
-        {/* Explore Dropdown */}
+        {/* Updated dropdown to support testing */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className="gap-1 px-2">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="gap-1 px-2"
+              data-testid="nav-dropdown-explore"
+            >
               Explore
               <svg width="10" height="10" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
@@ -105,7 +130,12 @@ export function NavbarInteractive() {
         {/* Tokens Dropdown */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className="gap-1 px-2">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="gap-1 px-2"
+              data-testid="nav-dropdown-tokens"
+            >
               Tokens
               <svg width="10" height="10" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
@@ -143,7 +173,12 @@ export function NavbarInteractive() {
         {/* NFTs Dropdown */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className="gap-1 px-2">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="gap-1 px-2"
+              data-testid="nav-dropdown-nfts"
+            >
               NFTs
               <svg width="10" height="10" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
@@ -177,6 +212,41 @@ export function NavbarInteractive() {
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+        
+        {/* Analytics Dropdown (added to match test) */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="gap-1 px-2"
+              data-testid="nav-dropdown-analytics"
+            >
+              Analytics
+              <svg width="10" height="10" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="animate-duration-300">
+            <DropdownMenuItem 
+              onClick={(e) => {
+                e.stopPropagation();
+                router.push('/analytics');
+              }}
+            >
+              Dashboard
+            </DropdownMenuItem>
+            <DropdownMenuItem 
+              onClick={(e) => {
+                e.stopPropagation();
+                router.push('/analytics/trends');
+              }}
+            >
+              Trends
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
 
         <SettingsMenu />
         <WalletButton />
@@ -194,12 +264,15 @@ export function NavbarInteractive() {
         <AIChatSidebar
           isOpen={isAIChatOpen}
           onClose={() => setIsAIChatOpen(false)}
-          onWidthChange={() => {}}
-          onResizeStart={() => {}}
-          onResizeEnd={() => {}}
-          initialWidth={400}
+          onWidthChange={handleWidthChange}
+          onResizeStart={handleResizeStart}
+          onResizeEnd={handleResizeEnd}
+          initialWidth={sidebarWidth}
         />
       )}
+      
+      {/* Render children */}
+      {children}
     </div>
   );
 }
