@@ -114,205 +114,207 @@ export const NavbarInteractive: React.FC<NavbarInteractiveProps> = () => {
   return (
     <>
       <div
-        className="flex w-full h-14 items-center justify-between px-4 py-0 bg-background shadow-sm fixed top-0 left-0 z-40 border-b border-border/10"
+        className="flex w-full h-14 items-center justify-between py-0 bg-background shadow-sm fixed top-0 left-0 z-40 border-b border-border/10"
         onKeyDown={handleTabKey}
         role="navigation"
         aria-label="Main navigation"
       >
-        {/* Logo and brand */}
-        <div className="flex items-center gap-2 z-10">
-          <Link href="/" className="flex items-center gap-1.5 hover:opacity-80 transition-opacity">
-            <span className="font-bold text-lg">OPENSVM</span>
-            <span className="text-sm text-foreground/70">[AI]</span>
-          </Link>
-          <span className="hidden md:inline-block text-xs text-muted-foreground">{new Date().toLocaleTimeString()}</span>
-        </div>
-        
-        {/* Interactive search form */}
-        <form onSubmit={handleSearch} className="hidden md:flex flex-1 max-w-md mx-4 items-center">
-          <div className="relative group">
-            <svg 
-              width="18" 
-              height="18" 
-              viewBox="0 0 24 24" 
-              fill="none" 
-              stroke="currentColor" 
-              strokeWidth="2" 
-              strokeLinecap="round" 
-              strokeLinejoin="round"
-              className="absolute left-3 top-1/2 transform -translate-y-1/2 opacity-70 text-muted-foreground"
-              aria-hidden="true"
-            >
-              <path d="M19 19l-4.35-4.35M11 5a6 6 0 100 12 6 6 0 000-12z" />
-            </svg>
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              aria-label="Search"
-              className="w-full bg-background/80 border border-border/50 hover:border-foreground/20 focus:border-foreground/30 focus:ring-1 focus:ring-primary/20 pl-10 h-9 transition-all rounded-md text-sm"
-              placeholder="Search accounts, tokens, or programs..."
-              role="searchbox"
-              data-testid="navbar-search"
-            />
+        <div className="container mx-auto px-4 flex w-full items-center justify-between">
+          {/* Logo and brand */}
+          <div className="flex items-center gap-2 z-10">
+            <Link href="/" className="flex items-center gap-1.5 hover:opacity-80 transition-opacity">
+              <span className="font-bold text-lg">OPENSVM</span>
+              <span className="text-sm text-foreground/70">[AI]</span>
+            </Link>
+            <span className="hidden md:inline-block text-xs text-muted-foreground">{new Date().toLocaleTimeString()}</span>
           </div>
-        </form>
-
-        {/* Interactive navigation */}
-        <div className="hidden md:flex items-center gap-1.5">
-          {/* Explore dropdown */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button 
-                variant="ghost" 
-                size="sm"
-                className="gap-1 px-3 h-9 text-sm font-medium"
-                data-testid="nav-dropdown-explore"
-              >
-                Explore
-                <DropdownIcon />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="duration-300 transition-all">
-              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); router.push('/networks'); }}>
-                Networks
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); router.push('/blocks'); }}>
-                Blocks
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); router.push('/programs'); }}>
-                Programs
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          {/* Tokens Dropdown */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button 
-                variant="ghost" 
-                size="sm"
-                className="gap-1 px-3 h-9 text-sm font-medium"
-                data-testid="nav-dropdown-tokens"
-              >
-                Tokens
-                <DropdownIcon />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="duration-300 transition-all">
-              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); router.push('/tokens'); }}>
-                All Tokens
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); router.push('/tokens/gainers'); }}>
-                Top Gainers
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); router.push('/tokens/new'); }}>
-                New Listings
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          {/* NFTs Dropdown */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button 
-                variant="ghost" 
-                size="sm"
-                className="gap-1 px-3 h-9 text-sm font-medium"
-                data-testid="nav-dropdown-nfts"
-              >
-                NFTs
-                <DropdownIcon />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="duration-300 transition-all">
-              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); router.push('/nfts'); }}>
-                Collections
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); router.push('/nfts/trending'); }}>
-                Trending
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); router.push('/nfts/new'); }}>
-                New Mints
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
           
-          {/* Analytics Dropdown */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button 
-                variant="ghost" 
-                size="sm"
-                className="gap-1 px-3 h-9 text-sm font-medium"
-                data-testid="nav-dropdown-analytics"
+          {/* Interactive search form */}
+          <form onSubmit={handleSearch} className="hidden md:flex flex-1 max-w-md mx-4 items-center">
+            <div className="relative group">
+              <svg 
+                width="18" 
+                height="18" 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth="2" 
+                strokeLinecap="round" 
+                strokeLinejoin="round"
+                className="absolute left-3 top-1/2 transform -translate-y-1/2 opacity-70 text-muted-foreground"
+                aria-hidden="true"
               >
-                Analytics
-                <DropdownIcon />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="duration-300 transition-all">
-              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); router.push('/analytics'); }}>
-                Dashboard
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); router.push('/analytics/trends'); }}>
-                Trends
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          <SettingsMenu />
-          <Button 
-            variant="outline"
-            size="sm" 
-            className="px-3 h-9 ml-1.5 text-sm border-border/70"
-            onClick={() => router.push('/wallet')}
-          >
-            Connect Wallet
-          </Button>
-          <Button 
-            size="sm" 
-            className="bg-[#00DC82] text-black hover:bg-[#00DC82]/90 ml-1.5 font-medium h-9 px-3 text-sm"
-            onClick={() => setIsAIChatOpen(true)}
-            aria-label="Open AI Assistant"
-          >
-            AI Assistant
-          </Button>
-        </div>
-
-        {/* Mobile navigation toggle */}
-        <div className="md:hidden flex items-center gap-2">
-          <Button
-            variant="ghost" 
-            size="sm" 
-            aria-label="Toggle mobile menu" 
-            className="relative z-20"
-            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            data-testid="mobile-menu-toggle"
-          >
-            <svg
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
+                <path d="M19 19l-4.35-4.35M11 5a6 6 0 100 12 6 6 0 000-12z" />
+              </svg>
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                aria-label="Search"
+                className="w-full bg-background/80 border border-border/50 hover:border-foreground/20 focus:border-foreground/30 focus:ring-1 focus:ring-primary/20 pl-10 h-9 transition-all rounded-md text-sm"
+                placeholder="Search accounts, tokens, or programs..."
+                role="searchbox"
+                data-testid="navbar-search"
+              />
+            </div>
+          </form>
+  
+          {/* Interactive navigation */}
+          <div className="hidden md:flex items-center gap-1.5">
+            {/* Explore dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  className="gap-1 px-3 h-9 text-sm font-medium"
+                  data-testid="nav-dropdown-explore"
+                >
+                  Explore
+                  <DropdownIcon />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="duration-300 transition-all">
+                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); router.push('/networks'); }}>
+                  Networks
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); router.push('/blocks'); }}>
+                  Blocks
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); router.push('/programs'); }}>
+                  Programs
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+  
+            {/* Tokens Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  className="gap-1 px-3 h-9 text-sm font-medium"
+                  data-testid="nav-dropdown-tokens"
+                >
+                  Tokens
+                  <DropdownIcon />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="duration-300 transition-all">
+                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); router.push('/tokens'); }}>
+                  All Tokens
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); router.push('/tokens/gainers'); }}>
+                  Top Gainers
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); router.push('/tokens/new'); }}>
+                  New Listings
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+  
+            {/* NFTs Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  className="gap-1 px-3 h-9 text-sm font-medium"
+                  data-testid="nav-dropdown-nfts"
+                >
+                  NFTs
+                  <DropdownIcon />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="duration-300 transition-all">
+                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); router.push('/nfts'); }}>
+                  Collections
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); router.push('/nfts/trending'); }}>
+                  Trending
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); router.push('/nfts/new'); }}>
+                  New Mints
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            
+            {/* Analytics Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  className="gap-1 px-3 h-9 text-sm font-medium"
+                  data-testid="nav-dropdown-analytics"
+                >
+                  Analytics
+                  <DropdownIcon />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="duration-300 transition-all">
+                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); router.push('/analytics'); }}>
+                  Dashboard
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); router.push('/analytics/trends'); }}>
+                  Trends
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+  
+            <SettingsMenu />
+            <Button 
+              variant="outline"
+              size="sm" 
+              className="px-3 h-9 ml-1.5 text-sm border-border/70"
+              onClick={() => router.push('/wallet')}
             >
-              {isMobileMenuOpen ? 
-                <path d="M18 6L6 18M6 6l12 12" /> : 
-                <path d="M3 12h18M3 6h18M3 18h18" />
-              }
-            </svg>
-          </Button>
+              Connect Wallet
+            </Button>
+            <Button 
+              size="sm" 
+              className="bg-[#00DC82] text-black hover:bg-[#00DC82]/90 ml-1.5 font-medium h-9 px-3 text-sm"
+              onClick={() => setIsAIChatOpen(true)}
+              aria-label="Open AI Assistant"
+            >
+              AI Assistant
+            </Button>
+          </div>
+  
+          {/* Mobile navigation toggle */}
+          <div className="md:hidden flex items-center gap-2">
+            <Button
+              variant="ghost" 
+              size="sm" 
+              aria-label="Toggle mobile menu" 
+              className="relative z-20"
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              data-testid="mobile-menu-toggle"
+            >
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                {isMobileMenuOpen ? 
+                  <path d="M18 6L6 18M6 6l12 12" /> : 
+                  <path d="M3 12h18M3 6h18M3 18h18" />
+                }
+              </svg>
+            </Button>
+          </div>
         </div>
 
         {/* Mobile menu */}
         <div
           ref={menuRef}
-          className={`fixed inset-0 bg-background/95 backdrop-blur-md md:hidden z-50 transition-all duration-300 ease-in-out ${
+          className={`fixed inset-0 bg-background/95 backdrop-blur-md md:hidden z-50 transition-all duration-300 ease-in-out w-full ${
             isMobileMenuOpen 
               ? 'opacity-100 translate-y-0' 
               : 'opacity-0 -translate-y-full pointer-events-none'
@@ -322,8 +324,8 @@ export const NavbarInteractive: React.FC<NavbarInteractiveProps> = () => {
           aria-hidden={!isMobileMenuOpen}
           aria-label="Mobile navigation menu"
         >
-          <div className="pt-20 px-4 pb-6 h-full overflow-y-auto">
-            <div className="absolute top-4 right-4">
+          <div className="container mx-auto pt-20 px-4 pb-6 h-full overflow-y-auto">
+            <div className="absolute top-4 right-4 md:right-8">
               <Button 
                 variant="outline" 
                 size="icon" 
