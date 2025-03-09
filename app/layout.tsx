@@ -90,12 +90,13 @@ export default function RootLayout({
         <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
       </head>
       <body className={inter.className}>
-          <Providers>
+        <Providers>
           <Suspense fallback={<div className="min-h-screen bg-background" />}>
-            <NavbarInteractive>
-                {children}
-            </NavbarInteractive>
-        </Suspense>
+            <NavbarInteractive />
+            <main className="flex-1">
+              {children}
+            </main>
+          </Suspense>
         </Providers>
       </body>
     </html>
