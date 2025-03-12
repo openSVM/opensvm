@@ -13,7 +13,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const resolvedParams = await params;
   const title = resolvedParams.slug.replace(/-/g, ' ');
   return {
-    title: `${title} - Documentation`,
+    title: `${title} - OpenSVM Documentation`,
   };
 }
 
@@ -21,8 +21,8 @@ export default async function DocPage({ params }: Props) {
   const resolvedParams = await params;
   const { slug } = resolvedParams;
   
-  // Use path.join with __dirname to get the correct path in both dev and prod
-  const docsDir = path.join(process.cwd(), 'agent_notes', 'vtable_study', 'vtable_docs');
+  // Use path.join with process.cwd() to get the correct path in both dev and prod
+  const docsDir = path.join(process.cwd(), 'docs');
   const filePath = path.join(docsDir, `${slug}.md`);
 
   try {
@@ -37,8 +37,13 @@ export default async function DocPage({ params }: Props) {
     const content = await fs.readFile(filePath, 'utf8');
 
     return (
-      <div className="container mx-auto px-4 py-8 prose dark:prose-invert max-w-none">
-        <ReactMarkdown>{content}</ReactMarkdown>
+      <div className="container mx-auto px-4 py-8">
+        <div className="mb-4">
+          <a href="/docs" className="text-blue-500 hover:underline">← Back to Documentation</a>
+        </div>
+        <div className="prose dark:prose-invert max-w-none">
+          <ReactMarkdown>{content}</ReactMarkdown>
+        </div>
       </div>
     );
   } catch (error) {
