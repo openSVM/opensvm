@@ -1,5 +1,8 @@
 # OpenSVM - Solana Virtual Machine Explorer
 
+![image](https://github.com/user-attachments/assets/6d829b8f-12b7-429a-a6fc-ef5916d9288b)
+
+
 OpenSVM is a comprehensive blockchain explorer for the Solana ecosystem, providing detailed insights into transactions, blocks, accounts, programs, and tokens on the Solana blockchain.
 
 ## Overview
