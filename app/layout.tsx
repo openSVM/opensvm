@@ -93,7 +93,7 @@ export default function RootLayout({
         <Providers>
           <Suspense fallback={<div className="min-h-screen bg-background" />}>
             <NavbarInteractive />
-            <main className="flex-1">
+            <main className="flex-1 pt-14">
               {children}
             </main>
           </Suspense>
