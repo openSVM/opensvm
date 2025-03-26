@@ -59,7 +59,7 @@ export default function EnhancedSearchBar() {
 
   useEffect(() => {
     const fetchSuggestions = async () => {
-      if (query.length < 3) {
+      if (query.length < 3 || searchSettings.networks.length === 0) {
         setSuggestions([]);
         return;
       }
@@ -136,14 +136,17 @@ export default function EnhancedSearchBar() {
   const buildAndNavigateToSearchUrl = (query: string) => {
     let searchUrl = `/search?q=${encodeURIComponent(query)}`;
     
-    // Add networks
+    // Add networks - ensure we have at least one network
     if (searchSettings.networks.length > 0) {
       searchUrl += `&networks=${searchSettings.networks.join(',')}`;
     }
     
-    // Add data types
+    // Add data types - only add if there are selected data types
     if (searchSettings.dataTypes.length > 0) {
       searchUrl += `&types=${searchSettings.dataTypes.join(',')}`;
+    } else {
+      // Default to all data types if none selected
+      searchUrl += `&types=transactions,blocks,programs,tokens`;
     }
     
     // Add sort options
@@ -176,9 +179,14 @@ export default function EnhancedSearchBar() {
       const index = networks.indexOf(networkId);
       
       if (index === -1) {
+        // Add the network
         networks.push(networkId);
-      } else {
+      } else if (networks.length > 1) {
+        // Only remove if there's more than one network selected
         networks.splice(index, 1);
+      } else {
+        // Don't allow removing the last network
+        return prev;
       }
       
       return {
@@ -194,9 +202,14 @@ export default function EnhancedSearchBar() {
       const index = dataTypes.indexOf(dataType);
       
       if (index === -1) {
+        // Add the data type
         dataTypes.push(dataType);
-      } else {
+      } else if (dataTypes.length > 1) {
+        // Only remove if there's more than one data type selected
         dataTypes.splice(index, 1);
+      } else {
+        // Don't allow removing the last data type
+        return prev;
       }
       
       return {
@@ -298,7 +311,17 @@ export default function EnhancedSearchBar() {
                         </label>
                       </div>
                     ))}
+                    {searchSettings.networks.length === 1 && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        At least one network must be selected
+                      </p>
+                    )}
                   </div>
+                  {searchSettings.dataTypes.length === 1 && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      At least one data type must be selected
+                    </p>
+                  )}
                 </div>
                 
                 {/* Data Type Filters */}
