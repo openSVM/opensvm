@@ -7,15 +7,10 @@ export function SearchPopup() {
   const [isOpen, setIsOpen] = useState(false);
   const popupRef = useRef<HTMLDivElement>(null);
   
-  // Use the keyboard shortcut hook to detect Command+K
+  // Use a single keyboard shortcut hook to detect both Command+K and Ctrl+K
   useKeyboardShortcut('k', () => {
     setIsOpen(true);
-  }, { metaKey: true });
-
-  // Also support Ctrl+K for Windows/Linux users
-  useKeyboardShortcut('k', () => {
-    setIsOpen(true);
-  }, { ctrlKey: true });
+  }, { metaKey: true, ctrlKey: true });
 
   // Close the popup when Escape is pressed
   useEffect(() => {
@@ -41,7 +36,9 @@ export function SearchPopup() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isOpen]);
 
-  if (!isOpen) return null;
+  if (!isOpen) {
+    return null;
+  }
 
   return (
     <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center">

@@ -23,13 +23,25 @@ export function useKeyboardShortcut(
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      // Check if the key matches and all required modifiers are pressed
+      // Check if the key matches and any of the required modifiers are pressed
+      // For metaKey and ctrlKey, we check if either is required and if so, is it pressed
+      const metaKeyMatch = options.metaKey ? event.metaKey : true;
+      const ctrlKeyMatch = options.ctrlKey ? event.ctrlKey : true;
+      
+      // If both metaKey and ctrlKey are specified, we need either one to be pressed
+      const modifierMatch = options.metaKey && options.ctrlKey 
+        ? (event.metaKey || event.ctrlKey) 
+        : (metaKeyMatch && ctrlKeyMatch);
+      
+      // Check other modifiers normally
+      const altKeyMatch = options.altKey === undefined || event.altKey === options.altKey;
+      const shiftKeyMatch = options.shiftKey === undefined || event.shiftKey === options.shiftKey;
+
       if (
         event.key.toLowerCase() === key.toLowerCase() &&
-        (options.metaKey === undefined || event.metaKey === options.metaKey) &&
-        (options.ctrlKey === undefined || event.ctrlKey === options.ctrlKey) &&
-        (options.altKey === undefined || event.altKey === options.altKey) &&
-        (options.shiftKey === undefined || event.shiftKey === options.shiftKey)
+        modifierMatch &&
+        altKeyMatch &&
+        shiftKeyMatch
       ) {
         // Prevent default behavior (like browser shortcuts)
         event.preventDefault();
