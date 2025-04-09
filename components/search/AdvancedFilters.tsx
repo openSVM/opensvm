@@ -14,10 +14,10 @@ export const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
 }) => {
   return (
     <div className="space-y-3">
-      <h4 className="font-medium text-sm text-gray-700">Advanced Filters</h4>
+      <h4 className="font-medium text-sm text-foreground">Advanced Filters</h4>
       <div className="space-y-2">
         <div>
-          <label htmlFor="status-filter" className="block text-xs text-gray-500 mb-1">Status</label>
+          <label htmlFor="status-filter" className="block text-xs text-muted-foreground mb-1">Status</label>
           <select
             id="status-filter"
             value={searchSettings.status || ''}
@@ -25,7 +25,7 @@ export const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
               ...searchSettings,
               status: e.target.value as any || undefined
             })}
-            className="w-full rounded border border-gray-200 px-2 py-1 text-sm"
+            className="w-full rounded border border-input bg-background px-2 py-1 text-sm text-foreground"
           >
             <option value="">All</option>
             <option value="success">Success</option>
@@ -34,7 +34,7 @@ export const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
         </div>
         
         <div>
-          <label className="block text-xs text-gray-500 mb-1">Date Range</label>
+          <label className="block text-xs text-muted-foreground mb-1">Date Range</label>
           <div className="grid grid-cols-2 gap-2">
             <input
               type="date"
@@ -46,7 +46,7 @@ export const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
                   end: searchSettings.dateRange?.end || ''
                 }
               })}
-              className="w-full rounded border border-gray-200 px-2 py-1 text-sm"
+              className="w-full rounded border border-input bg-background px-2 py-1 text-sm text-foreground"
             />
             <input
               type="date"
@@ -58,13 +58,13 @@ export const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
                   end: e.target.value
                 }
               })}
-              className="w-full rounded border border-gray-200 px-2 py-1 text-sm"
+              className="w-full rounded border border-input bg-background px-2 py-1 text-sm text-foreground"
             />
           </div>
         </div>
         
         <div>
-          <label className="block text-xs text-gray-500 mb-1">Amount Range</label>
+          <label className="block text-xs text-muted-foreground mb-1">Amount Range</label>
           <div className="grid grid-cols-2 gap-2">
             <input
               type="number"
@@ -74,7 +74,7 @@ export const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
                 ...searchSettings,
                 minAmount: e.target.value ? parseFloat(e.target.value) : undefined
               })}
-              className="w-full rounded border border-gray-200 px-2 py-1 text-sm"
+              className="w-full rounded border border-input bg-background px-2 py-1 text-sm text-foreground"
             />
             <input
               type="number"
@@ -84,7 +84,7 @@ export const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
                 ...searchSettings,
                 maxAmount: e.target.value ? parseFloat(e.target.value) : undefined
               })}
-              className="w-full rounded border border-gray-200 px-2 py-1 text-sm"
+              className="w-full rounded border border-input bg-background px-2 py-1 text-sm text-foreground"
             />
           </div>
         </div>
