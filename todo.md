@@ -12,18 +12,15 @@
 - [x] Add state management for controlling the search popup visibility
 - [x] Ensure the popup is properly styled according to the current theme
 - [x] Make the popup accessible and user-friendly
-- [ ] Add state management for controlling the search popup visibility
-- [ ] Ensure the popup is properly styled according to the current theme
-- [ ] Make the popup accessible and user-friendly
 
 ## UX Improvements
-- [ ] Improve search bar responsiveness
-- [ ] Enhance search suggestions UI
-- [ ] Make search filters more intuitive
-- [ ] Ensure smooth transitions when opening/closing the search popup
+- [x] Improve search bar responsiveness
+- [x] Enhance search suggestions UI
+- [x] Make search filters more intuitive
+- [x] Ensure smooth transitions when opening/closing the search popup
 
 ## Testing
-- [ ] Test theme integration across all available themes
-- [ ] Test Command+K shortcut functionality on different pages
-- [ ] Test search functionality within the popup
-- [ ] Verify mobile compatibility
+- [x] Test theme integration across all available themes
+- [x] Test Command+K shortcut functionality on different pages
+- [x] Test search functionality within the popup
+- [x] Verify mobile compatibility
