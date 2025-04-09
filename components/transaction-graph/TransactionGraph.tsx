@@ -226,7 +226,8 @@ return result;
     shouldIncludeTransaction,
     fetchAccountTransactionsWithError,
     queueAccountFetch,
-    cyRef
+    cyRef,
+    processAccountFetchQueue
   ]);
 
   // Expand the transaction graph incrementally
