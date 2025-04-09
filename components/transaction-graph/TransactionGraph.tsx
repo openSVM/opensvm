@@ -225,7 +225,9 @@ return result;
     shouldExcludeAddress,
     shouldIncludeTransaction,
     fetchAccountTransactionsWithError,
-    queueAccountFetch
+    queueAccountFetch,
+    totalAccounts,
+    cyRef
   ]);
 
   // Expand the transaction graph incrementally
@@ -241,7 +243,7 @@ return result;
       loadedTransactionsRef,
       signal
     );
-  }, [fetchTransactionDataWithCache, queueAccountFetch, addAccountToGraph, loadedTransactionsRef]);
+  }, [fetchTransactionDataWithCache, queueAccountFetch, addAccountToGraph, setExpandedNodesCount, loadedTransactionsRef]);
 
   // Focus on a specific transaction
   const focusOnTransaction = useCallback(async (
