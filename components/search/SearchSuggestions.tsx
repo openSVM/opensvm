@@ -25,7 +25,7 @@ export const SearchSuggestions: React.FC<SearchSuggestionsProps> = ({
   }
 
   return (
-    <div ref={suggestionsRef} className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto">
+    <div ref={suggestionsRef} className="absolute top-full left-0 right-0 mt-1 bg-background border border-input rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto">
       {suggestions.map((suggestion, index) => (
         <button
           key={index}
@@ -35,10 +35,10 @@ export const SearchSuggestions: React.FC<SearchSuggestionsProps> = ({
             setShowSuggestions(false);
             handleSubmit({ preventDefault: () => {} } as React.FormEvent);
           }}
-          className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center gap-2"
+          className="w-full px-4 py-2 text-left hover:bg-muted flex items-center gap-2"
         >
-          <span className="text-xs text-gray-500 uppercase">{suggestion.type}</span>
-          <span className="flex-1 truncate">{suggestion.label || suggestion.value}</span>
+          <span className="text-xs text-muted-foreground uppercase">{suggestion.type}</span>
+          <span className="flex-1 truncate text-foreground">{suggestion.label || suggestion.value}</span>
         </button>
       ))}
     </div>
