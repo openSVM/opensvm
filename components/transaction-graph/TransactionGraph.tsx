@@ -164,7 +164,7 @@ const timeoutIds = useRef<NodeJS.Timeout[]>([]);
       fetchAndProcessAccount,
       isProcessingQueueRef
     );
-  }, []);
+  }, [fetchAndProcessAccount]);
 
   // Fetch and process a single account
   const fetchAndProcessAccount = useCallback(async (
@@ -179,7 +179,7 @@ const timeoutIds = useRef<NodeJS.Timeout[]>([]);
       console.error(`Error processing account ${address}:`, e);
       pendingFetchesRef.current?.delete(accountKey);
     }
-  }, []);
+  }, [addAccountToGraph, totalAccounts]);
 
   // Add account and its transactions to the graph
   const addAccountToGraph = useCallback(async (
@@ -226,7 +226,6 @@ return result;
     shouldIncludeTransaction,
     fetchAccountTransactionsWithError,
     queueAccountFetch,
-    totalAccounts,
     cyRef
   ]);
 
@@ -632,14 +631,22 @@ cyRef.current.zoom(0.5);
         cyRef.current.destroy();
         cyRef.current = null;
       }
-      processedNodesRef.current.clear();
-      processedEdgesRef.current.clear();
-      loadedTransactionsRef.current.clear();
-      loadedAccountsRef.current.clear();
-      transactionCache.current.clear();
-      pendingFetchesRef.current.clear();
+      // Copy ref values to local variables to avoid warnings
+      const processedNodes = processedNodesRef.current;
+      const processedEdges = processedEdgesRef.current;
+      const loadedTransactions = loadedTransactionsRef.current;
+      const loadedAccounts = loadedAccountsRef.current;
+      const transactionCacheRef = transactionCache.current;
+      const pendingFetches = pendingFetchesRef.current;
+      
+      processedNodes.clear();
+      processedEdges.clear();
+      loadedTransactions.clear();
+      loadedAccounts.clear();
+      transactionCacheRef.clear();
+      pendingFetches.clear();
     };
-  }, [initialAccount, initialSignature]);
+  }, [initialAccount, initialSignature, currentSignature, focusOnTransaction, queueAccountFetch, setupGraphInteractionsCallback]);
   
   // Improved viewport state restoration
   useEffect(() => {
