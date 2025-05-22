@@ -24,6 +24,7 @@ export default function EnhancedSearchBar() {
   const router = useRouter();
   const suggestionsRef = useRef<HTMLDivElement>(null);
   const settingsRef = useRef<HTMLDivElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
     // Close suggestions and settings on outside click
@@ -84,7 +85,6 @@ export default function EnhancedSearchBar() {
       // Check if query is a transaction signature
       if (isValidTransactionSignature(trimmedQuery)) {
         console.log("Detected transaction signature, navigating to tx page");
-        // Use router.push instead of window.location for consistent navigation
         router.push(`/tx/${trimmedQuery}`);
         return;
       }
@@ -111,12 +111,10 @@ export default function EnhancedSearchBar() {
             break;
           default:
             console.log("Unknown account type, using search page");
-            // Build search URL with settings
             buildAndNavigateToSearchUrl(trimmedQuery);
         }
       } else {
         console.log("Using general search page");
-        // Use search page with settings
         buildAndNavigateToSearchUrl(trimmedQuery);
       }
     } catch (error) {
@@ -216,11 +214,12 @@ export default function EnhancedSearchBar() {
 
   const clearSearch = () => {
     setQuery('');
+    setShowSuggestions(false);
   };
 
   return (
-    <div className="w-full">
-      <form onSubmit={handleSubmit} className="relative flex flex-col w-full gap-4">
+    <div className="w-full max-w-3xl mx-auto">
+      <form ref={formRef} onSubmit={handleSubmit} className="relative flex flex-col w-full gap-4">
         <div className="relative flex w-full">
           <SearchInput 
             query={query}
@@ -229,6 +228,7 @@ export default function EnhancedSearchBar() {
             setShowSettings={setShowSettings}
             setShowSuggestions={setShowSuggestions}
             clearSearch={clearSearch}
+            isSearching={isLoading}
           />
           <SearchButton isLoading={isLoading} />
         </div>
@@ -252,6 +252,7 @@ export default function EnhancedSearchBar() {
           setQuery={setQuery}
           setShowSuggestions={setShowSuggestions}
           handleSubmit={handleSubmit}
+          isLoading={query.length >= 3 && suggestions.length === 0}
         />
       </form>
     </div>

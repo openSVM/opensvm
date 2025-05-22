@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { SearchSuggestion } from './types';
 
 interface SearchSuggestionsProps {
@@ -29,115 +28,65 @@ export const SearchSuggestions: React.FC<SearchSuggestionsProps> = ({
     return null;
   }
 
-  const containerVariants = {
-    hidden: { opacity: 0, y: -10 },
-    visible: { 
-      opacity: 1, 
-      y: 0,
-      transition: {
-        duration: 0.2,
-        staggerChildren: 0.03,
-        when: "beforeChildren"
-      }
-    },
-    exit: { 
-      opacity: 0, 
-      y: -10,
-      transition: { duration: 0.15 }
-    }
-  };
-
-  const itemVariants = {
-    hidden: { opacity: 0, y: -5 },
-    visible: { opacity: 1, y: 0 },
-    exit: { opacity: 0, y: -5 }
-  };
-
   return (
-    <AnimatePresence>
-      {showSuggestions && (
-        <motion.div 
-          ref={suggestionsRef} 
-          className="absolute top-full left-0 right-0 mt-1 bg-background border border-input rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto"
-          variants={containerVariants}
-          initial="hidden"
-          animate="visible"
-          exit="exit"
-        >
-          {isLoading ? (
-            <motion.div 
-              className="px-4 py-3 text-center text-muted-foreground"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.2 }}
+    <div 
+      ref={suggestionsRef} 
+      className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg z-50 max-h-60 overflow-y-auto"
+    >
+      {isLoading ? (
+        <div className="px-4 py-3 text-center text-gray-500 dark:text-gray-400">
+          <div className="flex items-center justify-center space-x-2">
+            <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></div>
+            <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse delay-150"></div>
+            <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse delay-300"></div>
+          </div>
+          <p className="mt-1 text-sm">Loading suggestions...</p>
+        </div>
+      ) : suggestions.length === 0 ? (
+        <div className="px-4 py-3 text-center text-gray-500 dark:text-gray-400">
+          No suggestions found
+        </div>
+      ) : (
+        <>
+          {suggestions.map((suggestion, index) => (
+            <button
+              key={index}
+              type="button"
+              onClick={() => {
+                setQuery(suggestion.value);
+                setShowSuggestions(false);
+                console.log("Suggestion selected:", suggestion.value);
+                // Use a timeout to ensure state is updated before submitting
+                setTimeout(() => {
+                  handleSubmit({ preventDefault: () => {} } as React.FormEvent);
+                }, 50);
+              }}
+              className={`w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-2 transition-colors duration-200 relative ${
+                hoveredIndex === index ? 'bg-gray-50 dark:bg-gray-800' : ''
+              }`}
+              onMouseEnter={() => setHoveredIndex(index)}
+              onMouseLeave={() => setHoveredIndex(null)}
             >
-              <div className="flex items-center justify-center space-x-2">
-                <div className="w-2 h-2 rounded-full bg-primary animate-pulse" style={{ animationDelay: '0ms' }}></div>
-                <div className="w-2 h-2 rounded-full bg-primary animate-pulse" style={{ animationDelay: '300ms' }}></div>
-                <div className="w-2 h-2 rounded-full bg-primary animate-pulse" style={{ animationDelay: '600ms' }}></div>
-              </div>
-              <p className="mt-1 text-sm">Loading suggestions...</p>
-            </motion.div>
-          ) : suggestions.length === 0 ? (
-            <motion.div 
-              className="px-4 py-3 text-center text-muted-foreground"
-              variants={itemVariants}
-            >
-              No suggestions found
-            </motion.div>
-          ) : (
-            <>
-              {suggestions.map((suggestion, index) => (
-                <motion.button
-                  key={index}
-                  type="button"
-                  onClick={() => {
-                    setQuery(suggestion.value);
-                    setShowSuggestions(false);
-                    console.log("Suggestion selected:", suggestion.value);
-                    // Use a timeout to ensure state is updated before submitting
-                    setTimeout(() => {
-                      handleSubmit({ preventDefault: () => {} } as React.FormEvent);
-                    }, 50);
-                  }}
-                  className="w-full px-4 py-2 text-left hover:bg-muted flex items-center gap-2 transition-colors duration-200 relative"
-                  variants={itemVariants}
-                  onMouseEnter={() => setHoveredIndex(index)}
-                  onMouseLeave={() => setHoveredIndex(null)}
-                  whileHover={{ backgroundColor: 'rgba(var(--muted), 0.7)' }}
-                  whileTap={{ scale: 0.98 }}
-                >
-                  {hoveredIndex === index && (
-                    <motion.div 
-                      className="absolute left-0 top-0 bottom-0 w-1 bg-primary rounded-r"
-                      layoutId="suggestionHighlight"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ duration: 0.2 }}
-                    />
-                  )}
-                  <span className="text-xs text-muted-foreground uppercase font-medium bg-muted/50 px-1.5 py-0.5 rounded">
-                    {suggestion.type}
-                  </span>
-                  <span className="flex-1 truncate text-foreground">
-                    {suggestion.label || suggestion.value}
-                  </span>
-                </motion.button>
-              ))}
-              
-              <motion.div 
-                className="px-4 py-2 border-t border-input text-xs text-muted-foreground"
-                variants={itemVariants}
-              >
-                <div className="flex justify-between items-center">
-                  <span>Press <kbd className="px-1 py-0.5 bg-muted rounded border border-border text-xs">↑</kbd> <kbd className="px-1 py-0.5 bg-muted rounded border border-border text-xs">↓</kbd> to navigate</span>
-                  <span>Press <kbd className="px-1 py-0.5 bg-muted rounded border border-border text-xs">Enter</kbd> to select</span>
-                </div>
-              </motion.div>
-            </>
-          )}
-        </motion.div>
+              {hoveredIndex === index && (
+                <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary rounded-r" />
+              )}
+              <span className="text-xs text-gray-500 dark:text-gray-400 uppercase font-medium bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">
+                {suggestion.type}
+              </span>
+              <span className="flex-1 truncate text-gray-900 dark:text-gray-100">
+                {suggestion.label || suggestion.value}
+              </span>
+            </button>
+          ))}
+          
+          <div className="px-4 py-2 border-t border-gray-200 dark:border-gray-700 text-xs text-gray-500 dark:text-gray-400">
+            <div className="flex justify-between items-center">
+              <span>Press <kbd className="px-1 py-0.5 bg-gray-100 dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 text-xs">↑</kbd> <kbd className="px-1 py-0.5 bg-gray-100 dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 text-xs">↓</kbd> to navigate</span>
+              <span>Press <kbd className="px-1 py-0.5 bg-gray-100 dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 text-xs">Enter</kbd> to select</span>
+            </div>
+          </div>
+        </>
       )}
-    </AnimatePresence>
+    </div>
   );
 };
