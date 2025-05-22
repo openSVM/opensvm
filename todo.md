@@ -43,6 +43,8 @@
   - [x] Identify the issue (missing comma in array)
   - [x] Fix the syntax error
   - [x] Commit and push the changes
+  - [x] Recreate file with ASCII apostrophes to fix Unicode character issues
+  - [ ] Verify build success after ASCII conversion
 
 ## OpenRouter AI Integration Enhancement
 - [x] Improve OpenRouter API integration
