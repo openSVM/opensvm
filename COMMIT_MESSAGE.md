@@ -1,25 +1,25 @@
-# Fix Netlify Deployment Errors and Update Build Configuration
+# Workspace Protocol Fix
 
-This PR addresses persistent Netlify deployment errors and updates the build configuration:
+This PR addresses the Netlify deployment error related to workspace protocol dependencies:
 
 ## Issues Fixed
 
-1. Updated Netlify build configuration in `netlify.toml`:
-   - Added `npm install --legacy-peer-deps` to the build command
-   - This resolves dependency conflicts that may be causing build failures
+1. Removed `bun.lock` file:
+   - The Netlify build was failing with "Unsupported URL Type 'workspace:'" error
+   - This error occurs when using Bun's lock file in an npm-based build environment
+   - Removing bun.lock allows Netlify to use npm's dependency resolution
 
-2. Verified code fixes in:
-   - `components/search/AIResponsePanel.tsx` - Confirmed bracket notation for '24hrChange'
-   - `lib/xcom-search.ts` - Confirmed syntax is correct
-   - `components/transaction-graph/TransactionGraph.tsx` - Confirmed React Hook dependencies
+2. Updated build configuration:
+   - Maintained the `--legacy-peer-deps` flag in netlify.toml
+   - Ensured clean dependency installation without workspace protocol conflicts
 
 ## Testing
 
-The fixes have been validated locally to ensure they resolve the syntax and parsing errors that were preventing successful deployment.
+The fix has been validated locally to ensure it resolves the workspace protocol error that was preventing successful deployment.
 
 ## Impact
 
 These changes should allow the Netlify deployment to proceed without the previous errors by:
-1. Ensuring proper installation of dependencies with peer dependency conflicts
-2. Maintaining the syntax fixes for the identified parsing errors
-3. Providing a more robust build process for future deployments
+1. Eliminating incompatible lock file formats
+2. Ensuring proper npm-based dependency resolution
+3. Maintaining the existing build command with legacy peer dependency support
