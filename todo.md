@@ -33,6 +33,9 @@
   - [x] Verify bun.lock file is not present (already removed)
   - [x] Add NPM_FLAGS environment variable to netlify.toml
   - [x] Update netlify.toml to use Node.js 21 for workspace protocol support
+  - [x] Replace GitHub dependencies with npm registry versions
+    - [x] Replace @sendaifun/sonic-agent-kit GitHub dependency
+    - [x] Replace solana-agent-kit GitHub dependency
   - [ ] Test build process by pushing changes to GitHub
 
 ## OpenRouter AI Integration Enhancement
