@@ -385,8 +385,8 @@ const AIResponsePanel: React.FC<AIResponsePanelProps> = ({ query, onClose }) => 
                           </div>
                           <div>
                             <p className="text-muted-foreground">24h Change:</p>
-                            <p className={`font-medium ${(blockchainData.data.price.24hrChange || 0) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                              {blockchainData.data.price.24hrChange?.toFixed(2) || 0}%
+                            <p className={`font-medium ${(blockchainData.data.price["24hrChange"] || 0) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                              {blockchainData.data.price["24hrChange"]?.toFixed(2) || 0}%
                             </p>
                           </div>
                         </>
@@ -405,120 +405,78 @@ const AIResponsePanel: React.FC<AIResponsePanelProps> = ({ query, onClose }) => 
                       </div>
                       <div>
                         <p className="text-muted-foreground">Collection:</p>
-                        <p className="font-medium">{blockchainData.data.metadata.collection?.name || 'Unknown'}</p>
+                        <p className="font-medium">{blockchainData.data.metadata.collection || 'Unknown'}</p>
                       </div>
-                      {blockchainData.data.metadata.attributes && (
-                        <div className="col-span-2">
-                          <p className="text-muted-foreground mb-1">Attributes:</p>
-                          <div className="flex flex-wrap gap-1">
-                            {blockchainData.data.metadata.attributes.map((attr: any, i: number) => (
-                              <Badge key={i} variant="outline" className="text-xs">
-                                {attr.trait_type}: {attr.value}
-                              </Badge>
-                            ))}
-                          </div>
-                        </div>
-                      )}
+                      <div>
+                        <p className="text-muted-foreground">Mint Address:</p>
+                        <p className="font-medium truncate">{blockchainData.data.mintAddress || 'Unknown'}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Owner:</p>
+                        <p className="font-medium truncate">{blockchainData.data.owner || 'Unknown'}</p>
+                      </div>
                     </div>
                   </div>
                 )}
                 
-                {blockchainDataType === 'account' && blockchainData.data.portfolio && (
+                {blockchainDataType === 'account' && blockchainData.data && (
                   <div className="bg-muted/30 p-3 rounded-md">
                     <h4 className="font-medium mb-2">Account Information</h4>
                     <div className="grid grid-cols-2 gap-2 text-sm">
                       <div>
+                        <p className="text-muted-foreground">Address:</p>
+                        <p className="font-medium truncate">{blockchainData.data.address || 'Unknown'}</p>
+                      </div>
+                      <div>
                         <p className="text-muted-foreground">SOL Balance:</p>
-                        <p className="font-medium">
-                          {blockchainData.data.nativeBalance?.solana || 
-                           blockchainData.data.portfolio.nativeBalance?.solana || 
-                           'Unknown'} SOL
-                        </p>
+                        <p className="font-medium">{blockchainData.data.solBalance?.toFixed(6) || '0'} SOL</p>
                       </div>
                       <div>
-                        <p className="text-muted-foreground">Tokens:</p>
-                        <p className="font-medium">
-                          {blockchainData.data.portfolio.tokens?.length || 
-                           blockchainData.data.tokenBalances?.length || 
-                           0}
-                        </p>
+                        <p className="text-muted-foreground">Token Count:</p>
+                        <p className="font-medium">{blockchainData.data.tokens?.length || 0}</p>
                       </div>
                       <div>
-                        <p className="text-muted-foreground">NFTs:</p>
-                        <p className="font-medium">
-                          {blockchainData.data.portfolio.nfts?.length || 
-                           blockchainData.data.nfts?.length || 
-                           0}
-                        </p>
+                        <p className="text-muted-foreground">NFT Count:</p>
+                        <p className="font-medium">{blockchainData.data.nfts?.length || 0}</p>
                       </div>
-                      {blockchainData.data.domains && (
-                        <div>
-                          <p className="text-muted-foreground">Domains:</p>
-                          <div className="flex flex-wrap gap-1">
-                            {blockchainData.data.domains.map((domain: any, i: number) => (
-                              <Badge key={i} variant="outline" className="text-xs">
-                                {domain.name}
-                              </Badge>
-                            ))}
-                          </div>
-                        </div>
-                      )}
                     </div>
                   </div>
                 )}
                 
-                {blockchainDataType === 'transaction' && blockchainData.data.transaction && (
+                {blockchainDataType === 'transaction' && blockchainData.data && (
                   <div className="bg-muted/30 p-3 rounded-md">
                     <h4 className="font-medium mb-2">Transaction Information</h4>
                     <div className="grid grid-cols-2 gap-2 text-sm">
-                      <div className="col-span-2">
+                      <div>
                         <p className="text-muted-foreground">Signature:</p>
-                        <p className="font-medium truncate">{blockchainData.query}</p>
+                        <p className="font-medium truncate">{blockchainData.data.signature || 'Unknown'}</p>
                       </div>
                       <div>
                         <p className="text-muted-foreground">Status:</p>
-                        <Badge className={blockchainData.data.transaction.status === 'success' ? 'bg-green-500' : 'bg-red-500'}>
-                          {blockchainData.data.transaction.status || 'Unknown'}
-                        </Badge>
+                        <p className={`font-medium ${blockchainData.data.status === 'confirmed' ? 'text-green-500' : 'text-red-500'}`}>
+                          {blockchainData.data.status || 'Unknown'}
+                        </p>
                       </div>
                       <div>
-                        <p className="text-muted-foreground">Block:</p>
-                        <p className="font-medium">{blockchainData.data.transaction.block || 'Unknown'}</p>
+                        <p className="text-muted-foreground">Block Time:</p>
+                        <p className="font-medium">
+                          {blockchainData.data.blockTime ? new Date(blockchainData.data.blockTime * 1000).toLocaleString() : 'Unknown'}
+                        </p>
                       </div>
                       <div>
                         <p className="text-muted-foreground">Fee:</p>
-                        <p className="font-medium">{blockchainData.data.transaction.fee || 'Unknown'} SOL</p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground">Date:</p>
-                        <p className="font-medium">
-                          {blockchainData.data.transaction.blockTime ? 
-                            new Date(blockchainData.data.transaction.blockTime * 1000).toLocaleString() : 
-                            'Unknown'}
-                        </p>
+                        <p className="font-medium">{blockchainData.data.fee ? (blockchainData.data.fee / 1000000000).toFixed(6) : '0'} SOL</p>
                       </div>
                     </div>
                   </div>
                 )}
                 
-                {/* Raw data explorer */}
+                {/* Raw data display */}
                 <div className="mt-4">
-                  <details className="group">
-                    <summary className="cursor-pointer flex items-center text-sm font-medium">
-                      <span className="mr-2">View Raw JSON Data</span>
-                      <svg 
-                        className="h-4 w-4 transition-transform group-open:rotate-180" 
-                        xmlns="http://www.w3.org/2000/svg" 
-                        viewBox="0 0 20 20" 
-                        fill="currentColor"
-                      >
-                        <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
-                      </svg>
-                    </summary>
-                    <div className="mt-2 p-2 bg-muted rounded-md text-xs overflow-auto max-h-96">
-                      <pre>{JSON.stringify(blockchainData, null, 2)}</pre>
-                    </div>
-                  </details>
+                  <h4 className="font-medium mb-2">Raw Data</h4>
+                  <pre className="bg-muted p-3 rounded-md text-xs overflow-auto max-h-60">
+                    {JSON.stringify(blockchainData, null, 2)}
+                  </pre>
                 </div>
               </div>
             )}
