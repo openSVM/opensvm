@@ -72,39 +72,50 @@ export default function EnhancedSearchBar() {
     
     try {
       setIsLoading(true);
+      console.log("Processing search query:", trimmedQuery);
       
       // Check if query is a block number
       if (/^\d+$/.test(trimmedQuery)) {
+        console.log("Detected block number, navigating to block page");
         router.push(`/block/${trimmedQuery}`);
         return;
       }
       
       // Check if query is a transaction signature
       if (isValidTransactionSignature(trimmedQuery)) {
-        window.location.href = `/tx/${trimmedQuery}`;
+        console.log("Detected transaction signature, navigating to tx page");
+        // Use router.push instead of window.location for consistent navigation
+        router.push(`/tx/${trimmedQuery}`);
         return;
       }
       
       // Check if query is a valid Solana address
       if (isValidSolanaAddress(trimmedQuery)) {
+        console.log("Detected Solana address, checking account type");
         const response = await fetch(`/api/check-account-type?address=${encodeURIComponent(trimmedQuery)}`);
         const data = await response.json();
+        console.log("Account type response:", data);
         
         switch (data.type) {
           case 'token':
-            window.location.href = `/token/${trimmedQuery}`;
+            console.log("Navigating to token page");
+            router.push(`/token/${trimmedQuery}`);
             break;
           case 'program':
-            window.location.href = `/program/${trimmedQuery}`;
+            console.log("Navigating to program page");
+            router.push(`/program/${trimmedQuery}`);
             break;
           case 'account':
-            window.location.href = `/account/${trimmedQuery}`;
+            console.log("Navigating to account page");
+            router.push(`/account/${trimmedQuery}`);
             break;
           default:
+            console.log("Unknown account type, using search page");
             // Build search URL with settings
             buildAndNavigateToSearchUrl(trimmedQuery);
         }
       } else {
+        console.log("Using general search page");
         // Use search page with settings
         buildAndNavigateToSearchUrl(trimmedQuery);
       }
@@ -153,6 +164,7 @@ export default function EnhancedSearchBar() {
       searchUrl += `&max=${searchSettings.maxAmount}`;
     }
     
+    console.log("Navigating to search URL:", searchUrl);
     router.push(searchUrl);
   };
 

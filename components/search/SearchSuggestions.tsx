@@ -94,7 +94,11 @@ export const SearchSuggestions: React.FC<SearchSuggestionsProps> = ({
                   onClick={() => {
                     setQuery(suggestion.value);
                     setShowSuggestions(false);
-                    handleSubmit({ preventDefault: () => {} } as React.FormEvent);
+                    console.log("Suggestion selected:", suggestion.value);
+                    // Use a timeout to ensure state is updated before submitting
+                    setTimeout(() => {
+                      handleSubmit({ preventDefault: () => {} } as React.FormEvent);
+                    }, 50);
                   }}
                   className="w-full px-4 py-2 text-left hover:bg-muted flex items-center gap-2 transition-colors duration-200 relative"
                   variants={itemVariants}
