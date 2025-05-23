@@ -1,4 +1,4 @@
-// Modify existing search page to include AI enhancements
+// Modify existing search page to include AI enhancements with real API integration
 'use client';
 
 import React, { Suspense, useEffect, useState } from 'react';
@@ -48,6 +48,7 @@ function SearchResults() {
   const [aiStreamComplete, setAiStreamComplete] = useState<boolean>(false);
   const [aiSources, setAiSources] = useState<{title: string, url: string}[]>([]);
   const [showAiPanel, setShowAiPanel] = useState<boolean>(true);
+  const [aiError, setAiError] = useState<string | null>(null);
 
   // Handle redirects on mount
   useEffect(() => {
@@ -182,7 +183,7 @@ function SearchResults() {
     performSearch();
   }, [query]);
   
-  // AI Response Generation
+  // Real AI Response Generation with Together AI
   useEffect(() => {
     if (!query) return;
     
@@ -190,60 +191,97 @@ function SearchResults() {
     setAiResponse('');
     setAiSources([]);
     setAiStreamComplete(false);
+    setAiError(null);
     
-    // Simulate AI thinking state
+    // Set thinking state
     setIsAiThinking(true);
     
-    // Simulate API call delay
-    const thinkingTimer = setTimeout(() => {
-      setIsAiThinking(false);
-      setIsAiStreaming(true);
-      
-      // Simulate streaming response
-      let fullResponse = generateAiResponseForQuery(query);
-      let currentIndex = 0;
-      
-      const streamInterval = setInterval(() => {
-        if (currentIndex < fullResponse.length) {
-          setAiResponse(prev => prev + fullResponse[currentIndex]);
-          currentIndex++;
-        } else {
-          clearInterval(streamInterval);
+    const fetchAiResponse = async () => {
+      try {
+        // Call the backend API with streaming
+        const response = await fetch('/api/ai-response', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ query }),
+        });
+        
+        if (!response.ok) {
+          throw new Error(`API responded with status: ${response.status}`);
+        }
+        
+        // Process the streaming response
+        const reader = response.body?.getReader();
+        if (!reader) {
+          throw new Error('Response body reader could not be created');
+        }
+        
+        // Transition from thinking to streaming
+        setIsAiThinking(false);
+        setIsAiStreaming(true);
+        
+        // Read the stream
+        const decoder = new TextDecoder();
+        let buffer = '';
+        
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          
+          // Decode the chunk and add to buffer
+          buffer += decoder.decode(value, { stream: true });
+          
+          // Process complete events in buffer
+          const lines = buffer.split('\n\n');
+          buffer = lines.pop() || ''; // Keep the last incomplete chunk in buffer
+          
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try {
+                const data = JSON.parse(line.substring(6));
+                
+                // Handle text chunks
+                if (data.text) {
+                  setAiResponse(prev => prev + data.text);
+                }
+                
+                // Handle sources
+                if (data.sources) {
+                  setAiSources(data.sources);
+                  setIsAiStreaming(false);
+                  setAiStreamComplete(true);
+                }
+              } catch (e) {
+                console.error('Error parsing SSE data:', e);
+              }
+            }
+          }
+        }
+        
+        // Ensure we mark streaming as complete if it hasn't been already
+        if (isAiStreaming) {
           setIsAiStreaming(false);
           setAiStreamComplete(true);
-          
-          // Add sources after streaming completes
-          setAiSources([
-            { title: 'Solana Documentation', url: 'https://docs.solana.com' },
-            { title: 'Solana Explorer', url: 'https://explorer.solana.com' },
-            { title: 'OpenSVM GitHub', url: 'https://github.com/aldrin-labs/opensvm' }
-          ]);
         }
-      }, 15); // Stream characters at a natural typing speed
-      
-      return () => {
-        clearTimeout(thinkingTimer);
-        clearInterval(streamInterval);
-      };
-    }, 1500);
+        
+      } catch (error) {
+        console.error('Error fetching AI response:', error);
+        setAiError('Failed to generate AI response. Please try again later.');
+        setIsAiThinking(false);
+        setIsAiStreaming(false);
+      }
+    };
     
-    return () => clearTimeout(thinkingTimer);
+    // Start the fetch after a short delay to allow UI to update
+    const timer = setTimeout(() => {
+      fetchAiResponse();
+    }, 500);
+    
+    return () => {
+      clearTimeout(timer);
+    };
   }, [query]);
-  
-  // Function to generate a response based on the query
-  const generateAiResponseForQuery = (query: string): string => {
-    // This would be replaced with actual AI response generation
-    return `Based on your search for "${query}", I found relevant information in the Solana blockchain.
-
-The query appears to be related to ${query.includes('transaction') ? 'a transaction' : query.includes('token') ? 'a token' : 'an account or program'} on the Solana network.
-
-Here's what you should know:
-- Solana is a high-performance blockchain supporting smart contracts and decentralized applications
-- Transactions on Solana are processed quickly with low fees
-- The Solana Virtual Machine (SVM) executes programs written in Rust, C, and C++
-
-For more detailed information, you can explore the search results below or check the provided sources.`;
-  };
 
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);
@@ -349,6 +387,10 @@ For more detailed information, you can explore the search results below or check
             {isAiThinking ? (
               <div className="h-24 flex items-center justify-center">
                 <div className="text-muted-foreground">Analyzing your query and searching for relevant information...</div>
+              </div>
+            ) : aiError ? (
+              <div className="text-red-500 p-4">
+                {aiError}
               </div>
             ) : (
               <div className="prose dark:prose-invert max-w-none">
