@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { TogetherAI } from 'together-ai';
+import Together from 'together-ai';
 import { createParser, ParsedEvent, ReconnectInterval } from 'eventsource-parser';
 
 // Initialize Together AI client
 // Note: In production, use environment variables for API keys
-const together = new TogetherAI({
+const together = new Together({
   apiKey: process.env.TOGETHER_AI_API_KEY || 'your-api-key-here',
 });
 
