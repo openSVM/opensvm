@@ -2,15 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import Together from 'together-ai';
 import { createParser, ParsedEvent, ReconnectInterval } from 'eventsource-parser';
 
-// Initialize Together AI client
-// Note: In production, use environment variables for API keys
-const together = new Together({
-  apiKey: process.env.TOGETHER_AI_API_KEY || 'your-api-key-here',
-});
-
-// Define the model to use
-const MODEL = 'mistralai/Mixtral-8x7B-Instruct-v0.1';
-
 export const runtime = 'edge';
 
 // Function to extract potential sources from AI response
@@ -48,38 +39,7 @@ function extractSourcesFromText(text: string): { title: string, url: string }[] 
     return sources.length > 0 ? sources : defaultSources;
   }
   
-  // If no URLs found, check for source references in the text
-  const sourceRegex = /(?:Source|Reference)s?:?\s*([^.]+)/gi;
-  const sourceMatches = text.matchAll(sourceRegex);
-  
-  for (const match of sourceMatches) {
-    if (match[1]) {
-      const sourceText = match[1].trim();
-      // Split by commas or newlines if multiple sources
-      const sourceParts = sourceText.split(/,|\n/).map(part => part.trim()).filter(Boolean);
-      
-      sourceParts.forEach(part => {
-        // Try to determine a URL based on the source name
-        let url = '';
-        if (part.toLowerCase().includes('solana')) {
-          url = 'https://docs.solana.com';
-        } else if (part.toLowerCase().includes('github')) {
-          url = 'https://github.com/aldrin-labs/opensvm';
-        } else if (part.toLowerCase().includes('explorer')) {
-          url = 'https://explorer.solana.com';
-        } else {
-          url = `https://www.google.com/search?q=${encodeURIComponent(part)}`;
-        }
-        
-        sources.push({
-          title: part,
-          url: url
-        });
-      });
-    }
-  }
-  
-  return sources.length > 0 ? sources : defaultSources;
+  return defaultSources;
 }
 
 export async function POST(req: NextRequest) {
@@ -92,6 +52,29 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
+
+    // Check for API key
+    const apiKey = process.env.TOGETHER_AI_API_KEY;
+    
+    if (!apiKey) {
+      // Return a fallback response when API key is missing
+      return NextResponse.json({
+        text: `This is a fallback response for "${query}". The Together AI integration requires an API key to be set in the environment variables.`,
+        sources: [
+          { title: 'Solana Documentation', url: 'https://docs.solana.com' },
+          { title: 'Solana Explorer', url: 'https://explorer.solana.com' },
+          { title: 'OpenSVM GitHub', url: 'https://github.com/aldrin-labs/opensvm' }
+        ]
+      });
+    }
+
+    // Initialize Together AI client with API key
+    const together = new Together({
+      apiKey: apiKey,
+    });
+
+    // Define the model to use
+    const MODEL = 'mistralai/Mixtral-8x7B-Instruct-v0.1';
 
     // Create a system prompt for blockchain and Solana-specific information
     const systemPrompt = `You are an AI assistant specialized in blockchain technology, particularly Solana. 
@@ -114,81 +97,111 @@ export async function POST(req: NextRequest) {
     // Store the complete response to extract sources at the end
     let completeResponse = '';
     
-    const stream = new ReadableStream({
-      async start(controller) {
-        // Function to handle streaming events
-        function onParse(event: ParsedEvent | ReconnectInterval) {
-          if (event.type === 'event') {
-            const data = event.data;
-            
-            // Handle different event types
-            try {
-              const json = JSON.parse(data);
+    try {
+      const stream = new ReadableStream({
+        async start(controller) {
+          // Function to handle streaming events
+          function onParse(event: ParsedEvent | ReconnectInterval) {
+            if (event.type === 'event') {
+              const data = event.data;
               
-              if (json.choices?.[0]?.delta?.content) {
-                const text = json.choices[0].delta.content;
-                completeResponse += text;
-                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text })}\n\n`));
-              } else if (json.choices?.[0]?.finish_reason === 'stop') {
-                // Extract sources from the complete response
-                const sources = extractSourcesFromText(completeResponse);
-                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ sources })}\n\n`));
-                controller.close();
+              // Handle different event types
+              try {
+                const json = JSON.parse(data);
+                
+                if (json.choices?.[0]?.delta?.content) {
+                  const text = json.choices[0].delta.content;
+                  completeResponse += text;
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text })}\n\n`));
+                } else if (json.choices?.[0]?.finish_reason === 'stop') {
+                  // Extract sources from the complete response
+                  const sources = extractSourcesFromText(completeResponse);
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ sources })}\n\n`));
+                  controller.close();
+                }
+              } catch (e) {
+                console.error('Error parsing streaming response:', e);
+                controller.error(e);
               }
-            } catch (e) {
-              console.error('Error parsing streaming response:', e);
-              controller.error(e);
             }
           }
-        }
 
-        // Create parser for SSE
-        const parser = createParser(onParse);
-        
-        // Call Together AI API with streaming
-        try {
-          const response = await together.chat.completions.create({
-            model: MODEL,
-            messages: [
-              { role: 'system', content: systemPrompt },
-              { role: 'user', content: prompt }
-            ],
-            temperature: 0.7,
-            max_tokens: 800,
-            stream: true,
-          });
+          // Create parser for SSE
+          const parser = createParser(onParse);
           
-          // Process the streaming response
-          if (response.body) {
-            const reader = response.body.getReader();
+          // Call Together AI API with streaming
+          try {
+            const response = await together.chat.completions.create({
+              model: MODEL,
+              messages: [
+                { role: 'system', content: systemPrompt },
+                { role: 'user', content: prompt }
+              ],
+              temperature: 0.7,
+              max_tokens: 800,
+              stream: true,
+            });
             
-            while (true) {
-              const { done, value } = await reader.read();
-              if (done) break;
+            // Process the streaming response
+            if (response.body) {
+              const reader = response.body.getReader();
               
-              // Parse chunks as they arrive
-              parser.feed(decoder.decode(value));
+              while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                
+                // Parse chunks as they arrive
+                parser.feed(decoder.decode(value));
+              }
             }
+          } catch (error) {
+            console.error('Error calling Together AI API:', error);
+            
+            // Send error message to client
+            const errorMessage = "Sorry, there was an error connecting to the AI service. Please try again later.";
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text: errorMessage })}\n\n`));
+            
+            // Add default sources
+            const defaultSources = [
+              { title: 'Solana Documentation', url: 'https://docs.solana.com' },
+              { title: 'Solana Explorer', url: 'https://explorer.solana.com' }
+            ];
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ sources: defaultSources })}\n\n`));
+            controller.close();
           }
-        } catch (error) {
-          console.error('Error calling Together AI API:', error);
-          controller.error(error);
         }
-      }
-    });
+      });
 
-    // Return streaming response
-    return new Response(stream, {
-      headers: {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive',
-      },
-    });
+      // Return streaming response
+      return new Response(stream, {
+        headers: {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          'Connection': 'keep-alive',
+        },
+      });
+    } catch (streamError) {
+      console.error('Error creating stream:', streamError);
+      
+      // Fallback to non-streaming response
+      return NextResponse.json({
+        text: `Failed to create streaming response for "${query}". Please try again later.`,
+        error: streamError.message,
+        sources: extractSourcesFromText('')
+      });
+    }
   } catch (error) {
     console.error('Error in AI response API:', error);
     return NextResponse.json(
-      { error: 'Failed to generate AI response' },
+      { 
+        error: 'Failed to generate AI response',
+        message: error.message,
+        text: `There was an error processing your query "${query}". Please try again later.`,
+        sources: [
+          { title: 'Solana Documentation', url: 'https://docs.solana.com' },
+          { title: 'Solana Explorer', url: 'https://explorer.solana.com' }
+        ]
+      },
       { status: 500 }
     );
   }

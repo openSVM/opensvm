@@ -280,8 +280,12 @@ function SearchResults() {
     
     return () => {
       clearTimeout(timer);
+      // Ensure we clean up any streaming state if component unmounts
+      if (isAiStreaming) {
+        setIsAiStreaming(false);
+      }
     };
-  }, [query]);
+  }, [query, isAiStreaming]);
 
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);
