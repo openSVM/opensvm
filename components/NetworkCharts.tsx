@@ -107,7 +107,7 @@ const NetworkChartsComponent = function({ networkId, isLive = false }: NetworkCh
         if (mounted) {
           fetchData(networkId);
         }
-      }, 13000); // Refresh every 13 seconds to avoid race conditions with cache
+      }, 13000); // 13 seconds refresh interval to avoid race conditions with cache and provide smooth data updates
     }
 
     return () => {

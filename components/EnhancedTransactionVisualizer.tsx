@@ -207,12 +207,14 @@ const EnhancedTransactionVisualizer = function({ tx }: EnhancedTransactionVisual
       .attr('d', 'M0,-5L10,0L0,5')
       .attr('fill', '#666');
 
-    // Create force simulation with optimized parameters
+    // Create force simulation with optimized parameters for top-to-bottom layout
     const simulation = d3.forceSimulation<Node>(nodes)
       .force('link', d3.forceLink<Node, Link>(links).id(d => d.id).distance(100))
       .force('charge', d3.forceManyBody().strength(-200))
       .force('x', d3.forceX())
-      .force('y', d3.forceY())
+      .force('y', d3.forceY().strength(0.1)) // Bias towards vertical center with gentle force
+      // Add hierarchical positioning for better top-to-bottom flow
+      .force('collision', d3.forceCollide().radius(d => getNodeRadius(d) + 5))
       // Reduce alpha decay for faster stabilization
       .alphaDecay(0.05)
       .alphaMin(0.001);
@@ -288,7 +290,7 @@ const EnhancedTransactionVisualizer = function({ tx }: EnhancedTransactionVisual
 
   return (
     <div className="w-full h-[600px] bg-neutral-900 rounded-lg overflow-hidden">
-      <svg ref={svgRef} className="w-full h-full" />
+      <svg ref={svgRef} className="w-full h-full" style={{ willChange: 'transform' }} />
     </div>
   );
 };

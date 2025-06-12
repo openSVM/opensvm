@@ -1,7 +1,7 @@
 'use client';
 
 import cytoscape from 'cytoscape';
-import { debounce, throttle } from '@/lib/sacred/common/utilities';
+import { debounce, throttle } from '@/lib/utils';
 import { ViewportState } from '@/lib/graph-state-cache';
 import { runLayout } from './layout';
 
@@ -182,12 +182,12 @@ export const setupGraphInteractions = (
       ele.addClass('hover');
       ele.connectedNodes().addClass('hover');
     }
-  }, 16); // ~60fps
+  }, 16); // 16ms ≈ 60fps (1000ms / 60fps = 16.67ms)
 
   const throttledHoverOut = throttle(() => {
     cy.elements().removeClass('hover');
     containerRef.current?.style.removeProperty('cursor');
-  }, 16);
+  }, 16); // 16ms ≈ 60fps for smooth interactions
 
   // Debounce viewport state updates for better performance
   const updateViewportState = debounce(() => {
@@ -198,7 +198,7 @@ export const setupGraphInteractions = (
         pan: viewport.pan
       });
     }
-  }, 250);
+  }, 250); // 250ms delay to reduce overhead from frequent pan/zoom events
   
   // Add click handler for all nodes (transactions and accounts)
   cy.on('tap', 'node', (event) => {
