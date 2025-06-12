@@ -69,7 +69,7 @@ export class SSEManager {
       try {
         client.writer.close();
       } catch (error) {
-        console.error(`Failed to close SSE client ${clientId}:`, error);
+        console.error('Failed to close SSE client %s:', clientId, error);
       }
       this.clients.delete(clientId);
       this.alertBuffer.delete(clientId);
