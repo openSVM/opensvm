@@ -3,11 +3,108 @@ import { getConnection } from '@/lib/solana-connection';
 import { Connection, PublicKey } from '@solana/web3.js';
 import { getStreamingAnomalyDetector } from '@/lib/streaming-anomaly-detector';
 
+// Input validation schemas
+interface StreamRequestBody {
+  action: string;
+  clientId?: string;
+  eventTypes?: string[];
+  authToken?: string;
+}
+
+// Safe JSON parsing with validation
+function parseAndValidateRequest(body: any): StreamRequestBody | null {
+  try {
+    if (!body || typeof body !== 'object') {
+      return null;
+    }
+    
+    const { action, clientId, eventTypes, authToken } = body;
+    
+    // Validate action
+    if (!action || typeof action !== 'string') {
+      return null;
+    }
+    
+    // Validate clientId if provided
+    if (clientId && typeof clientId !== 'string') {
+      return null;
+    }
+    
+    // Validate eventTypes if provided
+    if (eventTypes && (!Array.isArray(eventTypes) || !eventTypes.every(type => typeof type === 'string'))) {
+      return null;
+    }
+    
+    // Validate authToken if provided
+    if (authToken && typeof authToken !== 'string') {
+      return null;
+    }
+    
+    return { action, clientId, eventTypes, authToken };
+  } catch (error) {
+    console.error('Failed to parse request body:', error);
+    return null;
+  }
+}
+
 interface StreamClient {
   id: string;
   send: (data: any) => void;
   close: () => void;
   subscriptions: Set<string>;
+  authenticated: boolean;
+  connectionTime: number;
+  lastActivity: number;
+}
+
+// Simple authentication and rate limiting
+const CLIENT_AUTH_TOKENS = new Map<string, { token: string; clientId: string; createdAt: number }>();
+const CLIENT_RATE_LIMITS = new Map<string, { count: number; windowStart: number }>();
+
+function generateAuthToken(): string {
+  return Math.random().toString(36).substring(2) + Date.now().toString(36);
+}
+
+function validateAuthToken(clientId: string, token: string): boolean {
+  const authData = CLIENT_AUTH_TOKENS.get(clientId);
+  if (!authData) return false;
+  
+  // Token expires after 1 hour
+  if (Date.now() - authData.createdAt > 3600000) {
+    CLIENT_AUTH_TOKENS.delete(clientId);
+    return false;
+  }
+  
+  return authData.token === token;
+}
+
+function checkRateLimit(clientId: string): boolean {
+  const now = Date.now();
+  const windowSize = 60000; // 1 minute window
+  const maxRequests = 100; // Max 100 requests per minute
+  
+  const rateLimitData = CLIENT_RATE_LIMITS.get(clientId) || { count: 0, windowStart: now };
+  
+  // Reset window if it's expired
+  if (now - rateLimitData.windowStart > windowSize) {
+    rateLimitData.count = 0;
+    rateLimitData.windowStart = now;
+  }
+  
+  rateLimitData.count++;
+  CLIENT_RATE_LIMITS.set(clientId, rateLimitData);
+  
+  return rateLimitData.count <= maxRequests;
+}
+
+interface StreamClient {
+  id: string;
+  send: (data: any) => void;
+  close: () => void;
+  subscriptions: Set<string>;
+  authenticated: boolean;
+  connectionTime: number;
+  lastActivity: number;
 }
 
 interface BlockchainEvent {
@@ -40,11 +137,30 @@ class EventStreamManager {
     }
   }
 
+  public authenticateClient(clientId: string): string {
+    const token = generateAuthToken();
+    CLIENT_AUTH_TOKENS.set(clientId, {
+      token,
+      clientId,
+      createdAt: Date.now()
+    });
+    
+    const client = this.clients.get(clientId);
+    if (client) {
+      client.authenticated = true;
+      client.lastActivity = Date.now();
+    }
+    
+    return token;
+  }
+
   public removeClient(clientId: string): void {
     const client = this.clients.get(clientId);
     if (client) {
       client.subscriptions.clear();
       this.clients.delete(clientId);
+      CLIENT_AUTH_TOKENS.delete(clientId);
+      CLIENT_RATE_LIMITS.delete(clientId);
       console.log(`Client ${clientId} disconnected. Total clients: ${this.clients.size}`);
       
       if (this.clients.size === 0) {
@@ -99,19 +215,46 @@ class EventStreamManager {
       // Monitor for new transactions by subscribing to logs
       const logsSubscriptionId = this.connection.onLogs(
         'all',
-        (logs, context) => {
+        async (logs, context) => {
           if (logs.signature) {
-            const event = {
-              type: 'transaction' as const,
-              timestamp: Date.now(),
-              data: {
-                signature: logs.signature,
-                slot: context.slot,
-                logs: logs.logs,
-                err: logs.err
-              }
-            };
-            this.broadcastEvent(event);
+            try {
+              // Fetch transaction details to get fee information
+              const txDetails = await this.connection!.getTransaction(logs.signature, {
+                commitment: 'confirmed',
+                maxSupportedTransactionVersion: 0
+              });
+              
+              const event = {
+                type: 'transaction' as const,
+                timestamp: Date.now(),
+                data: {
+                  signature: logs.signature,
+                  slot: context.slot,
+                  logs: logs.logs,
+                  err: logs.err,
+                  fee: txDetails?.meta?.fee || null,
+                  preBalances: txDetails?.meta?.preBalances || [],
+                  postBalances: txDetails?.meta?.postBalances || [],
+                  accountKeys: txDetails?.transaction?.message?.accountKeys?.map(key => key.toString()) || []
+                }
+              };
+              this.broadcastEvent(event);
+            } catch (fetchError) {
+              // If we can't fetch transaction details, send the event without fee info
+              console.warn(`Failed to fetch transaction details for ${logs.signature}:`, fetchError);
+              const event = {
+                type: 'transaction' as const,
+                timestamp: Date.now(),
+                data: {
+                  signature: logs.signature,
+                  slot: context.slot,
+                  logs: logs.logs,
+                  err: logs.err,
+                  fee: null
+                }
+              };
+              this.broadcastEvent(event);
+            }
           }
         },
         'confirmed'
@@ -171,11 +314,27 @@ class EventStreamManager {
     }
   }
 
-  public subscribeToEvents(clientId: string, eventTypes: string[]): void {
+  public subscribeToEvents(clientId: string, eventTypes: string[], authToken?: string): boolean {
     const client = this.clients.get(clientId);
-    if (client) {
-      eventTypes.forEach(type => client.subscriptions.add(type));
+    if (!client) {
+      return false;
     }
+    
+    // Check authentication
+    if (!client.authenticated || (authToken && !validateAuthToken(clientId, authToken))) {
+      console.warn(`Unauthorized subscription attempt from client ${clientId}`);
+      return false;
+    }
+    
+    // Check rate limit
+    if (!checkRateLimit(clientId)) {
+      console.warn(`Rate limit exceeded for client ${clientId}`);
+      return false;
+    }
+    
+    client.lastActivity = Date.now();
+    eventTypes.forEach(type => client.subscriptions.add(type));
+    return true;
   }
 
   public getStatus(): any {
@@ -227,38 +386,105 @@ export async function GET(request: NextRequest) {
 // For now, we'll also provide a simple polling endpoint
 export async function POST(request: NextRequest) {
   try {
-    const { action, clientId, eventTypes } = await request.json();
+    // Safe JSON parsing
+    let requestBody;
+    try {
+      requestBody = await request.json();
+    } catch (jsonError) {
+      console.error('Invalid JSON in request:', jsonError);
+      return Response.json({ error: 'Invalid JSON format' }, { status: 400 });
+    }
+    
+    // Validate request structure
+    const validatedRequest = parseAndValidateRequest(requestBody);
+    if (!validatedRequest) {
+      return Response.json({ error: 'Invalid request format' }, { status: 400 });
+    }
+    
+    const { action, clientId, eventTypes, authToken } = validatedRequest;
     const manager = EventStreamManager.getInstance();
     
+    // Validate input
+    if (!clientId && action !== 'status') {
+      return Response.json({ error: 'Client ID is required' }, { status: 400 });
+    }
+    
+    // Check rate limit first (skip for authentication requests)
+    if (clientId && action !== 'authenticate' && !checkRateLimit(clientId)) {
+      return Response.json({ error: 'Rate limit exceeded' }, { status: 429 });
+    }
+    
     switch (action) {
-      case 'subscribe':
-        if (eventTypes && Array.isArray(eventTypes)) {
-          manager.subscribeToEvents(clientId, eventTypes);
-          return Response.json({ success: true, message: 'Subscribed to events' });
+      case 'authenticate':
+        if (!clientId) {
+          return Response.json({ error: 'Client ID is required for authentication' }, { status: 400 });
         }
-        return Response.json({ error: 'Invalid event types' }, { status: 400 });
+        const token = manager.authenticateClient(clientId);
+        return Response.json({ 
+          success: true, 
+          authToken: token,
+          message: 'Client authenticated',
+          expiresIn: 3600 // 1 hour
+        });
+        
+      case 'subscribe':
+        if (!eventTypes || !Array.isArray(eventTypes) || eventTypes.length === 0) {
+          return Response.json({ error: 'Valid event types array is required' }, { status: 400 });
+        }
+        
+        // Validate event types
+        const validEventTypes = ['transaction', 'block', 'account_change', 'all'];
+        const invalidTypes = eventTypes.filter(type => !validEventTypes.includes(type));
+        if (invalidTypes.length > 0) {
+          return Response.json({ 
+            error: `Invalid event types: ${invalidTypes.join(', ')}. Valid types: ${validEventTypes.join(', ')}` 
+          }, { status: 400 });
+        }
+        
+        const success = manager.subscribeToEvents(clientId!, eventTypes, authToken);
+        if (success) {
+          return Response.json({ success: true, message: 'Subscribed to events' });
+        } else {
+          return Response.json({ error: 'Authentication required or failed' }, { status: 401 });
+        }
         
       case 'unsubscribe':
-        manager.removeClient(clientId);
+        manager.removeClient(clientId!);
         return Response.json({ success: true, message: 'Unsubscribed from events' });
         
       case 'start_monitoring':
-        // Mock client for testing
+        // Create authenticated mock client for testing
         const mockClient = {
-          id: clientId || 'test_client',
+          id: clientId!,
           send: (data: any) => console.log('Mock send:', data),
           close: () => console.log('Mock close'),
-          subscriptions: new Set(['transaction', 'block'])
+          subscriptions: new Set(['transaction', 'block']),
+          authenticated: false,
+          connectionTime: Date.now(),
+          lastActivity: Date.now()
         };
         
         await manager.addClient(mockClient);
-        return Response.json({ success: true, message: 'Started monitoring' });
+        
+        // Auto-authenticate for start_monitoring to maintain compatibility
+        const autoToken = manager.authenticateClient(clientId!);
+        
+        return Response.json({ 
+          success: true, 
+          message: 'Started monitoring',
+          authToken: autoToken
+        });
         
       default:
-        return Response.json({ error: 'Invalid action' }, { status: 400 });
+        return Response.json({ 
+          error: `Invalid action: ${action}. Valid actions: authenticate, subscribe, unsubscribe, start_monitoring` 
+        }, { status: 400 });
     }
   } catch (error) {
     console.error('Stream API error:', error);
-    return Response.json({ error: 'Internal server error' }, { status: 500 });
+    return Response.json({ 
+      error: 'Internal server error',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    }, { status: 500 });
   }
 }

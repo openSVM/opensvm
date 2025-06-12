@@ -67,7 +67,67 @@ describe('/api/stream', () => {
   });
 
   describe('POST /api/stream', () => {
-    it('should handle subscribe action', async () => {
+    it('should handle authenticate action', async () => {
+      const request = new NextRequest('http://localhost:3000/api/stream', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          action: 'authenticate',
+          clientId: 'test123'
+        })
+      });
+
+      const response = await POST(request);
+      expect(response.status).toBe(200);
+      
+      const data = await response.json();
+      expect(data.success).toBe(true);
+      expect(data.authToken).toBeDefined();
+      expect(data.expiresIn).toBe(3600);
+    });
+
+    it('should handle subscribe action with authentication', async () => {
+      // First authenticate
+      const authRequest = new NextRequest('http://localhost:3000/api/stream', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          action: 'authenticate',
+          clientId: 'test123'
+        })
+      });
+
+      const authResponse = await POST(authRequest);
+      const authData = await authResponse.json();
+      const authToken = authData.authToken;
+
+      // Then subscribe
+      const request = new NextRequest('http://localhost:3000/api/stream', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          action: 'subscribe',
+          clientId: 'test123',
+          eventTypes: ['transaction', 'block'],
+          authToken
+        })
+      });
+
+      const response = await POST(request);
+      expect(response.status).toBe(200);
+      
+      const data = await response.json();
+      expect(data.success).toBe(true);
+      expect(data.message).toBe('Subscribed to events');
+    });
+
+    it('should handle subscribe action (legacy compatibility)', async () => {
       const request = new NextRequest('http://localhost:3000/api/stream', {
         method: 'POST',
         headers: {
@@ -81,11 +141,10 @@ describe('/api/stream', () => {
       });
 
       const response = await POST(request);
-      expect(response.status).toBe(200);
+      expect(response.status).toBe(401); // Should require auth now
       
       const data = await response.json();
-      expect(data.success).toBe(true);
-      expect(data.message).toBe('Subscribed to events');
+      expect(data.error).toBe('Authentication required or failed');
     });
 
     it('should handle unsubscribe action', async () => {
@@ -127,6 +186,26 @@ describe('/api/stream', () => {
       expect(data.error).toBe('Invalid action');
     });
 
+    it('should reject invalid event types', async () => {
+      const request = new NextRequest('http://localhost:3000/api/stream', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          action: 'subscribe',
+          clientId: 'test123',
+          eventTypes: ['invalid_type']
+        })
+      });
+
+      const response = await POST(request);
+      expect(response.status).toBe(400);
+      
+      const data = await response.json();
+      expect(data.error).toContain('Invalid event types');
+    });
+
     it('should reject subscribe without event types', async () => {
       const request = new NextRequest('http://localhost:3000/api/stream', {
         method: 'POST',
@@ -143,7 +222,28 @@ describe('/api/stream', () => {
       expect(response.status).toBe(400);
       
       const data = await response.json();
-      expect(data.error).toBe('Invalid event types');
+      expect(data.error).toBe('Valid event types array is required');
+    });
+
+    it('should handle start_monitoring action with auto-authentication', async () => {
+      const request = new NextRequest('http://localhost:3000/api/stream', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          action: 'start_monitoring',
+          clientId: 'test123'
+        })
+      });
+
+      const response = await POST(request);
+      expect(response.status).toBe(200);
+      
+      const data = await response.json();
+      expect(data.success).toBe(true);
+      expect(data.message).toBe('Started monitoring');
+      expect(data.authToken).toBeDefined();
     });
 
     it('should handle malformed JSON', async () => {
@@ -156,10 +256,28 @@ describe('/api/stream', () => {
       });
 
       const response = await POST(request);
-      expect(response.status).toBe(500);
+      expect(response.status).toBe(400);
       
       const data = await response.json();
-      expect(data.error).toBe('Internal server error');
+      expect(data.error).toBe('Invalid JSON format');
+    });
+
+    it('should validate request structure', async () => {
+      const request = new NextRequest('http://localhost:3000/api/stream', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          invalidField: 'test'
+        })
+      });
+
+      const response = await POST(request);
+      expect(response.status).toBe(400);
+      
+      const data = await response.json();
+      expect(data.error).toBe('Invalid request format');
     });
   });
 });

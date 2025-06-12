@@ -35,6 +35,7 @@ export function LiveEventMonitor({
   const [isConnected, setIsConnected] = useState(false);
   const [stats, setStats] = useState<any>(null);
   const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [authToken, setAuthToken] = useState<string | null>(null);
   const eventCountRef = useRef(0);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -83,11 +84,18 @@ export function LiveEventMonitor({
       });
 
       if (response.ok) {
+        const data = await response.json();
         setIsConnected(true);
         setConnectionError(null);
+        
+        // Store auth token for future requests
+        if (data.authToken) {
+          setAuthToken(data.authToken);
+        }
+        
         console.log('Started monitoring via API');
         
-        // Subscribe to events
+        // Subscribe to events with authentication
         await fetch('/api/stream', {
           method: 'POST',
           headers: {
@@ -96,7 +104,8 @@ export function LiveEventMonitor({
           body: JSON.stringify({
             action: 'subscribe',
             clientId: clientId.current,
-            eventTypes: ['transaction', 'block']
+            eventTypes: ['transaction', 'block'],
+            authToken: data.authToken
           })
         });
         

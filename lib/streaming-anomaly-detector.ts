@@ -10,6 +10,7 @@ interface StreamingAnomalyDetector {
 
 class StreamingAnomalyDetectorImpl implements StreamingAnomalyDetector {
   private anomalyDetector: AnomalyDetectionCapability | null = null;
+  private connection: any = null; // Store connection reference for cleanup
   private isActive = false;
   private subscriptionIds: number[] = [];
 
@@ -20,11 +21,11 @@ class StreamingAnomalyDetectorImpl implements StreamingAnomalyDetector {
     }
 
     try {
-      const connection = await getConnection();
-      this.anomalyDetector = new AnomalyDetectionCapability(connection);
+      this.connection = await getConnection();
+      this.anomalyDetector = new AnomalyDetectionCapability(this.connection);
       
       // Subscribe to slot changes for block events
-      const slotSubscriptionId = connection.onSlotChange(async (slotInfo) => {
+      const slotSubscriptionId = this.connection.onSlotChange(async (slotInfo) => {
         const blockEvent = {
           type: 'block' as const,
           timestamp: Date.now(),
@@ -43,7 +44,7 @@ class StreamingAnomalyDetectorImpl implements StreamingAnomalyDetector {
       this.subscriptionIds.push(slotSubscriptionId);
       
       // Subscribe to transaction logs
-      const logsSubscriptionId = connection.onLogs(
+      const logsSubscriptionId = this.connection.onLogs(
         'all',
         async (logs, context) => {
           if (logs.signature) {
@@ -91,12 +92,28 @@ class StreamingAnomalyDetectorImpl implements StreamingAnomalyDetector {
       return;
     }
 
-    // Remove subscriptions would go here
-    // Note: The current Connection interface doesn't provide remove methods
-    // This would need to be implemented based on the actual WebSocket connection
+    // Remove subscriptions properly
+    if (this.subscriptionIds.length > 0) {
+      try {
+        if (this.connection) {
+          // Remove slot change listener (first subscription)
+          if (this.subscriptionIds[0]) {
+            this.connection.removeSlotChangeListener(this.subscriptionIds[0]);
+          }
+          // Remove logs listener (second subscription)
+          if (this.subscriptionIds[1]) {
+            this.connection.removeOnLogsListener(this.subscriptionIds[1]);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to remove subscriptions:', error);
+      }
+    }
     
     this.subscriptionIds = [];
     this.isActive = false;
+    this.anomalyDetector = null;
+    this.connection = null;
     
     console.log('⏹️ Streaming anomaly detector stopped');
   }
