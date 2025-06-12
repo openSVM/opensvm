@@ -6,6 +6,7 @@ import dagre from 'cytoscape-dagre';
 import { useRouter } from 'next/navigation';
 import { GraphStateCache, ViewportState } from '@/lib/graph-state-cache';
 import { debounce } from '@/lib/utils';
+import { TrackingStatsPanel } from './TrackingStatsPanel';
 import {
   TransactionGraphProps,
   createAddressFilter,
@@ -27,7 +28,6 @@ if (typeof window !== 'undefined') {
   cytoscape.use(dagre);
 }
 
-// Add type definitions at the top of the file after imports
 interface CachedNode {
   data: {
     id: string;
@@ -47,6 +47,25 @@ interface CachedEdge {
 interface CachedState {
   nodes: CachedNode[];
   edges?: CachedEdge[];
+}
+
+interface TrackingStats {
+  totalTransactions: number;
+  splTransfers: number;
+  filteredSplTransfers: number;
+  topVolumeByAddress: Array<{
+    address: string;
+    volume: number;
+    tokenSymbol: string;
+  }>;
+  topVolumeByToken: Array<{
+    token: string;
+    volume: number;
+    transactionCount: number;
+  }>;
+  lastUpdate: number;
+  isTracking: boolean;
+  trackedAddress: string | null;
 }
 
 function TransactionGraph({
@@ -70,13 +89,10 @@ const timeoutIds = useRef<NodeJS.Timeout[]>([]);
   // Address tracking state
   const [trackedAddress, setTrackedAddress] = useState<string | null>(null);
   const [isTrackingMode, setIsTrackingMode] = useState<boolean>(false);
-  const [addressStats, setAddressStats] = useState<{
-    totalTransactions: number;
-    recentTransactions: any[];
-    lastUpdate: number;
-    averageInterval: number;
-  } | null>(null);
+  const [trackingStats, setTrackingStats] = useState<TrackingStats | null>(null);
   const trackingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const trackedTransactionsRef = useRef<Set<string>>(new Set());
+  const MAX_TRACKED_TRANSACTIONS = 100;
   
   // Excluded accounts and program identifiers
   const EXCLUDED_ACCOUNTS = useMemo(() => new Set([
@@ -426,7 +442,7 @@ return result;
     queueAccountFetch
   ]);
 
-  // Address tracking functionality
+  // Address tracking functionality with rate limiting and AI filtering
   const startAddressTracking = useCallback(async (address: string) => {
     if (trackedAddress === address && isTrackingMode) return;
     
@@ -434,6 +450,9 @@ return result;
     if (trackingIntervalRef.current) {
       clearInterval(trackingIntervalRef.current);
     }
+    
+    // Clear previous tracked transactions
+    trackedTransactionsRef.current.clear();
     
     setTrackedAddress(address);
     setIsTrackingMode(true);
@@ -446,94 +465,219 @@ return result;
       }
     }
     
-    // Initial fetch of address statistics
+    // Initialize tracking statistics
+    setTrackingStats({
+      totalTransactions: 0,
+      splTransfers: 0,
+      filteredSplTransfers: 0,
+      topVolumeByAddress: [],
+      topVolumeByToken: [],
+      lastUpdate: Date.now(),
+      isTracking: true,
+      trackedAddress: address
+    });
+    
+    // Initial fetch of SPL transfers
     try {
-      const response = await fetch(`/api/account-transactions/${address}?limit=20`);
+      const response = await fetch(`/api/account-transfers/${address}?limit=50`);
       if (response.ok) {
         const data = await response.json();
-        const transactions = data.transactions || [];
+        const transfers = data.data || [];
         
-        setAddressStats({
-          totalTransactions: transactions.length,
-          recentTransactions: transactions.slice(0, 5),
-          lastUpdate: Date.now(),
-          averageInterval: transactions.length > 1 ? 
-            (Date.now() - new Date(transactions[transactions.length - 1].timestamp).getTime()) / transactions.length 
-            : 0
-        });
+        // Filter and analyze with AI
+        if (transfers.length > 0) {
+          const filterResponse = await fetch('/api/filter-transactions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ transactions: transfers })
+          });
+          
+          if (filterResponse.ok) {
+            const filterData = await filterResponse.json();
+            const filteredTransfers = filterData.filteredTransactions || transfers;
+            
+            // Update statistics
+            updateTrackingStats(transfers, filteredTransfers);
+            
+            // Add filtered transfers to graph
+            addTransfersToGraph(filteredTransfers, address);
+          }
+        }
       }
     } catch (error) {
-      console.warn('Failed to fetch initial address stats:', error);
+      console.warn('Failed to fetch initial SPL transfers:', error);
     }
     
     // Start real-time polling (every 5 seconds)
     trackingIntervalRef.current = setInterval(async () => {
       try {
-        const response = await fetch(`/api/account-transactions/${address}?limit=5`);
+        const response = await fetch(`/api/account-transfers/${address}?limit=10`);
         if (response.ok) {
           const data = await response.json();
-          const newTransactions = data.transactions || [];
+          const newTransfers = data.data || [];
           
-          setAddressStats(prev => {
-            if (!prev) return null;
+          // Filter out transfers we've already processed
+          const unseenTransfers = newTransfers.filter(transfer => 
+            !trackedTransactionsRef.current.has(transfer.txId)
+          );
+          
+          if (unseenTransfers.length > 0) {
+            // Apply AI filtering
+            const filterResponse = await fetch('/api/filter-transactions', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ transactions: unseenTransfers })
+            });
             
-            // Check for new transactions by comparing timestamps
-            const lastKnownTimestamp = prev.recentTransactions[0]?.timestamp;
-            const newTxs = newTransactions.filter(tx => 
-              !lastKnownTimestamp || new Date(tx.timestamp) > new Date(lastKnownTimestamp)
-            );
-            
-            if (newTxs.length > 0) {
-              // Add new transactions to the graph
-              newTxs.forEach(tx => {
-                if (cyRef.current && !cyRef.current.getElementById(tx.signature).length) {
-                  cyRef.current.add({
-                    data: {
-                      id: tx.signature,
-                      label: `${tx.signature.slice(0, 8)}...`,
-                      type: 'transaction'
-                    },
-                    classes: 'transaction new-transaction'
-                  });
-                  
-                  // Add edge connecting to tracked address
-                  cyRef.current.add({
-                    data: {
-                      id: `${address}-${tx.signature}`,
-                      source: address,
-                      target: tx.signature,
-                      type: 'realtime'
-                    },
-                    classes: 'realtime-edge'
-                  });
-                }
-              });
+            if (filterResponse.ok) {
+              const filterData = await filterResponse.json();
+              const filteredTransfers = filterData.filteredTransactions || unseenTransfers;
               
-              // Re-run layout for new elements
-              if (cyRef.current) {
-                cyRef.current.layout({
-                  name: 'dagre',
-                  rankDir: 'TB',
-                  fit: false,
-                  padding: 50
-                }).run();
+              // Check rate limit
+              if (trackedTransactionsRef.current.size >= MAX_TRACKED_TRANSACTIONS) {
+                // Remove oldest transactions from graph and tracking
+                const sortedTxIds = Array.from(trackedTransactionsRef.current).slice(0, 10);
+                sortedTxIds.forEach(txId => {
+                  cyRef.current?.remove(`#${txId}`);
+                  trackedTransactionsRef.current.delete(txId);
+                });
               }
+              
+              // Update statistics
+              updateTrackingStats(unseenTransfers, filteredTransfers);
+              
+              // Add new filtered transfers to graph
+              addTransfersToGraph(filteredTransfers, address);
+              
+              // Mark as processed
+              unseenTransfers.forEach(transfer => {
+                trackedTransactionsRef.current.add(transfer.txId);
+              });
             }
-            
-            return {
-              ...prev,
-              totalTransactions: prev.totalTransactions + newTxs.length,
-              recentTransactions: [...newTxs, ...prev.recentTransactions].slice(0, 5),
-              lastUpdate: Date.now()
-            };
-          });
+          }
         }
       } catch (error) {
-        console.warn('Failed to fetch real-time transactions:', error);
+        console.warn('Failed to fetch real-time SPL transfers:', error);
       }
     }, 5000); // Poll every 5 seconds
     
   }, [trackedAddress, isTrackingMode]);
+
+  // Helper function to update tracking statistics
+  const updateTrackingStats = useCallback((allTransfers: any[], filteredTransfers: any[]) => {
+    setTrackingStats(prev => {
+      if (!prev) return null;
+
+      // Calculate volume by address and token
+      const volumeByAddress = new Map<string, { volume: number; tokenSymbol: string }>();
+      const volumeByToken = new Map<string, { volume: number; transactionCount: number }>();
+
+      filteredTransfers.forEach(transfer => {
+        const amount = parseFloat(transfer.tokenAmount || '0');
+        
+        // Volume by address
+        const key = transfer.from || transfer.to;
+        if (key) {
+          const existing = volumeByAddress.get(key) || { volume: 0, tokenSymbol: transfer.tokenSymbol };
+          volumeByAddress.set(key, {
+            volume: existing.volume + amount,
+            tokenSymbol: transfer.tokenSymbol
+          });
+        }
+        
+        // Volume by token
+        const tokenKey = transfer.tokenSymbol;
+        if (tokenKey) {
+          const existing = volumeByToken.get(tokenKey) || { volume: 0, transactionCount: 0 };
+          volumeByToken.set(tokenKey, {
+            volume: existing.volume + amount,
+            transactionCount: existing.transactionCount + 1
+          });
+        }
+      });
+
+      // Convert to sorted arrays
+      const topVolumeByAddress = Array.from(volumeByAddress.entries())
+        .map(([address, data]) => ({ address, ...data }))
+        .sort((a, b) => b.volume - a.volume);
+
+      const topVolumeByToken = Array.from(volumeByToken.entries())
+        .map(([token, data]) => ({ token, ...data }))
+        .sort((a, b) => b.volume - a.volume);
+
+      return {
+        ...prev,
+        totalTransactions: prev.totalTransactions + allTransfers.length,
+        splTransfers: prev.splTransfers + allTransfers.length,
+        filteredSplTransfers: prev.filteredSplTransfers + filteredTransfers.length,
+        topVolumeByAddress,
+        topVolumeByToken,
+        lastUpdate: Date.now()
+      };
+    });
+  }, []);
+
+  // Helper function to add transfers to graph
+  const addTransfersToGraph = useCallback((transfers: any[], trackedAddress: string) => {
+    if (!cyRef.current) return;
+
+    transfers.forEach(transfer => {
+      const txId = transfer.txId;
+      
+      // Add transaction node if it doesn't exist
+      if (!cyRef.current!.getElementById(txId).length) {
+        cyRef.current!.add({
+          data: {
+            id: txId,
+            label: `${transfer.tokenSymbol}: ${parseFloat(transfer.tokenAmount).toFixed(2)}`,
+            type: 'spl-transfer',
+            amount: transfer.tokenAmount,
+            token: transfer.tokenSymbol
+          },
+          classes: 'transaction spl-transfer new-transaction'
+        });
+        
+        // Add edge connecting to tracked address
+        cyRef.current!.add({
+          data: {
+            id: `${trackedAddress}-${txId}`,
+            source: trackedAddress,
+            target: txId,
+            type: 'realtime'
+          },
+          classes: 'realtime-edge'
+        });
+      }
+    });
+    
+    // Re-run layout for new elements
+    if (cyRef.current && transfers.length > 0) {
+      cyRef.current.layout({
+        name: 'dagre',
+        rankDir: 'TB',
+        fit: false,
+        padding: 50
+      }).run();
+    }
+  }, []);
+
+  // Stop tracking function
+  const stopAddressTracking = useCallback(() => {
+    if (trackingIntervalRef.current) {
+      clearInterval(trackingIntervalRef.current);
+      trackingIntervalRef.current = null;
+    }
+    
+    setTrackedAddress(null);
+    setIsTrackingMode(false);
+    setTrackingStats(null);
+    trackedTransactionsRef.current.clear();
+    
+    // Remove tracked address highlighting
+    if (cyRef.current) {
+      cyRef.current.$('.tracked-address').removeClass('tracked-address');
+    }
+  }, []);
   
   // Set up graph interaction handlers
   const setupGraphInteractionsCallback = useCallback((cy: cytoscape.Core) => {
@@ -926,25 +1070,6 @@ cyRef.current.zoom(0.5);
     };
   }, [resizeGraphCallback]);
 
-
-
-  const stopAddressTracking = useCallback(() => {
-    if (trackingIntervalRef.current) {
-      clearInterval(trackingIntervalRef.current);
-      trackingIntervalRef.current = null;
-    }
-    
-    setTrackedAddress(null);
-    setIsTrackingMode(false);
-    setAddressStats(null);
-    
-    // Remove real-time styling from graph
-    if (cyRef.current) {
-      cyRef.current.elements('.new-transaction, .realtime-edge').remove();
-      cyRef.current.elements().removeClass('tracked-address');
-    }
-  }, []);
-
   // Cleanup tracking on unmount
   useEffect(() => {
     return () => {
@@ -1005,65 +1130,11 @@ cyRef.current.zoom(0.5);
         </div>
       )}
 
-      {/* Address tracking panel */}
-      {isTrackingMode && trackedAddress && (
-        <div className="absolute top-4 left-4 bg-background/95 p-4 rounded-lg shadow-lg border border-primary/20 backdrop-blur-sm max-w-sm">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-lg font-semibold text-primary">Real-time Monitoring</h3>
-            <button 
-              onClick={stopAddressTracking}
-              className="text-muted-foreground hover:text-foreground transition-colors"
-              title="Stop tracking"
-            >
-              ✕
-            </button>
-          </div>
-          
-          <div className="space-y-3 text-sm">
-            <div>
-              <span className="text-muted-foreground">Address:</span>
-              <div className="font-mono text-xs break-all mt-1">
-                {trackedAddress.slice(0, 20)}...{trackedAddress.slice(-8)}
-              </div>
-            </div>
-            
-            {addressStats && (
-              <>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <span className="text-muted-foreground">Total TXs:</span>
-                    <div className="font-semibold">{addressStats.totalTransactions}</div>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Last update:</span>
-                    <div className="font-semibold">
-                      {new Date(addressStats.lastUpdate).toLocaleTimeString()}
-                    </div>
-                  </div>
-                </div>
-                
-                {addressStats.recentTransactions.length > 0 && (
-                  <div>
-                    <span className="text-muted-foreground">Recent:</span>
-                    <div className="mt-1 space-y-1">
-                      {addressStats.recentTransactions.slice(0, 3).map((tx, i) => (
-                        <div key={tx.signature} className="text-xs font-mono truncate bg-muted/30 px-2 py-1 rounded">
-                          {tx.signature.slice(0, 12)}...
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                
-                <div className="flex items-center space-x-2 text-success">
-                  <div className="w-2 h-2 bg-success rounded-full animate-pulse"></div>
-                  <span className="text-xs">Live monitoring active</span>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      )}
+      {/* Address tracking statistics panel */}
+      <TrackingStatsPanel 
+        stats={trackingStats}
+        onStopTracking={stopAddressTracking}
+      />
 
       <div 
         ref={containerRef}
