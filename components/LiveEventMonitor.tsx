@@ -41,8 +41,10 @@ export function LiveEventMonitor({
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const clientId = useRef(`client_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
 
-  // WebSocket connection management
+  // Enhanced WebSocket connection management with production considerations
   const connectWebSocket = useCallback(() => {
+    const isProduction = process.env.NODE_ENV === 'production';
+    
     try {
       // Clean up existing connection
       if (wsRef.current) {
@@ -55,19 +57,127 @@ export function LiveEventMonitor({
       
       console.log('Attempting WebSocket connection to:', wsUrl);
       
-      // For now, we'll use the polling approach since actual WebSocket requires server-side upgrade handling
-      // Start monitoring via API call instead
-      startApiBasedMonitoring();
+      // Try WebSocket connection first
+      const ws = new WebSocket(wsUrl);
+      
+      ws.onopen = () => {
+        console.log('WebSocket connected successfully');
+        setIsConnected(true);
+        setConnectionError(null);
+        wsRef.current = ws;
+        
+        // Send authentication request
+        if (authToken) {
+          ws.send(JSON.stringify({
+            action: 'subscribe',
+            clientId: clientId.current,
+            authToken,
+            eventTypes: ['transaction', 'block']
+          }));
+        }
+      };
+      
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          handleRealtimeEvent(data);
+        } catch (parseError) {
+          console.error('Failed to parse WebSocket message:', parseError);
+        }
+      };
+      
+      ws.onclose = (event) => {
+        console.log('WebSocket closed:', event.code, event.reason);
+        setIsConnected(false);
+        wsRef.current = null;
+        
+        // In production, don't fall back to polling - require WebSocket
+        if (isProduction) {
+          setConnectionError('WebSocket connection required in production. Please check server configuration.');
+          return;
+        }
+        
+        // In development, fall back to polling after WebSocket fails
+        if (!event.wasClean) {
+          console.log('WebSocket failed, falling back to API polling in development mode');
+          startApiBasedMonitoring();
+        }
+      };
+      
+      ws.onerror = (error) => {
+        console.error('WebSocket error:', error);
+        setConnectionError('WebSocket connection failed');
+        setIsConnected(false);
+        
+        // In production, don't fall back to polling
+        if (isProduction) {
+          setConnectionError('WebSocket connection failed. Production requires WebSocket support.');
+          return;
+        }
+        
+        // In development, fall back to polling
+        console.log('WebSocket error, falling back to API polling in development mode');
+        startApiBasedMonitoring();
+      };
       
     } catch (error) {
       console.error('WebSocket connection failed:', error);
       setConnectionError(error instanceof Error ? error.message : 'Connection failed');
       setIsConnected(false);
       
-      // Retry connection after 5 seconds
-      reconnectTimeoutRef.current = setTimeout(connectWebSocket, 5000);
+      // In production, don't fall back
+      if (isProduction) {
+        setConnectionError('WebSocket connection required in production');
+        return;
+      }
+      
+      // In development, fall back to polling
+      startApiBasedMonitoring();
     }
-  }, []);
+  }, [authToken]);
+
+  const handleRealtimeEvent = (data: any) => {
+    if (data.type === 'transaction' || data.type === 'block') {
+      setEvents(prev => {
+        const newEvents = [data, ...prev].slice(0, maxEvents);
+        eventCountRef.current = newEvents.length;
+        return newEvents;
+      });
+      
+      // Process event for anomaly detection
+      processEventForAnomalies(data);
+    }
+  };
+
+  const processEventForAnomalies = async (event: BlockchainEvent) => {
+    try {
+      // Only analyze 10% of events to reduce API load
+      if (Math.random() > 0.1) return;
+      
+      const response = await fetch('/api/anomaly', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'analyze',
+          event
+        })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success && result.data.alerts && result.data.alerts.length > 0) {
+          setAlerts(prev => {
+            const newAlerts = [...result.data.alerts, ...prev].slice(0, 50);
+            return newAlerts;
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Failed to analyze event for anomalies:', error);
+    }
+  };
 
   const startApiBasedMonitoring = async () => {
     try {

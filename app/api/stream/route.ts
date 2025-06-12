@@ -3,6 +3,7 @@ import { getConnection } from '@/lib/solana-connection';
 import { Connection, PublicKey } from '@solana/web3.js';
 import { getStreamingAnomalyDetector } from '@/lib/streaming-anomaly-detector';
 import { validateStreamRequest } from '@/lib/validation/stream-schemas';
+import { getRateLimiter, type RateLimitResult } from '@/lib/rate-limiter';
 
 // Input validation schemas
 interface StreamRequestBody {
@@ -58,9 +59,10 @@ interface StreamClient {
   lastActivity: number;
 }
 
-// Simple authentication and rate limiting
+// Enhanced authentication and rate limiting
 const CLIENT_AUTH_TOKENS = new Map<string, { token: string; clientId: string; createdAt: number }>();
-const CLIENT_RATE_LIMITS = new Map<string, { count: number; windowStart: number }>();
+const AUTH_FAILURES = new Map<string, { attempts: number; lastAttempt: number; blocked: boolean }>();
+const rateLimiter = getRateLimiter();
 
 function generateAuthToken(): string {
   return Math.random().toString(36).substring(2) + Date.now().toString(36);
@@ -68,34 +70,60 @@ function generateAuthToken(): string {
 
 function validateAuthToken(clientId: string, token: string): boolean {
   const authData = CLIENT_AUTH_TOKENS.get(clientId);
-  if (!authData) return false;
+  if (!authData) {
+    logAuthFailure(clientId, 'Token not found');
+    return false;
+  }
   
   // Token expires after 1 hour
   if (Date.now() - authData.createdAt > 3600000) {
     CLIENT_AUTH_TOKENS.delete(clientId);
+    logAuthFailure(clientId, 'Token expired');
     return false;
   }
   
-  return authData.token === token;
+  if (authData.token !== token) {
+    logAuthFailure(clientId, 'Invalid token');
+    return false;
+  }
+
+  return true;
 }
 
-function checkRateLimit(clientId: string): boolean {
+function logAuthFailure(clientId: string, reason: string): void {
   const now = Date.now();
-  const windowSize = 60000; // 1 minute window
-  const maxRequests = 100; // Max 100 requests per minute
+  const failures = AUTH_FAILURES.get(clientId) || { attempts: 0, lastAttempt: 0, blocked: false };
   
-  const rateLimitData = CLIENT_RATE_LIMITS.get(clientId) || { count: 0, windowStart: now };
+  failures.attempts++;
+  failures.lastAttempt = now;
   
-  // Reset window if it's expired
-  if (now - rateLimitData.windowStart > windowSize) {
-    rateLimitData.count = 0;
-    rateLimitData.windowStart = now;
+  // Block client after 5 failed attempts within 10 minutes
+  if (failures.attempts >= 5 && now - failures.lastAttempt < 600000) {
+    failures.blocked = true;
   }
   
-  rateLimitData.count++;
-  CLIENT_RATE_LIMITS.set(clientId, rateLimitData);
+  AUTH_FAILURES.set(clientId, failures);
   
-  return rateLimitData.count <= maxRequests;
+  console.warn(`[AUTH FAILURE] Client ${clientId}: ${reason} (attempts: ${failures.attempts}, blocked: ${failures.blocked})`);
+}
+
+function isClientBlocked(clientId: string): boolean {
+  const failures = AUTH_FAILURES.get(clientId);
+  if (!failures) return false;
+  
+  // Unblock after 1 hour
+  if (failures.blocked && Date.now() - failures.lastAttempt > 3600000) {
+    failures.blocked = false;
+    failures.attempts = 0;
+    AUTH_FAILURES.set(clientId, failures);
+    return false;
+  }
+  
+  return failures.blocked;
+}
+
+function checkRateLimit(clientId: string, type: string, tokens: number = 1): RateLimitResult {
+  return rateLimiter.checkRateLimit(clientId, type, tokens);
 }
 
 interface StreamClient {
@@ -161,7 +189,7 @@ class EventStreamManager {
       client.subscriptions.clear();
       this.clients.delete(clientId);
       CLIENT_AUTH_TOKENS.delete(clientId);
-      CLIENT_RATE_LIMITS.delete(clientId);
+      AUTH_FAILURES.delete(clientId);
       console.log(`Client ${clientId} disconnected. Total clients: ${this.clients.size}`);
       
       if (this.clients.size === 0) {
@@ -419,7 +447,8 @@ class EventStreamManager {
     }
     
     // Check rate limit
-    if (!checkRateLimit(clientId)) {
+    const rateLimitResult = checkRateLimit(clientId, 'api_requests', 1);
+    if (!rateLimitResult.allowed) {
       console.warn(`Rate limit exceeded for client ${clientId}`);
       return false;
     }
@@ -443,6 +472,7 @@ class EventStreamManager {
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const action = searchParams.get('action');
+  const clientId = searchParams.get('clientId') || `client_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   
   // Handle status request
   if (action === 'status') {
@@ -453,21 +483,61 @@ export async function GET(request: NextRequest) {
     });
   }
   
-  const clientId = searchParams.get('clientId') || `client_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  
   // Check if this is a WebSocket upgrade request
   const upgrade = request.headers.get('upgrade');
-  if (upgrade !== 'websocket') {
-    return new Response('Expected WebSocket connection', { status: 400 });
+  const connection = request.headers.get('connection');
+  
+  if (upgrade?.toLowerCase() === 'websocket' && connection?.toLowerCase().includes('upgrade')) {
+    // This is a proper WebSocket upgrade request
+    
+    // Check rate limits for WebSocket connections
+    const rateLimitResult = checkRateLimit(clientId, 'websocket_connections', 1);
+    if (!rateLimitResult.allowed) {
+      return new Response('Rate limit exceeded for WebSocket connections', { 
+        status: 429,
+        headers: {
+          'X-RateLimit-Remaining': rateLimitResult.remainingTokens.toString(),
+          'X-RateLimit-Reset': new Date(rateLimitResult.resetTime).toISOString(),
+          'Retry-After': rateLimitResult.retryAfter?.toString() || '60'
+        }
+      });
+    }
+
+    // Check if client is blocked
+    if (isClientBlocked(clientId)) {
+      return new Response('Client blocked due to authentication failures', { status: 403 });
+    }
+
+    // In a real implementation, this would need to be handled by a WebSocket server
+    // For Next.js API routes, WebSocket upgrades require a custom server or serverless function
+    // that supports WebSocket protocols. 
+    
+    // For now, return information about proper WebSocket usage
+    return new Response(JSON.stringify({
+      error: 'WebSocket upgrade not supported in this environment',
+      message: 'Use polling endpoints or deploy with WebSocket-capable server',
+      clientId,
+      supportedEvents: ['transaction', 'block', 'account_change'],
+      alternatives: {
+        polling: '/api/stream (POST)',
+        documentation: '/docs/api/streaming'
+      }
+    }), {
+      status: 426, // Upgrade Required
+      headers: {
+        'Content-Type': 'application/json',
+        'Upgrade': 'websocket'
+      },
+    });
   }
 
-  // For development/testing, return a simple response
-  // In production, this would handle the WebSocket upgrade
+  // If not a WebSocket request, return API information
   return new Response(JSON.stringify({
-    message: 'WebSocket endpoint ready',
+    message: 'Streaming API endpoint',
     clientId,
+    supportedMethods: ['POST for polling', 'GET with WebSocket upgrade headers'],
     supportedEvents: ['transaction', 'block', 'account_change'],
-    usage: 'Connect using WebSocket with clientId parameter'
+    documentation: '/docs/api/streaming'
   }), {
     headers: {
       'Content-Type': 'application/json',
@@ -504,9 +574,32 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: 'Client ID is required' }, { status: 400 });
     }
     
+    // Check if client is blocked (skip for authentication requests)
+    if (clientId && action !== 'authenticate' && isClientBlocked(clientId)) {
+      return Response.json({ 
+        error: 'Client blocked due to authentication failures',
+        details: 'Contact support to unblock your client'
+      }, { status: 403 });
+    }
+    
     // Check rate limit first (skip for authentication requests)
-    if (clientId && action !== 'authenticate' && !checkRateLimit(clientId)) {
-      return Response.json({ error: 'Rate limit exceeded' }, { status: 429 });
+    if (clientId && action !== 'authenticate') {
+      const rateLimitResult = checkRateLimit(clientId, 'api_requests', 1);
+      if (!rateLimitResult.allowed) {
+        return Response.json({ 
+          error: 'Rate limit exceeded',
+          remainingTokens: rateLimitResult.remainingTokens,
+          resetTime: new Date(rateLimitResult.resetTime).toISOString(),
+          retryAfter: rateLimitResult.retryAfter
+        }, { 
+          status: 429,
+          headers: {
+            'X-RateLimit-Remaining': rateLimitResult.remainingTokens.toString(),
+            'X-RateLimit-Reset': new Date(rateLimitResult.resetTime).toISOString(),
+            'Retry-After': rateLimitResult.retryAfter?.toString() || '60'
+          }
+        });
+      }
     }
     
     switch (action) {
@@ -514,12 +607,45 @@ export async function POST(request: NextRequest) {
         if (!clientId) {
           return Response.json({ error: 'Client ID is required for authentication' }, { status: 400 });
         }
+        
+        // Check authentication rate limit
+        const authRateLimit = checkRateLimit(clientId, 'authentication', 1);
+        if (!authRateLimit.allowed) {
+          logAuthFailure(clientId, 'Authentication rate limit exceeded');
+          return Response.json({ 
+            error: 'Authentication rate limit exceeded',
+            retryAfter: authRateLimit.retryAfter
+          }, { 
+            status: 429,
+            headers: {
+              'X-RateLimit-Remaining': authRateLimit.remainingTokens.toString(),
+              'X-RateLimit-Reset': new Date(authRateLimit.resetTime).toISOString(),
+              'Retry-After': authRateLimit.retryAfter?.toString() || '60'
+            }
+          });
+        }
+        
         const token = manager.authenticateClient(clientId);
+        
+        // Clear auth failures on successful authentication
+        if (AUTH_FAILURES.has(clientId)) {
+          const failures = AUTH_FAILURES.get(clientId)!;
+          failures.attempts = 0;
+          failures.blocked = false;
+          AUTH_FAILURES.set(clientId, failures);
+        }
+        
+        console.log(`[AUTH SUCCESS] Client ${clientId} authenticated successfully`);
+        
         return Response.json({ 
           success: true, 
           authToken: token,
           message: 'Client authenticated',
-          expiresIn: 3600 // 1 hour
+          expiresIn: 3600, // 1 hour
+          rateLimits: {
+            api_requests: rateLimiter.getBucketState(clientId, 'api_requests'),
+            websocket_connections: rateLimiter.getBucketState(clientId, 'websocket_connections')
+          }
         });
         
       case 'subscribe':
