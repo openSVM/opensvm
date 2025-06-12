@@ -1,7 +1,7 @@
 'use client';
 
 import cytoscape from 'cytoscape';
-import { debounce } from '@/lib/utils';
+import { debounce, throttle } from '@/lib/sacred/common/utilities';
 import { ViewportState } from '@/lib/graph-state-cache';
 import { runLayout } from './layout';
 
@@ -159,8 +159,46 @@ export const setupGraphInteractions = (
   // Add active state styling
   cy.style().selector(':active').style({ 'opacity': 0.7 }).update();
   
-  // Remove any existing event listeners
-  cy.off('tap');
+  // Remove any existing event listeners to prevent memory leaks
+  cy.off('tap mouseover mouseout pan zoom');
+  
+  // Throttle hover effects to improve performance
+  const throttledHoverIn = throttle((event) => {
+    const ele = event.target;
+    
+    if (ele.isNode() && ele.data('type') === 'transaction') {
+      containerRef.current?.style.setProperty('cursor', 'pointer');
+      ele.addClass('hover');
+      ele.connectedEdges().addClass('hover').connectedNodes().addClass('hover');
+    }
+    
+    if (ele.isNode() && ele.data('type') === 'account') {
+      containerRef.current?.style.setProperty('cursor', 'pointer');
+      ele.addClass('hover');
+      ele.connectedEdges().addClass('hover');
+    }
+    
+    if (ele.isEdge()) {
+      ele.addClass('hover');
+      ele.connectedNodes().addClass('hover');
+    }
+  }, 16); // ~60fps
+
+  const throttledHoverOut = throttle(() => {
+    cy.elements().removeClass('hover');
+    containerRef.current?.style.removeProperty('cursor');
+  }, 16);
+
+  // Debounce viewport state updates for better performance
+  const updateViewportState = debounce(() => {
+    if (cy) {
+      const viewport = cy.viewport();
+      setViewportState({
+        zoom: viewport.zoom,
+        pan: viewport.pan
+      });
+    }
+  }, 250);
   
   // Add click handler for all nodes (transactions and accounts)
   cy.on('tap', 'node', (event) => {
@@ -189,31 +227,9 @@ export const setupGraphInteractions = (
     }
   });
   
-  // Add hover effects for nodes and edges
-  cy.on('mouseover', 'node, edge', (event) => {
-    const ele = event.target;
-    
-    if (ele.isNode() && ele.data('type') === 'transaction') {
-      containerRef.current?.style.setProperty('cursor', 'pointer');
-    }
-    
-    if (ele.isNode() && ele.data('type') === 'transaction') {
-      ele.addClass('hover');
-      ele.connectedEdges().addClass('hover').connectedNodes().addClass('hover');
-    }
-    
-    if (ele.isNode() && ele.data('type') === 'account') {
-      containerRef.current?.style.setProperty('cursor', 'pointer');
-      ele.addClass('hover');
-      ele.connectedEdges().addClass('hover');
-    }
-  });
-  
-  // Remove hover effects when mouse leaves
-  cy.on('mouseout', 'node, edge', () => {
-    cy.elements().removeClass('hover');
-    containerRef.current?.style.removeProperty('cursor');
-  });
+  // Add throttled hover effects for better performance
+  cy.on('mouseover', 'node, edge', throttledHoverIn);
+  cy.on('mouseout', 'node, edge', throttledHoverOut);
 
   // Add click handler for edges
   cy.on('tap', 'edge', (event) => {
@@ -240,13 +256,8 @@ export const setupGraphInteractions = (
     }
   });
   
-  // Track viewport changes
-  cy.on('viewport', debounce(() => {
-    setViewportState({
-      zoom: cy.zoom(),
-      pan: cy.pan()
-    });
-  }, 100));
+  // Track viewport changes with debounced updates for performance
+  cy.on('pan zoom', updateViewportState);
 };
 
 /**
