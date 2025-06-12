@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { DetailedTransactionInfo } from '@/lib/solana';
 import LoadingSpinner from '@/components/LoadingSpinner';
 
@@ -8,14 +8,79 @@ interface TransactionGPTAnalysisProps {
   tx: DetailedTransactionInfo;
 }
 
+// Debounce hook
+function useDebounce<T extends (...args: any[]) => any>(
+  callback: T,
+  delay: number
+): [T, () => void] {
+  const timeoutRef = useRef<NodeJS.Timeout>();
+  const callbackRef = useRef(callback);
+  
+  // Update callback ref when callback changes
+  useEffect(() => {
+    callbackRef.current = callback;
+  }, [callback]);
+
+  const debouncedCallback = useCallback(
+    ((...args: Parameters<T>) => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+      
+      timeoutRef.current = setTimeout(() => {
+        callbackRef.current(...args);
+      }, delay);
+    }) as T,
+    [delay]
+  );
+
+  const cancel = useCallback(() => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+  }, []);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
+
+  return [debouncedCallback, cancel];
+}
+
 export default function TransactionGPTAnalysis({ tx }: TransactionGPTAnalysisProps) {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [lastAnalyzedTime, setLastAnalyzedTime] = useState<number>(0);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
-  const analyzeWithGPT = useCallback(async () => {
+  // Cooldown period in milliseconds (prevent spam clicking)
+  const COOLDOWN_PERIOD = 3000; // 3 seconds
+
+  const performAnalysis = useCallback(async () => {
+    // Check cooldown period
+    const now = Date.now();
+    if (now - lastAnalyzedTime < COOLDOWN_PERIOD) {
+      setError(`Please wait ${Math.ceil((COOLDOWN_PERIOD - (now - lastAnalyzedTime)) / 1000)} seconds before analyzing again`);
+      return;
+    }
+
     setIsAnalyzing(true);
     setError(null);
+    setLastAnalyzedTime(now);
+
+    // Cancel any previous request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    // Create new abort controller
+    abortControllerRef.current = new AbortController();
 
     try {
       // Extract data needed for analysis
@@ -30,13 +95,14 @@ export default function TransactionGPTAnalysis({ tx }: TransactionGPTAnalysisPro
         to: tx.details?.accounts?.[1]?.pubkey
       };
 
-      // Call the API endpoint
+      // Call the API endpoint with abort signal
       const response = await fetch('/api/analyze-transaction', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(transactionData),
+        signal: abortControllerRef.current.signal
       });
 
       if (!response.ok) {
@@ -44,14 +110,44 @@ export default function TransactionGPTAnalysis({ tx }: TransactionGPTAnalysisPro
       }
 
       const data = await response.json();
+      
+      // Check if request was aborted
+      if (abortControllerRef.current.signal.aborted) {
+        return;
+      }
+      
       setAnalysisResult(data.analysis);
     } catch (err) {
+      // Don't set error if request was aborted (component unmounted or new request started)
+      if (err instanceof Error && err.name === 'AbortError') {
+        return;
+      }
+      
       console.error('Error analyzing transaction:', err);
       setError('Failed to analyze transaction');
     } finally {
       setIsAnalyzing(false);
     }
-  }, [tx]);
+  }, [tx, lastAnalyzedTime]);
+
+  // Debounced version to prevent rapid successive calls
+  const [debouncedAnalyze, cancelDebounce] = useDebounce(performAnalysis, 500);
+
+  const analyzeWithGPT = useCallback(() => {
+    debouncedAnalyze();
+  }, [debouncedAnalyze]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      cancelDebounce();
+    };
+  }, [cancelDebounce]);
+
+  const canAnalyze = !isAnalyzing && (Date.now() - lastAnalyzedTime >= COOLDOWN_PERIOD);
 
   return (
     <div className="space-y-4">
@@ -59,8 +155,9 @@ export default function TransactionGPTAnalysis({ tx }: TransactionGPTAnalysisPro
         <h2 className="text-lg font-medium mb-0">GPT Analysis</h2>
         <button
           onClick={analyzeWithGPT}
-          disabled={isAnalyzing}
+          disabled={!canAnalyze}
           className="bg-primary text-white px-4 py-2 rounded-md flex items-center space-x-2 hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          title={!canAnalyze && !isAnalyzing ? `Please wait ${Math.ceil((COOLDOWN_PERIOD - (Date.now() - lastAnalyzedTime)) / 1000)} seconds` : undefined}
         >
           {isAnalyzing ? (
             <>
