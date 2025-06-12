@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Card } from '@/components/ui/card';
 import { getConnection } from '@/lib/solana';
+import { useSSEAlerts } from '@/lib/hooks/useSSEAlerts';
 
 interface BlockchainEvent {
   type: 'transaction' | 'block' | 'account_change';
@@ -32,7 +33,6 @@ export function LiveEventMonitor({
   refreshInterval = 5000 // Reduced to 5s for more real-time feel
 }: LiveMonitorProps) {
   const [events, setEvents] = useState<BlockchainEvent[]>([]);
-  const [alerts, setAlerts] = useState<AnomalyAlert[]>([]);
   const [isConnected, setIsConnected] = useState(false);
   const [stats, setStats] = useState<any>(null);
   const [connectionError, setConnectionError] = useState<string | null>(null);
@@ -40,6 +40,30 @@ export function LiveEventMonitor({
   const connectionRef = useRef<any>(null);
   const eventCountRef = useRef(0);
   const clientId = useRef(`client_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
+
+  // Use SSE for anomaly alerts instead of polling
+  const {
+    alerts,
+    systemStatus,
+    isConnected: sseConnected,
+    error: sseError,
+    connect: connectSSE,
+    disconnect: disconnectSSE,
+    clearAlerts
+  } = useSSEAlerts({
+    clientId: clientId.current,
+    autoConnect: true,
+    maxAlerts: 50,
+    onAlert: (alert) => {
+      console.log('Received real-time anomaly alert:', alert);
+    },
+    onStatusUpdate: (status) => {
+      console.log('System status update:', status);
+    },
+    onError: (error) => {
+      console.error('SSE error:', error);
+    }
+  });
 
   // System programs to filter out
   const SYSTEM_PROGRAMS = new Set([
@@ -224,8 +248,8 @@ export function LiveEventMonitor({
 
   const processEventForAnomalies = async (event: BlockchainEvent) => {
     try {
-      // Only analyze 20% of events to reduce API load while maintaining detection
-      if (Math.random() > 0.2) return;
+      // Only analyze 10% of events to reduce API load (SSE will push alerts)
+      if (Math.random() > 0.1) return;
       
       const response = await fetch('/api/anomaly', {
         method: 'POST',
@@ -240,12 +264,8 @@ export function LiveEventMonitor({
 
       if (response.ok) {
         const result = await response.json();
-        if (result.success && result.data.alerts && result.data.alerts.length > 0) {
-          setAlerts(prev => {
-            const newAlerts = [...result.data.alerts, ...prev].slice(0, 50);
-            return newAlerts;
-          });
-        }
+        // No need to set alerts here - SSE will push them automatically
+        console.log('Event analyzed for anomalies:', result);
       }
     } catch (error) {
       console.error('Failed to analyze event for anomalies:', error);
@@ -259,8 +279,9 @@ export function LiveEventMonitor({
     }
     setIsConnected(false);
     setConnectionError(null);
+    disconnectSSE(); // Disconnect SSE as well
     console.log('Disconnected from Solana monitoring');
-  }, []);
+  }, [disconnectSSE]);
 
   // Initial connection and polling setup
   useEffect(() => {
@@ -287,41 +308,27 @@ export function LiveEventMonitor({
     };
   }, [isConnected, autoRefresh, refreshInterval, fetchRealtimeEvents]);
 
-  // Fetch anomaly data periodically
+  // Fetch anomaly stats periodically (but not alerts - SSE handles those)
   useEffect(() => {
     let interval: NodeJS.Timeout;
     
     if (autoRefresh) {
       interval = setInterval(() => {
-        fetchAnomalyData();
-      }, 30000); // Every 30 seconds
+        fetchAnomalyStats();
+      }, 60000); // Every minute for stats only
     }
     
     // Initial fetch
-    fetchAnomalyData();
+    fetchAnomalyStats();
     
     return () => {
       if (interval) clearInterval(interval);
     };
   }, [autoRefresh]);
 
-  const fetchAnomalyData = async () => {
+  const fetchAnomalyStats = async () => {
     try {
-      // Fetch alerts
-      const alertsResponse = await fetch('/api/anomaly?action=alerts');
-      if (alertsResponse.ok) {
-        const alertsData = await alertsResponse.json();
-        if (alertsData.success && alertsData.data.alerts) {
-          setAlerts(prev => {
-            // Merge with existing alerts, avoiding duplicates
-            const existingIds = new Set(prev.map(alert => alert.id));
-            const newAlerts = alertsData.data.alerts.filter((alert: any) => !existingIds.has(alert.id));
-            return [...newAlerts, ...prev].slice(0, 50);
-          });
-        }
-      }
-      
-      // Fetch stats
+      // Only fetch stats - alerts come via SSE
       const statsResponse = await fetch('/api/anomaly?action=stats');
       if (statsResponse.ok) {
         const statsData = await statsResponse.json();
@@ -330,7 +337,7 @@ export function LiveEventMonitor({
         }
       }
     } catch (error) {
-      console.error('Failed to fetch anomaly data:', error);
+      console.error('Failed to fetch anomaly stats:', error);
     }
   };
 
@@ -395,6 +402,15 @@ export function LiveEventMonitor({
                 <span className="text-xs text-yellow-600">({connectionError})</span>
               )}
             </div>
+            <div className="flex items-center space-x-2">
+              <div className={`w-2 h-2 rounded-full ${sseConnected ? 'bg-blue-500' : 'bg-gray-500'}`} />
+              <span className="text-xs text-muted-foreground">
+                SSE {sseConnected ? 'Connected' : 'Disconnected'}
+              </span>
+              {sseError && (
+                <span className="text-xs text-red-600">({sseError})</span>
+              )}
+            </div>
             <div className="text-sm text-muted-foreground">
               Events: {eventCountRef.current}
             </div>
@@ -414,6 +430,12 @@ export function LiveEventMonitor({
               disabled={!isConnected}
             >
               Refresh
+            </button>
+            <button
+              onClick={clearAlerts}
+              className="px-3 py-1 text-sm bg-purple-500 text-white rounded hover:bg-purple-600"
+            >
+              Clear Alerts
             </button>
             <button
               onClick={isConnected ? disconnect : connectToSolana}
@@ -482,9 +504,12 @@ export function LiveEventMonitor({
           </div>
         </Card>
 
-        {/* Anomaly Alerts */}
+        {/* Anomaly Alerts - Now powered by SSE */}
         <Card className="p-4">
-          <h3 className="text-lg font-semibold mb-4">Anomaly Alerts</h3>
+          <h3 className="text-lg font-semibold mb-4">
+            Real-Time Anomaly Alerts 
+            {sseConnected && <span className="text-xs text-green-600 ml-2">(Live SSE)</span>}
+          </h3>
           <div className="space-y-2 max-h-96 overflow-y-auto">
             {alerts.map((alert) => (
               <div key={alert.id} className="p-3 border rounded-lg">

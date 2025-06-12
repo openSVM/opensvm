@@ -24,6 +24,7 @@ export class TokenBucket {
   private readonly capacity: number;
   private readonly refillRate: number;
   private readonly windowMs: number;
+  private refillTimer: NodeJS.Timeout | null = null;
 
   constructor(config: TokenBucketConfig) {
     this.capacity = config.capacity;
@@ -31,13 +32,42 @@ export class TokenBucket {
     this.windowMs = config.windowMs;
     this.tokens = config.capacity;
     this.lastRefill = Date.now();
+    this.startRefillTimer();
+  }
+
+  /**
+   * Start timer-based token refill for better accuracy
+   */
+  private startRefillTimer(): void {
+    if (this.refillTimer) {
+      clearInterval(this.refillTimer);
+    }
+    
+    // Refill every 100ms for smooth rate limiting
+    this.refillTimer = setInterval(() => {
+      this.timerBasedRefill();
+    }, 100);
+  }
+
+  /**
+   * Timer-based refill with improved semantics
+   */
+  private timerBasedRefill(): void {
+    const now = Date.now();
+    const timeSinceLastRefill = (now - this.lastRefill) / 1000; // seconds
+    
+    if (timeSinceLastRefill > 0) {
+      const tokensToAdd = timeSinceLastRefill * this.refillRate;
+      this.tokens = Math.min(this.capacity, this.tokens + tokensToAdd);
+      this.lastRefill = now;
+    }
   }
 
   /**
    * Attempt to consume tokens from the bucket
    */
   consume(tokens: number = 1): RateLimitResult {
-    this.refill();
+    this.timerBasedRefill();
 
     if (this.tokens >= tokens) {
       this.tokens -= tokens;
@@ -60,7 +90,7 @@ export class TokenBucket {
    * Check if tokens are available without consuming them
    */
   check(tokens: number = 1): RateLimitResult {
-    this.refill();
+    this.timerBasedRefill();
 
     return {
       allowed: this.tokens >= tokens,
@@ -74,7 +104,7 @@ export class TokenBucket {
    * Get current bucket state
    */
   getState() {
-    this.refill();
+    this.timerBasedRefill();
     return {
       tokens: this.tokens,
       capacity: this.capacity,
@@ -83,13 +113,26 @@ export class TokenBucket {
     };
   }
 
+  /**
+   * Clean up timer when bucket is destroyed
+   */
+  destroy(): void {
+    if (this.refillTimer) {
+      clearInterval(this.refillTimer);
+      this.refillTimer = null;
+    }
+  }
+
   private refill(): void {
+    // Keep legacy refill method for immediate needs
     const now = Date.now();
     const timePassed = (now - this.lastRefill) / 1000; // seconds
-    const tokensToAdd = timePassed * this.refillRate;
     
-    this.tokens = Math.min(this.capacity, this.tokens + tokensToAdd);
-    this.lastRefill = now;
+    if (timePassed > 0) {
+      const tokensToAdd = timePassed * this.refillRate;
+      this.tokens = Math.min(this.capacity, this.tokens + tokensToAdd);
+      this.lastRefill = now;
+    }
   }
 
   private getResetTime(): number {
@@ -196,6 +239,7 @@ export class RateLimiterManager {
     for (const [key, bucket] of this.buckets.entries()) {
       const state = bucket.getState();
       if (now - state.lastRefill > maxAge) {
+        bucket.destroy(); // Clean up timer
         this.buckets.delete(key);
       }
     }

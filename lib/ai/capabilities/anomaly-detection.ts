@@ -7,6 +7,7 @@ import {
   type AnomalyPattern, 
   type AnomalyContext 
 } from '@/lib/anomaly-patterns';
+import { SSEManager } from '@/lib/sse-manager';
 
 // UUID v4 generation function
 function generateUUID(): string {
@@ -29,16 +30,78 @@ interface AnomalyAlert {
   category?: string;
 }
 
+// Ring buffer implementation for efficient memory management
+class RingBuffer<T> {
+  private buffer: T[];
+  private head = 0;
+  private tail = 0;
+  private count = 0;
+  private readonly capacity: number;
+  private readonly mutex = { locked: false };
+
+  constructor(capacity: number) {
+    this.capacity = capacity;
+    this.buffer = new Array(capacity);
+  }
+
+  async push(item: T): Promise<void> {
+    await this.lock();
+    try {
+      this.buffer[this.tail] = item;
+      this.tail = (this.tail + 1) % this.capacity;
+      
+      if (this.count < this.capacity) {
+        this.count++;
+      } else {
+        this.head = (this.head + 1) % this.capacity;
+      }
+    } finally {
+      this.unlock();
+    }
+  }
+
+  async toArray(): Promise<T[]> {
+    await this.lock();
+    try {
+      const result: T[] = [];
+      for (let i = 0; i < this.count; i++) {
+        const index = (this.head + i) % this.capacity;
+        result.push(this.buffer[index]);
+      }
+      return result;
+    } finally {
+      this.unlock();
+    }
+  }
+
+  private async lock(): Promise<void> {
+    while (this.mutex.locked) {
+      await new Promise(resolve => setTimeout(resolve, 1));
+    }
+    this.mutex.locked = true;
+  }
+
+  private unlock(): void {
+    this.mutex.locked = false;
+  }
+
+  get size(): number {
+    return this.count;
+  }
+}
+
 export class AnomalyDetectionCapability extends BaseCapability {
   type = 'anomaly_detection' as const;
   private patterns: AnomalyPattern[] = [];
-  private recentEvents: any[] = [];
-  private alerts: AnomalyAlert[] = [];
+  private recentEvents: RingBuffer<any>;
+  private alerts: RingBuffer<AnomalyAlert>;
   private maxEventHistory = 1000;
   private maxAlertHistory = 100;
 
   constructor(connection: Connection) {
     super(connection);
+    this.recentEvents = new RingBuffer<any>(this.maxEventHistory);
+    this.alerts = new RingBuffer<AnomalyAlert>(this.maxAlertHistory);
     this.initializePatterns();
     this.tools = this.createTools();
   }
@@ -85,43 +148,77 @@ export class AnomalyDetectionCapability extends BaseCapability {
     ];
   }
 
+  // Runtime validation for event data
+  private validateEventData(event: any): boolean {
+    if (!event || typeof event !== 'object') return false;
+    if (typeof event.type !== 'string') return false;
+    if (typeof event.timestamp !== 'number') return false;
+    if (!event.data || typeof event.data !== 'object') return false;
+    return true;
+  }
+
+  // Safe pattern check with validation
+  private async safePatternCheck(pattern: AnomalyPattern, event: any, context: AnomalyContext): Promise<boolean> {
+    try {
+      // Validate event structure first
+      if (!this.validateEventData(event)) {
+        console.warn(`Invalid event data for pattern ${pattern.type}`);
+        return false;
+      }
+
+      // Validate context
+      if (!context || typeof context !== 'object') {
+        console.warn(`Invalid context for pattern ${pattern.type}`);
+        return false;
+      }
+
+      return pattern.check(event, context);
+    } catch (error) {
+      console.error(`Error checking pattern ${pattern.type}:`, error);
+      return false;
+    }
+  }
+
   public async processEvent(event: any): Promise<AnomalyAlert[]> {
-    // Add event to history
-    this.recentEvents.push(event);
-    if (this.recentEvents.length > this.maxEventHistory) {
-      this.recentEvents.shift();
+    // Validate event before processing
+    if (!this.validateEventData(event)) {
+      console.warn('Received invalid event data, skipping processing');
+      return [];
     }
 
+    // Add event to ring buffer
+    await this.recentEvents.push(event);
+
     // Create context for analysis
-    const context = this.createContext();
+    const context = await this.createContext();
     
-    // Check for anomalies
+    // Check for anomalies with safe pattern checking
     const alerts: AnomalyAlert[] = [];
     
     for (const pattern of this.patterns) {
-      try {
-        if (pattern.check(event, context)) {
-          const alert = this.createAlert(pattern, event, context);
-          alerts.push(alert);
-          this.alerts.push(alert);
+      const isAnomaly = await this.safePatternCheck(pattern, event, context);
+      if (isAnomaly) {
+        const alert = this.createAlert(pattern, event, context);
+        alerts.push(alert);
+        await this.alerts.push(alert);
+        
+        // Push alert via SSE for real-time updates
+        try {
+          const sseManager = SSEManager.getInstance();
+          sseManager.broadcastAnomalyAlert(alert);
+        } catch (sseError) {
+          console.error('Failed to broadcast alert via SSE:', sseError);
         }
-      } catch (error) {
-        console.error(`Error checking pattern ${pattern.type}:`, error);
       }
-    }
-
-    // Limit alert history
-    if (this.alerts.length > this.maxAlertHistory) {
-      this.alerts = this.alerts.slice(-this.maxAlertHistory);
     }
 
     return alerts;
   }
 
-  private createContext(): AnomalyContext {
+  private async createContext(): Promise<AnomalyContext> {
     const now = Date.now();
     const recentWindow = 5 * 60 * 1000; // 5 minutes
-    const recentEvents = this.recentEvents.filter(e => e.timestamp > now - recentWindow);
+    const recentEvents = (await this.recentEvents.toArray()).filter(e => e.timestamp > now - recentWindow);
     
     const transactionEvents = recentEvents.filter(e => e.type === 'transaction');
     const failedTransactions = transactionEvents.filter(e => e.data.err !== null);
@@ -193,7 +290,8 @@ export class AnomalyDetectionCapability extends BaseCapability {
   }
 
   private async getAnomalyAlerts(params: ToolParams): Promise<any> {
-    const recentAlerts = this.alerts
+    const allAlerts = await this.alerts.toArray();
+    const recentAlerts = allAlerts
       .filter(alert => alert.timestamp > Date.now() - (24 * 60 * 60 * 1000)) // Last 24 hours
       .sort((a, b) => b.timestamp - a.timestamp)
       .slice(0, 50); // Limit to 50 most recent
@@ -226,8 +324,9 @@ export class AnomalyDetectionCapability extends BaseCapability {
       { name: '24h', duration: 24 * 60 * 60 * 1000 }
     ];
 
+    const allAlerts = await this.alerts.toArray();
     const stats = periods.map(period => {
-      const alerts = this.alerts.filter(alert => alert.timestamp > now - period.duration);
+      const alerts = allAlerts.filter(alert => alert.timestamp > now - period.duration);
       return {
         period: period.name,
         total: alerts.length,
@@ -246,8 +345,8 @@ export class AnomalyDetectionCapability extends BaseCapability {
         threshold: p.threshold
       })),
       systemHealth: {
-        eventHistorySize: this.recentEvents.length,
-        alertHistorySize: this.alerts.length,
+        eventHistorySize: this.recentEvents.size,
+        alertHistorySize: this.alerts.size,
         activePatterns: this.patterns.length
       }
     };

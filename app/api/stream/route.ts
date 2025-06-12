@@ -4,6 +4,12 @@ import { Connection, PublicKey } from '@solana/web3.js';
 import { getStreamingAnomalyDetector } from '@/lib/streaming-anomaly-detector';
 import { validateStreamRequest } from '@/lib/validation/stream-schemas';
 import { getRateLimiter, type RateLimitResult } from '@/lib/rate-limiter';
+import { 
+  createSuccessResponse, 
+  createErrorResponse, 
+  CommonErrors, 
+  ErrorCodes 
+} from '@/lib/api-response';
 
 // Input validation schemas
 interface StreamRequestBody {
@@ -59,9 +65,13 @@ interface StreamClient {
   lastActivity: number;
 }
 
-// Enhanced authentication and rate limiting
+// Enhanced authentication and rate limiting with timestamp-based blocking
 const CLIENT_AUTH_TOKENS = new Map<string, { token: string; clientId: string; createdAt: number }>();
-const AUTH_FAILURES = new Map<string, { attempts: number; lastAttempt: number; blocked: boolean }>();
+const AUTH_FAILURES = new Map<string, { 
+  attempts: number; 
+  lastAttempt: number; 
+  blockUntil: number | null; // Use timestamp instead of boolean flag
+}>();
 const rateLimiter = getRateLimiter();
 
 function generateAuthToken(): string {
@@ -92,34 +102,43 @@ function validateAuthToken(clientId: string, token: string): boolean {
 
 function logAuthFailure(clientId: string, reason: string): void {
   const now = Date.now();
-  const failures = AUTH_FAILURES.get(clientId) || { attempts: 0, lastAttempt: 0, blocked: false };
+  const failures = AUTH_FAILURES.get(clientId) || { 
+    attempts: 0, 
+    lastAttempt: 0, 
+    blockUntil: null 
+  };
   
   failures.attempts++;
   failures.lastAttempt = now;
   
-  // Block client after 5 failed attempts within 10 minutes
-  if (failures.attempts >= 5 && now - failures.lastAttempt < 600000) {
-    failures.blocked = true;
+  // Block client after 5 failed attempts - use stricter timestamp-based blocking
+  if (failures.attempts >= 5) {
+    failures.blockUntil = now + (60 * 60 * 1000); // Block for 1 hour
+    console.warn(`[AUTH FAILURE] Client ${clientId} BLOCKED until ${new Date(failures.blockUntil).toISOString()}: ${reason}`);
+  } else {
+    console.warn(`[AUTH FAILURE] Client ${clientId}: ${reason} (attempts: ${failures.attempts})`);
   }
   
   AUTH_FAILURES.set(clientId, failures);
-  
-  console.warn(`[AUTH FAILURE] Client ${clientId}: ${reason} (attempts: ${failures.attempts}, blocked: ${failures.blocked})`);
 }
 
 function isClientBlocked(clientId: string): boolean {
   const failures = AUTH_FAILURES.get(clientId);
-  if (!failures) return false;
+  if (!failures || !failures.blockUntil) return false;
   
-  // Unblock after 1 hour
-  if (failures.blocked && Date.now() - failures.lastAttempt > 3600000) {
-    failures.blocked = false;
+  const now = Date.now();
+  
+  // Check if block period has expired
+  if (now >= failures.blockUntil) {
+    // Automatically unblock - reset failure count for fresh start
     failures.attempts = 0;
+    failures.blockUntil = null;
     AUTH_FAILURES.set(clientId, failures);
+    console.log(`[AUTH] Client ${clientId} automatically unblocked after timeout`);
     return false;
   }
   
-  return failures.blocked;
+  return true;
 }
 
 function checkRateLimit(clientId: string, type: string, tokens: number = 1): RateLimitResult {
@@ -477,10 +496,7 @@ export async function GET(request: NextRequest) {
   // Handle status request
   if (action === 'status') {
     const manager = EventStreamManager.getInstance();
-    return Response.json({
-      success: true,
-      data: manager.getStatus()
-    });
+    return Response.json(createSuccessResponse(manager.getStatus()));
   }
   
   // Check if this is a WebSocket upgrade request
@@ -493,9 +509,11 @@ export async function GET(request: NextRequest) {
     // Check rate limits for WebSocket connections
     const rateLimitResult = checkRateLimit(clientId, 'websocket_connections', 1);
     if (!rateLimitResult.allowed) {
-      return new Response('Rate limit exceeded for WebSocket connections', { 
-        status: 429,
+      const { response, status } = CommonErrors.rateLimit(rateLimitResult.retryAfter, rateLimitResult.remainingTokens);
+      return new Response(JSON.stringify(response), { 
+        status,
         headers: {
+          'Content-Type': 'application/json',
           'X-RateLimit-Remaining': rateLimitResult.remainingTokens.toString(),
           'X-RateLimit-Reset': new Date(rateLimitResult.resetTime).toISOString(),
           'Retry-After': rateLimitResult.retryAfter?.toString() || '60'
@@ -505,41 +523,61 @@ export async function GET(request: NextRequest) {
 
     // Check if client is blocked
     if (isClientBlocked(clientId)) {
-      return new Response('Client blocked due to authentication failures', { status: 403 });
+      const { response, status } = CommonErrors.clientBlocked('Authentication failures');
+      return new Response(JSON.stringify(response), { 
+        status,
+        headers: { 'Content-Type': 'application/json' }
+      });
     }
 
     // In a real implementation, this would need to be handled by a WebSocket server
     // For Next.js API routes, WebSocket upgrades require a custom server or serverless function
     // that supports WebSocket protocols. 
+    // 
+    // LIMITATION: True WebSocket support requires infrastructure changes.
+    // Current implementation provides polling-based alternative.
+    // Feature flag: ENABLE_WEBSOCKET_UPGRADE can be set to enable when infrastructure supports it.
     
-    // For now, return information about proper WebSocket usage
-    return new Response(JSON.stringify({
-      error: 'WebSocket upgrade not supported',
-      message: 'Server does not support WebSocket upgrades. Use HTTP polling mode instead.',
-      clientId,
-      supportedEvents: ['transaction', 'block', 'account_change'],
-      alternatives: {
-        polling: '/api/stream (POST)',
-        documentation: '/docs/api/streaming'
-      }
-    }), {
-      status: 426, // Upgrade Required
-      headers: {
-        'Content-Type': 'application/json',
-        'Upgrade': 'websocket',
-        'Connection': 'Upgrade'
-      },
-    });
+    const webSocketSupported = process.env.ENABLE_WEBSOCKET_UPGRADE === 'true';
+    
+    if (!webSocketSupported) {
+      const { response, status } = createErrorResponse(
+        'WEBSOCKET_NOT_SUPPORTED',
+        'WebSocket upgrade not supported in current deployment',
+        {
+          message: 'Server does not support WebSocket upgrades. Use HTTP polling mode instead.',
+          clientId,
+          supportedEvents: ['transaction', 'block', 'account_change'],
+          alternatives: {
+            polling: '/api/stream (POST)',
+            documentation: '/docs/api/streaming'
+          }
+        },
+        426 // Upgrade Required
+      );
+      
+      return new Response(JSON.stringify(response), {
+        status,
+        headers: {
+          'Content-Type': 'application/json',
+          'Upgrade': 'websocket',
+          'Connection': 'Upgrade'
+        },
+      });
+    }
+    
+    // Future: Implement true WebSocket upgrade handling here
+    // when infrastructure supports it
   }
 
   // If not a WebSocket request, return API information
-  return new Response(JSON.stringify({
+  return new Response(JSON.stringify(createSuccessResponse({
     message: 'Streaming API endpoint',
     clientId,
     supportedMethods: ['POST for polling', 'GET with WebSocket upgrade headers'],
     supportedEvents: ['transaction', 'block', 'account_change'],
     documentation: '/docs/api/streaming'
-  }), {
+  })), {
     headers: {
       'Content-Type': 'application/json',
     },
@@ -555,16 +593,20 @@ export async function POST(request: NextRequest) {
       requestBody = await request.json();
     } catch (jsonError) {
       console.error('Invalid JSON in request:', jsonError);
-      return Response.json({ error: 'Invalid JSON format' }, { status: 400 });
+      const { response, status } = CommonErrors.invalidJson(jsonError);
+      return Response.json(response, { status });
     }
     
     // Validate request structure with Zod
     const validationResult = validateStreamRequest(requestBody);
     if (!validationResult.success) {
-      return Response.json({ 
-        error: 'Invalid request format', 
-        details: validationResult.errors 
-      }, { status: 400 });
+      const { response, status } = createErrorResponse(
+        ErrorCodes.INVALID_REQUEST,
+        'Invalid request format',
+        validationResult.errors,
+        400
+      );
+      return Response.json(response, { status });
     }
     
     const { action, clientId, eventTypes, authToken } = validationResult.data;
@@ -572,28 +614,23 @@ export async function POST(request: NextRequest) {
     
     // Validate input
     if (!clientId && action !== 'status') {
-      return Response.json({ error: 'Client ID is required' }, { status: 400 });
+      const { response, status } = CommonErrors.missingField('clientId');
+      return Response.json(response, { status });
     }
     
     // Check if client is blocked (skip for authentication requests)
     if (clientId && action !== 'authenticate' && isClientBlocked(clientId)) {
-      return Response.json({ 
-        error: 'Client blocked due to authentication failures',
-        details: 'Contact support to unblock your client'
-      }, { status: 403 });
+      const { response, status } = CommonErrors.clientBlocked('Contact support to unblock your client');
+      return Response.json(response, { status });
     }
     
     // Check rate limit first (skip for authentication requests)
     if (clientId && action !== 'authenticate') {
       const rateLimitResult = checkRateLimit(clientId, 'api_requests', 1);
       if (!rateLimitResult.allowed) {
-        return Response.json({ 
-          error: 'Rate limit exceeded',
-          remainingTokens: rateLimitResult.remainingTokens,
-          resetTime: new Date(rateLimitResult.resetTime).toISOString(),
-          retryAfter: rateLimitResult.retryAfter
-        }, { 
-          status: 429,
+        const { response, status } = CommonErrors.rateLimit(rateLimitResult.retryAfter, rateLimitResult.remainingTokens);
+        return Response.json(response, { 
+          status,
           headers: {
             'X-RateLimit-Remaining': rateLimitResult.remainingTokens.toString(),
             'X-RateLimit-Reset': new Date(rateLimitResult.resetTime).toISOString(),
@@ -606,18 +643,17 @@ export async function POST(request: NextRequest) {
     switch (action) {
       case 'authenticate':
         if (!clientId) {
-          return Response.json({ error: 'Client ID is required for authentication' }, { status: 400 });
+          const { response, status } = CommonErrors.missingField('clientId');
+          return Response.json(response, { status });
         }
         
         // Check authentication rate limit
         const authRateLimit = checkRateLimit(clientId, 'authentication', 1);
         if (!authRateLimit.allowed) {
           logAuthFailure(clientId, 'Authentication rate limit exceeded');
-          return Response.json({ 
-            error: 'Authentication rate limit exceeded',
-            retryAfter: authRateLimit.retryAfter
-          }, { 
-            status: 429,
+          const { response, status } = CommonErrors.rateLimit(authRateLimit.retryAfter, authRateLimit.remainingTokens);
+          return Response.json(response, { 
+            status,
             headers: {
               'X-RateLimit-Remaining': authRateLimit.remainingTokens.toString(),
               'X-RateLimit-Reset': new Date(authRateLimit.resetTime).toISOString(),
@@ -632,14 +668,13 @@ export async function POST(request: NextRequest) {
         if (AUTH_FAILURES.has(clientId)) {
           const failures = AUTH_FAILURES.get(clientId)!;
           failures.attempts = 0;
-          failures.blocked = false;
+          failures.blockUntil = null;
           AUTH_FAILURES.set(clientId, failures);
         }
         
         console.log(`[AUTH SUCCESS] Client ${clientId} authenticated successfully`);
         
-        return Response.json({ 
-          success: true, 
+        return Response.json(createSuccessResponse({ 
           authToken: token,
           message: 'Client authenticated',
           expiresIn: 3600, // 1 hour
@@ -647,32 +682,38 @@ export async function POST(request: NextRequest) {
             api_requests: rateLimiter.getBucketState(clientId, 'api_requests'),
             websocket_connections: rateLimiter.getBucketState(clientId, 'websocket_connections')
           }
-        });
+        }));
         
       case 'subscribe':
         if (!eventTypes || !Array.isArray(eventTypes) || eventTypes.length === 0) {
-          return Response.json({ error: 'Valid event types array is required' }, { status: 400 });
+          const { response, status } = CommonErrors.missingField('eventTypes');
+          return Response.json(response, { status });
         }
         
         // Validate event types
         const validEventTypes = ['transaction', 'block', 'account_change', 'all'];
         const invalidTypes = eventTypes.filter(type => !validEventTypes.includes(type));
         if (invalidTypes.length > 0) {
-          return Response.json({ 
-            error: `Invalid event types: ${invalidTypes.join(', ')}. Valid types: ${validEventTypes.join(', ')}` 
-          }, { status: 400 });
+          const { response, status } = createErrorResponse(
+            ErrorCodes.INVALID_REQUEST,
+            `Invalid event types: ${invalidTypes.join(', ')}. Valid types: ${validEventTypes.join(', ')}`,
+            { invalidTypes, validEventTypes },
+            400
+          );
+          return Response.json(response, { status });
         }
         
         const success = manager.subscribeToEvents(clientId!, eventTypes, authToken);
         if (success) {
-          return Response.json({ success: true, message: 'Subscribed to events' });
+          return Response.json(createSuccessResponse({ message: 'Subscribed to events' }));
         } else {
-          return Response.json({ error: 'Authentication required or failed' }, { status: 401 });
+          const { response, status } = CommonErrors.unauthorized('Authentication required or failed');
+          return Response.json(response, { status });
         }
         
       case 'unsubscribe':
         manager.removeClient(clientId!);
-        return Response.json({ success: true, message: 'Unsubscribed from events' });
+        return Response.json(createSuccessResponse({ message: 'Unsubscribed from events' }));
         
       case 'start_monitoring':
         // Create authenticated mock client for testing
@@ -691,22 +732,23 @@ export async function POST(request: NextRequest) {
         // Auto-authenticate for start_monitoring to maintain compatibility
         const autoToken = manager.authenticateClient(clientId!);
         
-        return Response.json({ 
-          success: true, 
+        return Response.json(createSuccessResponse({ 
           message: 'Started monitoring',
           authToken: autoToken
-        });
+        }));
         
       default:
-        return Response.json({ 
-          error: `Invalid action: ${action}. Valid actions: authenticate, subscribe, unsubscribe, start_monitoring` 
-        }, { status: 400 });
+        const { response, status } = createErrorResponse(
+          ErrorCodes.INVALID_REQUEST,
+          `Invalid action: ${action}. Valid actions: authenticate, subscribe, unsubscribe, start_monitoring`,
+          { validActions: ['authenticate', 'subscribe', 'unsubscribe', 'start_monitoring'] },
+          400
+        );
+        return Response.json(response, { status });
     }
   } catch (error) {
     console.error('Stream API error:', error);
-    return Response.json({ 
-      error: 'Internal server error',
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined
-    }, { status: 500 });
+    const { response, status } = CommonErrors.internalError(error);
+    return Response.json(response, { status });
   }
 }

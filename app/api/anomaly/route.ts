@@ -2,6 +2,12 @@ import { NextRequest } from 'next/server';
 import { getConnection } from '@/lib/solana-connection';
 import { AnomalyDetectionCapability } from '@/lib/ai/capabilities/anomaly-detection';
 import { validateAnomalyRequest, validateBlockchainEvent } from '@/lib/validation/stream-schemas';
+import { 
+  createSuccessResponse, 
+  createErrorResponse, 
+  CommonErrors, 
+  ErrorCodes 
+} from '@/lib/api-response';
 
 // Global anomaly detector instance
 let anomalyDetector: AnomalyDetectionCapability | null = null;
@@ -27,31 +33,28 @@ export async function GET(request: NextRequest) {
           message: { role: 'user', content: 'get alerts' },
           context: { messages: [] }
         });
-        return Response.json({
-          success: true,
-          data: alerts
-        });
+        return Response.json(createSuccessResponse(alerts));
         
       case 'stats':
         const stats = await detector.getAnomalyStats({
           message: { role: 'user', content: 'get stats' },
           context: { messages: [] }
         });
-        return Response.json({
-          success: true,
-          data: stats
-        });
+        return Response.json(createSuccessResponse(stats));
         
       default:
-        return Response.json({
-          error: 'Invalid action. Use action=alerts or action=stats'
-        }, { status: 400 });
+        const { response, status } = createErrorResponse(
+          ErrorCodes.INVALID_REQUEST,
+          'Invalid action. Use action=alerts or action=stats',
+          { validActions: ['alerts', 'stats'] },
+          400
+        );
+        return Response.json(response, { status });
     }
   } catch (error) {
     console.error('Anomaly API error:', error);
-    return Response.json({
-      error: 'Internal server error'
-    }, { status: 500 });
+    const { response, status } = CommonErrors.internalError(error);
+    return Response.json(response, { status });
   }
 }
 
@@ -62,16 +65,21 @@ export async function POST(request: NextRequest) {
       requestBody = await request.json();
     } catch (jsonError) {
       console.error('Invalid JSON in request:', jsonError);
-      return Response.json({ error: 'Invalid JSON format' }, { status: 400 });
+      const { response, status } = CommonErrors.invalidJson(jsonError);
+      return Response.json(response, { status });
     }
 
     // Validate request with Zod
     const validationResult = validateAnomalyRequest(requestBody);
     if (!validationResult.success) {
-      return Response.json({
-        error: 'Invalid request format',
-        details: validationResult.errors
-      }, { status: 400 });
+      const { response, status } = createErrorResponse(
+        ErrorCodes.INVALID_REQUEST,
+        'Invalid request format',
+        validationResult.errors,
+        400
+      );
+      return Response.json(response, { status });
+    }
     }
 
     const { event, action } = validationResult.data;
@@ -80,47 +88,53 @@ export async function POST(request: NextRequest) {
     switch (action) {
       case 'analyze':
         if (!event) {
-          return Response.json({
-            error: 'Event data is required'
-          }, { status: 400 });
+          const { response, status } = CommonErrors.missingField('event');
+          return Response.json(response, { status });
         }
         
         // Additional validation for single event
         if (!Array.isArray(event)) {
           const eventValidation = validateBlockchainEvent(event);
           if (!eventValidation.success) {
-            return Response.json({
-              error: 'Invalid event format',
-              details: eventValidation.errors
-            }, { status: 400 });
+            const { response, status } = createErrorResponse(
+              ErrorCodes.INVALID_REQUEST,
+              'Invalid event format',
+              eventValidation.errors,
+              400
+            );
+            return Response.json(response, { status });
           }
         }
         
         const alerts = await detector.processEvent(event);
-        return Response.json({
-          success: true,
-          data: {
-            event,
-            alerts,
-            anomalyCount: alerts.length
-          }
-        });
+        return Response.json(createSuccessResponse({
+          event,
+          alerts,
+          anomalyCount: alerts.length
+        }));
         
       case 'bulk_analyze':
         if (!Array.isArray(event)) {
-          return Response.json({
-            error: 'Events array is required for bulk analysis'
-          }, { status: 400 });
+          const { response, status } = createErrorResponse(
+            ErrorCodes.INVALID_REQUEST,
+            'Events array is required for bulk analysis',
+            { expectedType: 'array' },
+            400
+          );
+          return Response.json(response, { status });
         }
         
         // Validate each event
-        for (const evt of event) {
-          const eventValidation = validateBlockchainEvent(evt);
+        for (let i = 0; i < event.length; i++) {
+          const eventValidation = validateBlockchainEvent(event[i]);
           if (!eventValidation.success) {
-            return Response.json({
-              error: 'Invalid event format in bulk data',
-              details: eventValidation.errors
-            }, { status: 400 });
+            const { response, status } = createErrorResponse(
+              ErrorCodes.INVALID_REQUEST,
+              `Invalid event format at index ${i}`,
+              { index: i, errors: eventValidation.errors },
+              400
+            );
+            return Response.json(response, { status });
           }
         }
         
@@ -134,23 +148,23 @@ export async function POST(request: NextRequest) {
           });
         }
         
-        return Response.json({
-          success: true,
-          data: {
-            processed: results.length,
-            results
-          }
-        });
+        return Response.json(createSuccessResponse({
+          processed: results.length,
+          results
+        }));
         
       default:
-        return Response.json({
-          error: 'Invalid action. Use action=analyze or action=bulk_analyze'
-        }, { status: 400 });
+        const { response, status } = createErrorResponse(
+          ErrorCodes.INVALID_REQUEST,
+          'Invalid action. Use action=analyze or action=bulk_analyze',
+          { validActions: ['analyze', 'bulk_analyze'] },
+          400
+        );
+        return Response.json(response, { status });
     }
   } catch (error) {
     console.error('Anomaly API error:', error);
-    return Response.json({
-      error: 'Internal server error'
-    }, { status: 500 });
+    const { response, status } = CommonErrors.internalError(error);
+    return Response.json(response, { status });
   }
 }
