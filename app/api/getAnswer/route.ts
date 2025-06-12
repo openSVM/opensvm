@@ -63,10 +63,18 @@ export async function POST(request: Request) {
 
   let { question, sources } = await request.json();
 
+  const trustedDomains = ["example.com", "trusted-source.com"];
+
   console.log("[getAnswer] Fetching text from source URLS");
   let finalResults = await Promise.all(
     sources.map(async (result: any) => {
       try {
+        // Validate the source URL against the trusted domains
+        const url = new URL(result.url);
+        if (!trustedDomains.some(domain => url.hostname.endsWith(domain))) {
+          throw new Error(`Untrusted domain: ${url.hostname}`);
+        }
+
         // Fetch the source URL, or abort if it's been 3 seconds
         const response = await fetchWithTimeout(result.url);
         const html = await response.text();
