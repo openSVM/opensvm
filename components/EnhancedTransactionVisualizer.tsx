@@ -269,67 +269,6 @@ const EnhancedTransactionVisualizer = function({ tx }: EnhancedTransactionVisual
         .attr('transform', (d: any) => `translate(${d.x || 0},${d.y || 0})`);
     });
 
-    // Drag functions
-    function dragstarted(event: d3.D3DragEvent<SVGGElement, Node, Node>) {
-      if (!event.active) simulation.alphaTarget(0.3).restart();
-      event.subject.fx = event.subject.x;
-      event.subject.fy = event.subject.y;
-    }
-
-    function dragged(event: d3.D3DragEvent<SVGGElement, Node, Node>) {
-      event.subject.fx = event.x;
-      event.subject.fy = event.y;
-    }
-
-    function dragended(event: d3.D3DragEvent<SVGGElement, Node, Node>) {
-      if (!event.active) simulation.alphaTarget(0);
-      event.subject.fx = null;
-      event.subject.fy = null;
-    }
-
-    // Helper functions
-    function getNodeRadius(node: Node): number {
-      switch (node.type) {
-        case 'instruction': return 15;
-        case 'program': return 12;
-        case 'signer': return 10;
-        default: return 8;
-      }
-    }
-
-    function getNodeColor(node: Node): string {
-      switch (node.type) {
-        case 'instruction': return '#FF9800';
-        case 'program': return '#2196F3';
-        case 'signer': return '#4CAF50';
-        default: return '#9E9E9E';
-      }
-    }
-
-    function getNodeLabel(node: Node): string {
-      if (node.type === 'instruction') {
-        return `IX ${node.id.split('-')[1]}`;
-      }
-      return `${node.id.slice(0, 4)}...`;
-    }
-
-    function getNodeTooltip(node: Node): string {
-      switch (node.type) {
-        case 'instruction': {
-          const ix = node.data as InstructionWithAccounts;
-          return `Instruction ${node.id.split('-')[1]}\nProgram: ${
-            isParsedInstruction(ix) ? ix.program : ix.programId.toString()
-          }`;
-        }
-        case 'program':
-          return `Program: ${node.id}`;
-        case 'signer':
-          return `Signer: ${node.id}`;
-        default:
-          return `Account: ${node.id}`;
-      }
-    }
-
     // Cleanup function to prevent memory leaks
     return () => {
       // Stop and cleanup D3 simulation

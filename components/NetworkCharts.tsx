@@ -56,7 +56,7 @@ const NetworkChartsComponent = function({ networkId, isLive = false }: NetworkCh
   }, [chartData]);
 
   // Memoize data fetching function to prevent recreation
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (currentNetworkId: string) => {
     try {
       const [stats, latency] = await Promise.all([
         getNetworkStats(),
@@ -86,7 +86,7 @@ const NetworkChartsComponent = function({ networkId, isLive = false }: NetworkCh
       setError(err instanceof Error ? err.message : 'Failed to fetch network data');
       setLoading(false);
     }
-  }, []);
+  }, [networkId]);
 
   useEffect(() => {
     let mounted = true;
@@ -94,7 +94,7 @@ const NetworkChartsComponent = function({ networkId, isLive = false }: NetworkCh
 
     const runFetch = async () => {
       if (mounted) {
-        await fetchData();
+        await fetchData(networkId);
       }
     };
 
@@ -105,7 +105,7 @@ const NetworkChartsComponent = function({ networkId, isLive = false }: NetworkCh
     if (isLive) {
       interval = setInterval(() => {
         if (mounted) {
-          fetchData();
+          fetchData(networkId);
         }
       }, 13000); // Refresh every 13 seconds to avoid race conditions with cache
     }
