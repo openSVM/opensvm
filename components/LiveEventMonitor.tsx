@@ -145,30 +145,54 @@ export function LiveEventMonitor({
     const eventTypes = ['transaction', 'block'] as const;
     const randomType = eventTypes[Math.floor(Math.random() * eventTypes.length)];
     
-    const event: BlockchainEvent = {
-      type: randomType,
-      timestamp: Date.now(),
-      data: randomType === 'transaction' ? {
-        signature: generateMockSignature(),
-        slot: Math.floor(Math.random() * 1000000) + 250000000,
-        logs: ['Program log: Instruction: Transfer', 'Program consumed: 3000 compute units'],
-        err: Math.random() > 0.95 ? 'Transaction failed' : null,
-        fee: Math.floor(Math.random() * 10000) + 5000
-      } : {
-        slot: Math.floor(Math.random() * 1000000) + 250000000,
-        parent: Math.floor(Math.random() * 1000000) + 249999999,
-        root: Math.floor(Math.random() * 1000000) + 249999998
-      }
-    };
-    
-    setEvents(prev => {
-      const newEvents = [event, ...prev].slice(0, maxEvents);
-      eventCountRef.current++;
-      return newEvents;
-    });
-    
-    // Queue events for batch anomaly detection instead of immediate processing
-    queueEventForAnomalyDetection(event);
+    if (randomType === 'transaction') {
+      // Simulate different transaction types
+      const transactionTypes = ['spl-transfer', 'custom-program'];
+      const knownPrograms = ['raydium', 'meteora', 'aldrin', 'pumpswap', null];
+      const randomTransactionType = transactionTypes[Math.floor(Math.random() * transactionTypes.length)];
+      const randomKnownProgram = Math.random() < 0.3 ? knownPrograms[Math.floor(Math.random() * knownPrograms.length)] : null;
+      
+      const event: BlockchainEvent = {
+        type: randomType,
+        timestamp: Date.now(),
+        data: {
+          signature: generateMockSignature(),
+          slot: Math.floor(Math.random() * 1000000) + 250000000,
+          logs: randomTransactionType === 'spl-transfer' 
+            ? ['Program log: Instruction: Transfer', 'Program consumed: 3000 compute units']
+            : ['Program log: Custom program execution', 'Program consumed: 5000 compute units'],
+          err: Math.random() > 0.95 ? 'Transaction failed' : null,
+          fee: Math.floor(Math.random() * 10000) + 5000,
+          knownProgram: randomKnownProgram,
+          transactionType: randomTransactionType
+        }
+      };
+      
+      setEvents(prev => {
+        const newEvents = [event, ...prev].slice(0, maxEvents);
+        eventCountRef.current++;
+        return newEvents;
+      });
+      
+      // Queue events for batch anomaly detection instead of immediate processing
+      queueEventForAnomalyDetection(event);
+    } else {
+      const event: BlockchainEvent = {
+        type: randomType,
+        timestamp: Date.now(),
+        data: {
+          slot: Math.floor(Math.random() * 1000000) + 250000000,
+          parent: Math.floor(Math.random() * 1000000) + 249999999,
+          root: Math.floor(Math.random() * 1000000) + 249999998
+        }
+      };
+      
+      setEvents(prev => {
+        const newEvents = [event, ...prev].slice(0, maxEvents);
+        eventCountRef.current++;
+        return newEvents;
+      });
+    }
   };
 
   // Batch anomaly detection to reduce API calls
@@ -377,9 +401,27 @@ export function LiveEventMonitor({
     }
   };
 
-  const getEventTypeColor = (type: string) => {
+  const getEventTypeColor = (type: string, data?: any) => {
     switch (type) {
-      case 'transaction': return 'bg-green-100 text-green-800';
+      case 'transaction': 
+        // Highlight known programs with special colors
+        if (data?.knownProgram) {
+          switch (data.knownProgram) {
+            case 'raydium': return 'bg-purple-100 text-purple-800 border-purple-300';
+            case 'meteora': return 'bg-blue-100 text-blue-800 border-blue-300';
+            case 'aldrin': return 'bg-orange-100 text-orange-800 border-orange-300';
+            case 'pumpswap': return 'bg-pink-100 text-pink-800 border-pink-300';
+            default: return 'bg-green-100 text-green-800';
+          }
+        }
+        // Different colors for transaction types
+        if (data?.transactionType === 'spl-transfer') {
+          return 'bg-emerald-100 text-emerald-800';
+        }
+        if (data?.transactionType === 'custom-program') {
+          return 'bg-green-100 text-green-800';
+        }
+        return 'bg-green-100 text-green-800';
       case 'block': return 'bg-blue-100 text-blue-800';
       case 'account_change': return 'bg-purple-100 text-purple-800';
       default: return 'bg-gray-100 text-gray-800';
@@ -440,8 +482,16 @@ export function LiveEventMonitor({
             {events.map((event, index) => (
               <div key={`${event.timestamp}-${index}`} className="flex items-center justify-between p-2 bg-gray-50 rounded">
                 <div className="flex items-center space-x-3">
-                  <span className={`px-2 py-1 text-xs rounded ${getEventTypeColor(event.type)}`}>
+                  <span className={`px-2 py-1 text-xs rounded border ${getEventTypeColor(event.type, event.data)}`}>
                     {event.type}
+                    {event.data?.knownProgram && (
+                      <span className="ml-1 font-semibold">({event.data.knownProgram.toUpperCase()})</span>
+                    )}
+                    {event.data?.transactionType && (
+                      <span className="ml-1 text-xs opacity-75">
+                        {event.data.transactionType === 'spl-transfer' ? 'SPL' : 'CUSTOM'}
+                      </span>
+                    )}
                   </span>
                   <span className="text-sm text-muted-foreground">
                     {new Date(event.timestamp).toLocaleTimeString()}

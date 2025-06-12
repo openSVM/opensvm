@@ -213,17 +213,66 @@ class EventStreamManager {
     if (!this.connection) return;
     
     try {
+      // System programs to filter out
+      const SYSTEM_PROGRAMS = new Set([
+        'Vote111111111111111111111111111111111111111', // Vote program
+        '11111111111111111111111111111111', // System program  
+        'ComputeBudget111111111111111111111111111111', // Compute budget program
+        'AddressLookupTab1e1111111111111111111111111', // Address lookup table program
+        'Config1111111111111111111111111111111111111', // Config program
+        'Stake11111111111111111111111111111111111111', // Stake program
+      ]);
+
+      // Known programs to highlight
+      const KNOWN_PROGRAMS = {
+        raydium: ['675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8', '27haf8L6oxUeXrHrgEgsexjSY5hbVUWEmvv9Nyxg8vQv'],
+        meteora: ['Eo7WjKq67rjJQSZxS6z3YkapzY3eMj6Xy8X5EQVn5UaB'],
+        aldrin: ['AMM55ShdkoGRB5jVYPjWziwk8m5MpwyDgsMWHaMSQWH6'],
+        pumpswap: ['6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P'],
+      };
+
       // Monitor for new transactions by subscribing to logs
       const logsSubscriptionId = this.connection.onLogs(
         'all',
         async (logs, context) => {
           if (logs.signature) {
             try {
-              // Fetch transaction details to get fee information
+              // Fetch transaction details to get fee information and analyze programs
               const txDetails = await this.connection!.getTransaction(logs.signature, {
                 commitment: 'confirmed',
                 maxSupportedTransactionVersion: 0
               });
+
+              // Filter out vote transactions and system program transactions
+              if (txDetails?.transaction?.message) {
+                const accountKeys = txDetails.transaction.message.accountKeys?.map(key => key.toString()) || [];
+                
+                // Check if this is a vote transaction or system program transaction
+                const isSystemTransaction = accountKeys.some(key => SYSTEM_PROGRAMS.has(key));
+                const isVoteTransaction = logs.logs?.some(log => log.includes('Vote111111111111111111111111111111111111111'));
+                
+                // Skip system transactions and vote transactions
+                if (isSystemTransaction || isVoteTransaction) {
+                  return;
+                }
+
+                // Check for SPL token transfers (include these)
+                const isSplTransfer = logs.logs?.some(log => 
+                  log.includes('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA') ||
+                  log.includes('Program log: Instruction: Transfer')
+                );
+
+                // Check for custom program calls (include these)
+                const hasCustomProgram = accountKeys.some(key => 
+                  !SYSTEM_PROGRAMS.has(key) && 
+                  !key.startsWith('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA')
+                );
+
+                // Only include transactions that are SPL transfers or custom program calls
+                if (!isSplTransfer && !hasCustomProgram) {
+                  return;
+                }
+              }
               
               const event = {
                 type: 'transaction' as const,
@@ -236,25 +285,16 @@ class EventStreamManager {
                   fee: txDetails?.meta?.fee || null,
                   preBalances: txDetails?.meta?.preBalances || [],
                   postBalances: txDetails?.meta?.postBalances || [],
-                  accountKeys: txDetails?.transaction?.message?.accountKeys?.map(key => key.toString()) || []
+                  accountKeys: txDetails?.transaction?.message?.accountKeys?.map(key => key.toString()) || [],
+                  knownProgram: this.identifyKnownProgram(txDetails?.transaction?.message?.accountKeys?.map(key => key.toString()) || []),
+                  transactionType: this.classifyTransaction(logs.logs || [], txDetails?.transaction?.message?.accountKeys?.map(key => key.toString()) || [])
                 }
               };
               this.broadcastEvent(event);
             } catch (fetchError) {
-              // If we can't fetch transaction details, send the event without fee info
+              // If we can't fetch transaction details, skip this transaction
               console.warn(`Failed to fetch transaction details for ${logs.signature}:`, fetchError);
-              const event = {
-                type: 'transaction' as const,
-                timestamp: Date.now(),
-                data: {
-                  signature: logs.signature,
-                  slot: context.slot,
-                  logs: logs.logs,
-                  err: logs.err,
-                  fee: null
-                }
-              };
-              this.broadcastEvent(event);
+              return;
             }
           }
         },
@@ -265,6 +305,57 @@ class EventStreamManager {
     } catch (error) {
       console.error('Failed to setup transaction monitoring:', error);
     }
+  }
+
+  private identifyKnownProgram(accountKeys: string[]): string | null {
+    const KNOWN_PROGRAMS = {
+      raydium: ['675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8', '27haf8L6oxUeXrHrgEgsexjSY5hbVUWEmvv9Nyxg8vQv'],
+      meteora: ['Eo7WjKq67rjJQSZxS6z3YkapzY3eMj6Xy8X5EQVn5UaB'],
+      aldrin: ['AMM55ShdkoGRB5jVYPjWziwk8m5MpwyDgsMWHaMSQWH6'],
+      pumpswap: ['6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P'],
+    };
+
+    for (const [programName, programIds] of Object.entries(KNOWN_PROGRAMS)) {
+      if (programIds.some(id => accountKeys.includes(id))) {
+        return programName;
+      }
+    }
+
+    // Check for program names that contain known identifiers
+    for (const key of accountKeys) {
+      if (key.toLowerCase().includes('raydium')) return 'raydium';
+      if (key.toLowerCase().includes('meteora')) return 'meteora';
+      if (key.toLowerCase().includes('aldrin')) return 'aldrin';
+      if (key.toLowerCase().includes('pump')) return 'pumpswap';
+    }
+
+    return null;
+  }
+
+  private classifyTransaction(logs: string[], accountKeys: string[]): string {
+    // Check for SPL token transfer
+    if (logs.some(log => 
+      log.includes('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA') ||
+      log.includes('Program log: Instruction: Transfer')
+    )) {
+      return 'spl-transfer';
+    }
+
+    // Check for custom program calls
+    const SYSTEM_PROGRAMS = new Set([
+      'Vote111111111111111111111111111111111111111',
+      '11111111111111111111111111111111',
+      'ComputeBudget111111111111111111111111111111',
+      'AddressLookupTab1e1111111111111111111111111',
+      'Config1111111111111111111111111111111111111',
+      'Stake11111111111111111111111111111111111111',
+    ]);
+
+    if (accountKeys.some(key => !SYSTEM_PROGRAMS.has(key))) {
+      return 'custom-program';
+    }
+
+    return 'other';
   }
 
   private stopMonitoring(): void {
