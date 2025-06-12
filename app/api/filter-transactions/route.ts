@@ -70,7 +70,7 @@ export async function POST(request: Request) {
       to: tx.to,
       amount: tx.tokenAmount,
       token: tx.tokenSymbol,
-      type: tx.transferType
+      type: tx.transferType,
       tx: JSON.stringify(tx),
     }));
 
