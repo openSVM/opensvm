@@ -425,6 +425,115 @@ return result;
     currentHistoryIndex,
     queueAccountFetch
   ]);
+
+  // Address tracking functionality
+  const startAddressTracking = useCallback(async (address: string) => {
+    if (trackedAddress === address && isTrackingMode) return;
+    
+    // Stop previous tracking
+    if (trackingIntervalRef.current) {
+      clearInterval(trackingIntervalRef.current);
+    }
+    
+    setTrackedAddress(address);
+    setIsTrackingMode(true);
+    
+    // Highlight the tracked address
+    if (cyRef.current) {
+      const addressNode = cyRef.current.getElementById(address);
+      if (addressNode.length > 0) {
+        addressNode.addClass('tracked-address');
+      }
+    }
+    
+    // Initial fetch of address statistics
+    try {
+      const response = await fetch(`/api/account-transactions/${address}?limit=20`);
+      if (response.ok) {
+        const data = await response.json();
+        const transactions = data.transactions || [];
+        
+        setAddressStats({
+          totalTransactions: transactions.length,
+          recentTransactions: transactions.slice(0, 5),
+          lastUpdate: Date.now(),
+          averageInterval: transactions.length > 1 ? 
+            (Date.now() - new Date(transactions[transactions.length - 1].timestamp).getTime()) / transactions.length 
+            : 0
+        });
+      }
+    } catch (error) {
+      console.warn('Failed to fetch initial address stats:', error);
+    }
+    
+    // Start real-time polling (every 5 seconds)
+    trackingIntervalRef.current = setInterval(async () => {
+      try {
+        const response = await fetch(`/api/account-transactions/${address}?limit=5`);
+        if (response.ok) {
+          const data = await response.json();
+          const newTransactions = data.transactions || [];
+          
+          setAddressStats(prev => {
+            if (!prev) return null;
+            
+            // Check for new transactions by comparing timestamps
+            const lastKnownTimestamp = prev.recentTransactions[0]?.timestamp;
+            const newTxs = newTransactions.filter(tx => 
+              !lastKnownTimestamp || new Date(tx.timestamp) > new Date(lastKnownTimestamp)
+            );
+            
+            if (newTxs.length > 0) {
+              // Add new transactions to the graph
+              newTxs.forEach(tx => {
+                if (cyRef.current && !cyRef.current.getElementById(tx.signature).length) {
+                  cyRef.current.add({
+                    data: {
+                      id: tx.signature,
+                      label: `${tx.signature.slice(0, 8)}...`,
+                      type: 'transaction'
+                    },
+                    classes: 'transaction new-transaction'
+                  });
+                  
+                  // Add edge connecting to tracked address
+                  cyRef.current.add({
+                    data: {
+                      id: `${address}-${tx.signature}`,
+                      source: address,
+                      target: tx.signature,
+                      type: 'realtime'
+                    },
+                    classes: 'realtime-edge'
+                  });
+                }
+              });
+              
+              // Re-run layout for new elements
+              if (cyRef.current) {
+                cyRef.current.layout({
+                  name: 'dagre',
+                  rankDir: 'TB',
+                  fit: false,
+                  padding: 50
+                }).run();
+              }
+            }
+            
+            return {
+              ...prev,
+              totalTransactions: prev.totalTransactions + newTxs.length,
+              recentTransactions: [...newTxs, ...prev.recentTransactions].slice(0, 5),
+              lastUpdate: Date.now()
+            };
+          });
+        }
+      } catch (error) {
+        console.warn('Failed to fetch real-time transactions:', error);
+      }
+    }, 5000); // Poll every 5 seconds
+    
+  }, [trackedAddress, isTrackingMode]);
   
   // Set up graph interaction handlers
   const setupGraphInteractionsCallback = useCallback((cy: cytoscape.Core) => {
@@ -817,114 +926,7 @@ cyRef.current.zoom(0.5);
     };
   }, [resizeGraphCallback]);
 
-  // Address tracking functionality
-  const startAddressTracking = useCallback(async (address: string) => {
-    if (trackedAddress === address && isTrackingMode) return;
-    
-    // Stop previous tracking
-    if (trackingIntervalRef.current) {
-      clearInterval(trackingIntervalRef.current);
-    }
-    
-    setTrackedAddress(address);
-    setIsTrackingMode(true);
-    
-    // Highlight the tracked address
-    if (cyRef.current) {
-      const addressNode = cyRef.current.getElementById(address);
-      if (addressNode.length > 0) {
-        addressNode.addClass('tracked-address');
-      }
-    }
-    
-    // Initial fetch of address statistics
-    try {
-      const response = await fetch(`/api/account-transactions/${address}?limit=20`);
-      if (response.ok) {
-        const data = await response.json();
-        const transactions = data.transactions || [];
-        
-        setAddressStats({
-          totalTransactions: transactions.length,
-          recentTransactions: transactions.slice(0, 5),
-          lastUpdate: Date.now(),
-          averageInterval: transactions.length > 1 ? 
-            (Date.now() - new Date(transactions[transactions.length - 1].timestamp).getTime()) / transactions.length 
-            : 0
-        });
-      }
-    } catch (error) {
-      console.warn('Failed to fetch initial address stats:', error);
-    }
-    
-    // Start real-time polling (every 5 seconds)
-    trackingIntervalRef.current = setInterval(async () => {
-      try {
-        const response = await fetch(`/api/account-transactions/${address}?limit=5`);
-        if (response.ok) {
-          const data = await response.json();
-          const newTransactions = data.transactions || [];
-          
-          setAddressStats(prev => {
-            if (!prev) return null;
-            
-            // Check for new transactions by comparing timestamps
-            const lastKnownTimestamp = prev.recentTransactions[0]?.timestamp;
-            const newTxs = newTransactions.filter(tx => 
-              !lastKnownTimestamp || new Date(tx.timestamp) > new Date(lastKnownTimestamp)
-            );
-            
-            if (newTxs.length > 0) {
-              // Add new transactions to the graph
-              newTxs.forEach(tx => {
-                if (cyRef.current && !cyRef.current.getElementById(tx.signature).length) {
-                  cyRef.current.add({
-                    data: {
-                      id: tx.signature,
-                      label: `${tx.signature.slice(0, 8)}...`,
-                      type: 'transaction'
-                    },
-                    classes: 'transaction new-transaction'
-                  });
-                  
-                  // Add edge connecting to tracked address
-                  cyRef.current.add({
-                    data: {
-                      id: `${address}-${tx.signature}`,
-                      source: address,
-                      target: tx.signature,
-                      type: 'realtime'
-                    },
-                    classes: 'realtime-edge'
-                  });
-                }
-              });
-              
-              // Re-run layout for new elements
-              if (cyRef.current) {
-                cyRef.current.layout({
-                  name: 'dagre',
-                  rankDir: 'TB',
-                  fit: false,
-                  padding: 50
-                }).run();
-              }
-            }
-            
-            return {
-              ...prev,
-              totalTransactions: prev.totalTransactions + newTxs.length,
-              recentTransactions: [...newTxs, ...prev.recentTransactions].slice(0, 5),
-              lastUpdate: Date.now()
-            };
-          });
-        }
-      } catch (error) {
-        console.warn('Failed to fetch real-time transactions:', error);
-      }
-    }, 5000); // Poll every 5 seconds
-    
-  }, [trackedAddress, isTrackingMode]);
+
 
   const stopAddressTracking = useCallback(() => {
     if (trackingIntervalRef.current) {
