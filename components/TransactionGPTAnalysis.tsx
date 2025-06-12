@@ -1,55 +1,13 @@
 'use client';
 
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { DetailedTransactionInfo } from '@/lib/solana';
 import LoadingSpinner from '@/components/LoadingSpinner';
+import { useAbortableFetch } from '@/lib/hooks/useAbortableFetch';
+import { logError } from '@/lib/errorLogger';
 
 interface TransactionGPTAnalysisProps {
   tx: DetailedTransactionInfo;
-}
-
-// Debounce hook
-function useDebounce<T extends (...args: any[]) => any>(
-  callback: T,
-  delay: number
-): [T, () => void] {
-  const timeoutRef = useRef<NodeJS.Timeout>();
-  const callbackRef = useRef(callback);
-  
-  // Update callback ref when callback changes
-  useEffect(() => {
-    callbackRef.current = callback;
-  }, [callback]);
-
-  const debouncedCallback = useCallback(
-    ((...args: Parameters<T>) => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-      
-      timeoutRef.current = setTimeout(() => {
-        callbackRef.current(...args);
-      }, delay);
-    }) as T,
-    [delay]
-  );
-
-  const cancel = useCallback(() => {
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-    }
-  }, []);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-    };
-  }, []);
-
-  return [debouncedCallback, cancel];
 }
 
 export default function TransactionGPTAnalysis({ tx }: TransactionGPTAnalysisProps) {
@@ -57,12 +15,14 @@ export default function TransactionGPTAnalysis({ tx }: TransactionGPTAnalysisPro
   const [analysisResult, setAnalysisResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [lastAnalyzedTime, setLastAnalyzedTime] = useState<number>(0);
-  const abortControllerRef = useRef<AbortController | null>(null);
+  
+  // Use centralized fetch hook with abort logic
+  const { fetch: abortableFetch } = useAbortableFetch();
 
   // Cooldown period in milliseconds (prevent spam clicking)
   const COOLDOWN_PERIOD = 3000; // 3 seconds
 
-  const performAnalysis = useCallback(async () => {
+  const analyzeWithGPT = useCallback(async () => {
     // Check cooldown period
     const now = Date.now();
     if (now - lastAnalyzedTime < COOLDOWN_PERIOD) {
@@ -73,14 +33,6 @@ export default function TransactionGPTAnalysis({ tx }: TransactionGPTAnalysisPro
     setIsAnalyzing(true);
     setError(null);
     setLastAnalyzedTime(now);
-
-    // Cancel any previous request
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
-
-    // Create new abort controller
-    abortControllerRef.current = new AbortController();
 
     try {
       // Extract data needed for analysis
@@ -95,26 +47,14 @@ export default function TransactionGPTAnalysis({ tx }: TransactionGPTAnalysisPro
         to: tx.details?.accounts?.[1]?.pubkey
       };
 
-      // Call the API endpoint with abort signal
-      const response = await fetch('/api/analyze-transaction', {
+      // Call the API endpoint using centralized fetch with abort logic
+      const data = await abortableFetch<{ analysis: string }>('/api/analyze-transaction', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(transactionData),
-        signal: abortControllerRef.current.signal
       });
-
-      if (!response.ok) {
-        throw new Error('Failed to analyze transaction');
-      }
-
-      const data = await response.json();
-      
-      // Check if request was aborted
-      if (abortControllerRef.current.signal.aborted) {
-        return;
-      }
       
       setAnalysisResult(data.analysis);
     } catch (err) {
@@ -123,29 +63,16 @@ export default function TransactionGPTAnalysis({ tx }: TransactionGPTAnalysisPro
         return;
       }
       
-      console.error('Error analyzing transaction:', err);
+      logError('Error analyzing transaction', err instanceof Error ? err : new Error(String(err)), {
+        transactionType: tx.type,
+        transactionSuccess: tx.success,
+        endpoint: '/api/analyze-transaction'
+      });
       setError('Failed to analyze transaction');
     } finally {
       setIsAnalyzing(false);
     }
-  }, [tx, lastAnalyzedTime]);
-
-  // Debounced version to prevent rapid successive calls
-  const [debouncedAnalyze, cancelDebounce] = useDebounce(performAnalysis, 500);
-
-  const analyzeWithGPT = useCallback(() => {
-    debouncedAnalyze();
-  }, [debouncedAnalyze]);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-      cancelDebounce();
-    };
-  }, [cancelDebounce]);
+  }, [tx, lastAnalyzedTime, abortableFetch]);
 
   const canAnalyze = !isAnalyzing && (Date.now() - lastAnalyzedTime >= COOLDOWN_PERIOD);
 

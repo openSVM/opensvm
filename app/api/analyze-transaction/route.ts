@@ -8,6 +8,16 @@ const MAX_REQUEST_SIZE = 1024 * 1024; // 1MB max request size
 const MAX_LOG_ENTRIES = 100; // Maximum number of log entries
 const MAX_LOG_LENGTH = 10000; // Maximum length per log entry
 
+// Simple server-side logging (in production, use proper logging service)
+function serverLog(level: 'error' | 'warn' | 'info', message: string, context?: Record<string, any>) {
+  if (process.env.NODE_ENV !== 'production') {
+    const logMethod = level === 'error' ? console.error : 
+                     level === 'warn' ? console.warn : console.log;
+    logMethod(`[API] ${message}`, context || {});
+  }
+  // In production, send to external logging service
+}
+
 function sanitizeString(str: string): string {
   // Remove potential log injection characters and limit length
   return str
@@ -108,9 +118,7 @@ Without more context or API access, I cannot provide a detailed analysis of the 
 
     // Check if API key is available
     if (!process.env.TOGETHER_API_KEY) {
-      if (process.env.NODE_ENV !== 'production') {
-        console.warn('TOGETHER_API_KEY is not set, using fallback response');
-      }
+      serverLog('warn', 'TOGETHER_API_KEY is not set, using fallback response');
       return NextResponse.json({ analysis: fallbackAnalysis.trim() });
     }
 
@@ -151,26 +159,26 @@ Please explain in simple terms what happened in this transaction, including:
     });
 
     if (!response.ok) {
-      if (process.env.NODE_ENV !== 'production') {
-        console.error('API response not OK:', response.status, response.statusText);
-      }
+      serverLog('error', 'GPT API response not OK', { 
+        status: response.status, 
+        statusText: response.statusText 
+      });
       throw new Error('GPT API request failed');
     }
 
     const data = await response.json();
     
     if (!data?.output?.choices?.[0]?.text) {
-      if (process.env.NODE_ENV !== 'production') {
-        console.error('Unexpected API response format:', data);
-      }
+      serverLog('error', 'Unexpected API response format', { responseData: data });
       throw new Error('Invalid API response format');
     }
     
     return NextResponse.json({ analysis: data.output.choices[0].text.trim() });
   } catch (error) {
-    if (process.env.NODE_ENV !== 'production') {
-      console.error('Error analyzing transaction:', error);
-    }
+    serverLog('error', 'Error analyzing transaction', { 
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
+    });
     return NextResponse.json(
       { error: 'Failed to analyze transaction' },
       { status: 500 }
