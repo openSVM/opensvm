@@ -148,13 +148,15 @@ export const focusOnTransaction = async (
  * @param focusSignatureRef Reference to currently focused signature
  * @param focusOnTransaction Function to focus on a transaction
  * @param setViewportState Function to update viewport state
+ * @param onAddressTrack Optional callback for address tracking
  */
 export const setupGraphInteractions = (
   cy: cytoscape.Core,
   containerRef: React.RefObject<HTMLDivElement>,
   focusSignatureRef: React.MutableRefObject<string>,
   focusOnTransaction: (signature: string, incrementalLoad: boolean) => void,
-  setViewportState: (state: ViewportState) => void
+  setViewportState: (state: ViewportState) => void,
+  onAddressTrack?: (address: string) => void
 ): void => {
   // Add active state styling
   cy.style().selector(':active').style({ 'opacity': 0.7 }).update();
@@ -222,8 +224,16 @@ export const setupGraphInteractions = (
       focusOnTransaction(signature, true);
     }
     else if (nodeType === 'account') {
-      // For account nodes, just highlight them and their connections
+      // For account nodes, start address tracking on click
+      const address = signature; // In this case, the ID is the address
+      
+      // Highlight the account and its connections
       node.connectedEdges().addClass('highlighted').connectedNodes().addClass('highlighted');
+      
+      // Trigger address tracking if callback is provided
+      if (onAddressTrack) {
+        onAddressTrack(address);
+      }
     }
   });
   

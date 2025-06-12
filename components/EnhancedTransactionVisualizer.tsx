@@ -209,12 +209,18 @@ const EnhancedTransactionVisualizer = function({ tx }: EnhancedTransactionVisual
 
     // Create force simulation with optimized parameters for top-to-bottom layout
     const simulation = d3.forceSimulation<Node>(nodes)
-      .force('link', d3.forceLink<Node, Link>(links).id(d => d.id).distance(100))
-      .force('charge', d3.forceManyBody().strength(-200))
-      .force('x', d3.forceX())
-      .force('y', d3.forceY().strength(0.1)) // Bias towards vertical center with gentle force
-      // Add hierarchical positioning for better top-to-bottom flow
-      .force('collision', d3.forceCollide().radius(d => getNodeRadius(d) + 5))
+      .force('link', d3.forceLink<Node, Link>(links).id(d => d.id).distance(80))
+      .force('charge', d3.forceManyBody().strength(-150))
+      .force('center', d3.forceCenter(0, 0))
+      // Add vertical positioning bias for top-to-bottom flow
+      .force('y', d3.forceY(d => {
+        // Position instructions at top, programs in middle, accounts at bottom
+        if (d.type === 'instruction') return -height/4;
+        if (d.type === 'program') return 0;
+        return height/4;
+      }).strength(0.3))
+      .force('x', d3.forceX().strength(0.1)) // Weak horizontal centering
+      .force('collision', d3.forceCollide().radius(d => getNodeRadius(d) + 8))
       // Reduce alpha decay for faster stabilization
       .alphaDecay(0.05)
       .alphaMin(0.001);
