@@ -19,6 +19,7 @@ export async function POST(request: Request) {
       amount: tx.tokenAmount,
       token: tx.tokenSymbol,
       type: tx.transferType
+      tx: JSON.stringify(tx),
     }));
 
     const prompt = `Analyze these SPL token transactions and filter out spam/irrelevant transactions. Return a JSON array with only the transaction IDs that are legitimate and relevant (not spam, bot activity, or micro-transactions).
@@ -43,18 +44,18 @@ Return only a JSON array of transaction IDs that should be kept, like: ["txId1",
         'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini', // Using available model instead of non-existent gpt-4.1-nano
+        model: 'gpt-4.1-nano', // Using available model instead of non-existent gpt-4.1-nano
         messages: [
           {
             role: 'system',
-            content: 'You are a Solana transaction analyzer. Respond only with valid JSON arrays of transaction IDs.'
+            content: 'You are a Solana transaction analyzer. Respond only with valid JSON arrays of transaction IDs. Filter out meaningless transactions, focus only one wallet <> wallet transfers'
           },
           {
             role: 'user',
             content: prompt
           }
         ],
-        max_tokens: 1000,
+        max_tokens: 32000,
         temperature: 0.1,
         response_format: { type: 'json_object' }
       }),
