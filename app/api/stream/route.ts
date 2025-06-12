@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { getConnection } from '@/lib/solana-connection';
 import { Connection, PublicKey } from '@solana/web3.js';
 import { getStreamingAnomalyDetector } from '@/lib/streaming-anomaly-detector';
+import { validateStreamRequest } from '@/lib/validation/stream-schemas';
 
 // Input validation schemas
 interface StreamRequestBody {
@@ -395,13 +396,16 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: 'Invalid JSON format' }, { status: 400 });
     }
     
-    // Validate request structure
-    const validatedRequest = parseAndValidateRequest(requestBody);
-    if (!validatedRequest) {
-      return Response.json({ error: 'Invalid request format' }, { status: 400 });
+    // Validate request structure with Zod
+    const validationResult = validateStreamRequest(requestBody);
+    if (!validationResult.success) {
+      return Response.json({ 
+        error: 'Invalid request format', 
+        details: validationResult.errors 
+      }, { status: 400 });
     }
     
-    const { action, clientId, eventTypes, authToken } = validatedRequest;
+    const { action, clientId, eventTypes, authToken } = validationResult.data;
     const manager = EventStreamManager.getInstance();
     
     // Validate input

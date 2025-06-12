@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { getConnection } from '@/lib/solana-connection';
 import { AnomalyDetectionCapability } from '@/lib/ai/capabilities/anomaly-detection';
+import { validateAnomalyRequest, validateBlockchainEvent } from '@/lib/validation/stream-schemas';
 
 // Global anomaly detector instance
 let anomalyDetector: AnomalyDetectionCapability | null = null;
@@ -56,8 +57,24 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const { event, action } = await request.json();
-    
+    let requestBody;
+    try {
+      requestBody = await request.json();
+    } catch (jsonError) {
+      console.error('Invalid JSON in request:', jsonError);
+      return Response.json({ error: 'Invalid JSON format' }, { status: 400 });
+    }
+
+    // Validate request with Zod
+    const validationResult = validateAnomalyRequest(requestBody);
+    if (!validationResult.success) {
+      return Response.json({
+        error: 'Invalid request format',
+        details: validationResult.errors
+      }, { status: 400 });
+    }
+
+    const { event, action } = validationResult.data;
     const detector = await getAnomalyDetector();
     
     switch (action) {
@@ -66,6 +83,17 @@ export async function POST(request: NextRequest) {
           return Response.json({
             error: 'Event data is required'
           }, { status: 400 });
+        }
+        
+        // Additional validation for single event
+        if (!Array.isArray(event)) {
+          const eventValidation = validateBlockchainEvent(event);
+          if (!eventValidation.success) {
+            return Response.json({
+              error: 'Invalid event format',
+              details: eventValidation.errors
+            }, { status: 400 });
+          }
         }
         
         const alerts = await detector.processEvent(event);
@@ -83,6 +111,17 @@ export async function POST(request: NextRequest) {
           return Response.json({
             error: 'Events array is required for bulk analysis'
           }, { status: 400 });
+        }
+        
+        // Validate each event
+        for (const evt of event) {
+          const eventValidation = validateBlockchainEvent(evt);
+          if (!eventValidation.success) {
+            return Response.json({
+              error: 'Invalid event format in bulk data',
+              details: eventValidation.errors
+            }, { status: 400 });
+          }
         }
         
         const results = [];
