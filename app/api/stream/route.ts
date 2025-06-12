@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { getConnection } from '@/lib/solana-connection';
 import { Connection, PublicKey } from '@solana/web3.js';
+import { getStreamingAnomalyDetector } from '@/lib/streaming-anomaly-detector';
 
 interface StreamClient {
   id: string;
@@ -59,17 +60,24 @@ class EventStreamManager {
       this.connection = await getConnection();
       this.isMonitoring = true;
       
+      // Start the anomaly detector
+      const anomalyDetector = getStreamingAnomalyDetector();
+      if (!anomalyDetector.isRunning()) {
+        await anomalyDetector.start();
+      }
+      
       // Subscribe to slot changes (new blocks)
       const slotSubscriptionId = this.connection.onSlotChange((slotInfo) => {
-        this.broadcastEvent({
-          type: 'block',
+        const event = {
+          type: 'block' as const,
           timestamp: Date.now(),
           data: {
             slot: slotInfo.slot,
             parent: slotInfo.parent,
             root: slotInfo.root
           }
-        });
+        };
+        this.broadcastEvent(event);
       });
       
       this.subscriptionIds.set('slots', slotSubscriptionId);
@@ -77,7 +85,7 @@ class EventStreamManager {
       // Subscribe to signature notifications for transaction monitoring
       this.setupTransactionMonitoring();
       
-      console.log('Started blockchain event monitoring');
+      console.log('Started blockchain event monitoring with anomaly detection');
     } catch (error) {
       console.error('Failed to start monitoring:', error);
       this.isMonitoring = false;
@@ -88,19 +96,13 @@ class EventStreamManager {
     if (!this.connection) return;
     
     try {
-      // Get recent signatures to monitor
-      const signatures = await this.connection.getSignaturesForAddress(
-        new PublicKey('11111111111111111111111111111111'), // System program - high activity
-        { limit: 1 }
-      );
-      
       // Monitor for new transactions by subscribing to logs
       const logsSubscriptionId = this.connection.onLogs(
         'all',
         (logs, context) => {
           if (logs.signature) {
-            this.broadcastEvent({
-              type: 'transaction',
+            const event = {
+              type: 'transaction' as const,
               timestamp: Date.now(),
               data: {
                 signature: logs.signature,
@@ -108,7 +110,8 @@ class EventStreamManager {
                 logs: logs.logs,
                 err: logs.err
               }
-            });
+            };
+            this.broadcastEvent(event);
           }
         },
         'confirmed'
@@ -150,8 +153,11 @@ class EventStreamManager {
     
     for (const [clientId, client] of this.clients) {
       try {
-        client.send(eventData);
-        successCount++;
+        // Check if client is subscribed to this event type
+        if (client.subscriptions.has(event.type) || client.subscriptions.has('all')) {
+          client.send(eventData);
+          successCount++;
+        }
       } catch (error) {
         console.error(`Failed to send event to client ${clientId}:`, error);
         failureCount++;
@@ -171,10 +177,31 @@ class EventStreamManager {
       eventTypes.forEach(type => client.subscriptions.add(type));
     }
   }
+
+  public getStatus(): any {
+    const anomalyDetector = getStreamingAnomalyDetector();
+    return {
+      isMonitoring: this.isMonitoring,
+      clientCount: this.clients.size,
+      subscriptions: Array.from(this.subscriptionIds.keys()),
+      anomalyDetector: anomalyDetector.getStats()
+    };
+  }
 }
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
+  const action = searchParams.get('action');
+  
+  // Handle status request
+  if (action === 'status') {
+    const manager = EventStreamManager.getInstance();
+    return Response.json({
+      success: true,
+      data: manager.getStatus()
+    });
+  }
+  
   const clientId = searchParams.get('clientId') || `client_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   
   // Check if this is a WebSocket upgrade request
@@ -214,6 +241,18 @@ export async function POST(request: NextRequest) {
       case 'unsubscribe':
         manager.removeClient(clientId);
         return Response.json({ success: true, message: 'Unsubscribed from events' });
+        
+      case 'start_monitoring':
+        // Mock client for testing
+        const mockClient = {
+          id: clientId || 'test_client',
+          send: (data: any) => console.log('Mock send:', data),
+          close: () => console.log('Mock close'),
+          subscriptions: new Set(['transaction', 'block'])
+        };
+        
+        await manager.addClient(mockClient);
+        return Response.json({ success: true, message: 'Started monitoring' });
         
       default:
         return Response.json({ error: 'Invalid action' }, { status: 400 });
