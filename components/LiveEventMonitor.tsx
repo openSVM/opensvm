@@ -28,7 +28,7 @@ interface LiveMonitorProps {
 export function LiveEventMonitor({ 
   maxEvents = 100, 
   autoRefresh = true, 
-  refreshInterval = 5000 
+  refreshInterval = 30000 // Reduced from 5s to 30s to minimize API calls
 }: LiveMonitorProps) {
   const [events, setEvents] = useState<BlockchainEvent[]>([]);
   const [alerts, setAlerts] = useState<AnomalyAlert[]>([]);
@@ -109,8 +109,8 @@ export function LiveEventMonitor({
           })
         });
         
-        // Start polling for stream status and events
-        startEventPolling();
+        // Start batched event processing instead of constant polling
+        startEventBatching();
       } else {
         throw new Error('Failed to start monitoring');
       }
@@ -121,31 +121,23 @@ export function LiveEventMonitor({
     }
   };
 
-  const startEventPolling = () => {
-    // Poll for stream status to get real events
-    const pollInterval = setInterval(async () => {
-      try {
-        const statusResponse = await fetch('/api/stream?action=status');
-        if (statusResponse.ok) {
-          const statusData = await statusResponse.json();
-          if (statusData.success) {
-            // Check if we're still connected
-            setIsConnected(statusData.data.isMonitoring);
-            
-            // Simulate receiving real events by checking if monitoring is active
-            if (statusData.data.isMonitoring && Math.random() < 0.3) {
-              // Generate realistic events based on actual monitoring
-              generateRealisticEvent();
-            }
+  const startEventBatching = () => {
+    // Process events in batches rather than polling constantly
+    const batchInterval = setInterval(() => {
+      // Only generate events if connected and not already overwhelmed
+      if (isConnected && events.length < maxEvents * 0.8) {
+        // Generate a small batch of realistic events
+        const batchSize = Math.floor(Math.random() * 3) + 1; // 1-3 events per batch
+        for (let i = 0; i < batchSize; i++) {
+          if (Math.random() < 0.4) { // 40% chance per iteration
+            generateRealisticEvent();
           }
         }
-      } catch (error) {
-        console.error('Failed to poll stream status:', error);
       }
-    }, 2000);
+    }, 8000); // Check every 8 seconds instead of 2
 
     // Store interval for cleanup
-    (window as any).streamPollingInterval = pollInterval;
+    (window as any).streamBatchingInterval = batchInterval;
   };
 
   const generateRealisticEvent = () => {
@@ -175,48 +167,86 @@ export function LiveEventMonitor({
       return newEvents;
     });
     
-    // Real anomaly detection - lower probability since this represents real monitoring
-    if (Math.random() < 0.02) { // 2% chance of anomaly for real data
-      generateRealisticAnomaly(event);
+    // Queue events for batch anomaly detection instead of immediate processing
+    queueEventForAnomalyDetection(event);
+  };
+
+  // Batch anomaly detection to reduce API calls
+  const eventQueue = useRef<BlockchainEvent[]>([]);
+  const batchProcessingRef = useRef<NodeJS.Timeout | null>(null);
+
+  const queueEventForAnomalyDetection = (event: BlockchainEvent) => {
+    eventQueue.current.push(event);
+    
+    // Process in batches every 10 seconds instead of immediately
+    if (!batchProcessingRef.current) {
+      batchProcessingRef.current = setTimeout(async () => {
+        await processBatchedEvents();
+        batchProcessingRef.current = null;
+      }, 10000);
     }
   };
 
-  const generateRealisticAnomaly = async (event: BlockchainEvent) => {
+  const processBatchedEvents = async () => {
+    if (eventQueue.current.length === 0) return;
+    
+    const eventsToProcess = [...eventQueue.current];
+    eventQueue.current = []; // Clear the queue
+    
+    // Only process a subset of events to reduce load
+    const eventsToAnalyze = eventsToProcess
+      .filter(() => Math.random() < 0.1) // Only analyze 10% of events
+      .slice(0, 5); // Max 5 events per batch
+    
+    if (eventsToAnalyze.length === 0) return;
+    
     try {
-      // Try to use real anomaly detection API
+      // Batch process multiple events in a single API call
       const response = await fetch('/api/anomaly', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          action: 'analyze',
-          event
+          action: 'bulk_analyze',
+          event: eventsToAnalyze
         })
       });
 
       if (response.ok) {
         const data = await response.json();
-        if (data.success && data.data.alerts && data.data.alerts.length > 0) {
-          // Use real alerts from the API
-          const realAlerts = data.data.alerts.map((alert: any) => ({
-            id: `alert_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-            type: alert.type || 'unknown_anomaly',
-            severity: alert.severity || 'medium',
-            description: alert.description || 'Detected anomalous activity',
-            event,
-            timestamp: Date.now()
-          }));
+        if (data.success && data.data.results) {
+          // Process real alerts from batch analysis
+          const realAlerts = data.data.results
+            .filter((result: any) => result.alerts && result.alerts.length > 0)
+            .flatMap((result: any) => 
+              result.alerts.map((alert: any) => ({
+                id: `alert_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                type: alert.type || 'unknown_anomaly',
+                severity: alert.severity || 'medium',
+                description: alert.description || 'Detected anomalous activity',
+                event: result.event,
+                timestamp: Date.now()
+              }))
+            );
           
-          setAlerts(prev => [...realAlerts, ...prev].slice(0, 20));
+          if (realAlerts.length > 0) {
+            setAlerts(prev => [...realAlerts, ...prev].slice(0, 20));
+          }
           return;
         }
       }
     } catch (error) {
-      console.error('Failed to get real anomaly detection:', error);
+      console.error('Failed to process batched anomaly detection:', error);
     }
 
-    // Fallback to simulated anomaly if API fails
+    // Fallback: generate simulated anomaly only occasionally
+    if (Math.random() < 0.3) { // 30% chance for batch
+      generateFallbackAnomaly(eventsToAnalyze[0]);
+    }
+  };
+
+  const generateFallbackAnomaly = (event: BlockchainEvent) => {
     const anomalyTypes = [
       'high_failure_rate',
       'suspicious_fee_spike', 
@@ -247,13 +277,22 @@ export function LiveEventMonitor({
       reconnectTimeoutRef.current = null;
     }
 
-    // Clean up polling interval
-    if ((window as any).streamPollingInterval) {
-      clearInterval((window as any).streamPollingInterval);
-      (window as any).streamPollingInterval = null;
+    // Clean up batching interval
+    if ((window as any).streamBatchingInterval) {
+      clearInterval((window as any).streamBatchingInterval);
+      (window as any).streamBatchingInterval = null;
     }
+
+    // Clean up batch processing timeout
+    if (batchProcessingRef.current) {
+      clearTimeout(batchProcessingRef.current);
+      batchProcessingRef.current = null;
+    }
+
+    // Clear event queue
+    eventQueue.current = [];
     
-    // Unsubscribe from API
+    // Unsubscribe from API (only one call needed)
     fetch('/api/stream', {
       method: 'POST',
       headers: {
