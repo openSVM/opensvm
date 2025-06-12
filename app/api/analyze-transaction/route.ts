@@ -49,7 +49,8 @@ Please explain in simple terms what happened in this transaction, including:
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `******      },
+        'Authorization': `Bearer ${process.env.TOGETHER_API_KEY}`,
+      },
       body: JSON.stringify({
         model: 'mistralai/Mixtral-8x7B-Instruct-v0.1',
         prompt,
