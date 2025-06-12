@@ -41,10 +41,8 @@ export function LiveEventMonitor({
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const clientId = useRef(`client_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
 
-  // Enhanced WebSocket connection management with production considerations
+  // Enhanced WebSocket connection management with graceful fallback
   const connectWebSocket = useCallback(() => {
-    const isProduction = process.env.NODE_ENV === 'production';
-    
     try {
       // Clean up existing connection
       if (wsRef.current) {
@@ -91,47 +89,31 @@ export function LiveEventMonitor({
         setIsConnected(false);
         wsRef.current = null;
         
-        // In production, don't fall back to polling - require WebSocket
-        if (isProduction) {
-          setConnectionError('WebSocket connection required in production. Please check server configuration.');
-          return;
-        }
-        
-        // In development, fall back to polling after WebSocket fails
+        // Gracefully fall back to polling for any WebSocket closure
         if (!event.wasClean) {
-          console.log('WebSocket failed, falling back to API polling in development mode');
+          console.log('WebSocket connection failed, falling back to HTTP polling mode');
+          setConnectionError('WebSocket unavailable, using HTTP polling');
           startApiBasedMonitoring();
         }
       };
       
       ws.onerror = (error) => {
         console.error('WebSocket error:', error);
-        setConnectionError('WebSocket connection failed');
         setIsConnected(false);
         
-        // In production, don't fall back to polling
-        if (isProduction) {
-          setConnectionError('WebSocket connection failed. Production requires WebSocket support.');
-          return;
-        }
-        
-        // In development, fall back to polling
-        console.log('WebSocket error, falling back to API polling in development mode');
+        // Always fall back to polling when WebSocket fails
+        console.log('WebSocket connection failed, falling back to HTTP polling mode');
+        setConnectionError('WebSocket unavailable, using HTTP polling');
         startApiBasedMonitoring();
       };
       
     } catch (error) {
       console.error('WebSocket connection failed:', error);
-      setConnectionError(error instanceof Error ? error.message : 'Connection failed');
       setIsConnected(false);
       
-      // In production, don't fall back
-      if (isProduction) {
-        setConnectionError('WebSocket connection required in production');
-        return;
-      }
-      
-      // In development, fall back to polling
+      // Always fall back to HTTP polling when WebSocket is not available
+      console.log('WebSocket unavailable, falling back to HTTP polling mode');
+      setConnectionError('WebSocket unavailable, using HTTP polling');
       startApiBasedMonitoring();
     }
   }, [authToken]);

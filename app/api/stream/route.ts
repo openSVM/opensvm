@@ -514,8 +514,8 @@ export async function GET(request: NextRequest) {
     
     // For now, return information about proper WebSocket usage
     return new Response(JSON.stringify({
-      error: 'WebSocket upgrade not supported in this environment',
-      message: 'Use polling endpoints or deploy with WebSocket-capable server',
+      error: 'WebSocket upgrade not supported',
+      message: 'Server does not support WebSocket upgrades. Use HTTP polling mode instead.',
       clientId,
       supportedEvents: ['transaction', 'block', 'account_change'],
       alternatives: {
@@ -526,7 +526,8 @@ export async function GET(request: NextRequest) {
       status: 426, // Upgrade Required
       headers: {
         'Content-Type': 'application/json',
-        'Upgrade': 'websocket'
+        'Upgrade': 'websocket',
+        'Connection': 'Upgrade'
       },
     });
   }
