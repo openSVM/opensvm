@@ -64,16 +64,15 @@ export default function EnhancedSearchBar() {
     return () => clearTimeout(debounceTimeout);
   }, [query, searchSettings.networks]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const trimmedQuery = query.trim();
+  const handleSubmitValue = async (value: string) => {
+    const trimmedQuery = value.trim();
     if (!trimmedQuery || isLoading) {
       return;
     }
     
     try {
       setIsLoading(true);
-      console.log("Processing search query:", trimmedQuery);
+      console.log("Processing search value:", trimmedQuery);
       
       // Check if query is a block number
       if (/^\d+$/.test(trimmedQuery)) {
@@ -123,6 +122,11 @@ export default function EnhancedSearchBar() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await handleSubmitValue(query);
   };
 
   const buildAndNavigateToSearchUrl = (query: string) => {
@@ -252,6 +256,7 @@ export default function EnhancedSearchBar() {
           setQuery={setQuery}
           setShowSuggestions={setShowSuggestions}
           handleSubmit={handleSubmit}
+          onSubmitValue={handleSubmitValue}
           isLoading={query.length >= 3 && suggestions.length === 0}
         />
       </form>
