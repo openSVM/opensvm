@@ -2,7 +2,11 @@
 import axios from 'axios';
 
 // Moralis API configuration
-const MORALIS_API_KEY = process.env.MORALIS_API_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJub25jZSI6IjRjOTdiNjY5LWU0NTAtNDc0ZC04NDk5LWM3MzQ3MTY2MzZjZSIsIm9yZ0lkIjoiNDM3NTQzIiwidXNlcklkIjoiNDUwMTMwIiwidHlwZUlkIjoiZjY3MzczODctNjQ1MC00YzIyLTg1YjAtOWI1ZjE3NWE3ZWQ3IiwidHlwZSI6IlBST0pFQ1QiLCJpYXQiOjE3NDI2MzYxMDcsImV4cCI6NDg5ODM5NjEwN30.bLDNejPrPEg9tFbmUITy9cpuMBuvU5pzbloq0b-7r4A';
+const MORALIS_API_KEY = process.env.MORALIS_API_KEY;
+
+if (!MORALIS_API_KEY) {
+  throw new Error('MORALIS_API_KEY environment variable is required');
+}
 const MORALIS_BASE_URL = 'https://solana-gateway.moralis.io';
 
 // Network type for Solana

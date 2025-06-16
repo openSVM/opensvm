@@ -58,7 +58,25 @@ export const SearchSuggestions: React.FC<SearchSuggestionsProps> = ({
                 console.log("Suggestion selected:", suggestion.value);
                 // Use a timeout to ensure state is updated before submitting
                 setTimeout(() => {
-                  handleSubmit({ preventDefault: () => {} } as React.FormEvent);
+                  // Create a proper synthetic event with all required properties
+                  const syntheticEvent = {
+                    preventDefault: () => {},
+                    target: { value: suggestion.value },
+                    currentTarget: { value: suggestion.value },
+                    type: 'submit',
+                    nativeEvent: {} as Event,
+                    bubbles: false,
+                    cancelable: false,
+                    defaultPrevented: false,
+                    eventPhase: 0,
+                    isTrusted: false,
+                    timeStamp: Date.now(),
+                    stopPropagation: () => {},
+                    isPropagationStopped: () => false,
+                    persist: () => {},
+                    isDefaultPrevented: () => false
+                  } as React.FormEvent;
+                  handleSubmit(syntheticEvent);
                 }, 50);
               }}
               className={`w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-2 transition-colors duration-200 relative ${
