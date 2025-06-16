@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Check for API key
-    const apiKey = process.env.TOGETHER_AI_API_KEY;
+    const apiKey = process.env.TOGETHER_API_KEY;
     
     if (!apiKey) {
       // Return a fallback response when API key is missing
@@ -164,7 +164,7 @@ export async function POST(req: NextRequest) {
             // Add default sources
             const defaultSources = [
               { title: 'Solana Documentation', url: 'https://docs.solana.com' },
-              { title: 'Solana Explorer', url: 'https://explorer.solana.com' }
+              { title: 'Solana Explorer', url: 'https://opensvm.com' }
             ];
             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ sources: defaultSources })}\n\n`));
             controller.close();
