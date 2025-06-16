@@ -10,6 +10,7 @@ interface SearchSuggestionsProps {
   setQuery: (query: string) => void;
   setShowSuggestions: (show: boolean) => void;
   handleSubmit: (e: React.FormEvent) => void;
+  onSubmitValue?: (value: string) => void;
   isLoading?: boolean;
 }
 
@@ -20,6 +21,7 @@ export const SearchSuggestions: React.FC<SearchSuggestionsProps> = ({
   setQuery,
   setShowSuggestions,
   handleSubmit,
+  onSubmitValue,
   isLoading = false,
 }) => {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
@@ -48,26 +50,50 @@ export const SearchSuggestions: React.FC<SearchSuggestionsProps> = ({
         </div>
       ) : (
         <>
-          {suggestions.map((suggestion, index) => (
+          {suggestions.map((suggestion) => (
             <button
-              key={index}
+              key={`${suggestion.type}-${suggestion.value}`}
               type="button"
               onClick={() => {
                 setQuery(suggestion.value);
                 setShowSuggestions(false);
                 console.log("Suggestion selected:", suggestion.value);
-                // Use a timeout to ensure state is updated before submitting
-                setTimeout(() => {
-                  handleSubmit({ preventDefault: () => {} } as React.FormEvent);
-                }, 50);
+                
+                // Use the cleaner value-based handler if available, otherwise use timeout with form submit
+                if (onSubmitValue) {
+                  onSubmitValue(suggestion.value);
+                } else {
+                  // Fallback to the previous approach for backward compatibility
+                  setTimeout(() => {
+                    // Create a proper synthetic event with all required properties
+                    const syntheticEvent = {
+                      preventDefault: () => {},
+                      target: { value: suggestion.value },
+                      currentTarget: { value: suggestion.value },
+                      type: 'submit',
+                      nativeEvent: {} as Event,
+                      bubbles: false,
+                      cancelable: false,
+                      defaultPrevented: false,
+                      eventPhase: 0,
+                      isTrusted: false,
+                      timeStamp: Date.now(),
+                      stopPropagation: () => {},
+                      isPropagationStopped: () => false,
+                      persist: () => {},
+                      isDefaultPrevented: () => false
+                    } as React.FormEvent;
+                    handleSubmit(syntheticEvent);
+                  }, 50);
+                }
               }}
               className={`w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-2 transition-colors duration-200 relative ${
-                hoveredIndex === index ? 'bg-gray-50 dark:bg-gray-800' : ''
+                hoveredIndex === suggestions.findIndex(s => s.value === suggestion.value) ? 'bg-gray-50 dark:bg-gray-800' : ''
               }`}
-              onMouseEnter={() => setHoveredIndex(index)}
+              onMouseEnter={() => setHoveredIndex(suggestions.findIndex(s => s.value === suggestion.value))}
               onMouseLeave={() => setHoveredIndex(null)}
             >
-              {hoveredIndex === index && (
+              {hoveredIndex === suggestions.findIndex(s => s.value === suggestion.value) && (
                 <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary rounded-r" />
               )}
               <span className="text-xs text-gray-500 dark:text-gray-400 uppercase font-medium bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">

@@ -2,7 +2,11 @@
 import axios from 'axios';
 
 // OpenRouter API configuration
-const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || 'sk-or-v1-free-tier-demo-key';
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
+
+if (!OPENROUTER_API_KEY) {
+  throw new Error('OPENROUTER_API_KEY environment variable is required');
+}
 const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
 
 // Available models with their capabilities

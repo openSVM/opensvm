@@ -146,7 +146,7 @@ const timeoutIds = useRef<NodeJS.Timeout[]>([]);
       fetchAndProcessAccount,
       isProcessingQueueRef
     );
-  }, []);
+  }, [fetchAndProcessAccount]); // Add missing dependency
 
   // Queue an account for fetching
   const queueAccountFetch = useCallback((address: string, depth = 0, parentSignature: string | null = null) => {
