@@ -990,6 +990,29 @@ cyRef.current.zoom(0.5);
     };
   }, [resizeGraphCallback]);
 
+  // Navigation functions for back/forward history
+  const navigateBack = useCallback(() => {
+    if (currentHistoryIndex > 0) {
+      const newIndex = currentHistoryIndex - 1;
+      const signature = navigationHistory[newIndex];
+      setCurrentHistoryIndex(newIndex);
+      setIsNavigatingHistory(true);
+      focusOnTransaction(signature, false, false, false);
+      setTimeout(() => setIsNavigatingHistory(false), 100);
+    }
+  }, [currentHistoryIndex, navigationHistory, focusOnTransaction]);
+
+  const navigateForward = useCallback(() => {
+    if (currentHistoryIndex < navigationHistory.length - 1) {
+      const newIndex = currentHistoryIndex + 1;
+      const signature = navigationHistory[newIndex];
+      setCurrentHistoryIndex(newIndex);
+      setIsNavigatingHistory(true);
+      focusOnTransaction(signature, false, false, false);
+      setTimeout(() => setIsNavigatingHistory(false), 100);
+    }
+  }, [currentHistoryIndex, navigationHistory, focusOnTransaction]);
+
   // Cleanup tracking on unmount
   useEffect(() => {
     return () => {
