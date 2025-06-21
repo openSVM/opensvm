@@ -139,6 +139,8 @@ const timeoutIds = useRef<NodeJS.Timeout[]>([]);
   const pendingFetchesRef = useRef<Set<string>>(new Set());
   // Add a reference to track if the queue is being processed
   const isProcessingQueueRef = useRef<boolean>(false);
+  // Add a reference to the queueAccountFetch function to avoid circular dependencies
+  const queueAccountFetchRef = useRef<((address: string, depth: number, parentSignature: string | null) => void) | null>(null);
   
   // Track the current focus transaction
   const focusSignatureRef = useRef<string>(initialSignature);
@@ -169,48 +171,6 @@ const timeoutIds = useRef<NodeJS.Timeout[]>([]);
     [setError]
   );
 
-  // Process the fetch queue in parallel
-  const processAccountFetchQueue = useCallback(() => {
-    processAccountFetchQueueUtil(
-      fetchQueueRef,
-      fetchAndProcessAccount,
-      isProcessingQueueRef
-    );
-  }, [fetchAndProcessAccount]); // Add missing dependency
-
-  // Queue an account for fetching
-  const queueAccountFetch = useCallback((address: string, depth = 0, parentSignature: string | null = null) => {
-    if (!address || loadedAccountsRef.current.has(address) || pendingFetchesRef.current.has(`${address}:${depth}`)) {
-      return;
-    }
-    queueAccountFetchUtil(
-      address,
-      depth,
-      parentSignature,
-      fetchQueueRef,
-      pendingFetchesRef,
-      loadedAccountsRef,
-      setTotalAccounts,
-      processAccountFetchQueue,
-      isProcessingQueueRef
-    );
-  }, [processAccountFetchQueue]);
-
-  // Fetch and process a single account
-  const fetchAndProcessAccount = useCallback(async (
-    address: string,
-    depth = 0,
-    parentSignature: string | null = null
-  ) => {
-    try {
-      await addAccountToGraph(address, totalAccounts, depth, parentSignature);
-    } catch (e) {
-      const accountKey = `${address}:${depth}`;
-      console.error(`Error processing account ${address}:`, e);
-      pendingFetchesRef.current?.delete(accountKey);
-    }
-  }, [addAccountToGraph, totalAccounts]);
-
   // Add account and its transactions to the graph
   const addAccountToGraph = useCallback(async (
     address: string,
@@ -236,7 +196,7 @@ const timeoutIds = useRef<NodeJS.Timeout[]>([]);
       processedNodesRef,
       processedEdgesRef,
       setLoadingProgress,
-      queueAccountFetch
+      queueAccountFetchRef.current // Use ref to avoid circular dependency
     );
 
 if (cyRef.current) {
@@ -254,9 +214,55 @@ return result;
     maxDepth,
     shouldExcludeAddress,
     shouldIncludeTransaction,
-    fetchAccountTransactionsWithError,
-    queueAccountFetch
+    fetchAccountTransactionsWithError
   ]);
+
+  // Fetch and process a single account
+  const fetchAndProcessAccount = useCallback(async (
+    address: string,
+    depth = 0,
+    parentSignature: string | null = null
+  ) => {
+    try {
+      await addAccountToGraph(address, totalAccounts, depth, parentSignature);
+    } catch (e) {
+      const accountKey = `${address}:${depth}`;
+      console.error(`Error processing account ${address}:`, e);
+      pendingFetchesRef.current?.delete(accountKey);
+    }
+  }, [addAccountToGraph, totalAccounts]);
+
+  // Process the fetch queue in parallel
+  const processAccountFetchQueue = useCallback(() => {
+    processAccountFetchQueueUtil(
+      fetchQueueRef,
+      fetchAndProcessAccount,
+      isProcessingQueueRef
+    );
+  }, [fetchAndProcessAccount]);
+
+  // Queue an account for fetching
+  const queueAccountFetch = useCallback((address: string, depth = 0, parentSignature: string | null = null) => {
+    if (!address || loadedAccountsRef.current.has(address) || pendingFetchesRef.current.has(`${address}:${depth}`)) {
+      return;
+    }
+    queueAccountFetchUtil(
+      address,
+      depth,
+      parentSignature,
+      fetchQueueRef,
+      pendingFetchesRef,
+      loadedAccountsRef,
+      setTotalAccounts,
+      processAccountFetchQueue,
+      isProcessingQueueRef
+    );
+  }, [processAccountFetchQueue]);
+
+  // Set the ref to the queueAccountFetch function
+  useEffect(() => {
+    queueAccountFetchRef.current = queueAccountFetch;
+  }, [queueAccountFetch]);
 
   // Expand the transaction graph incrementally
   const expandTransactionGraph = useCallback(async (signature: string, signal?: AbortSignal) => {
