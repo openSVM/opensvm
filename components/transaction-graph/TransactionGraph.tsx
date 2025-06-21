@@ -920,6 +920,13 @@ cyRef.current.zoom(0.5);
     };
   }, []);
 
+  // Resize graph callback for fullscreen changes
+  const resizeGraphCallback = useCallback(() => {
+    if (cyRef.current && containerRef.current) {
+      resizeGraph(cyRef.current, containerRef.current);
+    }
+  }, []);
+
   // Fullscreen functionality
   const toggleFullscreen = useCallback(async () => {
     if (!containerRef.current) return;
