@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { GraphStateCache, ViewportState } from '@/lib/graph-state-cache';
 import { debounce } from '@/lib/utils';
 import { TrackingStatsPanel } from './TrackingStatsPanel';
+import { TransactionGraphClouds } from '../TransactionGraphClouds';
 import {
   TransactionGraphProps,
   createAddressFilter,
@@ -124,6 +125,9 @@ const timeoutIds = useRef<NodeJS.Timeout[]>([]);
   const [navigationHistory, setNavigationHistory] = useState<string[]>([]);
   const [currentHistoryIndex, setCurrentHistoryIndex] = useState<number>(-1);
   const [isNavigatingHistory, setIsNavigatingHistory] = useState<boolean>(false);
+  
+  // Cloud view state
+  const [showCloudViewPanel, setShowCloudViewPanel] = useState<boolean>(false);
   
   // Track when props change without causing remounts
   const initialSignatureRef = useRef<string>(initialSignature);
@@ -1013,6 +1017,86 @@ cyRef.current.zoom(0.5);
     }
   }, [currentHistoryIndex, navigationHistory, focusOnTransaction]);
 
+  // Cloud view functions
+  const showCloudView = useCallback(() => {
+    setShowCloudViewPanel(true);
+  }, []);
+
+  const handleLoadGraphState = useCallback((state: any) => {
+    try {
+      if (cyRef.current && state.nodes) {
+        // Clear current graph
+        cyRef.current.elements().remove();
+        
+        // Load nodes and edges from saved state
+        if (state.nodes.length > 0) {
+          cyRef.current.add(state.nodes);
+        }
+        if (state.edges && state.edges.length > 0) {
+          cyRef.current.add(state.edges);
+        }
+        
+        // Apply layout
+        cyRef.current.layout({
+          name: 'dagre',
+          // @ts-ignore - dagre layout options are not fully typed
+          rankDir: 'TB', // Top to bottom layout
+          fit: true,
+          padding: 50
+        }).run();
+        
+        // Update tracking state
+        if (state.focusedTransaction) {
+          setCurrentSignature(state.focusedTransaction);
+          focusSignatureRef.current = state.focusedTransaction;
+        }
+        
+        setShowCloudViewPanel(false);
+      }
+    } catch (error) {
+      console.error('Error loading graph state:', error);
+      setError({
+        message: 'Failed to load saved graph state',
+        severity: 'error'
+      });
+    }
+  }, []);
+
+  const handleSaveCurrentState = useCallback(() => {
+    try {
+      if (cyRef.current) {
+        const currentState = {
+          nodes: cyRef.current.nodes().map(node => ({
+            data: node.data(),
+            position: node.position(),
+            classes: node.classes()
+          })),
+          edges: cyRef.current.edges().map(edge => ({
+            data: edge.data(),
+            classes: edge.classes()
+          })),
+          focusedTransaction: currentSignature,
+          timestamp: Date.now()
+        };
+        
+        GraphStateCache.saveState(currentSignature, currentState);
+        setError({
+          message: 'Graph state saved successfully',
+          severity: 'warning'
+        });
+        
+        // Clear success message after 3 seconds
+        setTimeout(() => setError(null), 3000);
+      }
+    } catch (error) {
+      console.error('Error saving graph state:', error);
+      setError({
+        message: 'Failed to save graph state',
+        severity: 'error'
+      });
+    }
+  }, [currentSignature]);
+
   // Cleanup tracking on unmount
   useEffect(() => {
     return () => {
@@ -1066,6 +1150,17 @@ cyRef.current.zoom(0.5);
         stats={trackingStats}
         onStopTracking={stopAddressTracking}
       />
+
+      {/* Cloud view panel for saved graph states */}
+      {showCloudViewPanel && (
+        <div className="absolute top-4 left-4 z-30">
+          <TransactionGraphClouds
+            currentFocusedTransaction={currentSignature}
+            onLoadState={handleLoadGraphState}
+            onSaveCurrentState={handleSaveCurrentState}
+          />
+        </div>
+      )}
 
       <div 
         ref={containerRef}
