@@ -4,6 +4,7 @@ import cytoscape from 'cytoscape';
 import { debounce, throttle } from '@/lib/utils';
 import { ViewportState } from '@/lib/graph-state-cache';
 import { runLayout } from './layout';
+import { gpuThrottle, optimizeCytoscapeContainer } from './gpu-utils';
 
 /**
  * Focus on a specific transaction in the graph
@@ -164,8 +165,13 @@ export const setupGraphInteractions = (
   // Remove any existing event listeners to prevent memory leaks
   cy.off('tap mouseover mouseout pan zoom');
   
-  // Throttle hover effects to improve performance
-  const throttledHoverIn = throttle((event) => {
+  // Apply GPU acceleration to container
+  if (containerRef.current) {
+    optimizeCytoscapeContainer(containerRef.current);
+  }
+  
+  // GPU-accelerated throttle hover effects for better performance
+  const throttledHoverIn = gpuThrottle((event) => {
     const ele = event.target;
     
     if (ele.isNode() && ele.data('type') === 'transaction') {
@@ -184,12 +190,12 @@ export const setupGraphInteractions = (
       ele.addClass('hover');
       ele.connectedNodes().addClass('hover');
     }
-  }, 16); // 16ms ≈ 60fps (1000ms / 60fps = 16.67ms)
+  }, 60); // 60fps for smooth GPU-accelerated interactions
 
-  const throttledHoverOut = throttle(() => {
+  const throttledHoverOut = gpuThrottle(() => {
     cy.elements().removeClass('hover');
     containerRef.current?.style.removeProperty('cursor');
-  }, 16); // 16ms ≈ 60fps for smooth interactions
+  }, 60); // 60fps for smooth GPU-accelerated interactions
 
   // Debounce viewport state updates for better performance
   const updateViewportState = debounce(() => {

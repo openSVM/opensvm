@@ -1171,6 +1171,11 @@ cyRef.current.zoom(0.5);
           position: 'relative',
           overflow: 'hidden',
           margin: isFullscreen ? '0' : '0 auto', // Remove margin in fullscreen
+          // GPU acceleration hints
+          willChange: 'transform',
+          transform: 'translateZ(0)',
+          backfaceVisibility: 'hidden',
+          perspective: '1000px',
         }}
       />
 

@@ -52,8 +52,9 @@ function isValidAccount(account: any): account is TransactionAccount {
 
 // Memoize the component to prevent unnecessary re-renders
 const EnhancedTransactionVisualizer = function({ tx }: EnhancedTransactionVisualizerProps) {
-  const svgRef = useRef<SVGSVGElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const simulationRef = useRef<d3.Simulation<Node, undefined> | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
 
   // Memoize helper functions
   const getNodeRadius = useCallback((node: Node): number => {
@@ -296,7 +297,15 @@ const EnhancedTransactionVisualizer = function({ tx }: EnhancedTransactionVisual
 
   return (
     <div className="w-full h-[600px] bg-neutral-900 rounded-lg overflow-hidden">
-      <svg ref={svgRef} className="w-full h-full" style={{ willChange: 'transform' }} />
+      <canvas 
+        ref={canvasRef} 
+        className="w-full h-full" 
+        style={{ 
+          willChange: 'transform',
+          transform: 'translateZ(0)',
+          backfaceVisibility: 'hidden'
+        }} 
+      />
     </div>
   );
 };

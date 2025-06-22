@@ -285,11 +285,15 @@ export const createGraphStyle = (): cytoscape.StylesheetCSS[] => [
 ];
 
 /**
- * Initialize a Cytoscape instance with default settings
+ * Initialize a Cytoscape instance with GPU acceleration
  * @param container HTML element to contain the graph
  * @returns Cytoscape instance
  */
 export const initializeCytoscape = (container: HTMLElement): cytoscape.Core => {
+  // Add GPU acceleration hints to the container
+  container.style.willChange = 'transform';
+  container.style.transform = 'translateZ(0)'; // Force hardware acceleration
+  
   return cytoscape({
     container: container,
     style: createGraphStyle(),
@@ -306,5 +310,26 @@ export const initializeCytoscape = (container: HTMLElement): cytoscape.Core => {
     minZoom: 0.2,
     maxZoom: 3,
     wheelSensitivity: 1.0, // Using default value for consistent zoom behavior across different mice
+    // Enable GPU acceleration through renderer options
+    renderer: {
+      name: 'canvas', // Use canvas renderer with GPU acceleration
+      showFps: false,
+      textureOnViewport: false,
+      hideEdgesOnViewport: false,
+      hideLabelsOnViewport: false,
+      // Enable hardware acceleration
+      motionBlur: false,
+      pixelRatio: typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1,
+    } as any,
+    // Performance optimizations
+    styleEnabled: true,
+    hideEdgesOnViewport: false,
+    hideLabelsOnViewport: false,
+    textureOnViewport: false,
+    motionBlur: false,
+    // Enable batching for better performance
+    autoungrabify: false,
+    autolock: false,
+    autounselectify: false,
   });
 };
