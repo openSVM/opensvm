@@ -24,8 +24,7 @@ const nextConfig = {
   },
   // Experimental features (safe subset for Next.js 14)
   experimental: {
-    // Enable server actions
-    serverActions: true
+    // Server actions are enabled by default in Next.js 14+
   },
   // Enable React strict mode
   reactStrictMode: false,
