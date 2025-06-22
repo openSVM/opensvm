@@ -53,7 +53,7 @@ export const fetchTransactionData = async (
  */
 export const fetchAccountTransactions = async (
   address: string,
-  limit = 10,
+  limit = 5, // Reduced from 10 to 5 for better performance
   setError: (error: {message: string; severity: 'error' | 'warning'} | null) => void
 ): Promise<AccountData | null> => {
   try {
@@ -142,7 +142,7 @@ export const queueAccountFetch = (
   }
   
   // Enforce maximum queue size to prevent unbounded growth
-  const MAX_QUEUE_SIZE = 500;
+  const MAX_QUEUE_SIZE = 250; // Reduced from 500 to 250 for better performance
   if (fetchQueueRef.current.length >= MAX_QUEUE_SIZE) {
     console.warn(`Fetch queue size limit reached (${MAX_QUEUE_SIZE}). Skipping address: ${address}`);
     return;

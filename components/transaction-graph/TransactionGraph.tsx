@@ -76,7 +76,7 @@ function TransactionGraph({
   clientSideNavigation = true,
   width = '100%',
   height = '100%',
-  maxDepth = 3
+  maxDepth = 2 // Reduced from 3 to 2 for better performance
 }: TransactionGraphProps) {
   // Component refs 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -93,7 +93,7 @@ const timeoutIds = useRef<NodeJS.Timeout[]>([]);
   const [trackingStats, setTrackingStats] = useState<TrackingStats | null>(null);
   const trackingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const trackedTransactionsRef = useRef<Set<string>>(new Set());
-  const MAX_TRACKED_TRANSACTIONS = 100;
+  const MAX_TRACKED_TRANSACTIONS = 50; // Reduced from 100 to 50 for better performance
   
   // Excluded accounts and program identifiers
   const EXCLUDED_ACCOUNTS = useMemo(() => new Set([
@@ -487,9 +487,9 @@ return result;
       trackedAddress: address
     });
     
-    // Initial fetch of SPL transfers
+    // Initial fetch of SPL transfers (reduced limit for performance)
     try {
-      const response = await fetch(`/api/account-transfers/${address}?limit=50`);
+      const response = await fetch(`/api/account-transfers/${address}?limit=20`); // Reduced from 50 to 20
       if (response.ok) {
         const data = await response.json();
         const transfers = data.data || [];
@@ -521,7 +521,7 @@ return result;
     // Start real-time polling (every 5 seconds)
     trackingIntervalRef.current = setInterval(async () => {
       try {
-        const response = await fetch(`/api/account-transfers/${address}?limit=10`);
+        const response = await fetch(`/api/account-transfers/${address}?limit=5`); // Reduced from 10 to 5
         if (response.ok) {
           const data = await response.json();
           const newTransfers = data.data || [];

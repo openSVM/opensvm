@@ -227,10 +227,26 @@ export async function GET(
 
     console.log(`Total transfers found: ${transfers.length}`);
 
+    // Sort by volume (amount) and limit to top 10 SPL transfers only
+    const filteredAndSortedTransfers = transfers
+      .filter(transfer => {
+        const amount = parseFloat(transfer.tokenAmount);
+        // Only include significant transfers (minimum 0.01 SOL) and filter out potential trading/DEX activity
+        // Simple heuristic: transfers between user wallets typically have cleaner amounts
+        return amount >= 0.01 && 
+               transfer.from !== transfer.to && // Prevent self-transfers
+               transfer.from.length >= 32 && transfer.to.length >= 32; // Ensure full wallet addresses
+      })
+      .sort((a, b) => parseFloat(b.tokenAmount) - parseFloat(a.tokenAmount))
+      .slice(0, 10); // Limit to top 10 by volume
+
+    console.log(`Filtered to top ${filteredAndSortedTransfers.length} transfers by volume`);
+
     return NextResponse.json({
-      data: transfers,
+      data: filteredAndSortedTransfers,
       hasMore: signatures.length === limit,
-      total: transfers.length
+      total: filteredAndSortedTransfers.length,
+      originalTotal: transfers.length
     }, { headers: corsHeaders });
 
   } catch (error) {

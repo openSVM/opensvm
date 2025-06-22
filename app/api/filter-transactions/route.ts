@@ -28,38 +28,50 @@ export async function POST(request: Request) {
       'ComputeBudget111111111111111111111111111111'
     ]);
 
-    // Pre-filter obvious spam before AI analysis
-    const preFiltered = transactions.filter(tx => {
-      const amount = parseFloat(tx.tokenAmount || '0');
-      const token = (tx.tokenSymbol || '').toLowerCase();
-      const from = tx.from || '';
-      const to = tx.to || '';
-      
-      // Filter out dust transactions
-      if (amount < 0.001) return false;
-      
-      // Filter out spam tokens
-      if (SPAM_TOKENS.has(tx.tokenSymbol) || 
-          [...SPAM_TOKENS].some(spam => token.includes(spam.toLowerCase()))) {
-        return false;
-      }
-      
-      // Filter out spam addresses
-      if (SPAM_ADDRESSES.has(from) || SPAM_ADDRESSES.has(to)) {
-        return false;
-      }
-      
-      return true;
-    });
+    // Pre-filter obvious spam before AI analysis and prioritize by volume
+    const preFiltered = transactions
+      .filter(tx => {
+        const amount = parseFloat(tx.tokenAmount || '0');
+        const token = (tx.tokenSymbol || '').toLowerCase();
+        const from = tx.from || '';
+        const to = tx.to || '';
+        
+        // Filter out dust transactions (increased threshold)
+        if (amount < 0.01) return false;
+        
+        // Filter out spam tokens
+        if (SPAM_TOKENS.has(tx.tokenSymbol) || 
+            [...SPAM_TOKENS].some(spam => token.includes(spam.toLowerCase()))) {
+          return false;
+        }
+        
+        // Filter out spam addresses
+        if (SPAM_ADDRESSES.has(from) || SPAM_ADDRESSES.has(to)) {
+          return false;
+        }
+        
+        // Only include simple wallet-to-wallet transfers (filter out DEX/trading activity)
+        // DEX transactions often involve program accounts with specific patterns
+        const isDexLike = from.length < 32 || to.length < 32 || // Program accounts are often shorter
+                          from.includes('Program') || to.includes('Program') ||
+                          from.includes('111111111') || to.includes('111111111'); // System programs
+        
+        if (isDexLike) return false;
+        
+        return true;
+      })
+      .sort((a, b) => parseFloat(b.tokenAmount || '0') - parseFloat(a.tokenAmount || '0')) // Sort by volume desc
+      .slice(0, 10); // Limit to top 10 by volume
 
-    // If too many transactions were filtered, use the pre-filtered results
-    if (preFiltered.length < transactions.length * 0.5) {
+    // If too many transactions were filtered, use the pre-filtered results (already limited to top 10)
+    if (preFiltered.length < transactions.length * 0.5 || preFiltered.length <= 10) {
       return NextResponse.json({ 
         filteredTransactions: preFiltered,
         aiAnalysis: false,
         preFiltered: true,
         originalCount: transactions.length,
-        filteredCount: preFiltered.length
+        filteredCount: preFiltered.length,
+        limitedToTop10: true
       });
     }
 
@@ -80,14 +92,15 @@ Transactions to analyze:
 ${JSON.stringify(transactionSummary, null, 2)}
 
 Criteria for filtering:
-1. Remove transactions with amounts < 0.001 tokens (likely spam/dust)
+1. Remove transactions with amounts < 0.01 tokens (increased threshold for performance)
 2. Remove transactions to/from known spam addresses or analytics services
 3. Remove repetitive bot-like patterns (same amounts, regular intervals)
 4. Remove transactions with suspicious token names containing: flip, spam, bot, airdrop, test
-5. Keep legitimate transfers, swaps, and meaningful token movements
-6. Keep transactions with significant amounts or unique patterns
+5. Remove DEX/trading activity (keep only simple wallet-to-wallet transfers)
+6. Keep only top 10 transfers by volume for performance
+7. Keep legitimate transfers between user wallets with significant amounts
 
-Return only a JSON array of transaction IDs that should be kept, like: ["txId1", "txId2", ...]`;
+Return only a JSON array of transaction IDs for the top 10 transfers by volume that should be kept, like: ["txId1", "txId2", ...]`;
 
     // Use GPT-4.1-nano or similar model for analysis
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -115,35 +128,45 @@ Return only a JSON array of transaction IDs that should be kept, like: ["txId1",
     });
 
     if (!response.ok) {
-      // Fallback: if AI analysis fails, apply enhanced basic filtering
-      const basicFiltered = transactions.filter(tx => {
-        const amount = parseFloat(tx.tokenAmount || '0');
-        const token = (tx.tokenSymbol || '').toLowerCase();
-        const from = tx.from || '';
-        const to = tx.to || '';
-        
-        // Filter out dust transactions
-        if (amount < 0.001) return false;
-        
-        // Filter out spam tokens and addresses (same as above)
-        const SPAM_TOKENS = ['flip', 'bot', 'spam', 'dust', 'airdrop', 'free', 'test', 'demo'];
-        const SPAM_ADDRESSES = [
-          'FetTyW8xAYfd33x4GMHoE7hTuEdWLj1fNnhJuyVMUGGa',
-          'WaLLeTaS7qTaSnKFTYJNGAeu7VzoLMUV9QCMfKxFsgt',
-          'RecipienTEKQQQQQQQQQQQQQQQQQQQQQQQQQQFrThs',
-          'ComputeBudget111111111111111111111111111111'
-        ];
-        
-        if (SPAM_TOKENS.some(spam => token.includes(spam))) return false;
-        if (SPAM_ADDRESSES.includes(from) || SPAM_ADDRESSES.includes(to)) return false;
-        
-        return true;
-      });
+      // Fallback: if AI analysis fails, apply enhanced basic filtering with top 10 volume limit
+      const basicFiltered = transactions
+        .filter(tx => {
+          const amount = parseFloat(tx.tokenAmount || '0');
+          const token = (tx.tokenSymbol || '').toLowerCase();
+          const from = tx.from || '';
+          const to = tx.to || '';
+          
+          // Filter out dust transactions (increased threshold)
+          if (amount < 0.01) return false;
+          
+          // Filter out spam tokens and addresses (same as above)
+          const SPAM_TOKENS = ['flip', 'bot', 'spam', 'dust', 'airdrop', 'free', 'test', 'demo'];
+          const SPAM_ADDRESSES = [
+            'FetTyW8xAYfd33x4GMHoE7hTuEdWLj1fNnhJuyVMUGGa',
+            'WaLLeTaS7qTaSnKFTYJNGAeu7VzoLMUV9QCMfKxFsgt',
+            'RecipienTEKQQQQQQQQQQQQQQQQQQQQQQQQQQFrThs',
+            'ComputeBudget111111111111111111111111111111'
+          ];
+          
+          if (SPAM_TOKENS.some(spam => token.includes(spam))) return false;
+          if (SPAM_ADDRESSES.includes(from) || SPAM_ADDRESSES.includes(to)) return false;
+          
+          // Filter out DEX/trading activity
+          const isDexLike = from.length < 32 || to.length < 32 ||
+                            from.includes('Program') || to.includes('Program') ||
+                            from.includes('111111111') || to.includes('111111111');
+          if (isDexLike) return false;
+          
+          return true;
+        })
+        .sort((a, b) => parseFloat(b.tokenAmount || '0') - parseFloat(a.tokenAmount || '0'))
+        .slice(0, 10); // Limit to top 10 by volume
       
       return NextResponse.json({ 
         filteredTransactions: basicFiltered,
         aiAnalysis: false,
-        fallback: true
+        fallback: true,
+        limitedToTop10: true
       });
     }
 
