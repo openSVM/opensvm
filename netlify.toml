@@ -2,6 +2,7 @@
 [build.environment]
   NODE_VERSION = "20"
   NEXT_TELEMETRY_DISABLED = "1"
+  PUPPETEER_SKIP_DOWNLOAD = "true"
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
