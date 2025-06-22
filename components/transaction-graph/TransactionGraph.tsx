@@ -8,6 +8,7 @@ import { GraphStateCache, ViewportState } from '@/lib/graph-state-cache';
 import { debounce } from '@/lib/utils';
 import { TrackingStatsPanel } from './TrackingStatsPanel';
 import { TransactionGraphClouds } from '../TransactionGraphClouds';
+import { GPUAcceleratedForceGraph } from './GPUAcceleratedForceGraph';
 import {
   TransactionGraphProps,
   createAddressFilter,
@@ -94,6 +95,10 @@ function TransactionGraph({
   
   // Fullscreen state
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+  
+  // GPU Force Graph State
+  const [useGPUGraph, setUseGPUGraph] = useState<boolean>(true); // Always use GPU by default
+  const [gpuGraphData, setGpuGraphData] = useState<{ nodes: any[]; links: any[] }>({ nodes: [], links: [] });
   
   // Address tracking state
   const [trackedAddress, setTrackedAddress] = useState<string | null>(null);
@@ -230,7 +235,7 @@ function TransactionGraph({
 
   // Enhanced fetch function with better error handling
   const fetchTransactionDataWithCache = useCallback(async (signature: string, signal?: AbortSignal) => {
-    return fetchTransactionData(signature, transactionCache, signal);
+    return fetchTransactionData(signature, transactionCache.current);
   }, []);
 
   const fetchAccountTransactionsWithError = useCallback(async (pubkey: string, signal?: AbortSignal) => {
@@ -239,6 +244,24 @@ function TransactionGraph({
     } catch (error) {
       console.error(`Error fetching transactions for ${pubkey}:`, error);
       return { address: pubkey, transactions: [] };
+    }
+  }, []);
+
+  // Helper function to check if an account has SPL transfers
+  const checkForSplTransfers = useCallback(async (address: string): Promise<boolean> => {
+    try {
+      const response = await fetch(`/api/account-transfers/${address}?limit=1`, {
+        headers: { 'Cache-Control': 'no-cache' }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        return (data.data && data.data.length > 0);
+      }
+      return false;
+    } catch (error) {
+      console.warn(`Could not check SPL transfers for ${address}:`, error);
+      return false; // Default to no SPL transfers on error
     }
   }, []);
 
@@ -298,24 +321,6 @@ function TransactionGraph({
     setLoadingProgress
   ]);
 
-  // Helper function to check if an account has SPL transfers
-  const checkForSplTransfers = useCallback(async (address: string): Promise<boolean> => {
-    try {
-      const response = await fetch(`/api/account-transfers/${address}?limit=1`, {
-        headers: { 'Cache-Control': 'no-cache' }
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        return (data.data && data.data.length > 0);
-      }
-      return false;
-    } catch (error) {
-      console.warn(`Could not check SPL transfers for ${address}:`, error);
-      return false; // Default to no SPL transfers on error
-    }
-  }, []);
-
   // Fetch and process a single account
   const fetchAndProcessAccount = useCallback(async (
     address: string,
@@ -330,6 +335,64 @@ function TransactionGraph({
       pendingFetchesRef.current?.delete(accountKey);
     }
   }, [addAccountToGraph, totalAccounts]);
+
+  // Convert Cytoscape data to GPU graph format
+  const convertToGPUGraphData = useCallback(() => {
+    if (!cyRef.current) return { nodes: [], links: [] };
+
+    const nodes = cyRef.current.nodes().map((node) => {
+      const data = node.data();
+      return {
+        id: data.id,
+        type: data.type || 'account',
+        label: data.label || data.id,
+        status: data.status,
+        tracked: data.tracked || false,
+        color: data.type === 'transaction' ? '#3b82f6' : (data.tracked ? '#ef4444' : '#10b981')
+      };
+    });
+
+    const links = cyRef.current.edges().map((edge) => {
+      const data = edge.data();
+      return {
+        source: data.source,
+        target: data.target,
+        type: data.type || 'interaction',
+        value: data.value || 1,
+        color: '#64748b'
+      };
+    });
+
+    return { nodes, links };
+  }, []);
+
+  // Update GPU graph data when Cytoscape changes
+  const updateGPUGraphData = useCallback(() => {
+    if (useGPUGraph) {
+      const newData = convertToGPUGraphData();
+      setGpuGraphData(newData);
+    }
+  }, [useGPUGraph, convertToGPUGraphData]);
+
+  // GPU Graph event handlers
+  const handleGPUNodeClick = useCallback((node: any) => {
+    if (node.type === 'transaction') {
+      // Use the focus function when it's available
+      if (cyRef.current) {
+        focusOnTransactionUtil(node.id, false, cyRef, onTransactionSelect, clientSideNavigation);
+      }
+    } else if (node.type === 'account') {
+      // Handle account selection
+      console.log('Account clicked:', node.id);
+    }
+  }, [onTransactionSelect, clientSideNavigation]);
+
+  const handleGPUNodeHover = useCallback((node: any) => {
+    // Handle node hover for GPU graph
+    if (node) {
+      console.log('Hovered node:', node.id);
+    }
+  }, []);
 
   // Process the fetch queue in parallel
   const processAccountFetchQueue = useCallback(() => {
@@ -545,7 +608,13 @@ function TransactionGraph({
   const setupGraphInteractionsCallback = useCallback((cy: cytoscape.Core) => {
     setupGraphInteractions(
       cy,
+      containerRef,
+      focusSignatureRef,
       focusOnTransaction,
+      (state: ViewportState) => {
+        // Update viewport state - placeholder implementation
+        console.log('Viewport state updated:', state);
+      },
       startAddressTracking
     );
   }, [focusOnTransaction, startAddressTracking]);
@@ -553,6 +622,13 @@ function TransactionGraph({
   // Initialize graph once - no dependencies to prevent re-initialization
   useEffect(() => {
     if (!containerRef.current || cyRef.current) {
+      return;
+    }
+
+    // Find the Cytoscape data container
+    const cytoscapeContainer = containerRef.current.querySelector('#cytoscape-data-container') as HTMLDivElement;
+    if (!cytoscapeContainer) {
+      console.error('Cytoscape data container not found');
       return;
     }
 
@@ -568,7 +644,7 @@ function TransactionGraph({
     pendingFetchesRef.current.clear();
     isProcessingQueueRef.current = false;
 
-    const cy = initializeCytoscape(containerRef.current);
+    const cy = initializeCytoscape(cytoscapeContainer);
     cyRef.current = cy;
     setupGraphInteractionsCallback(cy);
 
@@ -583,6 +659,27 @@ function TransactionGraph({
       }
     };
   }, []); // No dependencies to prevent re-initialization
+
+  // Update GPU graph data when Cytoscape graph changes
+  useEffect(() => {
+    if (cyRef.current && useGPUGraph) {
+      // Set up listener for graph changes
+      const updateHandler = () => {
+        updateGPUGraphData();
+      };
+      
+      cyRef.current.on('add remove data', updateHandler);
+      
+      // Initial update
+      updateGPUGraphData();
+      
+      return () => {
+        if (cyRef.current) {
+          cyRef.current.off('add remove data', updateHandler);
+        }
+      };
+    }
+  }, [useGPUGraph, updateGPUGraphData]);
 
   // Handle initial signature loading
   useEffect(() => {
@@ -819,7 +916,7 @@ function TransactionGraph({
   useEffect(() => {
     const handleResize = debounce(() => {
       if (cyRef.current && containerRef.current) {
-        resizeGraph(cyRef.current, containerRef.current);
+        resizeGraph(cyRef, true);
       }
     }, 250);
 
@@ -832,7 +929,7 @@ function TransactionGraph({
   // Resize graph callback for fullscreen changes
   const resizeGraphCallback = useCallback(() => {
     if (cyRef.current && containerRef.current) {
-      resizeGraph(cyRef.current, containerRef.current);
+      resizeGraph(cyRef, true);
     }
   }, []);
 
@@ -1026,7 +1123,7 @@ function TransactionGraph({
 
       <div 
         ref={containerRef}
-        className={`cytoscape-container w-full bg-muted/50 rounded-lg border border-border overflow-hidden ${isFullscreen ? 'rounded-none border-none bg-background' : ''}`}
+        className={`graph-container w-full bg-muted/50 rounded-lg border border-border overflow-hidden ${isFullscreen ? 'rounded-none border-none bg-background' : ''}`}
         style={{ 
           width: '100%', 
           height: isFullscreen ? '100vh' : '100%',
@@ -1039,7 +1136,33 @@ function TransactionGraph({
           backfaceVisibility: 'hidden',
           perspective: '1000px',
         }}
-      />
+      >
+        {useGPUGraph ? (
+          <GPUAcceleratedForceGraph
+            graphData={gpuGraphData}
+            onNodeClick={handleGPUNodeClick}
+            onNodeHover={handleGPUNodeHover}
+            width={containerRef.current?.clientWidth || 800}
+            height={containerRef.current?.clientHeight || 600}
+            use3D={false}
+            enableGPUParticles={true}
+          />
+        ) : null}
+        
+        {/* Hidden Cytoscape container for data processing - always present */}
+        <div 
+          id="cytoscape-data-container"
+          style={{ 
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            visibility: useGPUGraph ? 'hidden' : 'visible',
+            pointerEvents: useGPUGraph ? 'none' : 'auto'
+          }}
+        />
+      </div>
 
       {/* Controls overlay */}
       <div className="absolute bottom-4 right-4 flex gap-2 bg-background/90 p-2 rounded-md shadow-md backdrop-blur-sm border border-border">
@@ -1064,6 +1187,18 @@ function TransactionGraph({
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M5 12h14"></path>
             <path d="M12 5l7 7-7 7"></path>
+          </svg>
+        </button>
+
+        <button 
+          className={`p-1.5 rounded-md transition-colors ${useGPUGraph ? 'bg-primary text-primary-foreground' : 'hover:bg-primary/10'}`}
+          onClick={() => setUseGPUGraph(!useGPUGraph)}
+          title={useGPUGraph ? "Switch to Cytoscape" : "Switch to GPU rendering"}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+            <line x1="8" y1="21" x2="16" y2="21"></line>
+            <line x1="12" y1="17" x2="12" y2="21"></line>
           </svg>
         </button>
 
