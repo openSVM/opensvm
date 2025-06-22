@@ -1,12 +1,17 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Card } from '@/components/ui/card';
 import { getConnection } from '@/lib/solana';
 import { useSSEAlerts } from '@/lib/hooks/useSSEAlerts';
 import { lamportsToSol } from '@/components/transaction-graph/utils';
+import { FIFOQueue } from '@/lib/utils/fifo-queue';
+import { TransactionTooltip } from './TransactionTooltip';
+import { PumpStatistics } from './PumpStatistics';
+import { EventFilterControls, EventFilters } from './EventFilterControls';
+import { VirtualEventTable } from './VirtualEventTable';
 
-interface BlockchainEvent {
+export interface BlockchainEvent {
   type: 'transaction' | 'block' | 'account_change';
   timestamp: number;
   data: any;
@@ -29,15 +34,35 @@ interface LiveMonitorProps {
 }
 
 export function LiveEventMonitor({ 
-  maxEvents = 100, 
+  maxEvents = 10000,  // Increased to 10,000 as requested
   autoRefresh = true, 
   refreshInterval = 5000 // Reduced to 5s for more real-time feel
 }: LiveMonitorProps) {
+  const [eventQueue] = useState(() => new FIFOQueue<BlockchainEvent>(maxEvents));
   const [events, setEvents] = useState<BlockchainEvent[]>([]);
   const [isConnected, setIsConnected] = useState(false);
   const [stats, setStats] = useState<any>(null);
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [lastSlot, setLastSlot] = useState<number | null>(null);
+  const [filters, setFilters] = useState<EventFilters>({
+    showTransactions: true,
+    showBlocks: true,
+    showAccountChanges: true,
+    showSuccessOnly: false,
+    showFailedOnly: false,
+    showSPLTransfers: true,
+    showCustomPrograms: true,
+    showSystemPrograms: false,
+    showKnownPrograms: {
+      raydium: true,
+      meteora: true,
+      aldrin: true,
+      pumpswap: true
+    },
+    minFee: 0,
+    maxFee: 1000000000, // 1 SOL in lamports
+    timeRange: 'all'
+  });
   const connectionRef = useRef<any>(null);
   const eventCountRef = useRef(0);
   const clientId = useRef(`client_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
@@ -240,11 +265,9 @@ export function LiveEventMonitor({
   };
 
   const addEvent = (event: BlockchainEvent) => {
-    setEvents(prev => {
-      const newEvents = [event, ...prev].slice(0, maxEvents);
-      eventCountRef.current = newEvents.length;
-      return newEvents;
-    });
+    eventQueue.enqueue(event);
+    setEvents(eventQueue.getAll());
+    eventCountRef.current = eventQueue.size();
   };
 
   const processEventForAnomalies = async (event: BlockchainEvent) => {
@@ -326,6 +349,80 @@ export function LiveEventMonitor({
       if (interval) clearInterval(interval);
     };
   }, [autoRefresh]);
+
+  // Apply filters to events
+  const filteredEvents = useMemo(() => {
+    const now = Date.now();
+    let timeThreshold = 0;
+    
+    switch (filters.timeRange) {
+      case '1h': timeThreshold = now - (60 * 60 * 1000); break;
+      case '6h': timeThreshold = now - (6 * 60 * 60 * 1000); break;
+      case '24h': timeThreshold = now - (24 * 60 * 60 * 1000); break;
+      default: timeThreshold = 0;
+    }
+    
+    return events.filter(event => {
+      // Time filter
+      if (timeThreshold > 0 && event.timestamp < timeThreshold) return false;
+      
+      // Type filters
+      if (!filters.showTransactions && event.type === 'transaction') return false;
+      if (!filters.showBlocks && event.type === 'block') return false;
+      if (!filters.showAccountChanges && event.type === 'account_change') return false;
+      
+      // Transaction-specific filters
+      if (event.type === 'transaction' && event.data) {
+        // Status filters
+        if (filters.showSuccessOnly && event.data.err) return false;
+        if (filters.showFailedOnly && !event.data.err) return false;
+        
+        // Fee filters
+        if (event.data.fee) {
+          if (event.data.fee < filters.minFee || event.data.fee > filters.maxFee) return false;
+        }
+        
+        // Program type filters
+        const isSystemProgram = event.data.accountKeys?.some((key: string) => 
+          SYSTEM_PROGRAMS.has(key)
+        );
+        const isSPLTransfer = event.data.transactionType === 'spl-transfer';
+        const isCustomProgram = event.data.transactionType === 'custom-program';
+        
+        if (!filters.showSystemPrograms && isSystemProgram) return false;
+        if (!filters.showSPLTransfers && isSPLTransfer) return false;
+        if (!filters.showCustomPrograms && isCustomProgram) return false;
+        
+        // Known program filters
+        if (event.data.knownProgram) {
+          const program = event.data.knownProgram as keyof EventFilters['showKnownPrograms'];
+          if (!filters.showKnownPrograms[program]) return false;
+        }
+      }
+      
+      return true;
+    });
+  }, [events, filters]);
+
+  // Calculate event counts for filters
+  const eventCounts = useMemo(() => {
+    const counts = {
+      transactions: 0,
+      blocks: 0,
+      accountChanges: 0,
+      total: filteredEvents.length
+    };
+    
+    filteredEvents.forEach(event => {
+      switch (event.type) {
+        case 'transaction': counts.transactions++; break;
+        case 'block': counts.blocks++; break;
+        case 'account_change': counts.accountChanges++; break;
+      }
+    });
+    
+    return counts;
+  }, [filteredEvents]);
 
   const fetchAnomalyStats = async () => {
     try {
@@ -422,7 +519,10 @@ export function LiveEventMonitor({
               )}
             </div>
             <div className="text-sm text-muted-foreground">
-              Events: {eventCountRef.current}
+              Events: {eventCountRef.current}/{maxEvents}
+            </div>
+            <div className="text-sm text-muted-foreground">
+              Filtered: {eventCounts.total}
             </div>
             <div className="text-sm text-muted-foreground">
               Alerts: {alerts.length}
@@ -448,6 +548,16 @@ export function LiveEventMonitor({
               Clear Alerts
             </button>
             <button
+              onClick={() => {
+                eventQueue.clear();
+                setEvents([]);
+                eventCountRef.current = 0;
+              }}
+              className="px-3 py-1 text-sm bg-gray-500 text-white rounded hover:bg-gray-600"
+            >
+              Clear Events
+            </button>
+            <button
               onClick={isConnected ? disconnect : connectToSolana}
               className={`px-3 py-1 text-sm rounded ${
                 isConnected 
@@ -461,108 +571,70 @@ export function LiveEventMonitor({
         </div>
       </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Live Events */}
-        <Card className="p-4">
-          <h3 className="text-lg font-semibold mb-4">Live Events</h3>
-          <div className="space-y-2 max-h-96 overflow-y-auto">
-            {events.map((event, index) => {
-              const isClickable = event.type === 'transaction' && event.data?.signature;
-              return (
-                <div 
-                  key={`${event.timestamp}-${index}`} 
-                  className={`flex items-center justify-between p-2 bg-gray-50 rounded ${
-                    isClickable 
-                      ? 'cursor-pointer hover:bg-gray-100 hover:shadow-sm transition-all duration-200' 
-                      : ''
-                  }`}
-                  onClick={() => handleEventClick(event)}
-                  title={isClickable ? 'Click to view transaction details in new tab' : undefined}
-                >
-                  <div className="flex items-center space-x-3">
-                    <span className={`px-2 py-1 text-xs rounded border ${getEventTypeColor(event.type, event.data)}`}>
-                      {event.type}
-                      {event.data?.knownProgram && (
-                        <span className="ml-1 font-semibold">({event.data.knownProgram.toUpperCase()})</span>
-                      )}
-                      {event.data?.transactionType && (
-                        <span className="ml-1 text-xs opacity-75">
-                          {event.data.transactionType === 'spl-transfer' ? 'SPL' : 'CUSTOM'}
-                        </span>
-                      )}
-                    </span>
-                    <span className="text-sm text-muted-foreground">
-                      {new Date(event.timestamp).toLocaleTimeString()}
-                    </span>
-                    {event.data.err && (
-                      <span className="px-2 py-1 text-xs bg-red-100 text-red-800 rounded">
-                        ERROR
-                      </span>
-                    )}
-                    {isClickable && (
-                      <span className="text-xs text-blue-500 opacity-75">
-                        Click to view →
-                      </span>
-                    )}
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    {event.type === 'transaction' && (
-                      <div className="text-right">
-                        {event.data.signature && (
-                          <div>{event.data.signature.substring(0, 8)}...</div>
-                        )}
-                        {event.data.fee && (
-                          <div>Fee: {lamportsToSol(event.data.fee).toFixed(9)} SOL</div>
-                        )}
-                      </div>
-                    )}
-                    {event.type === 'block' && event.data.slot && (
-                      <div>Slot: {event.data.slot}</div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-            {events.length === 0 && (
-              <div className="text-center text-muted-foreground py-8">
-                {isConnected ? 'Waiting for blockchain events...' : 'Not connected to Solana'}
-              </div>
-            )}
-          </div>
-        </Card>
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+        {/* Left Sidebar - Statistics and Filters */}
+        <div className="lg:col-span-1 space-y-4">
+          {/* Pump Detection Statistics */}
+          <PumpStatistics events={filteredEvents} />
+          
+          {/* Event Filters */}
+          <EventFilterControls 
+            filters={filters}
+            onFiltersChange={setFilters}
+            eventCounts={eventCounts}
+          />
+        </div>
 
-        {/* Anomaly Alerts - Now powered by SSE */}
-        <Card className="p-4">
-          <h3 className="text-lg font-semibold mb-4">
-            Real-Time Anomaly Alerts 
-            {sseConnected && <span className="text-xs text-green-600 ml-2">(Live SSE)</span>}
-          </h3>
-          <div className="space-y-2 max-h-96 overflow-y-auto">
-            {alerts.map((alert) => (
-              <div key={alert.id} className="p-3 border rounded-lg">
-                <div className="flex items-center justify-between mb-2">
-                  <span className={`px-2 py-1 text-xs rounded ${getSeverityColor(alert.severity)}`}>
-                    {alert.severity.toUpperCase()}
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    {new Date(alert.timestamp).toLocaleTimeString()}
-                  </span>
-                </div>
-                <div className="text-sm font-medium text-foreground">
-                  {alert.type.replace(/_/g, ' ').toUpperCase()}
-                </div>
-                <div className="text-xs text-muted-foreground mt-1">
-                  {alert.description}
-                </div>
-              </div>
-            ))}
-            {alerts.length === 0 && (
+        {/* Main Content - Virtual Table and Alerts */}
+        <div className="lg:col-span-3 space-y-4">
+          {/* Live Events with Virtual Table */}
+          <Card className="p-4">
+            <h3 className="text-lg font-semibold mb-4">Live Events (Virtual Table)</h3>
+            <VirtualEventTable 
+              events={filteredEvents}
+              onEventClick={handleEventClick}
+              height={500}
+            />
+            {filteredEvents.length === 0 && (
               <div className="text-center text-muted-foreground py-8">
-                No anomalies detected
+                {isConnected ? 'No events match current filters' : 'Not connected to Solana'}
               </div>
             )}
-          </div>
-        </Card>
+          </Card>
+
+          {/* Anomaly Alerts - Now powered by SSE */}
+          <Card className="p-4">
+            <h3 className="text-lg font-semibold mb-4">
+              Real-Time Anomaly Alerts 
+              {sseConnected && <span className="text-xs text-green-600 ml-2">(Live SSE)</span>}
+            </h3>
+            <div className="space-y-2 max-h-96 overflow-y-auto">
+              {alerts.map((alert) => (
+                <div key={alert.id} className="p-3 border rounded-lg">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className={`px-2 py-1 text-xs rounded ${getSeverityColor(alert.severity)}`}>
+                      {alert.severity.toUpperCase()}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {new Date(alert.timestamp).toLocaleTimeString()}
+                    </span>
+                  </div>
+                  <div className="text-sm font-medium text-foreground">
+                    {alert.type.replace(/_/g, ' ').toUpperCase()}
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-1">
+                    {alert.description}
+                  </div>
+                </div>
+              ))}
+              {alerts.length === 0 && (
+                <div className="text-center text-muted-foreground py-8">
+                  No anomalies detected
+                </div>
+              )}
+            </div>
+          </Card>
+        </div>
       </div>
 
       {/* Statistics */}
