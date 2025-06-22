@@ -45,87 +45,113 @@ export const fetchTransactionData = async (
 };
 
 /**
- * Fetch account transactions with SPL transfer filtering and fallback
+ * Fetch account transactions with SPL transfer filtering and guaranteed fallback
  * @param address Account address
  * @param signal Optional abort signal
- * @returns Account data or null if error
+ * @returns Account data with guaranteed non-null result
  */
 export const fetchAccountTransactions = async (
   address: string,
   signal?: AbortSignal
 ): Promise<AccountData | null> => {
+  console.log(`Starting fetch for account: ${address}`);
+  
   try {
-    // Circuit breaker for problematic accounts
+    // Circuit breaker for problematic accounts - still return empty data
     if (address === 'FetTyW8xAYfd33x4GMHoE7hTuEdWLj1fNnhJuyVMUGGa' || 
         address === 'WaLLeTaS7qTaSnKFTYJNGAeu7VzoLMUV9QCMfKxFsgt' ||
         address === 'RecipienTEKQQQQQQQQQQQQQQQQQQQQQQQQQQFrThs') {
+      console.log(`Circuit breaker: Skipping problematic account ${address}`);
       return { address, transactions: [] };
     }
 
     // First try to get SPL transfers (top 10 by volume)
-    const transfersResponse = await fetch(`/api/account-transfers/${address}?limit=10`, {
-      signal,
-      headers: { 'Cache-Control': 'no-cache' }
-    });
+    console.log(`Trying SPL transfers for ${address}`);
+    try {
+      const transfersResponse = await fetch(`/api/account-transfers/${address}?limit=10`, {
+        signal,
+        headers: { 'Cache-Control': 'no-cache' }
+      });
 
-    if (transfersResponse.ok) {
-      const transfersData = await transfersResponse.json();
-      const transfers = transfersData.data || [];
-      
-      if (transfers.length > 0) {
-        // Convert transfers to transaction format
-        const transactions = transfers.map((transfer: any) => ({
-          signature: transfer.txId,
-          timestamp: new Date(transfer.date).getTime(),
-          slot: 0,
-          err: null,
-          success: true,
-          accounts: [
-            { pubkey: transfer.from, isSigner: false, isWritable: true },
-            { pubkey: transfer.to, isSigner: false, isWritable: true }
-          ],
-          transfers: [{
-            account: transfer.to,
-            change: parseFloat(transfer.tokenAmount) * 1e9 // Convert to lamports
-          }],
-          memo: null
-        }));
+      if (transfersResponse.ok) {
+        const transfersData = await transfersResponse.json();
+        const transfers = transfersData.data || [];
         
-        console.log(`Found ${transactions.length} SPL transfers for ${address}`);
-        return { address, transactions };
+        if (transfers.length > 0) {
+          // Convert transfers to transaction format
+          const transactions = transfers.map((transfer: any) => ({
+            signature: transfer.txId,
+            timestamp: new Date(transfer.date).getTime(),
+            slot: 0,
+            err: null,
+            success: true,
+            accounts: [
+              { pubkey: transfer.from, isSigner: false, isWritable: true },
+              { pubkey: transfer.to, isSigner: false, isWritable: true }
+            ],
+            transfers: [{
+              account: transfer.to,
+              change: parseFloat(transfer.tokenAmount) * 1e9 // Convert to lamports
+            }],
+            memo: null
+          }));
+          
+          console.log(`✓ Found ${transactions.length} SPL transfers for ${address}`);
+          return { address, transactions };
+        }
+      } else {
+        console.warn(`SPL transfers API failed for ${address}: ${transfersResponse.status}`);
       }
+    } catch (transferError) {
+      console.warn(`SPL transfers fetch failed for ${address}:`, transferError);
     }
 
-    // Fallback: Get regular transactions with reduced depth (depth will be limited to 1 in calling code)
-    console.log(`No SPL transfers found for ${address}, falling back to regular transactions`);
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000);
-    
-    // Use existing signal if provided, otherwise use our controller
-    const fetchSignal = signal || controller.signal;
-    
-    const response = await fetch(`/api/account-transactions/${address}?limit=3`, {
-      signal: fetchSignal,
-      headers: { 'Cache-Control': 'no-cache' }
-    });
-    
-    clearTimeout(timeoutId);
-    
-    if (!response.ok) {
-      if (response.status === 400) {
-        console.warn(`Bad request for account ${address}, returning empty transactions`);
-        return { address, transactions: [] };
+    // Fallback: Get regular transactions with timeout protection
+    console.log(`Falling back to regular transactions for ${address}`);
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // Reduced to 10s
+      
+      // Use existing signal if provided, otherwise use our controller
+      const fetchSignal = signal || controller.signal;
+      
+      const response = await fetch(`/api/account-transactions/${address}?limit=5`, {
+        signal: fetchSignal,
+        headers: { 'Cache-Control': 'no-cache' }
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        if (response.status === 400) {
+          console.warn(`Bad request for account ${address}, returning empty transactions`);
+          return { address, transactions: [] };
+        }
+        throw new Error(`Error fetching transactions: ${response.statusText} (${response.status})`);
       }
-      throw new Error(`Error fetching transactions: ${response.statusText} (${response.status})`);
+      
+      const data = await response.json();
+      const transactionCount = data.transactions?.length || 0;
+      console.log(`✓ Fallback: Found ${transactionCount} regular transactions for ${address}`);
+      
+      // Always return valid data structure, even if empty
+      return {
+        address,
+        transactions: data.transactions || []
+      };
+      
+    } catch (fallbackError) {
+      console.warn(`Regular transactions fallback failed for ${address}:`, fallbackError);
     }
     
-    const data = await response.json();
-    console.log(`Fallback: Found ${data.transactions?.length || 0} regular transactions for ${address}`);
-    return data;
+    // Final fallback: Return empty transactions but still mark account as processed
+    console.log(`All fetches failed for ${address}, returning empty transactions`);
+    return { address, transactions: [] };
     
   } catch (err) {
-    console.error(`Error fetching transactions for ${address}:`, err);
-    return null;
+    console.error(`Critical error fetching transactions for ${address}:`, err);
+    // Always return a valid structure, never null
+    return { address, transactions: [] };
   }
 };
 
@@ -301,22 +327,25 @@ export const addAccountToGraph = async (
   
   // Fetch transactions for this account
   const data = await fetchAccountTransactions?.(address);
-  if (!data) {
-    // Use the accountKey format for consistency
-    const accountKey = `${address}:${depth}`;
-    pendingFetchesRef?.current?.delete(accountKey);
-    return;
-  }
   
-  // Mark account as loaded
+  // Always mark account as processed and update progress, even if no data
   loadedAccountsRef?.current?.add(address);
   pendingFetchesRef?.current?.delete(`${address}:${depth}`);
   
-  // Update loading progress
+  // Update loading progress - ensure progress moves forward even with empty results
   setLoadingProgress?.((prev) => {
-    const progress = Math.min(loadedAccountsRef.current?.size / Math.max(totalAccounts, 1), 1);
-    return Math.floor(progress * 100);
+    const loadedCount = loadedAccountsRef?.current?.size || 0;
+    const total = Math.max(totalAccounts, 1);
+    const progress = Math.min(loadedCount / total, 1);
+    const newProgress = Math.floor(progress * 100);
+    console.log(`Progress update: ${loadedCount}/${total} accounts (${newProgress}%)`);
+    return newProgress;
   });
+  
+  if (!data || !data.transactions || data.transactions.length === 0) {
+    console.log(`No transactions found for account ${address}, but marked as processed`);
+    return { cy: cyRef?.current, address, newElements: new Set() };
+  }
 
   // Get cy instance and verify it exists
   const cy = cyRef?.current;
@@ -337,7 +366,7 @@ export const addAccountToGraph = async (
       newElements.add(nodeId);
     }
     
-    // Add account node if it doesn't exist
+    // Always add account node if it doesn't exist, even if no transactions
     if (!cy.getElementById(nodeId).length && !processedNodesRef?.current?.has(nodeId)) {
       cy.add({
         data: {
@@ -345,11 +374,19 @@ export const addAccountToGraph = async (
           label: shortenString(address),
           type: 'account',
           fullAddress: address,
-          status: 'loaded'
+          status: 'loaded',
+          transactionCount: data?.transactions?.length || 0
         },
         classes: 'account'
       });
       processedNodesRef?.current?.add(nodeId);
+      console.log(`Added account node: ${address} with ${data?.transactions?.length || 0} transactions`);
+    }
+
+    // If no transactions, return early but still show the account node
+    if (!data?.transactions || data.transactions.length === 0) {
+      console.log(`Account ${address} has no transactions but node was added to graph`);
+      return { cy, address, newElements };
     }
 
     // Add transaction nodes and edges

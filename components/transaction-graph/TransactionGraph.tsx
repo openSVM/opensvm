@@ -701,16 +701,21 @@ function TransactionGraph({
       try {
         const cachedState = GraphStateCache.loadState(initialSignature);
         
-        // Create initial transaction node
+        // Create initial transaction node and immediate progress update
         if (cyRef.current && !cyRef.current.getElementById(initialSignature).length) {
           cyRef.current.add({ 
             data: { 
               id: initialSignature, 
               label: initialSignature.slice(0, 8) + '...', 
-              type: 'transaction' 
+              type: 'transaction',
+              status: 'loading'
             }, 
             classes: 'transaction highlight-transaction' 
           });
+          
+          // Immediate progress update to show something is happening
+          setLoadingProgress(5);
+          setTotalAccounts(1);
         }
 
         // Restore cached state if available
@@ -736,50 +741,93 @@ function TransactionGraph({
             console.warn('Error restoring cached state:', err);
           }
         } else {
-          // Fetch fresh data
+          // Fetch transaction data with guaranteed processing
           const response = await fetch(`/api/transaction/${initialSignature}`);
+          
+          setLoadingProgress(10); // Show progress
           
           if (response.ok) {
             const txData = await response.json();
             
+            // Update transaction node with fetched data
+            if (cyRef.current) {
+              const txNode = cyRef.current.getElementById(initialSignature);
+              if (txNode.length) {
+                txNode.data('status', 'loaded');
+                txNode.data('timestamp', txData.details?.blockTime || Date.now());
+                txNode.data('success', !txData.details?.err);
+              }
+            }
+            
             if (txData.details?.accounts?.length > 0) {
               const firstAccount = txData.details.accounts[0].pubkey;
               if (firstAccount) {
+                console.log(`Starting graph build from account: ${firstAccount}`);
+                setTotalAccounts(txData.details.accounts.length);
                 queueAccountFetch(firstAccount, 0, initialSignature);
                 
-                // Wait for initial processing with better fallback
+                // Wait for initial processing with guaranteed completion
                 await new Promise<void>((resolve) => {
                   let attempts = 0;
-                  const maxAttempts = 50; // Reduced from 100
+                  const maxAttempts = 30; // Reduced for faster initial load
                   const checkInterval = setInterval(() => {
                     attempts++;
                     const elements = cyRef.current?.elements().length || 0;
+                    const accountsProcessed = loadedAccountsRef.current?.size || 0;
                     
-                    if (elements > 1 || attempts >= maxAttempts) {
+                    // Complete if we have more elements OR if we've processed accounts OR max attempts
+                    if (elements > 1 || accountsProcessed > 0 || attempts >= maxAttempts) {
                       clearInterval(checkInterval);
                       
-                      // If still no elements, show helpful message
-                      if (elements <= 1) {
+                      // Show helpful message based on what we found
+                      if (elements <= 1 && accountsProcessed === 0) {
                         setError({
-                          message: `Limited transaction data found for ${initialSignature.substring(0, 8)}... This transaction may not involve significant SPL transfers.`,
+                          message: `No transaction data available for ${initialSignature.substring(0, 8)}... This may be an invalid or very old transaction.`,
+                          severity: 'warning'
+                        });
+                      } else if (elements <= 2) {
+                        setError({
+                          message: `Limited activity found for ${initialSignature.substring(0, 8)}... This transaction may not involve significant SPL transfers.`,
                           severity: 'warning'
                         });
                       }
                       
+                      console.log(`Initial load complete: ${elements} elements, ${accountsProcessed} accounts processed`);
                       resolve();
                     }
-                  }, 100);
+                  }, 200); // Longer interval for less aggressive polling
                   
+                  // Guaranteed completion after 6 seconds
                   timeoutIds.current.push(setTimeout(() => {
                     clearInterval(checkInterval);
+                    console.log('Initial load timeout reached, completing anyway');
                     resolve();
-                  }, 5000)); // Reduced from 10000
+                  }, 6000));
+                });
+              } else {
+                console.log('No valid account found in transaction data');
+                setError({
+                  message: `No account data found for transaction ${initialSignature.substring(0, 8)}...`,
+                  severity: 'warning'
                 });
               }
+            } else {
+              console.log('No accounts found in transaction data');
+              setError({
+                message: `Transaction ${initialSignature.substring(0, 8)}... contains no account information`,
+                severity: 'warning'
+              });
             }
-
-            await focusOnTransaction(initialSignature, true, true, false);
+          } else {
+            console.error(`Failed to fetch transaction data: ${response.status}`);
+            setError({
+              message: `Failed to load transaction data: ${response.statusText}`,
+              severity: 'error'
+            });
           }
+          
+          // Always complete the loading, even if we only have the transaction node
+          setLoadingProgress(100);
           
           // Set initial viewport only for fresh data
           if (cyRef.current) {
