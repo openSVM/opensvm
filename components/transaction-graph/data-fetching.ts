@@ -106,16 +106,17 @@ export const fetchAccountTransactions = async (
       console.warn(`SPL transfers fetch failed for ${address}:`, transferError);
     }
 
-    // Fallback: Get regular transactions with timeout protection
-    console.log(`Falling back to regular transactions for ${address}`);
+    // Fallback: Get very limited regular transactions (reduced scope)
+    console.log(`Falling back to limited regular transactions for ${address}`);
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // Reduced to 10s
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // Reduced to 5s for faster fallback
       
       // Use existing signal if provided, otherwise use our controller
       const fetchSignal = signal || controller.signal;
       
-      const response = await fetch(`/api/account-transactions/${address}?limit=5`, {
+      // Heavily limit fallback to prevent graph explosion - only 2 transactions
+      const response = await fetch(`/api/account-transactions/${address}?limit=2`, {
         signal: fetchSignal,
         headers: { 'Cache-Control': 'no-cache' }
       });
@@ -131,13 +132,22 @@ export const fetchAccountTransactions = async (
       }
       
       const data = await response.json();
-      const transactionCount = data.transactions?.length || 0;
-      console.log(`✓ Fallback: Found ${transactionCount} regular transactions for ${address}`);
+      const transactions = data.transactions || [];
+      const transactionCount = transactions.length;
+      console.log(`✓ Fallback: Found ${transactionCount} limited regular transactions for ${address}`);
+      
+      // For fallback mode, further limit by taking only transactions with fewer accounts
+      // to prevent graph explosion
+      const limitedTransactions = transactions
+        .filter((tx: any) => tx.accounts && tx.accounts.length <= 5) // Max 5 accounts per transaction
+        .slice(0, 2); // Absolute max of 2 transactions
+      
+      console.log(`✓ After filtering: ${limitedTransactions.length} transactions (reduced from ${transactionCount})`);
       
       // Always return valid data structure, even if empty
       return {
         address,
-        transactions: data.transactions || []
+        transactions: limitedTransactions
       };
       
     } catch (fallbackError) {
@@ -196,9 +206,9 @@ export const queueAccountFetch = (
   }
   
   // Enforce maximum queue size to prevent unbounded growth
-  const MAX_QUEUE_SIZE = 250; // Reduced from 500 to 250 for better performance
+  const MAX_QUEUE_SIZE = 50; // Heavily reduced from 250 to prevent graph explosion
   if (fetchQueueRef.current.length >= MAX_QUEUE_SIZE) {
-    console.warn(`Fetch queue size limit reached (${MAX_QUEUE_SIZE}). Skipping address: ${address}`);
+    console.warn(`Queue size limit reached (${MAX_QUEUE_SIZE}), skipping ${address}`);
     return;
   }
   

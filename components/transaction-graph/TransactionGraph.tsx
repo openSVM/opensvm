@@ -277,7 +277,9 @@ function TransactionGraph({
       
       // Check if this account has SPL transfers first to determine max depth
       const hasSplTransfers = await checkForSplTransfers(address);
-      const effectiveMaxDepth = hasSplTransfers ? maxDepth : 1; // Reduce to depth 1 if no SPL transfers
+      const effectiveMaxDepth = hasSplTransfers ? maxDepth : 0; // Depth 0 for non-SPL (no expansion)
+      
+      console.log(`Account ${address}: hasSplTransfers=${hasSplTransfers}, effectiveMaxDepth=${effectiveMaxDepth}`);
       
       const result = await addAccountToGraphUtil(
         address,
@@ -285,7 +287,7 @@ function TransactionGraph({
         depth,
         parentSignature,
         undefined, // newElements
-        effectiveMaxDepth, // maxDepth
+        effectiveMaxDepth, // maxDepth - now 0 for non-SPL accounts
         shouldExcludeAddress,
         shouldIncludeTransaction,
         fetchAccountTransactionsWithError,
@@ -811,11 +813,12 @@ function TransactionGraph({
                   loadedAccountsRef.current = new Set();
                 }
                 
-                // Queue the first account and wait briefly for processing to start
+                // Queue the first account and provide immediate feedback
                 queueAccountFetch(firstAccount, 0, initialSignature);
                 
-                // Give a short time for processing to begin
-                await new Promise(resolve => setTimeout(resolve, 1000));
+                // Provide immediate progress update and wait briefly for processing
+                setLoadingProgress(85);
+                await new Promise(resolve => setTimeout(resolve, 1500));
                 
                 const elements = cyRef.current?.elements().length || 0;
                 console.log(`Graph elements after processing: ${elements}`);
@@ -824,10 +827,10 @@ function TransactionGraph({
                   setLoadingProgress(100);
                   console.log('Graph build successful, progress: 100%');
                 } else {
-                  // Even if no additional elements, still complete
+                  // Complete loading even with minimal data
                   setError({
-                    message: `Limited SPL transfer activity found for transaction ${initialSignature.substring(0, 8)}...`,
-                    severity: 'warning'
+                    message: `Limited transaction data for ${initialSignature.substring(0, 8)}... Graph shows basic transaction structure with minimal expansion.`,
+                    severity: 'info'
                   });
                   setLoadingProgress(100);
                   console.log('Graph build completed with limited data, progress: 100%');
@@ -916,16 +919,21 @@ function TransactionGraph({
         queueAccountFetch(initialAccount, 0, null);
         setLoadingProgress(50);
         
-        // Give time for processing to start
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        // Give more time for limited processing to complete and provide feedback
+        await new Promise(resolve => setTimeout(resolve, 2000));
         
         const elements = cyRef.current?.elements().length || 0;
         console.log(`Account loading complete. Elements: ${elements}`);
         
         if (elements === 0) {
           setError({
-            message: `No SPL transfers found for account ${initialAccount.substring(0, 8)}... This account may not have significant token transfer activity.`,
+            message: `No transaction data found for account ${initialAccount.substring(0, 8)}... Account may have no recent activity or only contains non-transferable transactions.`,
             severity: 'warning'
+          });
+        } else if (elements === 1) {
+          setError({
+            message: `Limited data available for account ${initialAccount.substring(0, 8)}... Only the account node is shown. This account may have minimal transaction activity.`,
+            severity: 'info'
           });
         }
         
