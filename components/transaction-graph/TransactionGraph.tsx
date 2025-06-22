@@ -238,27 +238,35 @@ function TransactionGraph({
       return await fetchAccountTransactions(pubkey, signal);
     } catch (error) {
       console.error(`Error fetching transactions for ${pubkey}:`, error);
-      return { transactions: [] };
+      return { address: pubkey, transactions: [] };
     }
   }, []);
 
-  // Optimized addAccountToGraph with reduced layout calls
+  // Optimized addAccountToGraph with reduced layout calls and fallback depth
   const addAccountToGraph = useCallback(async (
     address: string,
     totalAccounts: number,
     depth = 0,
     parentSignature: string | null = null
   ) => {
+    // Check if this account has SPL transfers first to determine max depth
+    const hasSplTransfers = await checkForSplTransfers(address);
+    const effectiveMaxDepth = hasSplTransfers ? maxDepth : 1; // Reduce to depth 1 if no SPL transfers
+    
     const result = await addAccountToGraphUtil(
       address,
-      cyRef,
       totalAccounts,
       depth,
       parentSignature,
+      undefined, // newElements
+      effectiveMaxDepth, // maxDepth
       shouldExcludeAddress,
       shouldIncludeTransaction,
       fetchAccountTransactionsWithError,
-      setExpandedNodesCount,
+      cyRef,
+      loadedAccountsRef,
+      pendingFetchesRef,
+      loadedTransactionsRef,
       processedNodesRef,
       processedEdgesRef,
       setLoadingProgress,
@@ -278,8 +286,35 @@ function TransactionGraph({
     shouldExcludeAddress,
     shouldIncludeTransaction,
     fetchAccountTransactionsWithError,
-    runLayoutOptimized
+    runLayoutOptimized,
+    maxDepth,
+    checkForSplTransfers,
+    // Add missing refs
+    loadedAccountsRef,
+    pendingFetchesRef,
+    loadedTransactionsRef,
+    processedNodesRef,
+    processedEdgesRef,
+    setLoadingProgress
   ]);
+
+  // Helper function to check if an account has SPL transfers
+  const checkForSplTransfers = useCallback(async (address: string): Promise<boolean> => {
+    try {
+      const response = await fetch(`/api/account-transfers/${address}?limit=1`, {
+        headers: { 'Cache-Control': 'no-cache' }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        return (data.data && data.data.length > 0);
+      }
+      return false;
+    } catch (error) {
+      console.warn(`Could not check SPL transfers for ${address}:`, error);
+      return false; // Default to no SPL transfers on error
+    }
+  }, []);
 
   // Fetch and process a single account
   const fetchAndProcessAccount = useCallback(async (
@@ -615,7 +650,7 @@ function TransactionGraph({
               if (firstAccount) {
                 queueAccountFetch(firstAccount, 0, initialSignature);
                 
-                // Wait for initial processing
+                // Wait for initial processing with better fallback
                 await new Promise<void>((resolve) => {
                   let attempts = 0;
                   const maxAttempts = 50; // Reduced from 100
@@ -625,6 +660,15 @@ function TransactionGraph({
                     
                     if (elements > 1 || attempts >= maxAttempts) {
                       clearInterval(checkInterval);
+                      
+                      // If still no elements, show helpful message
+                      if (elements <= 1) {
+                        setError({
+                          message: `Limited transaction data found for ${initialSignature.substring(0, 8)}... This transaction may not involve significant SPL transfers.`,
+                          severity: 'warning'
+                        });
+                      }
+                      
                       resolve();
                     }
                   }, 100);
@@ -695,8 +739,18 @@ function TransactionGraph({
             attempts++;
             const elements = cyRef.current?.elements().length || 0;
             
+            // More lenient loading - resolve if we have any elements OR if we've tried enough
             if (elements > 0 || attempts >= maxAttempts) {
               clearInterval(checkInterval);
+              
+              // If no elements after max attempts, show a helpful message
+              if (elements === 0) {
+                setError({
+                  message: `No SPL transfers found for account ${initialAccount.substring(0, 8)}... This account may not have significant token transfer activity.`,
+                  severity: 'warning'
+                });
+              }
+              
               resolve();
             }
           }, 100);

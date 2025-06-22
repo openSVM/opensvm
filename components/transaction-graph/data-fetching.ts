@@ -45,58 +45,86 @@ export const fetchTransactionData = async (
 };
 
 /**
- * Fetch account transactions
+ * Fetch account transactions with SPL transfer filtering and fallback
  * @param address Account address
- * @param limit Maximum number of transactions to fetch
- * @param setError Error state setter function
+ * @param signal Optional abort signal
  * @returns Account data or null if error
  */
 export const fetchAccountTransactions = async (
   address: string,
-  limit = 5, // Reduced from 10 to 5 for better performance
-  setError: (error: {message: string; severity: 'error' | 'warning'} | null) => void
+  signal?: AbortSignal
 ): Promise<AccountData | null> => {
   try {
     // Circuit breaker for problematic accounts
-    // Extended circuit breaker to handle additional problematic accounts
     if (address === 'FetTyW8xAYfd33x4GMHoE7hTuEdWLj1fNnhJuyVMUGGa' || 
         address === 'WaLLeTaS7qTaSnKFTYJNGAeu7VzoLMUV9QCMfKxFsgt' ||
         address === 'RecipienTEKQQQQQQQQQQQQQQQQQQQQQQQQQQFrThs') {
-      return { address, transactions: [] }; // Return empty transactions for this specific account
+      return { address, transactions: [] };
     }
-    // Add cache-busting parameter to prevent browser caching
-    const cacheBuster = Date.now();
-    // Add a timeout to the fetch request
+
+    // First try to get SPL transfers (top 10 by volume)
+    const transfersResponse = await fetch(`/api/account-transfers/${address}?limit=10`, {
+      signal,
+      headers: { 'Cache-Control': 'no-cache' }
+    });
+
+    if (transfersResponse.ok) {
+      const transfersData = await transfersResponse.json();
+      const transfers = transfersData.data || [];
+      
+      if (transfers.length > 0) {
+        // Convert transfers to transaction format
+        const transactions = transfers.map((transfer: any) => ({
+          signature: transfer.txId,
+          timestamp: new Date(transfer.date).getTime(),
+          slot: 0,
+          err: null,
+          success: true,
+          accounts: [
+            { pubkey: transfer.from, isSigner: false, isWritable: true },
+            { pubkey: transfer.to, isSigner: false, isWritable: true }
+          ],
+          transfers: [{
+            account: transfer.to,
+            change: parseFloat(transfer.tokenAmount) * 1e9 // Convert to lamports
+          }],
+          memo: null
+        }));
+        
+        console.log(`Found ${transactions.length} SPL transfers for ${address}`);
+        return { address, transactions };
+      }
+    }
+
+    // Fallback: Get regular transactions with reduced depth (depth will be limited to 1 in calling code)
+    console.log(`No SPL transfers found for ${address}, falling back to regular transactions`);
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
     
-    const response = await fetch(`/api/account-transactions/${address}?limit=${limit}&_=${cacheBuster}`, 
-      { 
-        signal: controller.signal,
-        // Add better error handling by capturing HTTP errors
-        headers: { 'Cache-Control': 'no-cache' }
-      });
-    clearTimeout(timeoutId); // Clear the timeout to prevent memory leaks
+    // Use existing signal if provided, otherwise use our controller
+    const fetchSignal = signal || controller.signal;
+    
+    const response = await fetch(`/api/account-transactions/${address}?limit=3`, {
+      signal: fetchSignal,
+      headers: { 'Cache-Control': 'no-cache' }
+    });
+    
+    clearTimeout(timeoutId);
     
     if (!response.ok) {
-      // Handle specific HTTP error codes more gracefully
       if (response.status === 400) {
         console.warn(`Bad request for account ${address}, returning empty transactions`);
         return { address, transactions: [] };
       }
       throw new Error(`Error fetching transactions: ${response.statusText} (${response.status})`);
     }
-    return await response.json();
+    
+    const data = await response.json();
+    console.log(`Fallback: Found ${data.transactions?.length || 0} regular transactions for ${address}`);
+    return data;
+    
   } catch (err) {
-    // Only set the error if it's not a circuit-broken account
     console.error(`Error fetching transactions for ${address}:`, err);
-    // Don't set global error for individual account fetch issues
-    // Instead, show a warning that doesn't block the UI
-    setError({
-      message: `Note: Could not fetch transactions for account ${address.substring(0, 8)}... 
-      This won't affect the rest of the graph.`,
-      severity: 'warning'
-    });
     return null;
   }
 };
@@ -249,7 +277,7 @@ export const addAccountToGraph = async (
   maxDepth = 3,
   shouldExcludeAddress?: (address: string) => boolean,
   shouldIncludeTransaction?: (accounts: {pubkey: string}[]) => boolean,
-  fetchAccountTransactions?: (address: string) => Promise<AccountData | null>,
+  fetchAccountTransactions?: (address: string, signal?: AbortSignal) => Promise<AccountData | null>,
   cyRef?: React.MutableRefObject<cytoscape.Core | null>,
   loadedAccountsRef?: React.MutableRefObject<Set<string>>,
   pendingFetchesRef?: React.MutableRefObject<Set<string>>,
