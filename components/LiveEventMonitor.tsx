@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Card } from '@/components/ui/card';
 import { getConnection } from '@/lib/solana';
 import { useSSEAlerts } from '@/lib/hooks/useSSEAlerts';
+import { lamportsToSol } from '@/components/transaction-graph/utils';
 
 interface BlockchainEvent {
   type: 'transaction' | 'block' | 'account_change';
@@ -511,7 +512,7 @@ export function LiveEventMonitor({
                           <div>{event.data.signature.substring(0, 8)}...</div>
                         )}
                         {event.data.fee && (
-                          <div>Fee: {(event.data.fee / 1000000).toFixed(6)} SOL</div>
+                          <div>Fee: {lamportsToSol(event.data.fee).toFixed(9)} SOL</div>
                         )}
                       </div>
                     )}
