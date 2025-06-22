@@ -80,7 +80,6 @@ export async function POST(request: NextRequest) {
       );
       return Response.json(response, { status });
     }
-    }
 
     const { event, action } = validationResult.data;
     const detector = await getAnomalyDetector();
