@@ -360,6 +360,15 @@ export function LiveEventMonitor({
     }
   };
 
+  const handleEventClick = (event: BlockchainEvent) => {
+    // Only handle transaction events that have signatures
+    if (event.type === 'transaction' && event.data?.signature) {
+      const url = `/tx/${event.data.signature}`;
+      // Open in new tab in background
+      window.open(url, '_blank', 'noopener,noreferrer');
+    }
+  };
+
   const getEventTypeColor = (type: string, data?: any) => {
     switch (type) {
       case 'transaction': 
@@ -456,46 +465,63 @@ export function LiveEventMonitor({
         <Card className="p-4">
           <h3 className="text-lg font-semibold mb-4">Live Events</h3>
           <div className="space-y-2 max-h-96 overflow-y-auto">
-            {events.map((event, index) => (
-              <div key={`${event.timestamp}-${index}`} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                <div className="flex items-center space-x-3">
-                  <span className={`px-2 py-1 text-xs rounded border ${getEventTypeColor(event.type, event.data)}`}>
-                    {event.type}
-                    {event.data?.knownProgram && (
-                      <span className="ml-1 font-semibold">({event.data.knownProgram.toUpperCase()})</span>
-                    )}
-                    {event.data?.transactionType && (
-                      <span className="ml-1 text-xs opacity-75">
-                        {event.data.transactionType === 'spl-transfer' ? 'SPL' : 'CUSTOM'}
+            {events.map((event, index) => {
+              const isClickable = event.type === 'transaction' && event.data?.signature;
+              return (
+                <div 
+                  key={`${event.timestamp}-${index}`} 
+                  className={`flex items-center justify-between p-2 bg-gray-50 rounded ${
+                    isClickable 
+                      ? 'cursor-pointer hover:bg-gray-100 hover:shadow-sm transition-all duration-200' 
+                      : ''
+                  }`}
+                  onClick={() => handleEventClick(event)}
+                  title={isClickable ? 'Click to view transaction details in new tab' : undefined}
+                >
+                  <div className="flex items-center space-x-3">
+                    <span className={`px-2 py-1 text-xs rounded border ${getEventTypeColor(event.type, event.data)}`}>
+                      {event.type}
+                      {event.data?.knownProgram && (
+                        <span className="ml-1 font-semibold">({event.data.knownProgram.toUpperCase()})</span>
+                      )}
+                      {event.data?.transactionType && (
+                        <span className="ml-1 text-xs opacity-75">
+                          {event.data.transactionType === 'spl-transfer' ? 'SPL' : 'CUSTOM'}
+                        </span>
+                      )}
+                    </span>
+                    <span className="text-sm text-muted-foreground">
+                      {new Date(event.timestamp).toLocaleTimeString()}
+                    </span>
+                    {event.data.err && (
+                      <span className="px-2 py-1 text-xs bg-red-100 text-red-800 rounded">
+                        ERROR
                       </span>
                     )}
-                  </span>
-                  <span className="text-sm text-muted-foreground">
-                    {new Date(event.timestamp).toLocaleTimeString()}
-                  </span>
-                  {event.data.err && (
-                    <span className="px-2 py-1 text-xs bg-red-100 text-red-800 rounded">
-                      ERROR
-                    </span>
-                  )}
+                    {isClickable && (
+                      <span className="text-xs text-blue-500 opacity-75">
+                        Click to view →
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {event.type === 'transaction' && (
+                      <div className="text-right">
+                        {event.data.signature && (
+                          <div>{event.data.signature.substring(0, 8)}...</div>
+                        )}
+                        {event.data.fee && (
+                          <div>Fee: {(event.data.fee / 1000000).toFixed(6)} SOL</div>
+                        )}
+                      </div>
+                    )}
+                    {event.type === 'block' && event.data.slot && (
+                      <div>Slot: {event.data.slot}</div>
+                    )}
+                  </div>
                 </div>
-                <div className="text-xs text-muted-foreground">
-                  {event.type === 'transaction' && (
-                    <div className="text-right">
-                      {event.data.signature && (
-                        <div>{event.data.signature.substring(0, 8)}...</div>
-                      )}
-                      {event.data.fee && (
-                        <div>Fee: {(event.data.fee / 1000000).toFixed(6)} SOL</div>
-                      )}
-                    </div>
-                  )}
-                  {event.type === 'block' && event.data.slot && (
-                    <div>Slot: {event.data.slot}</div>
-                  )}
-                </div>
-              </div>
-            ))}
+              );
+            })}
             {events.length === 0 && (
               <div className="text-center text-muted-foreground py-8">
                 {isConnected ? 'Waiting for blockchain events...' : 'Not connected to Solana'}
