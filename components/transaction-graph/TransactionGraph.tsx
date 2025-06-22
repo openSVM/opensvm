@@ -272,39 +272,58 @@ function TransactionGraph({
     depth = 0,
     parentSignature: string | null = null
   ) => {
-    // Check if this account has SPL transfers first to determine max depth
-    const hasSplTransfers = await checkForSplTransfers(address);
-    const effectiveMaxDepth = hasSplTransfers ? maxDepth : 1; // Reduce to depth 1 if no SPL transfers
-    
-    const result = await addAccountToGraphUtil(
-      address,
-      totalAccounts,
-      depth,
-      parentSignature,
-      undefined, // newElements
-      effectiveMaxDepth, // maxDepth
-      shouldExcludeAddress,
-      shouldIncludeTransaction,
-      fetchAccountTransactionsWithError,
-      cyRef,
-      loadedAccountsRef,
-      pendingFetchesRef,
-      loadedTransactionsRef,
-      processedNodesRef,
-      processedEdgesRef,
-      setLoadingProgress,
-      queueAccountFetchRef.current
-    );
+    try {
+      // Check if this account has SPL transfers first to determine max depth
+      const hasSplTransfers = await checkForSplTransfers(address);
+      const effectiveMaxDepth = hasSplTransfers ? maxDepth : 1; // Reduce to depth 1 if no SPL transfers
+      
+      const result = await addAccountToGraphUtil(
+        address,
+        totalAccounts,
+        depth,
+        parentSignature,
+        undefined, // newElements
+        effectiveMaxDepth, // maxDepth
+        shouldExcludeAddress,
+        shouldIncludeTransaction,
+        fetchAccountTransactionsWithError,
+        cyRef,
+        loadedAccountsRef,
+        pendingFetchesRef,
+        loadedTransactionsRef,
+        processedNodesRef,
+        processedEdgesRef,
+        setLoadingProgress,
+        queueAccountFetchRef.current
+      );
 
-    // Only run layout every 5 nodes to reduce blinking
-    if (cyRef.current) {
-      const elementCount = cyRef.current.elements().length;
-      if (elementCount % 5 === 0) {
-        runLayoutOptimized(false, false);
+      // Only run layout every 5 nodes to reduce blinking
+      if (cyRef.current) {
+        const elementCount = cyRef.current.elements().length;
+        if (elementCount % 5 === 0) {
+          runLayoutOptimized(false, false);
+        }
       }
-    }
 
-    return result;
+      return result;
+    } catch (error) {
+      console.error(`Error in addAccountToGraph for ${address}:`, error);
+      // Ensure account is marked as processed even if there's an error
+      loadedAccountsRef.current?.add(address);
+      pendingFetchesRef.current?.delete(`${address}:${depth}`);
+      
+      // Update progress even on error to prevent getting stuck
+      setLoadingProgress?.((prev) => {
+        const loadedCount = loadedAccountsRef?.current?.size || 0;
+        const total = Math.max(totalAccounts, 1);
+        const progress = Math.min(loadedCount / total, 1);
+        const newProgress = Math.floor(progress * 100);
+        console.log(`Progress update (error recovery): ${loadedCount}/${total} accounts (${newProgress}%)`);
+        return newProgress;
+      });
+      
+      return undefined;
+    }
   }, [
     shouldExcludeAddress,
     shouldIncludeTransaction,
@@ -328,11 +347,14 @@ function TransactionGraph({
     parentSignature: string | null = null
   ) => {
     try {
-      await addAccountToGraph(address, totalAccounts, depth, parentSignature);
+      // Use current totalAccounts state value instead of closure value
+      const currentTotalAccounts = totalAccounts || 1; // Ensure minimum of 1
+      await addAccountToGraph(address, currentTotalAccounts, depth, parentSignature);
     } catch (e) {
       const accountKey = `${address}:${depth}`;
       console.error(`Error processing account ${address}:`, e);
       pendingFetchesRef.current?.delete(accountKey);
+      loadedAccountsRef.current?.add(address); // Still mark as processed to avoid getting stuck
     }
   }, [addAccountToGraph, totalAccounts]);
 
@@ -763,21 +785,44 @@ function TransactionGraph({
               const firstAccount = txData.details.accounts[0].pubkey;
               if (firstAccount) {
                 console.log(`Starting graph build from account: ${firstAccount}`);
-                setTotalAccounts(txData.details.accounts.length);
+                // Set totalAccounts to a reasonable number for progress tracking
+                setTotalAccounts(Math.min(txData.details.accounts.length, 5)); // Limit to max 5 for progress calculation
+                setLoadingProgress(15); // Show initial progress
+                
                 queueAccountFetch(firstAccount, 0, initialSignature);
+                
+                // Add backup progress timer to ensure UI doesn't get stuck
+                const progressTimer = setInterval(() => {
+                  setLoadingProgress(prev => {
+                    if (prev < 90) {
+                      return Math.min(prev + 5, 90); // Slowly increment to 90%
+                    }
+                    return prev;
+                  });
+                }, 500); // Update every 500ms
                 
                 // Wait for initial processing with guaranteed completion
                 await new Promise<void>((resolve) => {
                   let attempts = 0;
-                  const maxAttempts = 30; // Reduced for faster initial load
+                  const maxAttempts = 20; // Reduced for faster completion
                   const checkInterval = setInterval(() => {
                     attempts++;
                     const elements = cyRef.current?.elements().length || 0;
                     const accountsProcessed = loadedAccountsRef.current?.size || 0;
                     
-                    // Complete if we have more elements OR if we've processed accounts OR max attempts
+                    // Update progress based on processing state
+                    const baseProgress = 15; // Starting progress
+                    const processingProgress = Math.min((accountsProcessed / Math.max(totalAccounts, 1)) * 70, 70); // Up to 70% for processing
+                    const elementProgress = Math.min((elements - 1) * 5, 15); // Up to 15% for elements added
+                    const currentProgress = Math.min(baseProgress + processingProgress + elementProgress, 95);
+                    setLoadingProgress(currentProgress);
+                    
+                    console.log(`Processing: ${elements} elements, ${accountsProcessed} accounts, progress: ${currentProgress}%`);
+                    
+                    // Complete if we have activity OR max attempts reached
                     if (elements > 1 || accountsProcessed > 0 || attempts >= maxAttempts) {
                       clearInterval(checkInterval);
+                      clearInterval(progressTimer); // Clear backup progress timer
                       
                       // Show helpful message based on what we found
                       if (elements <= 1 && accountsProcessed === 0) {
@@ -795,14 +840,15 @@ function TransactionGraph({
                       console.log(`Initial load complete: ${elements} elements, ${accountsProcessed} accounts processed`);
                       resolve();
                     }
-                  }, 200); // Longer interval for less aggressive polling
+                  }, 150); // Faster polling for better UX
                   
-                  // Guaranteed completion after 6 seconds
+                  // Guaranteed completion after 4 seconds
                   timeoutIds.current.push(setTimeout(() => {
                     clearInterval(checkInterval);
+                    clearInterval(progressTimer); // Clear backup progress timer
                     console.log('Initial load timeout reached, completing anyway');
                     resolve();
-                  }, 6000));
+                  }, 4000)); // Reduced timeout
                 });
               } else {
                 console.log('No valid account found in transaction data');
@@ -810,6 +856,8 @@ function TransactionGraph({
                   message: `No account data found for transaction ${initialSignature.substring(0, 8)}...`,
                   severity: 'warning'
                 });
+                // Set progress to 100% since there's nothing to process
+                setLoadingProgress(100);
               }
             } else {
               console.log('No accounts found in transaction data');
@@ -817,6 +865,8 @@ function TransactionGraph({
                 message: `Transaction ${initialSignature.substring(0, 8)}... contains no account information`,
                 severity: 'warning'
               });
+              // Set progress to 100% since there's nothing to process
+              setLoadingProgress(100);
             }
           } else {
             console.error(`Failed to fetch transaction data: ${response.status}`);
@@ -849,6 +899,7 @@ function TransactionGraph({
           message: `Failed to load transaction: ${err}`,
           severity: 'error'
         });
+        setLoadingProgress(100); // Ensure progress completes even on error
       } finally {
         setLoading(false);
       }
