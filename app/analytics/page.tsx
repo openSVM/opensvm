@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { SolanaDEXTab } from '@/components/solana/solana-dex-tab';
 import { CrossChainTab } from '@/components/solana/cross-chain-tab';
+import { DeFiHealthTab } from '@/components/solana/defi-health-tab';
 
 type TabType = 'overview' | 'dex' | 'cross-chain' | 'defi-health' | 'validators';
 
@@ -13,7 +14,7 @@ export default function AnalyticsPage() {
     { id: 'overview' as TabType, label: 'Overview', description: 'Network overview and key metrics' },
     { id: 'dex' as TabType, label: 'Solana DEX', description: 'DEX volume, liquidity, and arbitrage' },
     { id: 'cross-chain' as TabType, label: 'Cross-Chain', description: 'Bridge flows and migrations' },
-    { id: 'defi-health' as TabType, label: 'DeFi Health', description: 'Protocol health and risk monitoring', comingSoon: true },
+    { id: 'defi-health' as TabType, label: 'DeFi Health', description: 'Protocol health and risk monitoring' },
     { id: 'validators' as TabType, label: 'Validators', description: 'Validator performance and decentralization', comingSoon: true },
   ];
 
@@ -127,15 +128,7 @@ export default function AnalyticsPage() {
         return <CrossChainTab />;
       
       case 'defi-health':
-        return (
-          <div className="text-center py-12">
-            <h3 className="text-xl font-semibold mb-4">DeFi Protocol Health Monitor</h3>
-            <p className="text-gray-600 mb-4">Protocol health scores, exploit detection, and risk assessment</p>
-            <div className="inline-flex items-center px-4 py-2 bg-blue-100 text-blue-800 rounded-lg">
-              Coming in Phase 3 - DeFi Health Monitoring
-            </div>
-          </div>
-        );
+        return <DeFiHealthTab />;
       
       case 'validators':
         return (
