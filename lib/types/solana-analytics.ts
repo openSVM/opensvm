@@ -207,6 +207,59 @@ export interface StakeDistribution {
   exitedValidators24h: number;
 }
 
+// Validator Analytics Types
+export interface ValidatorMetrics {
+  voteAccount: string;
+  nodePubkey: string;
+  name: string;
+  commission: number;
+  activatedStake: number;
+  lastVote: number;
+  rootSlot: number;
+  credits: number;
+  epochCredits: number;
+  version: string;
+  status: 'active' | 'delinquent' | 'inactive';
+  datacenter?: string;
+  country?: string;
+  apy: number;
+  performanceScore: number;
+  uptimePercent: number;
+  skipRate?: number;
+  voteDistance?: number;
+}
+
+export interface ValidatorPerformance {
+  totalValidators: number;
+  activeValidators: number;
+  delinquentValidators: number;
+  totalStake: number;
+  averageCommission: number;
+  nakamotoCoefficient: number;
+  averageUptime: number;
+  networkHealth: 'excellent' | 'good' | 'fair' | 'poor';
+}
+
+export interface NetworkDecentralization {
+  geograficDistribution: Array<{
+    country: string;
+    validatorCount: number;
+    stakePercent: number;
+  }>;
+  datacenterDistribution: Array<{
+    datacenter: string;
+    validatorCount: number;
+    stakePercent: number;
+  }>;
+  clientDistribution: Array<{
+    version: string;
+    validatorCount: number;
+    percent: number;
+  }>;
+  herfindahlIndex: number;
+  nakamotoCoefficient: number;
+}
+
 // Callback types for real-time updates
 export type AnalyticsCallback<T> = (data: T) => void;
 

@@ -145,18 +145,18 @@ export function DeFiHealthTab() {
       case 'high': return 'bg-orange-100 text-orange-800';
       case 'medium': return 'bg-yellow-100 text-yellow-800';
       case 'low': return 'bg-blue-100 text-blue-800';
-      default: return 'bg-gray-100 text-gray-800';
+      default: return 'bg-muted text-muted-foreground';
     }
   };
 
   const getCategoryColor = (category: string) => {
     switch (category) {
-      case 'dex': return 'bg-blue-100 text-blue-800';
-      case 'lending': return 'bg-green-100 text-green-800';
-      case 'yield': return 'bg-purple-100 text-purple-800';
+      case 'dex': return 'bg-primary/10 text-primary';
+      case 'lending': return 'bg-secondary/50 text-secondary-foreground';
+      case 'yield': return 'bg-accent/20 text-accent-foreground';
       case 'derivatives': return 'bg-orange-100 text-orange-800';
-      case 'insurance': return 'bg-indigo-100 text-indigo-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'insurance': return 'bg-muted text-muted-foreground';
+      default: return 'bg-muted text-muted-foreground';
     }
   };
 
@@ -171,12 +171,12 @@ export function DeFiHealthTab() {
 
   if (error) {
     return (
-      <div className="flex items-center justify-center h-64 text-red-500">
+      <div className="flex items-center justify-center h-64 text-destructive">
         <AlertTriangle className="h-8 w-8 mr-2" />
         <span>Error: {error}</span>
         <button
           onClick={fetchDeFiHealthData}
-          className="ml-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+          className="ml-4 px-4 py-2 bg-primary text-primary-foreground rounded hover:opacity-90"
         >
           Retry
         </button>
@@ -198,7 +198,7 @@ export function DeFiHealthTab() {
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-bold">DeFi Protocol Health Monitor</h2>
-          <p className="text-gray-600">Real-time protocol health scores, exploit detection, and risk assessment</p>
+          <p className="text-muted-foreground">Real-time protocol health scores, exploit detection, and risk assessment</p>
         </div>
         <div className="flex items-center gap-4">
           <button
@@ -228,20 +228,20 @@ export function DeFiHealthTab() {
 
       {/* Ecosystem Overview Cards */}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-        <div className="bg-white p-6 rounded-lg shadow">
+        <div className="bg-background border p-6 rounded-lg shadow">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Total TVL</p>
+              <p className="text-sm font-medium text-muted-foreground">Total TVL</p>
               <p className="text-2xl font-bold">{formatCurrency(data.ecosystem.totalTvl)}</p>
             </div>
             <DollarSign className="h-8 w-8 text-green-600" />
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-lg shadow">
+        <div className="bg-background border p-6 rounded-lg shadow">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Avg Health</p>
+              <p className="text-sm font-medium text-muted-foreground">Avg Health</p>
               <p className={`text-2xl font-bold ${getHealthScoreColor(data.ecosystem.avgHealthScore)}`}>
                 {(data.ecosystem.avgHealthScore * 100).toFixed(0)}%
               </p>
@@ -250,32 +250,32 @@ export function DeFiHealthTab() {
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-lg shadow">
+        <div className="bg-background border p-6 rounded-lg shadow">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Avg Risk</p>
+              <p className="text-sm font-medium text-muted-foreground">Avg Risk</p>
               <p className={`text-2xl font-bold ${getRiskScoreColor(data.ecosystem.avgRiskScore)}`}>
                 {(data.ecosystem.avgRiskScore * 100).toFixed(0)}%
               </p>
             </div>
-            <Shield className="h-8 w-8 text-blue-600" />
+            <Shield className="h-8 w-8 text-primary" />
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-lg shadow">
+        <div className="bg-background border p-6 rounded-lg shadow">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Protocols</p>
+              <p className="text-sm font-medium text-muted-foreground">Protocols</p>
               <p className="text-2xl font-bold">{data.ecosystem.protocolCount}</p>
             </div>
-            <Activity className="h-8 w-8 text-purple-600" />
+            <Activity className="h-8 w-8 text-accent" />
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-lg shadow">
+        <div className="bg-background border p-6 rounded-lg shadow">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Critical Alerts</p>
+              <p className="text-sm font-medium text-muted-foreground">Critical Alerts</p>
               <p className="text-2xl font-bold text-red-600">{data.ecosystem.criticalAlerts}</p>
             </div>
             <AlertTriangle className="h-8 w-8 text-red-600" />
@@ -285,7 +285,7 @@ export function DeFiHealthTab() {
 
       {/* Active Alerts */}
       {data.alerts.length > 0 && (
-        <div className="bg-white rounded-lg shadow">
+        <div className="bg-background border rounded-lg shadow">
           <div className="p-6 border-b">
             <h3 className="text-lg font-semibold text-red-600 flex items-center gap-2">
               <AlertTriangle className="h-5 w-5" />
@@ -303,11 +303,11 @@ export function DeFiHealthTab() {
                       </span>
                       <span className="text-sm font-medium">{alert.type}</span>
                     </div>
-                    <span className="text-sm text-gray-500">
+                    <span className="text-sm text-muted-foreground">
                       {new Date(alert.timestamp).toLocaleDateString()}
                     </span>
                   </div>
-                  <p className="text-sm text-gray-700 mb-2">{alert.description}</p>
+                  <p className="text-sm text-muted-foreground mb-2">{alert.description}</p>
                   <div className="flex justify-between items-center text-sm">
                     <span>Affected Amount: <span className="font-medium">{formatCurrency(alert.affectedAmount)}</span></span>
                     <span>Protocols: <span className="font-medium">{alert.protocolsAffected.join(', ')}</span></span>
@@ -320,7 +320,7 @@ export function DeFiHealthTab() {
       )}
 
       {/* Protocol Health Rankings */}
-      <div className="bg-white rounded-lg shadow">
+      <div className="bg-background border rounded-lg shadow">
         <div className="p-6 border-b">
           <h3 className="text-lg font-semibold">Protocol Health Rankings</h3>
         </div>
@@ -342,7 +342,7 @@ export function DeFiHealthTab() {
               </thead>
               <tbody>
                 {data.protocols.slice(0, 15).map((protocol, index) => (
-                  <tr key={protocol.protocol} className="border-b">
+                  <tr key={protocol.protocol} className="border-b hover:bg-muted/50">
                     <td className="py-3 font-medium">#{index + 1}</td>
                     <td className="py-3 font-medium">{protocol.protocol}</td>
                     <td className="py-3">
@@ -365,7 +365,7 @@ export function DeFiHealthTab() {
                     </td>
                     <td className="py-3">
                       <div className="flex items-center gap-2">
-                        <div className="w-16 bg-gray-200 rounded-full h-2">
+                        <div className="w-16 bg-border rounded-full h-2">
                           <div
                             className="bg-green-600 h-2 rounded-full"
                             style={{ width: `${protocol.healthScore * 100}%` }}
@@ -384,7 +384,7 @@ export function DeFiHealthTab() {
                     <td className="py-3">
                       <div className="text-sm">
                         <div>{formatCurrency(protocol.treasuryHealth.treasuryValue)}</div>
-                        <div className="text-gray-500">{protocol.treasuryHealth.runwayMonths.toFixed(0)}mo runway</div>
+                        <div className="text-muted-foreground">{protocol.treasuryHealth.runwayMonths.toFixed(0)}mo runway</div>
                       </div>
                     </td>
                     <td className="py-3">
@@ -410,7 +410,7 @@ export function DeFiHealthTab() {
 
       {/* Risk Distribution */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-white rounded-lg shadow">
+        <div className="bg-background border rounded-lg shadow">
           <div className="p-6 border-b">
             <h3 className="text-lg font-semibold">Health Score Distribution</h3>
           </div>
@@ -427,14 +427,14 @@ export function DeFiHealthTab() {
                     <div className={`w-4 h-4 rounded ${item.color}`} />
                     <span className="text-sm font-medium">{item.range}</span>
                   </div>
-                  <span className="text-sm text-gray-600">{item.count} protocols</span>
+                  <span className="text-sm text-muted-foreground">{item.count} protocols</span>
                 </div>
               ))}
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow">
+        <div className="bg-background border rounded-lg shadow">
           <div className="p-6 border-b">
             <h3 className="text-lg font-semibold">Category Breakdown</h3>
           </div>
@@ -450,7 +450,7 @@ export function DeFiHealthTab() {
                   <span className={`px-2 py-1 rounded text-sm font-medium ${getCategoryColor(category)}`}>
                     {category}
                   </span>
-                  <span className="text-sm text-gray-600">{count} protocols</span>
+                  <span className="text-sm text-muted-foreground">{count} protocols</span>
                 </div>
               ))}
             </div>
