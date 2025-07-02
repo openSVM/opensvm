@@ -10,15 +10,23 @@ import {
   NetworkDecentralization
 } from '@/lib/types/solana-analytics';
 
-// In-memory data store for analytics data
-// In production, this would be replaced with a proper database like PostgreSQL or Redis
-class MemoryCache {
+// Enhanced cache implementation with persistence planning
+// TODO: Migrate to DuckDB or LevelDB for real persistence
+// Currently using improved memory cache with better state management
+class EnhancedCache {
   private liquidityData: SolanaLiquidityData[] = [];
   private volumeMetrics: DEXVolumeMetrics[] = [];
   private arbitrageOpportunities: CrossDEXArbitrage[] = [];
   private crossChainFlows: CrossChainFlow[] = [];
   private validatorMetrics: ValidatorMetrics[] = [];
-  private initialized = false;
+  
+  // State management
+  private initializationPromise: Promise<void> | null = null;
+  private isInitialized = false;
+  private isInitializing = false;
+  private cleanupInterval: NodeJS.Timeout | null = null;
+  
+  // Configuration
   private readonly maxItems = 1000; // Limit memory usage
   private readonly retentionDays = 14;
 
@@ -27,25 +35,59 @@ class MemoryCache {
   }
 
   async initialize(): Promise<void> {
-    if (this.initialized) return;
+    // Prevent multiple parallel initializations
+    if (this.isInitialized) {
+      return;
+    }
 
+    if (this.initializationPromise) {
+      return this.initializationPromise;
+    }
+
+    this.isInitializing = true;
+    this.initializationPromise = this.performInitialization();
+    
     try {
-      this.initialized = true;
-      console.log('Memory cache initialized successfully');
+      await this.initializationPromise;
+      this.isInitialized = true;
+    } catch (error) {
+      this.initializationPromise = null;
+      throw error;
+    } finally {
+      this.isInitializing = false;
+    }
+  }
+
+  private async performInitialization(): Promise<void> {
+    try {
+      // TODO: Replace with actual DuckDB/LevelDB initialization
+      // For now, using enhanced memory store with better lifecycle management
       
-      // Set up periodic cleanup
-      setInterval(() => {
+      console.log('Enhanced cache initialized successfully');
+      
+      // Set up periodic cleanup with proper cleanup on shutdown
+      this.cleanupInterval = setInterval(() => {
         this.cleanupOldData();
       }, 60 * 60 * 1000); // Every hour
+      
+      // TODO: Load existing data from persistent store
+      await this.loadPersistedData();
+      
     } catch (error) {
-      console.error('Failed to initialize Memory cache:', error);
+      console.error('Failed to initialize Enhanced cache:', error);
       throw error;
     }
   }
 
+  private async loadPersistedData(): Promise<void> {
+    // TODO: Implement loading from persistent store (DuckDB/LevelDB)
+    // For now, starting with empty cache
+    console.log('Cache initialized with empty data (persistence TODO)');
+  }
+
   // Solana Liquidity Data Methods
   async insertLiquidityData(data: SolanaLiquidityData[]): Promise<void> {
-    if (!this.initialized) await this.initialize();
+    if (!this.isInitialized) await this.initialize();
 
     // Add new data and keep only the most recent items
     this.liquidityData.push(...data);
@@ -53,10 +95,13 @@ class MemoryCache {
     if (this.liquidityData.length > this.maxItems) {
       this.liquidityData = this.liquidityData.slice(0, this.maxItems);
     }
+    
+    // TODO: Persist to DuckDB/LevelDB
+    await this.persistLiquidityData(data);
   }
 
   async getLiquidityData(dex?: string, limit = 100): Promise<SolanaLiquidityData[]> {
-    if (!this.initialized) await this.initialize();
+    if (!this.isInitialized) await this.initialize();
 
     let filteredData = this.liquidityData;
     if (dex) {
@@ -66,19 +111,27 @@ class MemoryCache {
     return filteredData.slice(0, limit);
   }
 
+  private async persistLiquidityData(data: SolanaLiquidityData[]): Promise<void> {
+    // TODO: Implement actual persistence to DuckDB/LevelDB
+    // console.log(`Persisting ${data.length} liquidity records`);
+  }
+
   // DEX Volume Metrics Methods
   async insertDEXVolumeMetrics(data: DEXVolumeMetrics[]): Promise<void> {
-    if (!this.initialized) await this.initialize();
+    if (!this.isInitialized) await this.initialize();
 
     this.volumeMetrics.push(...data);
     this.volumeMetrics.sort((a, b) => b.timestamp - a.timestamp);
     if (this.volumeMetrics.length > this.maxItems) {
       this.volumeMetrics = this.volumeMetrics.slice(0, this.maxItems);
     }
+    
+    // TODO: Persist to DuckDB/LevelDB
+    await this.persistVolumeMetrics(data);
   }
 
   async getDEXVolumeMetrics(dex?: string, limit = 100): Promise<DEXVolumeMetrics[]> {
-    if (!this.initialized) await this.initialize();
+    if (!this.isInitialized) await this.initialize();
 
     let filteredData = this.volumeMetrics;
     if (dex) {
@@ -88,36 +141,52 @@ class MemoryCache {
     return filteredData.slice(0, limit);
   }
 
+  private async persistVolumeMetrics(data: DEXVolumeMetrics[]): Promise<void> {
+    // TODO: Implement actual persistence to DuckDB/LevelDB
+    // console.log(`Persisting ${data.length} volume metric records`);
+  }
+
   // Arbitrage Opportunities Methods
   async insertArbitrageOpportunities(data: CrossDEXArbitrage[]): Promise<void> {
-    if (!this.initialized) await this.initialize();
+    if (!this.isInitialized) await this.initialize();
 
     this.arbitrageOpportunities.push(...data);
     this.arbitrageOpportunities.sort((a, b) => b.profitOpportunity - a.profitOpportunity);
     if (this.arbitrageOpportunities.length > this.maxItems) {
       this.arbitrageOpportunities = this.arbitrageOpportunities.slice(0, this.maxItems);
     }
+    
+    // TODO: Persist to DuckDB/LevelDB
+    await this.persistArbitrageOpportunities(data);
   }
 
   async getArbitrageOpportunities(limit = 100): Promise<CrossDEXArbitrage[]> {
-    if (!this.initialized) await this.initialize();
+    if (!this.isInitialized) await this.initialize();
 
     return this.arbitrageOpportunities.slice(0, limit);
   }
 
+  private async persistArbitrageOpportunities(data: CrossDEXArbitrage[]): Promise<void> {
+    // TODO: Implement actual persistence to DuckDB/LevelDB
+    // console.log(`Persisting ${data.length} arbitrage opportunity records`);
+  }
+
   // Cross-Chain Flow Methods
   async insertCrossChainFlows(data: CrossChainFlow[]): Promise<void> {
-    if (!this.initialized) await this.initialize();
+    if (!this.isInitialized) await this.initialize();
 
     this.crossChainFlows.push(...data);
     this.crossChainFlows.sort((a, b) => b.volume24h - a.volume24h);
     if (this.crossChainFlows.length > this.maxItems) {
       this.crossChainFlows = this.crossChainFlows.slice(0, this.maxItems);
     }
+    
+    // TODO: Persist to DuckDB/LevelDB
+    await this.persistCrossChainFlows(data);
   }
 
   async getCrossChainFlows(bridgeProtocol?: string, limit = 100): Promise<CrossChainFlow[]> {
-    if (!this.initialized) await this.initialize();
+    if (!this.isInitialized) await this.initialize();
 
     let filteredData = this.crossChainFlows;
     if (bridgeProtocol) {
@@ -127,19 +196,27 @@ class MemoryCache {
     return filteredData.slice(0, limit);
   }
 
+  private async persistCrossChainFlows(data: CrossChainFlow[]): Promise<void> {
+    // TODO: Implement actual persistence to DuckDB/LevelDB
+    // console.log(`Persisting ${data.length} cross-chain flow records`);
+  }
+
   // Validator Metrics Methods
   async insertValidatorMetrics(data: ValidatorMetrics[]): Promise<void> {
-    if (!this.initialized) await this.initialize();
+    if (!this.isInitialized) await this.initialize();
 
     this.validatorMetrics.push(...data);
     this.validatorMetrics.sort((a, b) => b.totalStake - a.totalStake);
     if (this.validatorMetrics.length > this.maxItems) {
       this.validatorMetrics = this.validatorMetrics.slice(0, this.maxItems);
     }
+    
+    // TODO: Persist to DuckDB/LevelDB
+    await this.persistValidatorMetrics(data);
   }
 
   async getValidatorMetrics(validatorAddress?: string, limit = 100): Promise<ValidatorMetrics[]> {
-    if (!this.initialized) await this.initialize();
+    if (!this.isInitialized) await this.initialize();
 
     let filteredData = this.validatorMetrics;
     if (validatorAddress) {
@@ -149,9 +226,14 @@ class MemoryCache {
     return filteredData.slice(0, limit);
   }
 
+  private async persistValidatorMetrics(data: ValidatorMetrics[]): Promise<void> {
+    // TODO: Implement actual persistence to DuckDB/LevelDB
+    // console.log(`Persisting ${data.length} validator metric records`);
+  }
+
   // Data cleanup methods
   async cleanupOldData(daysToKeep = 14): Promise<void> {
-    if (!this.initialized) await this.initialize();
+    if (!this.isInitialized) await this.initialize();
 
     const cutoffTimestamp = Date.now() - (daysToKeep * 24 * 60 * 60 * 1000);
     
@@ -162,22 +244,64 @@ class MemoryCache {
     this.validatorMetrics = this.validatorMetrics.filter(item => item.timestamp >= cutoffTimestamp);
 
     console.log('Cleaned up old data');
+    
+    // TODO: Also cleanup persistent store
+    await this.cleanupPersistedData(cutoffTimestamp);
+  }
+
+  private async cleanupPersistedData(cutoffTimestamp: number): Promise<void> {
+    // TODO: Implement cleanup for DuckDB/LevelDB
+    // console.log(`Cleaning up persisted data older than ${new Date(cutoffTimestamp)}`);
   }
 
   async close(): Promise<void> {
-    // Nothing to close for memory cache
-    this.initialized = false;
+    // Clean up resources
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+      this.cleanupInterval = null;
+    }
+    
+    this.isInitialized = false;
+    this.initializationPromise = null;
+    
+    // TODO: Close persistent store connections
+    console.log('Enhanced cache closed');
+  }
+
+  // Get initialization status
+  getStatus(): {
+    isInitialized: boolean;
+    isInitializing: boolean;
+    itemCounts: {
+      liquidity: number;
+      volume: number;
+      arbitrage: number;
+      crossChain: number;
+      validators: number;
+    };
+  } {
+    return {
+      isInitialized: this.isInitialized,
+      isInitializing: this.isInitializing,
+      itemCounts: {
+        liquidity: this.liquidityData.length,
+        volume: this.volumeMetrics.length,
+        arbitrage: this.arbitrageOpportunities.length,
+        crossChain: this.crossChainFlows.length,
+        validators: this.validatorMetrics.length
+      }
+    };
   }
 }
 
-// Singleton instance
-let memoryCacheInstance: MemoryCache | null = null;
+// Singleton instance with proper lifecycle management
+let enhancedCacheInstance: EnhancedCache | null = null;
 
-export function getDuckDBCache(): MemoryCache {
-  if (!memoryCacheInstance) {
-    memoryCacheInstance = new MemoryCache();
+export function getDuckDBCache(): EnhancedCache {
+  if (!enhancedCacheInstance) {
+    enhancedCacheInstance = new EnhancedCache();
   }
-  return memoryCacheInstance;
+  return enhancedCacheInstance;
 }
 
-export default MemoryCache;
+export default EnhancedCache;

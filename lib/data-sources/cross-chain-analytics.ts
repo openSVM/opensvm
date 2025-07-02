@@ -1,6 +1,5 @@
 import { Connection } from '@solana/web3.js';
-import { getConnection } from '@/lib/solana-connection';
-import { getDuckDBCache } from '@/lib/data-cache/duckdb-cache';
+import { BaseAnalytics } from './base-analytics';
 import {
   CrossChainFlow,
   EcosystemMigration,
@@ -10,13 +9,7 @@ import {
   AnalyticsConfig
 } from '@/lib/types/solana-analytics';
 
-export class CrossChainAnalytics {
-  private connection: Connection | null = null;
-  private cache = getDuckDBCache();
-  private config: AnalyticsConfig;
-  private intervals: NodeJS.Timeout[] = [];
-  private callbacks: Map<string, AnalyticsCallback<any>[]> = new Map();
-
+export class CrossChainAnalytics extends BaseAnalytics {
   // Monitored bridge protocols
   private readonly SUPPORTED_BRIDGES = [
     'Wormhole',
@@ -38,72 +31,35 @@ export class CrossChainAnalytics {
   ];
 
   constructor(config: AnalyticsConfig) {
-    this.config = config;
+    super(config);
   }
 
-  async initialize(): Promise<void> {
-    try {
-      this.connection = await getConnection();
-      await this.cache.initialize();
-      console.log('Cross-Chain Analytics initialized successfully');
-    } catch (error) {
-      console.error('Failed to initialize Cross-Chain Analytics:', error);
-      throw error;
-    }
+  protected getAnalyticsName(): string {
+    return 'Cross-Chain Analytics';
+  }
+
+  protected async onInitialize(): Promise<void> {
+    // Custom initialization for cross-chain analytics
+  }
+
+  protected async onStartMonitoring(): Promise<void> {
+    // Cross-chain API data monitoring (60-120 seconds)
+    this.createInterval(async () => {
+      await this.fetchAndUpdateCrossChainData();
+    }, this.config.refreshIntervals.crossChainData);
   }
 
   // Event-driven callback system
   onFlowUpdate(callback: AnalyticsCallback<CrossChainFlow[]>): void {
-    if (!this.callbacks.has('flows')) {
-      this.callbacks.set('flows', []);
-    }
-    this.callbacks.get('flows')!.push(callback);
+    this.registerCallback('flows', callback);
   }
 
   onMigrationUpdate(callback: AnalyticsCallback<EcosystemMigration[]>): void {
-    if (!this.callbacks.has('migrations')) {
-      this.callbacks.set('migrations', []);
-    }
-    this.callbacks.get('migrations')!.push(callback);
+    this.registerCallback('migrations', callback);
   }
 
   onArbitrageUpdate(callback: AnalyticsCallback<CrossChainArbitrage[]>): void {
-    if (!this.callbacks.has('crossChainArbitrage')) {
-      this.callbacks.set('crossChainArbitrage', []);
-    }
-    this.callbacks.get('crossChainArbitrage')!.push(callback);
-  }
-
-  private emit<T>(event: string, data: T): void {
-    const callbacks = this.callbacks.get(event);
-    if (callbacks) {
-      callbacks.forEach(callback => {
-        try {
-          callback(data);
-        } catch (error) {
-          console.error(`Error in ${event} callback:`, error);
-        }
-      });
-    }
-  }
-
-  // Start real-time monitoring
-  startMonitoring(): void {
-    // Cross-chain API data monitoring (60-120 seconds)
-    const crossChainInterval = setInterval(async () => {
-      try {
-        await this.fetchAndUpdateCrossChainData();
-      } catch (error) {
-        console.error('Error updating cross-chain data:', error);
-      }
-    }, this.config.refreshIntervals.crossChainData);
-
-    this.intervals.push(crossChainInterval);
-  }
-
-  stopMonitoring(): void {
-    this.intervals.forEach(interval => clearInterval(interval));
-    this.intervals = [];
+    this.registerCallback('crossChainArbitrage', callback);
   }
 
   // Fetch cross-chain data from multiple bridge APIs
@@ -162,7 +118,8 @@ export class CrossChainAnalytics {
     flows: CrossChainFlow[];
     migrations: EcosystemMigration[];
   }> {
-    // Mock implementation - replace with actual Wormhole API calls
+    // TODO: Replace with actual Wormhole API calls
+    // Mock implementation - should integrate with https://docs.wormhole.com/wormhole/
     const flows: CrossChainFlow[] = [
       {
         bridgeProtocol: 'Wormhole',
@@ -210,7 +167,8 @@ export class CrossChainAnalytics {
     flows: CrossChainFlow[];
     migrations: EcosystemMigration[];
   }> {
-    // Mock implementation - replace with actual Portal API calls
+    // TODO: Replace with actual Portal Bridge API calls
+    // Mock implementation - should integrate with Portal's API
     const flows: CrossChainFlow[] = [
       {
         bridgeProtocol: 'Portal',
@@ -233,7 +191,8 @@ export class CrossChainAnalytics {
     flows: CrossChainFlow[];
     migrations: EcosystemMigration[];
   }> {
-    // Mock implementation - replace with actual Allbridge API calls
+    // TODO: Replace with actual Allbridge API calls
+    // Mock implementation - should integrate with Allbridge's API
     const flows: CrossChainFlow[] = [
       {
         bridgeProtocol: 'Allbridge',
@@ -256,6 +215,7 @@ export class CrossChainAnalytics {
     flows: CrossChainFlow[];
     migrations: EcosystemMigration[];
   }> {
+    // TODO: Replace with actual bridge-specific API calls
     // Generic mock implementation for other bridges
     const flows: CrossChainFlow[] = [
       {

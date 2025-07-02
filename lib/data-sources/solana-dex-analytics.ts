@@ -1,6 +1,5 @@
 import { Connection } from '@solana/web3.js';
-import { getConnection } from '@/lib/solana-connection';
-import { getDuckDBCache } from '@/lib/data-cache/duckdb-cache';
+import { BaseAnalytics } from './base-analytics';
 import {
   SolanaLiquidityData,
   DEXVolumeMetrics,
@@ -10,17 +9,11 @@ import {
   AnalyticsConfig
 } from '@/lib/types/solana-analytics';
 
-export class SolanaDEXAnalytics {
-  private connection: Connection | null = null;
-  private cache = getDuckDBCache();
-  private config: AnalyticsConfig;
-  private intervals: NodeJS.Timeout[] = [];
-  private callbacks: Map<string, AnalyticsCallback<any>[]> = new Map();
-
+export class SolanaDEXAnalytics extends BaseAnalytics {
   // Target DEXes for monitoring
   private readonly SUPPORTED_DEXES = [
     'Jupiter',
-    'Raydium',
+    'Raydium', 
     'Orca',
     'Serum',
     'Saber',
@@ -30,81 +23,40 @@ export class SolanaDEXAnalytics {
   ];
 
   constructor(config: AnalyticsConfig) {
-    this.config = config;
+    super(config);
   }
 
-  async initialize(): Promise<void> {
-    try {
-      this.connection = await getConnection();
-      await this.cache.initialize();
-      console.log('Solana DEX Analytics initialized successfully');
-    } catch (error) {
-      console.error('Failed to initialize Solana DEX Analytics:', error);
-      throw error;
-    }
+  protected getAnalyticsName(): string {
+    return 'Solana DEX Analytics';
+  }
+
+  protected async onInitialize(): Promise<void> {
+    // Custom initialization for DEX analytics
+  }
+
+  protected async onStartMonitoring(): Promise<void> {
+    // DEX API data monitoring (30-60 seconds)
+    this.createInterval(async () => {
+      await this.fetchAndUpdateDEXData();
+    }, this.config.refreshIntervals.dexData);
+
+    // RPC data monitoring (5-10 seconds for critical data)
+    this.createInterval(async () => {
+      await this.fetchAndUpdateRPCData();
+    }, this.config.refreshIntervals.rpcData);
   }
 
   // Event-driven callback system
   onLiquidityUpdate(callback: AnalyticsCallback<SolanaLiquidityData[]>): void {
-    if (!this.callbacks.has('liquidity')) {
-      this.callbacks.set('liquidity', []);
-    }
-    this.callbacks.get('liquidity')!.push(callback);
+    this.registerCallback('liquidity', callback);
   }
 
   onVolumeUpdate(callback: AnalyticsCallback<DEXVolumeMetrics[]>): void {
-    if (!this.callbacks.has('volume')) {
-      this.callbacks.set('volume', []);
-    }
-    this.callbacks.get('volume')!.push(callback);
+    this.registerCallback('volume', callback);
   }
 
   onArbitrageUpdate(callback: AnalyticsCallback<CrossDEXArbitrage[]>): void {
-    if (!this.callbacks.has('arbitrage')) {
-      this.callbacks.set('arbitrage', []);
-    }
-    this.callbacks.get('arbitrage')!.push(callback);
-  }
-
-  private emit<T>(event: string, data: T): void {
-    const callbacks = this.callbacks.get(event);
-    if (callbacks) {
-      callbacks.forEach(callback => {
-        try {
-          callback(data);
-        } catch (error) {
-          console.error(`Error in ${event} callback:`, error);
-        }
-      });
-    }
-  }
-
-  // Start real-time monitoring
-  startMonitoring(): void {
-    // DEX API data monitoring (30-60 seconds)
-    const dexInterval = setInterval(async () => {
-      try {
-        await this.fetchAndUpdateDEXData();
-      } catch (error) {
-        console.error('Error updating DEX data:', error);
-      }
-    }, this.config.refreshIntervals.dexData);
-
-    // RPC data monitoring (5-10 seconds for critical data)
-    const rpcInterval = setInterval(async () => {
-      try {
-        await this.fetchAndUpdateRPCData();
-      } catch (error) {
-        console.error('Error updating RPC data:', error);
-      }
-    }, this.config.refreshIntervals.rpcData);
-
-    this.intervals.push(dexInterval, rpcInterval);
-  }
-
-  stopMonitoring(): void {
-    this.intervals.forEach(interval => clearInterval(interval));
-    this.intervals = [];
+    this.registerCallback('arbitrage', callback);
   }
 
   // Fetch DEX data from multiple APIs
@@ -169,7 +121,8 @@ export class SolanaDEXAnalytics {
     liquidity: SolanaLiquidityData[];
     volume: DEXVolumeMetrics[];
   }> {
-    // Mock implementation - replace with actual Jupiter API calls
+    // TODO: Replace with actual Jupiter API calls
+    // Mock implementation for now - should integrate with https://station.jup.ag/api-docs
     const liquidity: SolanaLiquidityData[] = [
       {
         dex: 'Jupiter',
@@ -186,7 +139,7 @@ export class SolanaDEXAnalytics {
 
     const volume: DEXVolumeMetrics[] = [
       {
-        dex: 'Jupiter',
+        dex: 'Jupiter',  
         volume24h: Math.random() * 10000000,
         volumeChange: (Math.random() - 0.5) * 0.2,
         activeUsers: Math.floor(Math.random() * 5000),
@@ -203,7 +156,8 @@ export class SolanaDEXAnalytics {
     liquidity: SolanaLiquidityData[];
     volume: DEXVolumeMetrics[];
   }> {
-    // Mock implementation - replace with actual Raydium API calls
+    // TODO: Replace with actual Raydium API calls
+    // Mock implementation - should integrate with Raydium's official API
     const liquidity: SolanaLiquidityData[] = [
       {
         dex: 'Raydium',
@@ -237,7 +191,8 @@ export class SolanaDEXAnalytics {
     liquidity: SolanaLiquidityData[];
     volume: DEXVolumeMetrics[];
   }> {
-    // Mock implementation - replace with actual Orca API calls
+    // TODO: Replace with actual Orca API calls
+    // Mock implementation - should integrate with Orca's API endpoints
     const liquidity: SolanaLiquidityData[] = [
       {
         dex: 'Orca',
@@ -271,6 +226,7 @@ export class SolanaDEXAnalytics {
     liquidity: SolanaLiquidityData[];
     volume: DEXVolumeMetrics[];
   }> {
+    // TODO: Replace with actual DEX API calls for each specific protocol
     // Generic mock implementation for other DEXes
     const liquidity: SolanaLiquidityData[] = [
       {

@@ -59,6 +59,7 @@ export function DeFiHealthTab() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [monitoringActive, setMonitoringActive] = useState(false);
+  const [toggleLoading, setToggleLoading] = useState(false); // New state for toggle loading
 
   const fetchDeFiHealthData = async () => {
     try {
@@ -79,6 +80,9 @@ export function DeFiHealthTab() {
   };
 
   const toggleMonitoring = async () => {
+    if (toggleLoading) return; // Prevent multiple clicks
+    
+    setToggleLoading(true);
     try {
       const action = monitoringActive ? 'stop_monitoring' : 'start_monitoring';
       const response = await fetch('/api/analytics/defi-health', {
@@ -92,9 +96,14 @@ export function DeFiHealthTab() {
       const result = await response.json();
       if (result.success) {
         setMonitoringActive(!monitoringActive);
+      } else {
+        setError(result.error || 'Failed to toggle monitoring');
       }
     } catch (err) {
       console.error('Error toggling DeFi health monitoring:', err);
+      setError('Failed to toggle monitoring');
+    } finally {
+      setToggleLoading(false);
     }
   };
 
@@ -194,22 +203,26 @@ export function DeFiHealthTab() {
         <div className="flex items-center gap-4">
           <button
             onClick={toggleMonitoring}
-            className={`px-4 py-2 rounded-lg font-medium ${
+            disabled={toggleLoading}
+            className={`px-4 py-2 rounded-lg font-medium flex items-center gap-2 ${
               monitoringActive
-                ? 'bg-red-600 text-white hover:bg-red-700'
-                : 'bg-green-600 text-white hover:bg-green-700'
-            }`}
+                ? 'bg-red-600 text-white hover:bg-red-700 disabled:bg-red-400'
+                : 'bg-green-600 text-white hover:bg-green-700 disabled:bg-green-400'
+            } ${toggleLoading ? 'cursor-not-allowed' : 'cursor-pointer'}`}
           >
+            {toggleLoading && <Loader2 className="h-4 w-4 animate-spin" />}
             {monitoringActive ? 'Stop Monitoring' : 'Start Monitoring'}
           </button>
-          <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-sm ${
-            data.health.isHealthy ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-          }`}>
-            <div className={`w-2 h-2 rounded-full ${
-              data.health.isHealthy ? 'bg-green-500' : 'bg-red-500'
-            }`} />
-            {data.health.isHealthy ? 'Healthy' : 'Unhealthy'}
-          </div>
+          {data && (
+            <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-sm ${
+              data.health.isHealthy ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+            }`}>
+              <div className={`w-2 h-2 rounded-full ${
+                data.health.isHealthy ? 'bg-green-500' : 'bg-red-500'
+              }`} />
+              {data.health.isHealthy ? 'Healthy' : 'Unhealthy'}
+            </div>
+          )}
         </div>
       </div>
 

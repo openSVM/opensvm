@@ -1,6 +1,5 @@
 import { Connection } from '@solana/web3.js';
-import { getConnection } from '@/lib/solana-connection';
-import { getDuckDBCache } from '@/lib/data-cache/duckdb-cache';
+import { BaseAnalytics } from './base-analytics';
 import {
   ProtocolHealth,
   ExploitAlert,
@@ -12,13 +11,7 @@ import {
   AnalyticsConfig
 } from '@/lib/types/solana-analytics';
 
-export class DeFiHealthMonitor {
-  private connection: Connection | null = null;
-  private cache = getDuckDBCache();
-  private config: AnalyticsConfig;
-  private intervals: NodeJS.Timeout[] = [];
-  private callbacks: Map<string, AnalyticsCallback<any>[]> = new Map();
-
+export class DeFiHealthMonitor extends BaseAnalytics {
   // Monitored protocols by category
   private readonly MONITORED_PROTOCOLS = {
     dex: [
@@ -48,74 +41,36 @@ export class DeFiHealthMonitor {
   };
 
   constructor(config: AnalyticsConfig) {
-    this.config = config;
+    super(config);
   }
 
-  async initialize(): Promise<void> {
-    try {
-      this.connection = await getConnection();
-      await this.cache.initialize();
-      console.log('DeFi Health Monitor initialized successfully');
-    } catch (error) {
-      console.error('Failed to initialize DeFi Health Monitor:', error);
-      throw error;
-    }
+  protected getAnalyticsName(): string {
+    return 'DeFi Health Monitor';
+  }
+
+  protected async onInitialize(): Promise<void> {
+    // Custom initialization for DeFi health monitoring
+  }
+
+  protected async onStartMonitoring(): Promise<void> {
+    // Protocol health monitoring (2-5 minutes)
+    this.createInterval(async () => {
+      await this.fetchAndUpdateProtocolHealth();
+    }, 3 * 60 * 1000); // 3 minutes
+
+    // Exploit detection (30 seconds)
+    this.createInterval(async () => {
+      await this.detectAndAlertExploits();
+    }, 30 * 1000); // 30 seconds
   }
 
   // Event-driven callback system
   onHealthUpdate(callback: AnalyticsCallback<ProtocolHealth[]>): void {
-    if (!this.callbacks.has('health')) {
-      this.callbacks.set('health', []);
-    }
-    this.callbacks.get('health')!.push(callback);
+    this.registerCallback('health', callback);
   }
 
   onExploitAlert(callback: AnalyticsCallback<ExploitAlert[]>): void {
-    if (!this.callbacks.has('exploits')) {
-      this.callbacks.set('exploits', []);
-    }
-    this.callbacks.get('exploits')!.push(callback);
-  }
-
-  private emit<T>(event: string, data: T): void {
-    const callbacks = this.callbacks.get(event);
-    if (callbacks) {
-      callbacks.forEach(callback => {
-        try {
-          callback(data);
-        } catch (error) {
-          console.error(`Error in ${event} callback:`, error);
-        }
-      });
-    }
-  }
-
-  // Start real-time monitoring
-  startMonitoring(): void {
-    // Protocol health monitoring (2-5 minutes)
-    const healthInterval = setInterval(async () => {
-      try {
-        await this.fetchAndUpdateProtocolHealth();
-      } catch (error) {
-        console.error('Error updating protocol health:', error);
-      }
-    }, 3 * 60 * 1000); // 3 minutes
-
-    // Exploit detection (30 seconds)
-    const exploitInterval = setInterval(async () => {
-      try {
-        await this.detectAndAlertExploits();
-      } catch (error) {
-        console.error('Error in exploit detection:', error);
-      }
-    }, 30 * 1000); // 30 seconds
-
-    this.intervals.push(healthInterval, exploitInterval);
-  }
-
-  stopMonitoring(): void {
-    this.intervals.forEach(interval => clearInterval(interval));
-    this.intervals = [];
+    this.registerCallback('exploits', callback);
   }
 
   // Fetch and update protocol health data
@@ -223,6 +178,7 @@ export class DeFiHealthMonitor {
   }
 
   private async generateExploitAlerts(protocol: string): Promise<ExploitAlert[]> {
+    // TODO: Replace with real exploit detection using transaction analysis
     // Randomly generate exploit alerts (very low probability)
     if (Math.random() < 0.02) { // 2% chance
       const exploitTypes: ExploitAlert['type'][] = [
@@ -349,12 +305,13 @@ export class DeFiHealthMonitor {
   private async scanForExploitPatterns(): Promise<ExploitAlert[]> {
     const alerts: ExploitAlert[] = [];
     
-    // Mock exploit detection - in reality, this would analyze:
+    // TODO: Replace with real exploit detection - in reality, this would analyze:
     // - Large value transfers
     // - Unusual transaction patterns
     // - Oracle price deviations
     // - Flash loan activities
     // - Governance voting anomalies
+    // - Integration with security monitoring services like Forta, OpenZeppelin Defender, etc.
     
     if (Math.random() < 0.001) { // 0.1% chance of detecting something
       alerts.push({
