@@ -1,101 +1,68 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { Connection, PublicKey } from '@solana/web3.js';
 
-// Simple self-contained Validators API without complex dependencies
+// Real Solana RPC endpoint - using public mainnet RPC
+const SOLANA_RPC_URL = process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com';
+
 export async function GET(request: NextRequest) {
   try {
-    // Generate realistic mock validator data
-    const mockValidators = [
-      {
-        voteAccount: '7K8DVxtNJGnMtUY1CQJT5jcs8sFGSZTDiG7kowvFpECh',
-        name: 'Coinbase Cloud',
-        commission: 5,
-        activatedStake: 12500000000000000, // 12.5M SOL
-        lastVote: 276543210,
-        rootSlot: 276543200,
-        credits: 450000,
-        epochCredits: 450000,
-        version: '1.18.22',
-        status: 'active' as const,
-        datacenter: 'Google Cloud (us-central1)',
-        country: 'United States',
-        apy: 6.8,
-        performanceScore: 0.98,
-        uptimePercent: 99.95
-      },
-      {
-        voteAccount: '9QU2QSxhb24FUX3Tu2FpczXjpK3VYrvRudywSZaM29mF',
-        name: 'Lido',
-        commission: 7,
-        activatedStake: 11200000000000000,
-        lastVote: 276543211,
-        rootSlot: 276543201,
-        credits: 448500,
-        epochCredits: 448500,
-        version: '1.18.22',
-        status: 'active' as const,
-        datacenter: 'AWS (eu-west-1)',
-        country: 'Ireland',
-        apy: 6.5,
-        performanceScore: 0.96,
-        uptimePercent: 99.88
-      },
-      {
-        voteAccount: 'J1to3PQfXidUUhprQWgdKkQAMWPJAEqSJ7amkBDE9qhF',
-        name: 'Jito',
-        commission: 4,
-        activatedStake: 10800000000000000,
-        lastVote: 276543212,
-        rootSlot: 276543202,
-        credits: 451200,
-        epochCredits: 451200,
-        version: '1.18.23',
-        status: 'active' as const,
-        datacenter: 'Hetzner (fsn1)',
-        country: 'Germany',
-        apy: 7.1,
-        performanceScore: 0.99,
-        uptimePercent: 99.98
-      },
-      // Add more validators with realistic data
-      ...Array.from({ length: 47 }, (_, i) => ({
-        voteAccount: `validator_${i + 4}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        name: [
-          'Marinade Finance', 'Everstake', 'Staked', 'P2P Validator', 'Chorus One',
-          'Figment', 'Blockdaemon', 'Allnodes', 'Stakin', 'DelegateInc'
-        ][i % 10] + ` ${Math.floor(i / 10) + 1}`,
-        commission: Math.floor(Math.random() * 10) + 1,
-        activatedStake: Math.floor(Math.random() * 5000000000000000) + 1000000000000000,
-        lastVote: 276543210 + Math.floor(Math.random() * 10),
-        rootSlot: 276543200 + Math.floor(Math.random() * 10),
-        credits: Math.floor(Math.random() * 50000) + 400000,
-        epochCredits: Math.floor(Math.random() * 50000) + 400000,
-        version: Math.random() > 0.7 ? '1.18.23' : '1.18.22',
-        status: Math.random() > 0.05 ? 'active' as const : 'delinquent' as const,
-        datacenter: [
-          'AWS (us-east-1)', 'Google Cloud (us-west2)', 'Azure (eastus)', 
-          'Hetzner (nbg1)', 'DigitalOcean (nyc3)', 'Linode (us-east)',
-          'OVH (gra)', 'Vultr (nj)', 'Oracle Cloud (us-phoenix-1)'
-        ][Math.floor(Math.random() * 9)],
-        country: [
-          'United States', 'Germany', 'Singapore', 'Netherlands', 'Japan',
-          'Canada', 'United Kingdom', 'France', 'Australia'
-        ][Math.floor(Math.random() * 9)],
-        apy: Math.random() * 3 + 5, // 5-8% APY
-        performanceScore: Math.random() * 0.15 + 0.85, // 85-100%
-        uptimePercent: Math.random() * 5 + 95 // 95-100%
-      }))
-    ];
+    const connection = new Connection(SOLANA_RPC_URL, 'confirmed');
+    
+    // Fetch real validator data from Solana RPC
+    const voteAccounts = await connection.getVoteAccounts('confirmed');
+    const epochInfo = await connection.getEpochInfo('confirmed');
+    const clusterNodes = await connection.getClusterNodes();
+    
+    // Process real validator data
+    const allValidators = [...voteAccounts.current, ...voteAccounts.delinquent];
+    
+    // Limit to top 50 validators by stake for performance
+    const topValidators = allValidators
+      .sort((a, b) => b.activatedStake - a.activatedStake)
+      .slice(0, 50)
+      .map((validator, index) => {
+        const clusterNode = clusterNodes.find(node => 
+          node.pubkey === validator.nodePubkey
+        );
+        
+        // Calculate performance metrics from real data
+        const totalCredits = validator.epochCredits.reduce((sum, credit) => sum + credit[1], 0);
+        const recentCredits = validator.epochCredits.slice(-5).reduce((sum, credit) => sum + credit[1], 0);
+        const performanceScore = recentCredits > 0 ? Math.min(recentCredits / (5 * 440000), 1) : 0;
+        
+        // Calculate APY estimate based on commission and performance
+        const baseAPY = 7; // Base Solana staking APY
+        const apy = baseAPY * (1 - validator.commission / 100) * performanceScore;
+        
+        return {
+          voteAccount: validator.votePubkey,
+          name: `Validator ${index + 1}`, // Real validator names would need additional API
+          commission: validator.commission,
+          activatedStake: validator.activatedStake,
+          lastVote: validator.lastVote,
+          rootSlot: validator.rootSlot,
+          credits: totalCredits,
+          epochCredits: validator.epochCredits[validator.epochCredits.length - 1]?.[1] || 0,
+          version: clusterNode?.version || 'Unknown',
+          status: voteAccounts.current.includes(validator) ? 'active' as const : 'delinquent' as const,
+          datacenter: clusterNode?.tpu ? `TPU: ${clusterNode.tpu}` : 'Unknown',
+          country: 'Unknown', // Would need geolocation API for real location data
+          apy: Math.round(apy * 100) / 100,
+          performanceScore: Math.round(performanceScore * 100) / 100,
+          uptimePercent: Math.round(performanceScore * 100 * 100) / 100
+        };
+      });
 
-    // Calculate network stats
-    const totalValidators = mockValidators.length;
-    const activeValidators = mockValidators.filter(v => v.status === 'active').length;
-    const delinquentValidators = mockValidators.filter(v => v.status === 'delinquent').length;
-    const totalStake = mockValidators.reduce((sum, v) => sum + v.activatedStake, 0);
-    const averageCommission = mockValidators.reduce((sum, v) => sum + v.commission, 0) / totalValidators;
-    const averageUptime = mockValidators.reduce((sum, v) => sum + v.uptimePercent, 0) / totalValidators;
+    // Calculate real network stats from Solana data
+    const totalValidators = allValidators.length;
+    const activeValidators = voteAccounts.current.length;
+    const delinquentValidators = voteAccounts.delinquent.length;
+    const totalStake = allValidators.reduce((sum, v) => sum + v.activatedStake, 0);
+    const averageCommission = allValidators.reduce((sum, v) => sum + v.commission, 0) / totalValidators;
+    const averageUptime = topValidators.reduce((sum, v) => sum + v.uptimePercent, 0) / topValidators.length;
 
-    // Calculate Nakamoto coefficient (validators controlling >33% stake)
-    const sortedByStake = [...mockValidators].sort((a, b) => b.activatedStake - a.activatedStake);
+    // Calculate Nakamoto coefficient from real stake distribution
+    const sortedByStake = [...allValidators].sort((a, b) => b.activatedStake - a.activatedStake);
     let cumulativeStake = 0;
     let nakamotoCoefficient = 0;
     const thresholdStake = totalStake * 0.33;
@@ -119,27 +86,27 @@ export async function GET(request: NextRequest) {
       networkHealth
     };
 
-    // Calculate decentralization metrics
+    // Calculate decentralization metrics from real data
     const countryMap = new Map<string, { count: number, stake: number }>();
     const datacenterMap = new Map<string, { count: number, stake: number }>();
     const versionMap = new Map<string, number>();
     
-    mockValidators.forEach(validator => {
-      // Country distribution
+    topValidators.forEach(validator => {
+      // Country distribution (would need geolocation service for real data)
       const currentCountry = countryMap.get(validator.country) || { count: 0, stake: 0 };
       countryMap.set(validator.country, {
         count: currentCountry.count + 1,
         stake: currentCountry.stake + validator.activatedStake
       });
       
-      // Datacenter distribution
+      // Datacenter distribution (simplified - would need IP geolocation)
       const currentDatacenter = datacenterMap.get(validator.datacenter) || { count: 0, stake: 0 };
       datacenterMap.set(validator.datacenter, {
         count: currentDatacenter.count + 1,
         stake: currentDatacenter.stake + validator.activatedStake
       });
       
-      // Version distribution
+      // Version distribution from real cluster data
       const currentVersion = versionMap.get(validator.version) || 0;
       versionMap.set(validator.version, currentVersion + 1);
     });
@@ -159,7 +126,7 @@ export async function GET(request: NextRequest) {
     const clientDistribution = Array.from(versionMap.entries()).map(([version, count]) => ({
       version,
       validatorCount: count,
-      percent: (count / totalValidators) * 100
+      percent: (count / topValidators.length) * 100
     }));
 
     const decentralization = {
@@ -168,7 +135,7 @@ export async function GET(request: NextRequest) {
       clientDistribution
     };
 
-    // Health status
+    // Health status based on real network conditions
     const issues = [];
     if (activeValidators < 1000) {
       issues.push('Low active validator count');
@@ -176,18 +143,21 @@ export async function GET(request: NextRequest) {
     if (averageUptime < 95) {
       issues.push('Below average network uptime');
     }
+    if (delinquentValidators > totalValidators * 0.05) {
+      issues.push('High delinquent validator ratio');
+    }
 
     const health = {
       isHealthy: issues.length === 0,
       lastUpdate: Date.now(),
-      monitoredValidators: totalValidators,
+      monitoredValidators: topValidators.length,
       issues
     };
 
     return NextResponse.json({
       success: true,
       data: {
-        validators: mockValidators,
+        validators: topValidators,
         networkStats,
         decentralization,
         health
@@ -196,10 +166,10 @@ export async function GET(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Error in validator analytics API:', error);
+    console.error('Error fetching real validator data:', error);
     return NextResponse.json({
       success: false,
-      error: error instanceof Error ? error.message : 'Internal server error'
+      error: error instanceof Error ? error.message : 'Failed to fetch validator data from Solana RPC'
     }, { status: 500 });
   }
 }
