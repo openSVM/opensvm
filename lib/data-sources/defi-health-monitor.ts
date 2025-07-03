@@ -447,7 +447,7 @@ export class DeFiHealthMonitor extends BaseAnalytics {
       const securityAlerts = await this.scanProtocolSecurity(protocol);
       return securityAlerts;
     } catch (error) {
-      console.warn(`Failed to fetch real exploit alerts for ${protocol}:`, error);
+      console.warn('Failed to fetch real exploit alerts for %s:', protocol, error);
       return [];
     }
   }
