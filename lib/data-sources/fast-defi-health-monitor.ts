@@ -461,17 +461,18 @@ export function getFastDeFiHealthMonitor(config?: AnalyticsConfig): FastDeFiHeal
         solana: [
           'https://api.mainnet-beta.solana.com',
           'https://solana-api.projectserum.com'
+        ],
+        ethereum: [
+          'https://cloudflare-eth.com'
         ]
       },
       refreshIntervals: {
-        fast: 30 * 1000,
-        medium: 2 * 60 * 1000,
-        slow: 5 * 60 * 1000
+        dexData: 30 * 1000,
+        crossChainData: 2 * 60 * 1000,
+        rpcData: 5 * 60 * 1000,
+        validatorData: 2 * 60 * 1000
       },
-      retentionPolicy: {
-        maxAge: 14 * 24 * 60 * 60 * 1000,
-        maxEntries: 100000
-      }
+      apiKeys: {}
     };
     
     fastDeFiHealthMonitorInstance = new FastDeFiHealthMonitor(config || defaultConfig);

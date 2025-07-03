@@ -1,0 +1,764 @@
+# Page snapshot
+
+```yaml
+- alert
+- button "Open Next.js Dev Tools":
+  - img
+- button "Open issues overlay": 2 Issue
+- button "Collapse issues badge":
+  - img
+- navigation "Main navigation":
+  - link "OPENSVM [AI]":
+    - /url: /
+  - text: 3:09:42 AM
+  - searchbox "Search"
+  - button "Search Settings":
+    - img
+  - button "Explore"
+  - button "Tokens"
+  - button "NFTs"
+  - button "Analytics"
+  - button:
+    - img
+  - button "Connect Wallet"
+  - button "Open AI Assistant": AI Assistant
+- main:
+  - heading "Solana Ecosystem Analytics" [level=1]
+  - paragraph: Comprehensive analytics for DEXes, cross-chain flows, DeFi protocols, and validator performance.
+  - navigation:
+    - button "Overview"
+    - button "Solana DEX"
+    - button "Cross-Chain"
+    - button "DeFi Health"
+    - button "Validators"
+  - heading "Validator Performance Analytics" [level=2]
+  - paragraph: Real-time validator metrics, performance tracking, and network decentralization
+  - button "Start Monitoring"
+  - text: Unhealthy
+  - paragraph: Active Validators
+  - paragraph: "47"
+  - paragraph: of 50 total
+  - img
+  - paragraph: Total Stake
+  - paragraph: 220396096055.51M SOL
+  - paragraph: across all validators
+  - img
+  - paragraph: Nakamoto Coefficient
+  - paragraph: "10"
+  - paragraph: validators to halt network
+  - img
+  - paragraph: Average Uptime
+  - paragraph: 9788.70%
+  - paragraph: network wide
+  - img
+  - heading "Validator Rankings" [level=3]
+  - text: "Sort by:"
+  - combobox:
+    - option "Activated Stake" [selected]
+    - option "Commission"
+    - option "Performance"
+    - option "Uptime"
+  - table:
+    - rowgroup:
+      - row "Rank Validator Status Activated Stake Commission APY Performance Uptime Location Version":
+        - cell "Rank"
+        - cell "Validator"
+        - cell "Status"
+        - cell "Activated Stake"
+        - cell "Commission"
+        - cell "APY"
+        - cell "Performance"
+        - cell "Uptime"
+        - cell "Location"
+        - cell "Version"
+    - rowgroup:
+      - row "#1 Coinbase Cloud 7K8DVxtN...owvFpECh active 12500000000.00M SOL 5.00% 680.00% 98.00% 100.0% United States Google Cloud (us-central1) 1.18.22":
+        - cell "#1"
+        - cell "Coinbase Cloud 7K8DVxtN...owvFpECh"
+        - cell "active"
+        - cell "12500000000.00M SOL"
+        - cell "5.00%"
+        - cell "680.00%"
+        - cell "98.00%"
+        - cell "100.0%"
+        - cell "United States Google Cloud (us-central1)":
+          - img
+          - text: United States Google Cloud (us-central1)
+        - cell "1.18.22"
+      - row "#2 Lido 9QU2QSxh...SZaM29mF active 11200000000.00M SOL 7.00% 650.00% 96.00% 99.9% Ireland AWS (eu-west-1) 1.18.22":
+        - cell "#2"
+        - cell "Lido 9QU2QSxh...SZaM29mF"
+        - cell "active"
+        - cell "11200000000.00M SOL"
+        - cell "7.00%"
+        - cell "650.00%"
+        - cell "96.00%"
+        - cell "99.9%"
+        - cell "Ireland AWS (eu-west-1)":
+          - img
+          - text: Ireland AWS (eu-west-1)
+        - cell "1.18.22"
+      - row "#3 Jito J1to3PQf...kBDE9qhF active 10800000000.00M SOL 4.00% 710.00% 99.00% 100.0% Germany Hetzner (fsn1) 1.18.23":
+        - cell "#3"
+        - cell "Jito J1to3PQf...kBDE9qhF"
+        - cell "active"
+        - cell "10800000000.00M SOL"
+        - cell "4.00%"
+        - cell "710.00%"
+        - cell "99.00%"
+        - cell "100.0%"
+        - cell "Germany Hetzner (fsn1)":
+          - img
+          - text: Germany Hetzner (fsn1)
+        - cell "1.18.23"
+      - row "#4 Marinade Finance 4 validato...7w2quehj active 5947031262.49M SOL 6.00% 548.06% 99.89% 97.1% Canada Vultr (nj) 1.18.22":
+        - cell "#4"
+        - cell "Marinade Finance 4 validato...7w2quehj"
+        - cell "active"
+        - cell "5947031262.49M SOL"
+        - cell "6.00%"
+        - cell "548.06%"
+        - cell "99.89%"
+        - cell "97.1%"
+        - cell "Canada Vultr (nj)":
+          - img
+          - text: Canada Vultr (nj)
+        - cell "1.18.22"
+      - row "#5 Chorus One 5 validato...823ymcgf active 5937986600.68M SOL 8.00% 793.03% 99.84% 99.3% United States Linode (us-east) 1.18.22":
+        - cell "#5"
+        - cell "Chorus One 5 validato...823ymcgf"
+        - cell "active"
+        - cell "5937986600.68M SOL"
+        - cell "8.00%"
+        - cell "793.03%"
+        - cell "99.84%"
+        - cell "99.3%"
+        - cell "United States Linode (us-east)":
+          - img
+          - text: United States Linode (us-east)
+        - cell "1.18.22"
+      - row "#6 P2P Validator 2 validato...4v7nek5k active 5924391608.24M SOL 1.00% 631.94% 97.12% 98.4% Japan Google Cloud (us-west2) 1.18.22":
+        - cell "#6"
+        - cell "P2P Validator 2 validato...4v7nek5k"
+        - cell "active"
+        - cell "5924391608.24M SOL"
+        - cell "1.00%"
+        - cell "631.94%"
+        - cell "97.12%"
+        - cell "98.4%"
+        - cell "Japan Google Cloud (us-west2)":
+          - img
+          - text: Japan Google Cloud (us-west2)
+        - cell "1.18.22"
+      - row "#7 P2P Validator 3 validato...932jizl7 active 5757765712.67M SOL 10.00% 678.15% 86.16% 98.9% United Kingdom Vultr (nj) 1.18.22":
+        - cell "#7"
+        - cell "P2P Validator 3 validato...932jizl7"
+        - cell "active"
+        - cell "5757765712.67M SOL"
+        - cell "10.00%"
+        - cell "678.15%"
+        - cell "86.16%"
+        - cell "98.9%"
+        - cell "United Kingdom Vultr (nj)":
+          - img
+          - text: United Kingdom Vultr (nj)
+        - cell "1.18.22"
+      - row "#8 Staked 5 validato...45luc52f active 5744365747.17M SOL 8.00% 622.45% 90.37% 99.5% United Kingdom Azure (eastus) 1.18.23":
+        - cell "#8"
+        - cell "Staked 5 validato...45luc52f"
+        - cell "active"
+        - cell "5744365747.17M SOL"
+        - cell "8.00%"
+        - cell "622.45%"
+        - cell "90.37%"
+        - cell "99.5%"
+        - cell "United Kingdom Azure (eastus)":
+          - img
+          - text: United Kingdom Azure (eastus)
+        - cell "1.18.23"
+      - row "#9 DelegateInc 4 validato...htdq95lr active 5736634178.22M SOL 10.00% 660.01% 95.03% 97.8% Netherlands Vultr (nj) 1.18.23":
+        - cell "#9"
+        - cell "DelegateInc 4 validato...htdq95lr"
+        - cell "active"
+        - cell "5736634178.22M SOL"
+        - cell "10.00%"
+        - cell "660.01%"
+        - cell "95.03%"
+        - cell "97.8%"
+        - cell "Netherlands Vultr (nj)":
+          - img
+          - text: Netherlands Vultr (nj)
+        - cell "1.18.23"
+      - row "#10 Blockdaemon 3 validato...pe1xkj62 active 5679497847.26M SOL 10.00% 528.90% 90.01% 96.3% Australia OVH (gra) 1.18.22":
+        - cell "#10"
+        - cell "Blockdaemon 3 validato...pe1xkj62"
+        - cell "active"
+        - cell "5679497847.26M SOL"
+        - cell "10.00%"
+        - cell "528.90%"
+        - cell "90.01%"
+        - cell "96.3%"
+        - cell "Australia OVH (gra)":
+          - img
+          - text: Australia OVH (gra)
+        - cell "1.18.22"
+      - row "#11 P2P Validator 5 validato...sk7y4y14 active 5558813489.16M SOL 2.00% 519.01% 97.01% 97.7% Netherlands Vultr (nj) 1.18.22":
+        - cell "#11"
+        - cell "P2P Validator 5 validato...sk7y4y14"
+        - cell "active"
+        - cell "5558813489.16M SOL"
+        - cell "2.00%"
+        - cell "519.01%"
+        - cell "97.01%"
+        - cell "97.7%"
+        - cell "Netherlands Vultr (nj)":
+          - img
+          - text: Netherlands Vultr (nj)
+        - cell "1.18.22"
+      - row "#12 Blockdaemon 1 validato...y0mfoyoj active 5495216387.41M SOL 6.00% 505.10% 96.55% 96.4% Netherlands DigitalOcean (nyc3) 1.18.23":
+        - cell "#12"
+        - cell "Blockdaemon 1 validato...y0mfoyoj"
+        - cell "active"
+        - cell "5495216387.41M SOL"
+        - cell "6.00%"
+        - cell "505.10%"
+        - cell "96.55%"
+        - cell "96.4%"
+        - cell "Netherlands DigitalOcean (nyc3)":
+          - img
+          - text: Netherlands DigitalOcean (nyc3)
+        - cell "1.18.23"
+      - row "#13 Stakin 2 validato...tonojj77 active 5471680850.53M SOL 9.00% 631.89% 86.98% 95.6% United Kingdom OVH (gra) 1.18.23":
+        - cell "#13"
+        - cell "Stakin 2 validato...tonojj77"
+        - cell "active"
+        - cell "5471680850.53M SOL"
+        - cell "9.00%"
+        - cell "631.89%"
+        - cell "86.98%"
+        - cell "95.6%"
+        - cell "United Kingdom OVH (gra)":
+          - img
+          - text: United Kingdom OVH (gra)
+        - cell "1.18.23"
+      - row "#14 Staked 1 validato...lium2kr7 active 5436931100.94M SOL 9.00% 554.75% 96.67% 96.7% Canada AWS (us-east-1) 1.18.22":
+        - cell "#14"
+        - cell "Staked 1 validato...lium2kr7"
+        - cell "active"
+        - cell "5436931100.94M SOL"
+        - cell "9.00%"
+        - cell "554.75%"
+        - cell "96.67%"
+        - cell "96.7%"
+        - cell "Canada AWS (us-east-1)":
+          - img
+          - text: Canada AWS (us-east-1)
+        - cell "1.18.22"
+      - row "#15 Chorus One 3 validato...dj0ik9sn delinquent 5233302052.79M SOL 7.00% 519.67% 96.75% 99.9% France Linode (us-east) 1.18.22":
+        - cell "#15"
+        - cell "Chorus One 3 validato...dj0ik9sn"
+        - cell "delinquent"
+        - cell "5233302052.79M SOL"
+        - cell "7.00%"
+        - cell "519.67%"
+        - cell "96.75%"
+        - cell "99.9%"
+        - cell "France Linode (us-east)":
+          - img
+          - text: France Linode (us-east)
+        - cell "1.18.22"
+      - row "#16 Allnodes 1 validato...pn8w6luz active 5126815361.75M SOL 1.00% 567.98% 99.99% 97.2% Japan Azure (eastus) 1.18.22":
+        - cell "#16"
+        - cell "Allnodes 1 validato...pn8w6luz"
+        - cell "active"
+        - cell "5126815361.75M SOL"
+        - cell "1.00%"
+        - cell "567.98%"
+        - cell "99.99%"
+        - cell "97.2%"
+        - cell "Japan Azure (eastus)":
+          - img
+          - text: Japan Azure (eastus)
+        - cell "1.18.22"
+      - row "#17 Chorus One 1 validato...1e0uabj9 active 5072338892.75M SOL 8.00% 744.54% 86.11% 96.0% Germany Azure (eastus) 1.18.22":
+        - cell "#17"
+        - cell "Chorus One 1 validato...1e0uabj9"
+        - cell "active"
+        - cell "5072338892.75M SOL"
+        - cell "8.00%"
+        - cell "744.54%"
+        - cell "86.11%"
+        - cell "96.0%"
+        - cell "Germany Azure (eastus)":
+          - img
+          - text: Germany Azure (eastus)
+        - cell "1.18.22"
+      - row "#18 Figment 2 validato...n0e6s43w active 4983231318.35M SOL 5.00% 600.79% 99.33% 95.9% Singapore Google Cloud (us-west2) 1.18.22":
+        - cell "#18"
+        - cell "Figment 2 validato...n0e6s43w"
+        - cell "active"
+        - cell "4983231318.35M SOL"
+        - cell "5.00%"
+        - cell "600.79%"
+        - cell "99.33%"
+        - cell "95.9%"
+        - cell "Singapore Google Cloud (us-west2)":
+          - img
+          - text: Singapore Google Cloud (us-west2)
+        - cell "1.18.22"
+      - row "#19 Figment 5 validato...5m2krke3 active 4902944302.05M SOL 1.00% 583.32% 95.61% 95.8% Canada Oracle Cloud (us-phoenix-1) 1.18.23":
+        - cell "#19"
+        - cell "Figment 5 validato...5m2krke3"
+        - cell "active"
+        - cell "4902944302.05M SOL"
+        - cell "1.00%"
+        - cell "583.32%"
+        - cell "95.61%"
+        - cell "95.8%"
+        - cell "Canada Oracle Cloud (us-phoenix-1)":
+          - img
+          - text: Canada Oracle Cloud (us-phoenix-1)
+        - cell "1.18.23"
+      - row "#20 Staked 4 validato...jwmp222n active 4872613111.87M SOL 3.00% 503.61% 85.59% 99.9% Netherlands Hetzner (nbg1) 1.18.22":
+        - cell "#20"
+        - cell "Staked 4 validato...jwmp222n"
+        - cell "active"
+        - cell "4872613111.87M SOL"
+        - cell "3.00%"
+        - cell "503.61%"
+        - cell "85.59%"
+        - cell "99.9%"
+        - cell "Netherlands Hetzner (nbg1)":
+          - img
+          - text: Netherlands Hetzner (nbg1)
+        - cell "1.18.22"
+      - row "#21 DelegateInc 3 validato...nol61uzn active 4746446618.14M SOL 1.00% 781.52% 87.61% 99.6% France AWS (us-east-1) 1.18.23":
+        - cell "#21"
+        - cell "DelegateInc 3 validato...nol61uzn"
+        - cell "active"
+        - cell "4746446618.14M SOL"
+        - cell "1.00%"
+        - cell "781.52%"
+        - cell "87.61%"
+        - cell "99.6%"
+        - cell "France AWS (us-east-1)":
+          - img
+          - text: France AWS (us-east-1)
+        - cell "1.18.23"
+      - row "#22 Stakin 1 validato...1gnzqbk0 active 4661147851.85M SOL 3.00% 514.64% 95.34% 96.3% Canada Azure (eastus) 1.18.23":
+        - cell "#22"
+        - cell "Stakin 1 validato...1gnzqbk0"
+        - cell "active"
+        - cell "4661147851.85M SOL"
+        - cell "3.00%"
+        - cell "514.64%"
+        - cell "95.34%"
+        - cell "96.3%"
+        - cell "Canada Azure (eastus)":
+          - img
+          - text: Canada Azure (eastus)
+        - cell "1.18.23"
+      - row "#23 Marinade Finance 5 validato...yio9gsv2 active 4588709668.51M SOL 8.00% 556.90% 85.69% 98.5% Australia Vultr (nj) 1.18.22":
+        - cell "#23"
+        - cell "Marinade Finance 5 validato...yio9gsv2"
+        - cell "active"
+        - cell "4588709668.51M SOL"
+        - cell "8.00%"
+        - cell "556.90%"
+        - cell "85.69%"
+        - cell "98.5%"
+        - cell "Australia Vultr (nj)":
+          - img
+          - text: Australia Vultr (nj)
+        - cell "1.18.22"
+      - row "#24 Allnodes 3 validato...gubynxzh active 4461589066.97M SOL 6.00% 712.96% 85.55% 96.7% Singapore Linode (us-east) 1.18.22":
+        - cell "#24"
+        - cell "Allnodes 3 validato...gubynxzh"
+        - cell "active"
+        - cell "4461589066.97M SOL"
+        - cell "6.00%"
+        - cell "712.96%"
+        - cell "85.55%"
+        - cell "96.7%"
+        - cell "Singapore Linode (us-east)":
+          - img
+          - text: Singapore Linode (us-east)
+        - cell "1.18.22"
+      - row "#25 Chorus One 2 validato...emuiavmy active 4360191766.34M SOL 6.00% 753.83% 91.09% 96.5% United Kingdom AWS (us-east-1) 1.18.22":
+        - cell "#25"
+        - cell "Chorus One 2 validato...emuiavmy"
+        - cell "active"
+        - cell "4360191766.34M SOL"
+        - cell "6.00%"
+        - cell "753.83%"
+        - cell "91.09%"
+        - cell "96.5%"
+        - cell "United Kingdom AWS (us-east-1)":
+          - img
+          - text: United Kingdom AWS (us-east-1)
+        - cell "1.18.22"
+      - row "#26 Allnodes 4 validato...rejgf662 active 4354537122.63M SOL 1.00% 502.69% 96.80% 98.1% United States Azure (eastus) 1.18.22":
+        - cell "#26"
+        - cell "Allnodes 4 validato...rejgf662"
+        - cell "active"
+        - cell "4354537122.63M SOL"
+        - cell "1.00%"
+        - cell "502.69%"
+        - cell "96.80%"
+        - cell "98.1%"
+        - cell "United States Azure (eastus)":
+          - img
+          - text: United States Azure (eastus)
+        - cell "1.18.22"
+      - row "#27 P2P Validator 4 validato...71tg3l71 delinquent 4294633576.05M SOL 1.00% 706.87% 89.44% 98.0% Netherlands DigitalOcean (nyc3) 1.18.22":
+        - cell "#27"
+        - cell "P2P Validator 4 validato...71tg3l71"
+        - cell "delinquent"
+        - cell "4294633576.05M SOL"
+        - cell "1.00%"
+        - cell "706.87%"
+        - cell "89.44%"
+        - cell "98.0%"
+        - cell "Netherlands DigitalOcean (nyc3)":
+          - img
+          - text: Netherlands DigitalOcean (nyc3)
+        - cell "1.18.22"
+      - row "#28 Staked 3 validato...mc7k985p active 4214352178.44M SOL 1.00% 756.28% 94.49% 98.4% Singapore Oracle Cloud (us-phoenix-1) 1.18.23":
+        - cell "#28"
+        - cell "Staked 3 validato...mc7k985p"
+        - cell "active"
+        - cell "4214352178.44M SOL"
+        - cell "1.00%"
+        - cell "756.28%"
+        - cell "94.49%"
+        - cell "98.4%"
+        - cell "Singapore Oracle Cloud (us-phoenix-1)":
+          - img
+          - text: Singapore Oracle Cloud (us-phoenix-1)
+        - cell "1.18.23"
+      - row "#29 Blockdaemon 2 validato...nk4htff5 active 4002726918.92M SOL 10.00% 532.89% 88.09% 98.2% Netherlands Azure (eastus) 1.18.22":
+        - cell "#29"
+        - cell "Blockdaemon 2 validato...nk4htff5"
+        - cell "active"
+        - cell "4002726918.92M SOL"
+        - cell "10.00%"
+        - cell "532.89%"
+        - cell "88.09%"
+        - cell "98.2%"
+        - cell "Netherlands Azure (eastus)":
+          - img
+          - text: Netherlands Azure (eastus)
+        - cell "1.18.22"
+      - row "#30 Marinade Finance 2 validato...fh7l7s3h active 3907788140.41M SOL 1.00% 796.16% 98.28% 99.1% Canada Vultr (nj) 1.18.23":
+        - cell "#30"
+        - cell "Marinade Finance 2 validato...fh7l7s3h"
+        - cell "active"
+        - cell "3907788140.41M SOL"
+        - cell "1.00%"
+        - cell "796.16%"
+        - cell "98.28%"
+        - cell "99.1%"
+        - cell "Canada Vultr (nj)":
+          - img
+          - text: Canada Vultr (nj)
+        - cell "1.18.23"
+      - row "#31 DelegateInc 2 validato...f10g4xfi active 3563037166.56M SOL 3.00% 736.12% 97.71% 97.0% Canada Hetzner (nbg1) 1.18.22":
+        - cell "#31"
+        - cell "DelegateInc 2 validato...f10g4xfi"
+        - cell "active"
+        - cell "3563037166.56M SOL"
+        - cell "3.00%"
+        - cell "736.12%"
+        - cell "97.71%"
+        - cell "97.0%"
+        - cell "Canada Hetzner (nbg1)":
+          - img
+          - text: Canada Hetzner (nbg1)
+        - cell "1.18.22"
+      - row "#32 Everstake 1 validato...05yqwqpa active 3413529998.13M SOL 8.00% 578.54% 85.46% 97.2% Germany AWS (us-east-1) 1.18.22":
+        - cell "#32"
+        - cell "Everstake 1 validato...05yqwqpa"
+        - cell "active"
+        - cell "3413529998.13M SOL"
+        - cell "8.00%"
+        - cell "578.54%"
+        - cell "85.46%"
+        - cell "97.2%"
+        - cell "Germany AWS (us-east-1)":
+          - img
+          - text: Germany AWS (us-east-1)
+        - cell "1.18.22"
+      - row "#33 Blockdaemon 5 validato...n7oosdrc active 3184776660.93M SOL 6.00% 642.30% 91.63% 95.8% France DigitalOcean (nyc3) 1.18.22":
+        - cell "#33"
+        - cell "Blockdaemon 5 validato...n7oosdrc"
+        - cell "active"
+        - cell "3184776660.93M SOL"
+        - cell "6.00%"
+        - cell "642.30%"
+        - cell "91.63%"
+        - cell "95.8%"
+        - cell "France DigitalOcean (nyc3)":
+          - img
+          - text: France DigitalOcean (nyc3)
+        - cell "1.18.22"
+      - row "#34 Everstake 4 validato...v997n7ut active 3037590890.12M SOL 6.00% 697.81% 94.37% 99.2% Singapore Oracle Cloud (us-phoenix-1) 1.18.22":
+        - cell "#34"
+        - cell "Everstake 4 validato...v997n7ut"
+        - cell "active"
+        - cell "3037590890.12M SOL"
+        - cell "6.00%"
+        - cell "697.81%"
+        - cell "94.37%"
+        - cell "99.2%"
+        - cell "Singapore Oracle Cloud (us-phoenix-1)":
+          - img
+          - text: Singapore Oracle Cloud (us-phoenix-1)
+        - cell "1.18.22"
+      - row "#35 Marinade Finance 1 validato...4ng17vzl active 2962561169.47M SOL 10.00% 600.56% 95.14% 96.4% France Vultr (nj) 1.18.22":
+        - cell "#35"
+        - cell "Marinade Finance 1 validato...4ng17vzl"
+        - cell "active"
+        - cell "2962561169.47M SOL"
+        - cell "10.00%"
+        - cell "600.56%"
+        - cell "95.14%"
+        - cell "96.4%"
+        - cell "France Vultr (nj)":
+          - img
+          - text: France Vultr (nj)
+        - cell "1.18.22"
+      - row "#36 DelegateInc 1 validato...zlm87qw0 active 2957184766.24M SOL 8.00% 616.31% 88.81% 99.1% Japan Hetzner (nbg1) 1.18.22":
+        - cell "#36"
+        - cell "DelegateInc 1 validato...zlm87qw0"
+        - cell "active"
+        - cell "2957184766.24M SOL"
+        - cell "8.00%"
+        - cell "616.31%"
+        - cell "88.81%"
+        - cell "99.1%"
+        - cell "Japan Hetzner (nbg1)":
+          - img
+          - text: Japan Hetzner (nbg1)
+        - cell "1.18.22"
+      - row "#37 Allnodes 2 validato...7od2iyw5 active 2827961839.56M SOL 5.00% 535.69% 96.91% 99.5% Australia Azure (eastus) 1.18.22":
+        - cell "#37"
+        - cell "Allnodes 2 validato...7od2iyw5"
+        - cell "active"
+        - cell "2827961839.56M SOL"
+        - cell "5.00%"
+        - cell "535.69%"
+        - cell "96.91%"
+        - cell "99.5%"
+        - cell "Australia Azure (eastus)":
+          - img
+          - text: Australia Azure (eastus)
+        - cell "1.18.22"
+      - row "#38 Blockdaemon 4 validato...vnv6vgk7 active 2755497454.68M SOL 9.00% 565.32% 97.19% 100.0% Netherlands Linode (us-east) 1.18.22":
+        - cell "#38"
+        - cell "Blockdaemon 4 validato...vnv6vgk7"
+        - cell "active"
+        - cell "2755497454.68M SOL"
+        - cell "9.00%"
+        - cell "565.32%"
+        - cell "97.19%"
+        - cell "100.0%"
+        - cell "Netherlands Linode (us-east)":
+          - img
+          - text: Netherlands Linode (us-east)
+        - cell "1.18.22"
+      - row "#39 Everstake 5 validato...u27abvbt active 2750206068.79M SOL 5.00% 692.39% 99.70% 96.3% Netherlands AWS (us-east-1) 1.18.22":
+        - cell "#39"
+        - cell "Everstake 5 validato...u27abvbt"
+        - cell "active"
+        - cell "2750206068.79M SOL"
+        - cell "5.00%"
+        - cell "692.39%"
+        - cell "99.70%"
+        - cell "96.3%"
+        - cell "Netherlands AWS (us-east-1)":
+          - img
+          - text: Netherlands AWS (us-east-1)
+        - cell "1.18.22"
+      - row "#40 Figment 4 validato...4xbi2h6h active 2703920063.04M SOL 8.00% 666.81% 92.91% 95.8% Germany DigitalOcean (nyc3) 1.18.23":
+        - cell "#40"
+        - cell "Figment 4 validato...4xbi2h6h"
+        - cell "active"
+        - cell "2703920063.04M SOL"
+        - cell "8.00%"
+        - cell "666.81%"
+        - cell "92.91%"
+        - cell "95.8%"
+        - cell "Germany DigitalOcean (nyc3)":
+          - img
+          - text: Germany DigitalOcean (nyc3)
+        - cell "1.18.23"
+      - row "#41 Figment 1 validato...qb5kbx7v active 2400161185.65M SOL 7.00% 502.41% 89.97% 97.9% Netherlands Linode (us-east) 1.18.23":
+        - cell "#41"
+        - cell "Figment 1 validato...qb5kbx7v"
+        - cell "active"
+        - cell "2400161185.65M SOL"
+        - cell "7.00%"
+        - cell "502.41%"
+        - cell "89.97%"
+        - cell "97.9%"
+        - cell "Netherlands Linode (us-east)":
+          - img
+          - text: Netherlands Linode (us-east)
+        - cell "1.18.23"
+      - row "#42 Everstake 2 validato...dcw58uz7 active 2390896283.56M SOL 2.00% 772.81% 95.90% 95.7% Australia Linode (us-east) 1.18.23":
+        - cell "#42"
+        - cell "Everstake 2 validato...dcw58uz7"
+        - cell "active"
+        - cell "2390896283.56M SOL"
+        - cell "2.00%"
+        - cell "772.81%"
+        - cell "95.90%"
+        - cell "95.7%"
+        - cell "Australia Linode (us-east)":
+          - img
+          - text: Australia Linode (us-east)
+        - cell "1.18.23"
+      - row "#43 Staked 2 validato...70nhe8ai delinquent 2319414140.70M SOL 4.00% 585.83% 90.35% 98.6% France DigitalOcean (nyc3) 1.18.22":
+        - cell "#43"
+        - cell "Staked 2 validato...70nhe8ai"
+        - cell "delinquent"
+        - cell "2319414140.70M SOL"
+        - cell "4.00%"
+        - cell "585.83%"
+        - cell "90.35%"
+        - cell "98.6%"
+        - cell "France DigitalOcean (nyc3)":
+          - img
+          - text: France DigitalOcean (nyc3)
+        - cell "1.18.22"
+      - row "#44 Figment 3 validato...9tmlhheb active 2211027169.26M SOL 4.00% 748.64% 88.98% 99.1% Singapore Oracle Cloud (us-phoenix-1) 1.18.22":
+        - cell "#44"
+        - cell "Figment 3 validato...9tmlhheb"
+        - cell "active"
+        - cell "2211027169.26M SOL"
+        - cell "4.00%"
+        - cell "748.64%"
+        - cell "88.98%"
+        - cell "99.1%"
+        - cell "Singapore Oracle Cloud (us-phoenix-1)":
+          - img
+          - text: Singapore Oracle Cloud (us-phoenix-1)
+        - cell "1.18.22"
+      - row "#45 Everstake 3 validato...genn77zm active 2171963988.16M SOL 4.00% 500.71% 90.79% 99.3% Germany DigitalOcean (nyc3) 1.18.22":
+        - cell "#45"
+        - cell "Everstake 3 validato...genn77zm"
+        - cell "active"
+        - cell "2171963988.16M SOL"
+        - cell "4.00%"
+        - cell "500.71%"
+        - cell "90.79%"
+        - cell "99.3%"
+        - cell "Germany DigitalOcean (nyc3)":
+          - img
+          - text: Germany DigitalOcean (nyc3)
+        - cell "1.18.22"
+      - row "#46 Stakin 3 validato...azi90xd2 active 2116403935.79M SOL 8.00% 639.34% 85.93% 95.6% Netherlands Vultr (nj) 1.18.23":
+        - cell "#46"
+        - cell "Stakin 3 validato...azi90xd2"
+        - cell "active"
+        - cell "2116403935.79M SOL"
+        - cell "8.00%"
+        - cell "639.34%"
+        - cell "85.93%"
+        - cell "95.6%"
+        - cell "Netherlands Vultr (nj)":
+          - img
+          - text: Netherlands Vultr (nj)
+        - cell "1.18.23"
+      - row "#47 P2P Validator 1 validato...batbv5d2 active 1589637521.29M SOL 3.00% 745.37% 94.72% 99.1% United States DigitalOcean (nyc3) 1.18.23":
+        - cell "#47"
+        - cell "P2P Validator 1 validato...batbv5d2"
+        - cell "active"
+        - cell "1589637521.29M SOL"
+        - cell "3.00%"
+        - cell "745.37%"
+        - cell "94.72%"
+        - cell "99.1%"
+        - cell "United States DigitalOcean (nyc3)":
+          - img
+          - text: United States DigitalOcean (nyc3)
+        - cell "1.18.23"
+      - row "#48 Chorus One 4 validato...w2u3fs9j active 1559376983.49M SOL 5.00% 755.23% 95.29% 98.0% Germany Hetzner (nbg1) 1.18.22":
+        - cell "#48"
+        - cell "Chorus One 4 validato...w2u3fs9j"
+        - cell "active"
+        - cell "1559376983.49M SOL"
+        - cell "5.00%"
+        - cell "755.23%"
+        - cell "95.29%"
+        - cell "98.0%"
+        - cell "Germany Hetzner (nbg1)":
+          - img
+          - text: Germany Hetzner (nbg1)
+        - cell "1.18.22"
+      - row "#49 Marinade Finance 3 validato...k7vptiok active 1336672286.40M SOL 10.00% 630.46% 88.52% 98.5% Japan Azure (eastus) 1.18.22":
+        - cell "#49"
+        - cell "Marinade Finance 3 validato...k7vptiok"
+        - cell "active"
+        - cell "1336672286.40M SOL"
+        - cell "10.00%"
+        - cell "630.46%"
+        - cell "88.52%"
+        - cell "98.5%"
+        - cell "Japan Azure (eastus)":
+          - img
+          - text: Japan Azure (eastus)
+        - cell "1.18.22"
+      - row "#50 Stakin 4 validato...uxywo2ht active 1170593751.12M SOL 10.00% 522.74% 87.67% 98.4% Australia Hetzner (nbg1) 1.18.23":
+        - cell "#50"
+        - cell "Stakin 4 validato...uxywo2ht"
+        - cell "active"
+        - cell "1170593751.12M SOL"
+        - cell "10.00%"
+        - cell "522.74%"
+        - cell "87.67%"
+        - cell "98.4%"
+        - cell "Australia Hetzner (nbg1)":
+          - img
+          - text: Australia Hetzner (nbg1)
+        - cell "1.18.23"
+  - heading "Geographic Distribution" [level=3]
+  - img
+  - text: United States 4 1106.29%
+  - img
+  - text: Ireland 1 508.18%
+  - img
+  - text: Germany 6 1167.04%
+  - img
+  - text: France 5 836.97%
+  - img
+  - text: Canada 6 1289.45%
+  - img
+  - text: Netherlands 10 1814.14%
+  - img
+  - text: Japan 4 696.25%
+  - img
+  - text: Australia 5 755.81%
+  - heading "Datacenter Distribution" [level=3]
+  - img
+  - text: Google Cloud (us-central1) 1 567.16%
+  - img
+  - text: AWS (eu-west-1) 1 508.18%
+  - img
+  - text: Hetzner (fsn1) 1 490.03%
+  - img
+  - text: Vultr (nj) 8 1659.54%
+  - img
+  - text: AWS (us-east-1) 5 939.55%
+  - img
+  - text: DigitalOcean (nyc3) 7 987.29%
+  - img
+  - text: Azure (eastus) 8 1503.05%
+  - img
+  - text: Linode (us-east) 6 1051.72%
+  - heading "Client Distribution" [level=3]
+  - img
+  - text: 1.18.22 34 6800.00%
+  - img
+  - text: 1.18.23 16 3200.00%
+```

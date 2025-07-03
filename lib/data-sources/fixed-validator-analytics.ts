@@ -18,7 +18,8 @@ export class FixedValidatorAnalytics extends BaseAnalytics {
   constructor(config: AnalyticsConfig) {
     super(config);
     // Use a more reliable RPC endpoint with timeout
-    const rpcEndpoint = config.rpcEndpoints?.solana?.[0] || 'https://api.mainnet-beta.solana.com';
+    const rpcEndpoints = config.rpcEndpoints?.solana || ['https://api.mainnet-beta.solana.com'];
+    const rpcEndpoint = rpcEndpoints[0] || 'https://api.mainnet-beta.solana.com';
     this.connection = new Connection(rpcEndpoint, {
       commitment: 'confirmed',
       httpAgent: false,
@@ -523,17 +524,18 @@ export function getFixedValidatorAnalytics(config?: AnalyticsConfig): FixedValid
           'https://api.mainnet-beta.solana.com',
           'https://solana-api.projectserum.com',
           'https://rpc.ankr.com/solana'
+        ],
+        ethereum: [
+          'https://cloudflare-eth.com'
         ]
       },
       refreshIntervals: {
-        fast: 30 * 1000,    // 30 seconds
-        medium: 2 * 60 * 1000,  // 2 minutes
-        slow: 5 * 60 * 1000     // 5 minutes
+        dexData: 30 * 1000,    // 30 seconds
+        crossChainData: 2 * 60 * 1000,  // 2 minutes
+        rpcData: 5 * 60 * 1000,     // 5 minutes
+        validatorData: 2 * 60 * 1000 // 2 minutes
       },
-      retentionPolicy: {
-        maxAge: 14 * 24 * 60 * 60 * 1000, // 14 days
-        maxEntries: 100000
-      }
+      apiKeys: {}
     };
     
     validatorAnalyticsInstance = new FixedValidatorAnalytics(config || defaultConfig);
