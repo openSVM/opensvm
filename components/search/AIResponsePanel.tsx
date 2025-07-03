@@ -58,7 +58,7 @@ const AIResponsePanel: React.FC<AIResponsePanelProps> = ({ query, onClose }) => 
   const refreshResponse = useCallback(() => {
     setIsRefreshing(true);
     generateAIResponse(query);
-  }, [query]);
+  }, [query, generateAIResponse]);
 
   // Main function to generate AI response
   const generateAIResponse = useCallback(async (searchQuery: string) => {

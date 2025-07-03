@@ -237,18 +237,6 @@ export class CrossChainAnalytics extends BaseAnalytics {
       throw error;
     }
   }
-        asset: 'USDT',
-        volume24h: Math.random() * 15000000,
-        volumeChange: (Math.random() - 0.5) * 0.25,
-        avgTransactionSize: Math.random() * 8000 + 1000,
-        transactionCount: Math.floor(Math.random() * 1500),
-        bridgeFees: Math.random() * 20000,
-        timestamp
-      }
-    ];
-
-    return { flows, migrations: [] };
-  }
 
   private async fetchGenericBridgeData(bridge: string, timestamp: number): Promise<{
     flows: CrossChainFlow[];

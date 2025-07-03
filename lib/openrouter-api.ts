@@ -394,7 +394,7 @@ export function selectBestModelForData(blockchainData: BlockchainData | null): s
   }
 }
 
-export default {
+const OpenRouterAPI = {
   generateAIResponse,
   generateStreamingAIResponse,
   createBlockchainSearchPrompt,
@@ -402,3 +402,5 @@ export default {
   selectBestModelForData,
   AVAILABLE_MODELS
 };
+
+export default OpenRouterAPI;
