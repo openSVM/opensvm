@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { formatNumber, truncateMiddle } from '@/lib/utils';
 import { Tooltip } from '@/components/ui/tooltip';
 import { useRouter, usePathname } from 'next/navigation';
-import { PinIcon } from 'lucide-react';
+import { PinIcon, Search, X } from 'lucide-react';
 import { useCallback as useStableCallback } from 'react';
 import Link from 'next/link';
 
@@ -22,6 +22,7 @@ export function TransfersTable({ address }: TransfersTableProps) {
   const [sortField, setSortField] = useState<keyof Transfer>('timestamp');
   const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
   const [pinnedRowIds, setPinnedRowIds] = useState<Set<string>>(new Set());
+  const [searchTerm, setSearchTerm] = useState('');
 
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
@@ -214,7 +215,21 @@ export function TransfersTable({ address }: TransfersTableProps) {
   const sortedTransfers = useMemo(() => {
     if (!transfers.length) return [];
 
-    const sorted = [...transfers].sort((a, b) => {
+    // First filter by search term
+    let filtered = transfers;
+    if (searchTerm.trim()) {
+      const lowerSearchTerm = searchTerm.toLowerCase();
+      filtered = transfers.filter(transfer => 
+        transfer.from?.toLowerCase().includes(lowerSearchTerm) ||
+        transfer.to?.toLowerCase().includes(lowerSearchTerm) ||
+        transfer.tokenSymbol?.toLowerCase().includes(lowerSearchTerm) ||
+        transfer.token?.toLowerCase().includes(lowerSearchTerm) ||
+        transfer.signature?.toLowerCase().includes(lowerSearchTerm)
+      );
+    }
+
+    // Then sort the filtered results
+    const sorted = [...filtered].sort((a, b) => {
       const aValue = a[sortField];
       const bValue = b[sortField];
 
@@ -241,7 +256,7 @@ export function TransfersTable({ address }: TransfersTableProps) {
     });
     
     return sorted;
-  }, [transfers, sortField, sortDirection]);
+  }, [transfers, sortField, sortDirection, searchTerm]);
 
   // Row identity function for selection
   const getRowId = useCallback((row: Transfer) => row.signature || '', []);
@@ -281,6 +296,35 @@ export function TransfersTable({ address }: TransfersTableProps) {
           )}
         </h2>
       </div>
+
+      {/* Search Input */}
+      <div className="relative">
+        <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+          <Search className="h-4 w-4 text-gray-400" />
+        </div>
+        <input
+          type="text"
+          placeholder="Search transfers by address, token symbol, or signature..."
+          className="w-full pl-10 pr-10 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
+        {searchTerm && (
+          <button
+            onClick={() => setSearchTerm('')}
+            className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+
+      {/* Search Results Count */}
+      {searchTerm && (
+        <div className="text-sm text-gray-600 dark:text-gray-400">
+          Found {sortedTransfers.length} transfers matching "{searchTerm}"
+        </div>
+      )}
 
       <div className="border border-border rounded-lg overflow-hidden h-[500px]" role="region" aria-labelledby="transfers-heading" aria-live="polite">
         <VTableWrapper

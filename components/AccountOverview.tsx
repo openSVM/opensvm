@@ -1,8 +1,17 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Loader2 } from 'lucide-react';
 import { type TokenAccount } from '@/lib/solana';
+import AccountExplorerLinks from './AccountExplorerLinks';
+import { 
+  PieChart,
+  Pie,
+  Cell,
+  ResponsiveContainer,
+  Tooltip,
+  Legend
+} from 'recharts';
 
 interface Props {
   address: string;
@@ -47,6 +56,36 @@ export default function AccountOverview({
     fetchAccountStats();
   }, [address]);
 
+  // Colors for pie chart
+  const CHART_COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
+
+  // Calculate portfolio breakdown for pie chart
+  const portfolioData = useMemo(() => {
+    const data = [];
+    
+    // Add SOL balance
+    if (solBalance > 0) {
+      data.push({
+        name: 'SOL',
+        value: solBalance,
+        color: '#9945FF' // Solana purple
+      });
+    }
+    
+    // Add token balances
+    tokenAccounts.forEach((token, index) => {
+      if (token.uiAmount && token.uiAmount > 0) {
+        data.push({
+          name: token.symbol || 'Unknown',
+          value: token.uiAmount,
+          color: CHART_COLORS[index % CHART_COLORS.length]
+        });
+      }
+    });
+    
+    return data;
+  }, [solBalance, tokenAccounts, CHART_COLORS]);
+
   return (
     <div className="rounded-lg border border-neutral-800 bg-black">
       <div className="p-6">
@@ -88,6 +127,42 @@ export default function AccountOverview({
               </div>
             )}
           </div>
+
+          {/* Portfolio Breakdown Pie Chart */}
+          {portfolioData.length > 0 && (
+            <div>
+              <div className="text-sm text-neutral-400 mb-2">Portfolio Breakdown</div>
+              <div className="bg-neutral-900 rounded-lg p-4">
+                <div className="h-[200px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={portfolioData}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        outerRadius={60}
+                        fill="#8884d8"
+                        dataKey="value"
+                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                      >
+                        {portfolioData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip 
+                        formatter={(value: number, name: string) => [
+                          `${value.toFixed(4)}`,
+                          name
+                        ]}
+                      />
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div>
             <div className="text-sm text-neutral-400">Total Transactions</div>
@@ -132,6 +207,8 @@ export default function AccountOverview({
               <div className="text-sm">{isSystemProgram ? 'System Program' : 'User Account'}</div>
             </div>
           )}
+
+          <AccountExplorerLinks address={address} />
         </div>
       </div>
     </div>
