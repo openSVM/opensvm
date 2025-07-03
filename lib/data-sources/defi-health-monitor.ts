@@ -204,9 +204,11 @@ export class DeFiHealthMonitor extends BaseAnalytics {
       'Risk Harbor': () => this.fetchRiskHarborData(),
     };
 
-    const fetchFunction = apiMappings[protocol as keyof typeof apiMappings];
-    if (fetchFunction) {
-      return await fetchFunction();
+    if (Object.prototype.hasOwnProperty.call(apiMappings, protocol)) {
+      const fetchFunction = apiMappings[protocol as keyof typeof apiMappings];
+      if (typeof fetchFunction === 'function') {
+        return await fetchFunction();
+      }
     }
     
     // Fallback to DeFiLlama for unknown protocols
