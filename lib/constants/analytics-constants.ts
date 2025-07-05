@@ -193,6 +193,53 @@ export const UI_CONSTANTS = {
   }
 } as const;
 
+// Launchpad Analytics Constants
+export const LAUNCHPAD_CONSTANTS = {
+  // Success rate thresholds (in percentage)
+  SUCCESS_RATES: {
+    EXCELLENT_THRESHOLD: 80,          // Above 80% = Excellent
+    GOOD_THRESHOLD: 65,               // 65-80% = Good
+    MODERATE_THRESHOLD: 50,           // 50-65% = Moderate
+    POOR_THRESHOLD: 35,               // 35-50% = Poor (below 35% = Critical)
+  },
+  
+  // ROI thresholds (in percentage)
+  ROI_THRESHOLDS: {
+    EXCELLENT_ROI: 500,               // Above 500% = Excellent
+    GOOD_ROI: 200,                    // 200-500% = Good
+    MODERATE_ROI: 50,                 // 50-200% = Moderate
+    POOR_ROI: 0,                      // 0-50% = Poor (below 0% = Loss)
+  },
+  
+  // Fundraising thresholds (in USD)
+  FUNDRAISING: {
+    MIN_RAISE_USD: 1000,              // $1K minimum raise
+    SMALL_RAISE_USD: 100000,          // $100K small raise
+    MEDIUM_RAISE_USD: 1000000,        // $1M medium raise
+    LARGE_RAISE_USD: 10000000,        // $10M large raise
+    MEGA_RAISE_USD: 50000000,         // $50M mega raise
+  },
+  
+  // Memecoin specific constants
+  MEMECOIN: {
+    PUMP_FUN_FEE_BP: 100,             // 1% pump.fun fee
+    MOONSHOT_FEE_BP: 150,             // 1.5% moonshot fee
+    MIN_LIQUIDITY_USD: 500,           // $500 minimum liquidity
+    MAX_REALISTIC_MCAP_USD: 1000000000, // $1B max realistic market cap
+    TYPICAL_HOLD_TIME_HOURS: 24,      // 24 hours typical hold time
+  },
+  
+  // Platform categories
+  CATEGORIES: {
+    IDO_PLATFORM: 'IDO Platform',
+    MEMECOIN_PLATFORM: 'Memecoin Platform',
+    GAMING_PLATFORM: 'Gaming Platform',
+    TRADING_PLATFORM: 'Trading Platform',
+    ECOSYSTEM: 'Ecosystem',
+    AGGREGATOR: 'Aggregator'
+  }
+} as const;
+
 // Utility functions for working with constants
 export const getFeeBasisPoints = (feePercentage: number): number => {
   return Math.round(feePercentage * 100);
