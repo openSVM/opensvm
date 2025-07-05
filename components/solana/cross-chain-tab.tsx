@@ -130,12 +130,12 @@ export function CrossChainTab() {
 
   if (error) {
     return (
-      <div className="flex items-center justify-center h-64 text-red-500">
+      <div className="flex items-center justify-center h-64 text-destructive">
         <AlertTriangle className="h-8 w-8 mr-2" />
         <span>Error: {error}</span>
         <button
           onClick={fetchCrossChainData}
-          className="ml-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+          className="ml-4 px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary/90 transition-colors"
         >
           Retry
         </button>
@@ -157,7 +157,7 @@ export function CrossChainTab() {
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-bold">Cross-Chain Flow Analytics</h2>
-          <p className="text-gray-600">Bridge flows, asset migrations, and cross-chain arbitrage opportunities</p>
+          <p className="text-muted-foreground">Bridge flows, asset migrations, and cross-chain arbitrage opportunities</p>
         </div>
         <div className="flex items-center gap-4">
           <button
@@ -165,8 +165,8 @@ export function CrossChainTab() {
             disabled={toggleLoading}
             className={`px-4 py-2 rounded-lg font-medium flex items-center gap-2 ${
               monitoringActive
-                ? 'bg-red-600 text-white hover:bg-red-700 disabled:bg-red-400'
-                : 'bg-green-600 text-white hover:bg-green-700 disabled:bg-green-400'
+                ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90 disabled:bg-destructive/50 transition-colors'
+                : 'bg-primary text-primary-foreground hover:bg-primary/90 disabled:bg-primary/50 transition-colors'
             } ${toggleLoading ? 'cursor-not-allowed' : 'cursor-pointer'}`}
           >
             {toggleLoading && <Loader2 className="h-4 w-4 animate-spin" />}
@@ -174,10 +174,10 @@ export function CrossChainTab() {
           </button>
           {data && (
             <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-sm ${
-              data.health.isHealthy ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+              data.health.isHealthy ? 'bg-primary/10 text-primary' : 'bg-destructive/10 text-destructive'
             }`}>
               <div className={`w-2 h-2 rounded-full ${
-                data.health.isHealthy ? 'bg-green-500' : 'bg-red-500'
+                data.health.isHealthy ? 'bg-primary' : 'bg-destructive'
               }`} />
               {data.health.isHealthy ? 'Healthy' : 'Unhealthy'}
             </div>
@@ -187,51 +187,51 @@ export function CrossChainTab() {
 
       {/* Key Metrics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white p-6 rounded-lg shadow">
+        <div className="bg-background border p-6 rounded-lg shadow">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Active Bridges</p>
+              <p className="text-sm font-medium text-muted-foreground">Active Bridges</p>
               <p className="text-2xl font-bold">{data.health.connectedBridges}</p>
             </div>
-            <Globe className="h-8 w-8 text-blue-600" />
+            <Globe className="h-8 w-8 text-primary" />
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-lg shadow">
+        <div className="bg-background border p-6 rounded-lg shadow">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Total Volume</p>
+              <p className="text-sm font-medium text-muted-foreground">Total Volume</p>
               <p className="text-2xl font-bold">
                 {formatCurrency(data.flows.reduce((sum, flow) => sum + flow.volume24h, 0))}
               </p>
             </div>
-            <ArrowUpDown className="h-8 w-8 text-green-600" />
+            <ArrowUpDown className="h-8 w-8 text-accent" />
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-lg shadow">
+        <div className="bg-background border p-6 rounded-lg shadow">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Active Assets</p>
+              <p className="text-sm font-medium text-muted-foreground">Active Assets</p>
               <p className="text-2xl font-bold">{data.assets.length}</p>
             </div>
-            <Zap className="h-8 w-8 text-yellow-600" />
+            <Zap className="h-8 w-8 text-secondary" />
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-lg shadow">
+        <div className="bg-background border p-6 rounded-lg shadow">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Data Points</p>
+              <p className="text-sm font-medium text-muted-foreground">Data Points</p>
               <p className="text-2xl font-bold">{data.health.dataPoints}</p>
             </div>
-            <Activity className="h-8 w-8 text-purple-600" />
+            <Activity className="h-8 w-8 text-primary" />
           </div>
         </div>
       </div>
 
       {/* Bridge Rankings */}
-      <div className="bg-white rounded-lg shadow">
+      <div className="bg-background border rounded-lg shadow">
         <div className="p-6 border-b">
           <h3 className="text-lg font-semibold">Bridge Protocol Rankings</h3>
         </div>
@@ -262,9 +262,9 @@ export function CrossChainTab() {
                     <td className="py-3">{formatCurrency(ranking.totalVolume)}</td>
                     <td className="py-3">
                       <div className="flex items-center gap-2">
-                        <div className="w-16 bg-gray-200 rounded-full h-2">
+                        <div className="w-16 bg-muted rounded-full h-2">
                           <div
-                            className="bg-purple-600 h-2 rounded-full"
+                            className="bg-primary h-2 rounded-full"
                             style={{ width: `${ranking.marketShare * 100}%` }}
                           />
                         </div>
@@ -272,7 +272,7 @@ export function CrossChainTab() {
                       </div>
                     </td>
                     <td className="py-3">
-                      <span className="px-2 py-1 bg-green-100 text-green-800 rounded text-sm">
+                      <span className="px-2 py-1 bg-primary/10 text-primary rounded text-sm">
                         Active
                       </span>
                     </td>
@@ -285,7 +285,7 @@ export function CrossChainTab() {
       </div>
 
       {/* Cross-Chain Flow Details */}
-      <div className="bg-white rounded-lg shadow">
+      <div className="bg-background border rounded-lg shadow">
         <div className="p-6 border-b">
           <h3 className="text-lg font-semibold">Cross-Chain Flow Details</h3>
         </div>
@@ -310,13 +310,13 @@ export function CrossChainTab() {
                       <div className="flex items-center gap-2">
                         <span className="text-lg">{getChainIcon(flow.sourceChain)}</span>
                         <span className="text-sm font-medium">{flow.sourceChain}</span>
-                        <ArrowUpDown className="h-4 w-4 text-gray-400" />
+                        <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
                         <span className="text-lg">{getChainIcon(flow.targetChain)}</span>
                         <span className="text-sm font-medium">{flow.targetChain}</span>
                       </div>
                     </td>
                     <td className="py-3">
-                      <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-sm font-medium">
+                      <span className="px-2 py-1 bg-primary/10 text-primary rounded text-sm font-medium">
                         {flow.asset}
                       </span>
                     </td>
@@ -328,7 +328,7 @@ export function CrossChainTab() {
                     <td className="py-3 font-medium">{formatCurrency(flow.volume24h)}</td>
                     <td className="py-3">
                       <div className={`flex items-center gap-1 ${
-                        flow.volumeChange >= 0 ? 'text-green-600' : 'text-red-600'
+                        flow.volumeChange >= 0 ? 'text-accent' : 'text-red-600'
                       }`}>
                         {flow.volumeChange >= 0 ? (
                           <TrendingUp className="h-4 w-4" />
@@ -349,7 +349,7 @@ export function CrossChainTab() {
       </div>
 
       {/* Top Assets */}
-      <div className="bg-white rounded-lg shadow">
+      <div className="bg-background border rounded-lg shadow">
         <div className="p-6 border-b">
           <h3 className="text-lg font-semibold">Top Cross-Chain Assets</h3>
         </div>
@@ -363,16 +363,16 @@ export function CrossChainTab() {
                 </div>
                 <div className="space-y-1">
                   <div className="flex justify-between">
-                    <span className="text-sm text-gray-600">Volume:</span>
+                    <span className="text-sm text-muted-foreground">Volume:</span>
                     <span className="text-sm font-medium">{formatCurrency(asset.totalVolume)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-sm text-gray-600">Bridges:</span>
+                    <span className="text-sm text-muted-foreground">Bridges:</span>
                     <span className="text-sm font-medium">{asset.bridgeCount}</span>
                   </div>
                 </div>
                 <div className="mt-3">
-                  <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div className="w-full bg-muted rounded-full h-2">
                     <div
                       className="bg-gradient-to-r from-blue-500 to-purple-600 h-2 rounded-full"
                       style={{ 

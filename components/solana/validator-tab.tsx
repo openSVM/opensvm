@@ -131,18 +131,18 @@ export function ValidatorTab() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'active': return 'text-green-600 bg-green-100';
-      case 'delinquent': return 'text-orange-600 bg-orange-100';
-      case 'inactive': return 'text-red-600 bg-red-100';
-      default: return 'text-gray-600 bg-gray-100';
+      case 'active': return 'text-accent bg-accent/10';
+      case 'delinquent': return 'text-secondary bg-secondary/20';
+      case 'inactive': return 'text-destructive bg-destructive/10';
+      default: return 'text-muted-foreground bg-muted';
     }
   };
 
   const getPerformanceColor = (score: number) => {
-    if (score >= 0.95) return 'text-green-600';
-    if (score >= 0.85) return 'text-yellow-600';
-    if (score >= 0.7) return 'text-orange-600';
-    return 'text-red-600';
+    if (score >= 0.95) return 'text-accent';
+    if (score >= 0.85) return 'text-secondary';
+    if (score >= 0.7) return 'text-muted-foreground';
+    return 'text-destructive';
   };
 
   const sortValidators = (validators: any[]) => {
@@ -173,12 +173,12 @@ export function ValidatorTab() {
 
   if (error) {
     return (
-      <div className="flex items-center justify-center h-64 text-red-500">
+      <div className="flex items-center justify-center h-64 text-destructive">
         <AlertTriangle className="h-8 w-8 mr-2" />
         <span>Error: {error}</span>
         <button
           onClick={fetchValidatorData}
-          className="ml-4 px-4 py-2 bg-primary text-primary-foreground rounded hover:opacity-90"
+          className="ml-4 px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary/90 transition-colors"
         >
           Retry
         </button>
@@ -210,8 +210,8 @@ export function ValidatorTab() {
             disabled={toggleLoading}
             className={`px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition-colors ${
               monitoringActive
-                ? 'bg-red-600 text-white hover:bg-red-700 disabled:bg-red-400'
-                : 'bg-green-600 text-white hover:bg-green-700 disabled:bg-green-400'
+                ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90 disabled:bg-destructive/50'
+                : 'bg-primary text-primary-foreground hover:bg-primary/90 disabled:bg-primary/50'
             } ${toggleLoading ? 'cursor-not-allowed' : 'cursor-pointer'}`}
           >
             {toggleLoading && <Loader2 className="h-4 w-4 animate-spin" />}
@@ -219,10 +219,10 @@ export function ValidatorTab() {
           </button>
           {data && (
             <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-sm ${
-              data.health.isHealthy ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+              data.health.isHealthy ? 'bg-primary/10 text-primary' : 'bg-destructive/10 text-destructive'
             }`}>
               <div className={`w-2 h-2 rounded-full ${
-                data.health.isHealthy ? 'bg-green-500' : 'bg-red-500'
+                data.health.isHealthy ? 'bg-primary' : 'bg-destructive'
               }`} />
               {data.health.isHealthy ? 'Healthy' : 'Unhealthy'}
             </div>
@@ -274,7 +274,7 @@ export function ValidatorTab() {
               </p>
               <p className="text-xs text-muted-foreground">network wide</p>
             </div>
-            <TrendingUp className="h-8 w-8 text-green-600" />
+            <TrendingUp className="h-8 w-8 text-primary" />
           </div>
         </div>
       </div>
@@ -340,15 +340,15 @@ export function ValidatorTab() {
                     <td className="py-3">{formatPercent(validator.commission / 100)}</td>
                     <td className="py-3">
                       <div className={`font-medium ${
-                        validator.apy >= 7 ? 'text-green-600' : 
-                        validator.apy >= 5 ? 'text-yellow-600' : 'text-red-600'
+                        validator.apy >= 7 ? 'text-accent' : 
+                        validator.apy >= 5 ? 'text-secondary' : 'text-destructive'
                       }`}>
                         {validator.apy.toFixed(2)}%
                       </div>
                     </td>
                     <td className="py-3">
                       <div className="flex items-center gap-2">
-                        <div className="w-16 bg-gray-200 rounded-full h-2">
+                        <div className="w-16 bg-muted rounded-full h-2">
                           <div
                             className="bg-primary h-2 rounded-full"
                             style={{ width: `${validator.performanceScore * 100}%` }}

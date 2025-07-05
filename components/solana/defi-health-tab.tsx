@@ -126,25 +126,25 @@ export function DeFiHealthTab() {
   };
 
   const getHealthScoreColor = (score: number) => {
-    if (score >= 0.8) return 'text-green-600';
-    if (score >= 0.6) return 'text-yellow-600';
-    if (score >= 0.4) return 'text-orange-600';
-    return 'text-red-600';
+    if (score >= 0.8) return 'text-accent';
+    if (score >= 0.6) return 'text-secondary';
+    if (score >= 0.4) return 'text-muted-foreground';
+    return 'text-destructive';
   };
 
   const getRiskScoreColor = (score: number) => {
-    if (score <= 0.2) return 'text-green-600';
-    if (score <= 0.4) return 'text-yellow-600';
-    if (score <= 0.6) return 'text-orange-600';
-    return 'text-red-600';
+    if (score <= 0.2) return 'text-accent';
+    if (score <= 0.4) return 'text-secondary';
+    if (score <= 0.6) return 'text-muted-foreground';
+    return 'text-destructive';
   };
 
   const getSeverityColor = (severity: string) => {
     switch (severity) {
-      case 'critical': return 'bg-red-100 text-red-800';
-      case 'high': return 'bg-orange-100 text-orange-800';
-      case 'medium': return 'bg-yellow-100 text-yellow-800';
-      case 'low': return 'bg-blue-100 text-blue-800';
+      case 'critical': return 'bg-destructive/10 text-destructive';
+      case 'high': return 'bg-secondary/20 text-secondary-foreground';
+      case 'medium': return 'bg-accent/20 text-accent-foreground';
+      case 'low': return 'bg-primary/10 text-primary';
       default: return 'bg-muted text-muted-foreground';
     }
   };
@@ -154,7 +154,7 @@ export function DeFiHealthTab() {
       case 'dex': return 'bg-primary/10 text-primary';
       case 'lending': return 'bg-secondary/50 text-secondary-foreground';
       case 'yield': return 'bg-accent/20 text-accent-foreground';
-      case 'derivatives': return 'bg-orange-100 text-orange-800';
+      case 'derivatives': return 'bg-muted text-muted-foreground';
       case 'insurance': return 'bg-muted text-muted-foreground';
       default: return 'bg-muted text-muted-foreground';
     }
@@ -176,7 +176,7 @@ export function DeFiHealthTab() {
         <span>Error: {error}</span>
         <button
           onClick={fetchDeFiHealthData}
-          className="ml-4 px-4 py-2 bg-primary text-primary-foreground rounded hover:opacity-90"
+          className="ml-4 px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary/90 transition-colors"
         >
           Retry
         </button>
@@ -204,10 +204,10 @@ export function DeFiHealthTab() {
           <button
             onClick={toggleMonitoring}
             disabled={toggleLoading}
-            className={`px-4 py-2 rounded-lg font-medium flex items-center gap-2 ${
+            className={`px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition-colors ${
               monitoringActive
-                ? 'bg-red-600 text-white hover:bg-red-700 disabled:bg-red-400'
-                : 'bg-green-600 text-white hover:bg-green-700 disabled:bg-green-400'
+                ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90 disabled:bg-destructive/50'
+                : 'bg-primary text-primary-foreground hover:bg-primary/90 disabled:bg-primary/50'
             } ${toggleLoading ? 'cursor-not-allowed' : 'cursor-pointer'}`}
           >
             {toggleLoading && <Loader2 className="h-4 w-4 animate-spin" />}
@@ -215,10 +215,10 @@ export function DeFiHealthTab() {
           </button>
           {data && (
             <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-sm ${
-              data.health.isHealthy ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+              data.health.isHealthy ? 'bg-primary/10 text-primary' : 'bg-destructive/10 text-destructive'
             }`}>
               <div className={`w-2 h-2 rounded-full ${
-                data.health.isHealthy ? 'bg-green-500' : 'bg-red-500'
+                data.health.isHealthy ? 'bg-primary' : 'bg-destructive'
               }`} />
               {data.health.isHealthy ? 'Healthy' : 'Unhealthy'}
             </div>
@@ -234,7 +234,7 @@ export function DeFiHealthTab() {
               <p className="text-sm font-medium text-muted-foreground">Total TVL</p>
               <p className="text-2xl font-bold">{formatCurrency(data.ecosystem.totalTvl)}</p>
             </div>
-            <DollarSign className="h-8 w-8 text-green-600" />
+            <DollarSign className="h-8 w-8 text-accent" />
           </div>
         </div>
 
@@ -276,9 +276,9 @@ export function DeFiHealthTab() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-muted-foreground">Critical Alerts</p>
-              <p className="text-2xl font-bold text-red-600">{data.ecosystem.criticalAlerts}</p>
+              <p className="text-2xl font-bold text-destructive">{data.ecosystem.criticalAlerts}</p>
             </div>
-            <AlertTriangle className="h-8 w-8 text-red-600" />
+            <AlertTriangle className="h-8 w-8 text-destructive" />
           </div>
         </div>
       </div>
@@ -287,7 +287,7 @@ export function DeFiHealthTab() {
       {data.alerts.length > 0 && (
         <div className="bg-background border rounded-lg shadow">
           <div className="p-6 border-b">
-            <h3 className="text-lg font-semibold text-red-600 flex items-center gap-2">
+            <h3 className="text-lg font-semibold text-destructive flex items-center gap-2">
               <AlertTriangle className="h-5 w-5" />
               Active Security Alerts
             </h3>
@@ -295,7 +295,7 @@ export function DeFiHealthTab() {
           <div className="p-6">
             <div className="space-y-4">
               {data.alerts.map((alert, index) => (
-                <div key={index} className="border rounded-lg p-4 border-red-200 bg-red-50">
+                <div key={index} className="border rounded-lg p-4 border-destructive/20 bg-destructive/5">
                   <div className="flex justify-between items-start mb-2">
                     <div className="flex items-center gap-2">
                       <span className={`px-2 py-1 rounded text-xs font-medium ${getSeverityColor(alert.severity)}`}>
@@ -353,7 +353,7 @@ export function DeFiHealthTab() {
                     <td className="py-3">{formatCurrency(protocol.tvl)}</td>
                     <td className="py-3">
                       <div className={`flex items-center gap-1 ${
-                        protocol.tvlChange24h >= 0 ? 'text-green-600' : 'text-red-600'
+                        protocol.tvlChange24h >= 0 ? 'text-accent' : 'text-destructive'
                       }`}>
                         {protocol.tvlChange24h >= 0 ? (
                           <TrendingUp className="h-4 w-4" />
@@ -367,7 +367,7 @@ export function DeFiHealthTab() {
                       <div className="flex items-center gap-2">
                         <div className="w-16 bg-border rounded-full h-2">
                           <div
-                            className="bg-green-600 h-2 rounded-full"
+                            className="bg-accent h-2 rounded-full"
                             style={{ width: `${protocol.healthScore * 100}%` }}
                           />
                         </div>
@@ -397,7 +397,7 @@ export function DeFiHealthTab() {
                           ))}
                         </div>
                       ) : (
-                        <span className="text-green-600 text-sm">✓ Clean</span>
+                        <span className="text-accent text-sm">✓ Clean</span>
                       )}
                     </td>
                   </tr>
@@ -417,10 +417,10 @@ export function DeFiHealthTab() {
           <div className="p-6">
             <div className="space-y-4">
               {[
-                { range: '80-100%', color: 'bg-green-500', count: data.protocols.filter(p => p.healthScore >= 0.8).length },
-                { range: '60-79%', color: 'bg-yellow-500', count: data.protocols.filter(p => p.healthScore >= 0.6 && p.healthScore < 0.8).length },
-                { range: '40-59%', color: 'bg-orange-500', count: data.protocols.filter(p => p.healthScore >= 0.4 && p.healthScore < 0.6).length },
-                { range: '0-39%', color: 'bg-red-500', count: data.protocols.filter(p => p.healthScore < 0.4).length }
+                { range: '80-100%', color: 'bg-accent', count: data.protocols.filter(p => p.healthScore >= 0.8).length },
+                { range: '60-79%', color: 'bg-secondary', count: data.protocols.filter(p => p.healthScore >= 0.6 && p.healthScore < 0.8).length },
+                { range: '40-59%', color: 'bg-muted', count: data.protocols.filter(p => p.healthScore >= 0.4 && p.healthScore < 0.6).length },
+                { range: '0-39%', color: 'bg-destructive', count: data.protocols.filter(p => p.healthScore < 0.4).length }
               ].map((item, index) => (
                 <div key={index} className="flex items-center justify-between">
                   <div className="flex items-center gap-3">

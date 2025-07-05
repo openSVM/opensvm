@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Loader2, TrendingUp, TrendingDown, Activity, DollarSign, Zap, AlertTriangle } from 'lucide-react';
+import { Loader2, TrendingUp, TrendingDown, Activity, DollarSign, Zap, AlertTriangle, InfoIcon } from 'lucide-react';
 
 interface DEXData {
   liquidity: Array<{
@@ -117,6 +117,15 @@ export function SolanaDEXTab() {
     return value >= 0 ? `+${formatted}%` : `${formatted}%`;
   };
 
+  const Tooltip = ({ children, content }: { children: React.ReactNode; content: string }) => (
+    <div className="group relative inline-block">
+      {children}
+      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-background border border-border rounded text-xs opacity-0 group-hover:opacity-100 transition-opacity z-10 whitespace-nowrap">
+        {content}
+      </div>
+    </div>
+  );
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -128,12 +137,12 @@ export function SolanaDEXTab() {
 
   if (error) {
     return (
-      <div className="flex items-center justify-center h-64 text-red-500">
+      <div className="flex items-center justify-center h-64 text-destructive">
         <AlertTriangle className="h-8 w-8 mr-2" />
         <span>Error: {error}</span>
         <button
           onClick={fetchDEXData}
-          className="ml-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+          className="ml-4 px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary/90 transition-colors"
         >
           Retry
         </button>
@@ -155,16 +164,16 @@ export function SolanaDEXTab() {
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-bold">Solana DEX Analytics</h2>
-          <p className="text-gray-600">Real-time DEX volume, liquidity, and arbitrage opportunities</p>
+          <p className="text-muted-foreground">Real-time DEX volume, liquidity, and arbitrage opportunities</p>
         </div>
         <div className="flex items-center gap-4">
           <button
             onClick={toggleMonitoring}
             disabled={toggleLoading}
-            className={`px-4 py-2 rounded-lg font-medium flex items-center gap-2 ${
+            className={`px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition-colors ${
               monitoringActive
-                ? 'bg-red-600 text-white hover:bg-red-700 disabled:bg-red-400'
-                : 'bg-green-600 text-white hover:bg-green-700 disabled:bg-green-400'
+                ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90 disabled:bg-destructive/50'
+                : 'bg-primary text-primary-foreground hover:bg-primary/90 disabled:bg-primary/50'
             } ${toggleLoading ? 'cursor-not-allowed' : 'cursor-pointer'}`}
           >
             {toggleLoading && <Loader2 className="h-4 w-4 animate-spin" />}
@@ -172,10 +181,10 @@ export function SolanaDEXTab() {
           </button>
           {data && (
             <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-sm ${
-              data.health.isHealthy ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+              data.health.isHealthy ? 'bg-primary/10 text-primary' : 'bg-destructive/10 text-destructive'
             }`}>
               <div className={`w-2 h-2 rounded-full ${
-                data.health.isHealthy ? 'bg-green-500' : 'bg-red-500'
+                data.health.isHealthy ? 'bg-primary' : 'bg-destructive'
               }`} />
               {data.health.isHealthy ? 'Healthy' : 'Unhealthy'}
             </div>
@@ -185,75 +194,99 @@ export function SolanaDEXTab() {
 
       {/* Key Metrics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white p-6 rounded-lg shadow">
+        <div className="bg-background border p-6 rounded-lg shadow">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Total DEXes</p>
+              <Tooltip content="Number of active DEX protocols monitored via on-chain program verification">
+                <p className="text-sm font-medium text-muted-foreground flex items-center gap-1">
+                  Total DEXes <InfoIcon className="h-3 w-3" />
+                </p>
+              </Tooltip>
               <p className="text-2xl font-bold">{data.health.connectedDEXes}</p>
             </div>
-            <Activity className="h-8 w-8 text-blue-600" />
+            <Activity className="h-8 w-8 text-primary" />
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-lg shadow">
+        <div className="bg-background border p-6 rounded-lg shadow">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Data Points</p>
+              <Tooltip content="Total number of liquidity pools and trading pairs aggregated from all DEXes">
+                <p className="text-sm font-medium text-muted-foreground flex items-center gap-1">
+                  Data Points <InfoIcon className="h-3 w-3" />
+                </p>
+              </Tooltip>
               <p className="text-2xl font-bold">{data.health.dataPoints.toLocaleString()}</p>
             </div>
-            <DollarSign className="h-8 w-8 text-green-600" />
+            <DollarSign className="h-8 w-8 text-accent" />
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-lg shadow">
+        <div className="bg-background border p-6 rounded-lg shadow">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Arbitrage Ops</p>
+              <Tooltip content="Cross-DEX arbitrage opportunities with >0.5% price difference and sufficient liquidity">
+                <p className="text-sm font-medium text-muted-foreground flex items-center gap-1">
+                  Arbitrage Ops <InfoIcon className="h-3 w-3" />
+                </p>
+              </Tooltip>
               <p className="text-2xl font-bold">{data.arbitrage.length}</p>
             </div>
-            <Zap className="h-8 w-8 text-yellow-600" />
+            <Zap className="h-8 w-8 text-secondary" />
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-lg shadow">
+        <div className="bg-background border p-6 rounded-lg shadow">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Last Update</p>
+              <Tooltip content="Minutes since last real-time data refresh from Solana RPC and DEX APIs">
+                <p className="text-sm font-medium text-muted-foreground flex items-center gap-1">
+                  Last Update <InfoIcon className="h-3 w-3" />
+                </p>
+              </Tooltip>
               <p className="text-2xl font-bold">
                 {Math.floor((Date.now() - data.health.lastUpdate) / 60000)}m
               </p>
             </div>
-            <TrendingUp className="h-8 w-8 text-purple-600" />
+            <TrendingUp className="h-8 w-8 text-primary" />
           </div>
         </div>
       </div>
 
       {/* DEX Rankings */}
-      <div className="bg-white rounded-lg shadow">
-        <div className="p-6 border-b">
+      <div className="bg-background border rounded-lg shadow">
+        <div className="p-6 border-b border-border">
           <h3 className="text-lg font-semibold">DEX Volume Rankings</h3>
         </div>
         <div className="p-6">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="text-left border-b">
+                <tr className="text-left border-b border-border">
                   <th className="pb-3 font-medium">Rank</th>
                   <th className="pb-3 font-medium">DEX</th>
-                  <th className="pb-3 font-medium">24h Volume</th>
-                  <th className="pb-3 font-medium">Market Share</th>
-                  <th className="pb-3 font-medium">Change</th>
+                  <Tooltip content="24-hour trading volume calculated from on-chain transaction analysis">
+                    <th className="pb-3 font-medium cursor-help flex items-center gap-1">
+                      24h Volume <InfoIcon className="h-3 w-3" />
+                    </th>
+                  </Tooltip>
+                  <Tooltip content="Percentage of total ecosystem trading volume captured by this DEX">
+                    <th className="pb-3 font-medium cursor-help">Market Share</th>
+                  </Tooltip>
+                  <Tooltip content="24-hour volume change compared to previous period">
+                    <th className="pb-3 font-medium cursor-help">Change</th>
+                  </Tooltip>
                 </tr>
               </thead>
               <tbody>
                 {data.rankings.map((ranking, index) => {
                   const volumeData = data.volume.find(v => v.dex === ranking.dex);
                   return (
-                    <tr key={ranking.dex} className="border-b">
+                    <tr key={ranking.dex} className="border-b border-border">
                       <td className="py-3 font-medium">#{index + 1}</td>
                       <td className="py-3">
                         <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-sm">
+                          <div className="w-8 h-8 bg-gradient-to-r from-primary to-secondary rounded-full flex items-center justify-center text-primary-foreground font-bold text-sm">
                             {ranking.dex.charAt(0)}
                           </div>
                           {ranking.dex}
@@ -262,9 +295,9 @@ export function SolanaDEXTab() {
                       <td className="py-3">{formatCurrency(ranking.totalVolume)}</td>
                       <td className="py-3">
                         <div className="flex items-center gap-2">
-                          <div className="w-16 bg-gray-200 rounded-full h-2">
+                          <div className="w-16 bg-muted rounded-full h-2">
                             <div
-                              className="bg-blue-600 h-2 rounded-full"
+                              className="bg-primary h-2 rounded-full"
                               style={{ width: `${ranking.marketShare * 100}%` }}
                             />
                           </div>
@@ -274,7 +307,7 @@ export function SolanaDEXTab() {
                       <td className="py-3">
                         {volumeData && (
                           <div className={`flex items-center gap-1 ${
-                            volumeData.volumeChange >= 0 ? 'text-green-600' : 'text-red-600'
+                            volumeData.volumeChange >= 0 ? 'text-accent' : 'text-destructive'
                           }`}>
                             {volumeData.volumeChange >= 0 ? (
                               <TrendingUp className="h-4 w-4" />
@@ -295,30 +328,40 @@ export function SolanaDEXTab() {
       </div>
 
       {/* Top Liquidity Pools */}
-      <div className="bg-white rounded-lg shadow">
-        <div className="p-6 border-b">
+      <div className="bg-background border rounded-lg shadow">
+        <div className="p-6 border-b border-border">
           <h3 className="text-lg font-semibold">Top Liquidity Pools</h3>
         </div>
         <div className="p-6">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="text-left border-b">
+                <tr className="text-left border-b border-border">
                   <th className="pb-3 font-medium">DEX</th>
                   <th className="pb-3 font-medium">Pair</th>
-                  <th className="pb-3 font-medium">TVL</th>
-                  <th className="pb-3 font-medium">24h Volume</th>
-                  <th className="pb-3 font-medium">24h Fees</th>
-                  <th className="pb-3 font-medium">APR</th>
+                  <Tooltip content="Total Value Locked - sum of all tokens deposited in the liquidity pool">
+                    <th className="pb-3 font-medium cursor-help flex items-center gap-1">
+                      TVL <InfoIcon className="h-3 w-3" />
+                    </th>
+                  </Tooltip>
+                  <Tooltip content="24-hour trading volume through this specific liquidity pool">
+                    <th className="pb-3 font-medium cursor-help">24h Volume</th>
+                  </Tooltip>
+                  <Tooltip content="Trading fees collected by liquidity providers in the last 24 hours">
+                    <th className="pb-3 font-medium cursor-help">24h Fees</th>
+                  </Tooltip>
+                  <Tooltip content="Annualized Percentage Return - estimated yearly returns based on current fee generation">
+                    <th className="pb-3 font-medium cursor-help">APR</th>
+                  </Tooltip>
                 </tr>
               </thead>
               <tbody>
                 {data.liquidity.slice(0, 10).map((pool, index) => {
                   const apr = (pool.fees24h * 365) / pool.tvl * 100;
                   return (
-                    <tr key={`${pool.dex}-${pool.poolAddress}-${index}`} className="border-b">
+                    <tr key={`${pool.dex}-${pool.poolAddress}-${index}`} className="border-b border-border">
                       <td className="py-3">
-                        <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-sm font-medium">
+                        <span className="px-2 py-1 bg-primary/10 text-primary rounded text-sm font-medium">
                           {pool.dex}
                         </span>
                       </td>
@@ -328,7 +371,7 @@ export function SolanaDEXTab() {
                       <td className="py-3">{formatCurrency(pool.fees24h)}</td>
                       <td className="py-3">
                         <span className={`font-medium ${
-                          apr > 50 ? 'text-green-600' : apr > 20 ? 'text-yellow-600' : 'text-gray-600'
+                          apr > 50 ? 'text-accent' : apr > 20 ? 'text-secondary' : 'text-muted-foreground'
                         }`}>
                           {apr.toFixed(2)}%
                         </span>
@@ -344,15 +387,15 @@ export function SolanaDEXTab() {
 
       {/* Arbitrage Opportunities */}
       {data.arbitrage.length > 0 && (
-        <div className="bg-white rounded-lg shadow">
-          <div className="p-6 border-b">
+        <div className="bg-background border rounded-lg shadow">
+          <div className="p-6 border-b border-border">
             <h3 className="text-lg font-semibold">Arbitrage Opportunities</h3>
           </div>
           <div className="p-6">
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="text-left border-b">
+                  <tr className="text-left border-b border-border">
                     <th className="pb-3 font-medium">Token Pair</th>
                     <th className="pb-3 font-medium">Source DEX</th>
                     <th className="pb-3 font-medium">Target DEX</th>
@@ -363,22 +406,22 @@ export function SolanaDEXTab() {
                 </thead>
                 <tbody>
                   {data.arbitrage.slice(0, 5).map((arb, index) => (
-                    <tr key={`${arb.tokenPair}-${arb.sourceDEX}-${arb.targetDEX}-${index}`} className="border-b">
+                    <tr key={`${arb.tokenPair}-${arb.sourceDEX}-${arb.targetDEX}-${index}`} className="border-b border-border">
                       <td className="py-3 font-medium">{arb.tokenPair}</td>
                       <td className="py-3">
-                        <span className="px-2 py-1 bg-red-100 text-red-800 rounded text-sm">
+                        <span className="px-2 py-1 bg-destructive/10 text-destructive rounded text-sm">
                           {arb.sourceDEX}
                         </span>
                       </td>
                       <td className="py-3">
-                        <span className="px-2 py-1 bg-green-100 text-green-800 rounded text-sm">
+                        <span className="px-2 py-1 bg-accent/10 text-accent rounded text-sm">
                           {arb.targetDEX}
                         </span>
                       </td>
-                      <td className="py-3 text-yellow-600 font-medium">
+                      <td className="py-3 text-secondary font-medium">
                         {formatPercent(arb.priceDifference)}
                       </td>
-                      <td className="py-3 text-green-600 font-medium">
+                      <td className="py-3 text-accent font-medium">
                         {formatCurrency(arb.profitOpportunity)}
                       </td>
                       <td className="py-3">{formatCurrency(arb.liquidityDepth)}</td>
