@@ -708,7 +708,57 @@ export async function addAccountToGraph(
         const targetAccount = transfer.account;
         console.log(`🔍 [TRANSFER_PROCESS] Processing transfer to ${targetAccount}, amount: ${transfer.change}`);
         
-        if (address !== targetAccount) {
+        // Enhanced transfer processing: handle both regular transfers and self-transfers
+        const isSelfTransfer = address === targetAccount;
+        const isNegativeChange = transfer.change < 0;
+        
+        // For self-transfers, check if they should be excluded (likely program/system accounts)
+        if (isSelfTransfer) {
+          // Only exclude self-transfers if they're to program accounts
+          if (shouldExcludeAddress(targetAccount)) {
+            console.log(`⏭️ [TRANSFER_PROCESS] Skipping self-transfer to excluded program account: ${targetAccount}`);
+            continue;
+          }
+          
+          // Include self-transfers as they represent valid operations (fees, etc.)
+          console.log(`✅ [TRANSFER_PROCESS] Including self-transfer for ${targetAccount} (likely fee/operation)`);
+          
+          // Create a self-transfer edge to visualize the operation
+          const selfTransferEdgeId = `${tx.signature}-${targetAccount}-self-transfer`;
+          if (!cy.getElementById(selfTransferEdgeId).length && !processedEdgesRef?.current?.has(selfTransferEdgeId)) {
+            console.log(`➕ [TRANSFER_PROCESS] Adding self-transfer edge: ${tx.signature} <-> ${targetAccount}, amount: ${transfer.change}`);
+            cy.add({
+              data: {
+                id: selfTransferEdgeId,
+                source: tx.signature,
+                target: targetAccount,
+                type: 'self-transfer',
+                amount: transfer.change,
+                label: `${isNegativeChange ? 'Fee' : 'Credit'}: ${formatSolChange(transfer.change)}`,
+                status: 'loaded'
+              },
+              classes: 'transfer self-transfer'
+            });
+            processedEdgesRef?.current?.add(selfTransferEdgeId);
+            
+            // Track new transfer edge elements if set is provided
+            if (newElements) {
+              newElements.add(selfTransferEdgeId);
+            }
+            console.log(`✅ [TRANSFER_PROCESS] Added self-transfer edge: ${tx.signature} <-> ${targetAccount}`);
+          } else {
+            console.log(`⏭️ [TRANSFER_PROCESS] Self-transfer edge ${selfTransferEdgeId} already exists`);
+          }
+        } else {
+          // Regular transfer to different account
+          // Apply filtering for SOL transfers: exclude transfers to program accounts
+          if (shouldExcludeAddress(targetAccount)) {
+            console.log(`⏭️ [TRANSFER_PROCESS] Skipping transfer to excluded program account: ${targetAccount}`);
+            continue;
+          }
+          
+          console.log(`✅ [TRANSFER_PROCESS] Including SOL transfer to user account: ${targetAccount}`);
+          
           // Ensure target account node exists (especially important for plain SOL transfers)
           const targetNodeId = targetAccount;
           if (!cy.getElementById(targetNodeId).length && !processedNodesRef?.current?.has(targetNodeId)) {
@@ -758,8 +808,6 @@ export async function addAccountToGraph(
           } else {
             console.log(`⏭️ [TRANSFER_PROCESS] Transfer edge ${transferEdgeId} already exists`);
           }
-        } else {
-          console.log(`⏭️ [TRANSFER_PROCESS] Skipping self-transfer: ${targetAccount}`);
         }
       }
     }
@@ -780,17 +828,19 @@ export async function addAccountToGraph(
       const transactionNodes = allNodes.filter(node => node.data('type') === 'transaction');
       const accountNodes = allNodes.filter(node => node.data('type') === 'account');
       const transferEdges = allEdges.filter(edge => edge.data('type') === 'transfer');
+      const selfTransferEdges = allEdges.filter(edge => edge.data('type') === 'self-transfer');
       const txAccountEdges = allEdges.filter(edge => edge.data('type') === 'tx-account');
       const accountTxEdges = allEdges.filter(edge => edge.data('type') === 'account-tx');
       
       console.log(`📊 [GRAPH_BUILD] Current graph statistics after processing ${address}:`);
       console.log(`  📈 Nodes: ${allNodes.length} total (${accountNodes.length} accounts, ${transactionNodes.length} transactions)`);
-      console.log(`  🔗 Edges: ${allEdges.length} total (${transferEdges.length} transfers, ${txAccountEdges.length} tx→account, ${accountTxEdges.length} account→tx)`);
+      console.log(`  🔗 Edges: ${allEdges.length} total (${transferEdges.length} transfers, ${selfTransferEdges.length} self-transfers, ${txAccountEdges.length} tx→account, ${accountTxEdges.length} account→tx)`);
       
       // Special fallback check for transactions with transfers but no transfer edges
-      if (processedTransactionCount > 0 && transferEdges.length === 0) {
+      const totalTransferEdges = transferEdges.length + selfTransferEdges.length;
+      if (processedTransactionCount > 0 && totalTransferEdges === 0) {
         console.log(`⚠️ [GRAPH_BUILD] FALLBACK WARNING: Processed ${processedTransactionCount} transactions but no transfer edges created`);
-        console.log(`⚠️ [GRAPH_BUILD] This may indicate plain SOL transfers are not being visualized properly`);
+        console.log(`⚠️ [GRAPH_BUILD] This may indicate SOL transfers are being filtered out`);
         
         // Log transfer data for debugging
         for (const tx of data.transactions.slice(0, 3)) { // Only log first 3 for brevity
@@ -799,6 +849,8 @@ export async function addAccountToGraph(
               tx.transfers.map(t => ({ account: t.account, change: t.change })));
           }
         }
+      } else if (totalTransferEdges > 0) {
+        console.log(`✅ [GRAPH_BUILD] Successfully created ${totalTransferEdges} transfer-related edges (${transferEdges.length} regular + ${selfTransferEdges.length} self-transfers)`);
       }
       
       // Enhanced fallback for plain transfers - ensure ANY transaction with transfers creates visual elements

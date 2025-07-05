@@ -425,6 +425,8 @@ function TransactionGraph({
       let color = '#64748b'; // Default gray
       if (data.type === 'transfer') {
         color = '#10b981'; // Green for transfers
+      } else if (data.type === 'self-transfer') {
+        color = '#f59e0b'; // Orange for self-transfers (fees/operations)
       } else if (data.type === 'tx-account') {
         color = '#6b7280'; // Gray for tx-account relationships
       } else if (data.type === 'account-tx') {
