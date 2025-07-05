@@ -244,26 +244,41 @@ export function VTableWrapper({
           tableRef.current = null;
         }
 
-        // Process data to add selection state
-        const processedData = data.map(row => {
-          const rowId = rowKey(row);
-          const isSelected = selectedRowId === rowId;
-          const isPinned = pinnedRowIds.has(rowId);
+        // Clear the container to ensure fresh start
+        containerRef.current.innerHTML = '';
+        
+        // Wait for the next frame to ensure DOM is updated
+        requestAnimationFrame(() => {
+          if (!containerRef.current) { return; }
           
-          return {
-            ...row,
-            __vtableRowId: rowId,
-            __isSelected: isSelected,
-            __isPinned: isPinned
-          };
-        });
+          // Process data to add selection state
+          const processedData = data.map(row => {
+            const rowId = rowKey(row);
+            const isSelected = selectedRowId === rowId;
+            const isPinned = pinnedRowIds.has(rowId);
+            
+            return {
+              ...row,
+              __vtableRowId: rowId,
+              __isSelected: isSelected,
+              __isPinned: isPinned
+            };
+          });
 
-        // Create new table with minimal config
-        const table = new ListTable({
-          container: containerRef.current,
-          records: processedData,
-          theme: createVTableTheme(theme),
-          columns: columns.map(col => ({
+          // Create new table with theme applied
+          const vtableTheme = createVTableTheme(theme);
+          
+          // Add explicit theme configuration to ensure it's applied
+          const tableConfig = {
+            container: containerRef.current,
+            records: processedData,
+            theme: vtableTheme,
+            // Force theme application by setting explicit style options
+            defaultRowHeight: 48,
+            defaultHeaderRowHeight: 48,
+            // Override any default theme
+            overscrollBehavior: 'none',
+            columns: columns.map(col => ({
             field: col.field,
             title: col.header || col.title,
             width: col.width || 150,
@@ -369,51 +384,64 @@ export function VTableWrapper({
               }
             }
           })),
-          defaultRowHeight: 48,
-          defaultHeaderRowHeight: 48,
-        });
+        };
 
-        if (onLoadMore) {
-          (table as any).on('scroll', (args: any) => {
-            const { scrollTop, scrollHeight, clientHeight } = args;
-            if (scrollHeight - scrollTop <= clientHeight * 1.5) {
-              onLoadMore();
+          // Create the table with the configuration
+          const table = new ListTable(tableConfig);
+
+          // Force theme application after table creation
+          try {
+            if (table.setTheme) {
+              table.setTheme(vtableTheme);
+            } else if (table.updateTheme) {
+              table.updateTheme(vtableTheme);
             }
-          });
-        }
-        
-        // Add click handler for cell interactions
-        (table as any).on('click_cell', (args: any) => {
-          // First check if we have a cell action (link click)
-          const cellValue = args.value ?? {};
-          const cellAction = cellValue.action || args.cellActionOption?.action;
-          
-          if (typeof cellAction === 'function') {
-            cellAction();
-            return; // Don't trigger row selection if we clicked a link
+          } catch (themeError) {
+            console.warn('Unable to apply theme after table creation:', themeError);
+          }
+
+          if (onLoadMore) {
+            (table as any).on('scroll', (args: any) => {
+              const { scrollTop, scrollHeight, clientHeight } = args;
+              if (scrollHeight - scrollTop <= clientHeight * 1.5) {
+                onLoadMore();
+              }
+            });
           }
           
-          // If no cell action, handle row selection
-          if (onRowSelect) {
-            const rowData = args.cellKey?.rowKey ? 
-              processedData.find(r => r.__vtableRowId === args.cellKey.rowKey) : 
-              null;
+          // Add click handler for cell interactions
+          (table as any).on('click_cell', (args: any) => {
+            // First check if we have a cell action (link click)
+            const cellValue = args.value ?? {};
+            const cellAction = cellValue.action || args.cellActionOption?.action;
             
-            if (rowData) {
-              handleRowClick(rowData, args);
+            if (typeof cellAction === 'function') {
+              cellAction();
+              return; // Don't trigger row selection if we clicked a link
             }
-          }
-        });
-
-        if (onSort) {
-          // Use any to bypass type checking for now
-          (table as any).on('sortClick', (args: any) => {
-            const { field, order } = args;
-            onSort(field, order);
+            
+            // If no cell action, handle row selection
+            if (onRowSelect) {
+              const rowData = args.cellKey?.rowKey ? 
+                processedData.find(r => r.__vtableRowId === args.cellKey.rowKey) : 
+                null;
+              
+              if (rowData) {
+                handleRowClick(rowData, args);
+              }
+            }
           });
-        }
 
-        tableRef.current = table;
+          if (onSort) {
+            // Use any to bypass type checking for now
+            (table as any).on('sortClick', (args: any) => {
+              const { field, order } = args;
+              onSort(field, order);
+            });
+          }
+
+          tableRef.current = table;
+        });
       } catch (err) {
         console.error('Failed to initialize table:', err);
       }
@@ -474,12 +502,13 @@ export function VTableWrapper({
   };
 
   return (
-    <div className={`vtable-container relative theme-${theme}`} style={{ height: '100%' }}>
+    <div className={`vtable-container relative theme-${theme}`} style={{ height: '100%' }} key={`vtable-${theme}`}>
       <div 
         className="vtable" 
         ref={containerRef} 
         style={{ width: '100%', height: '100%' }}
         data-selected-row={selectedRowId || ''}
+        data-theme={theme}
       />
       
       {renderFloatingButton()}
