@@ -440,12 +440,12 @@ export async function addAccountToGraph(
     console.log(`⚠️ [GRAPH_BUILD] No transactions found for account ${address}, adding minimal node`);
     
     // Get cy instance and add minimal account node even with no transactions
-    const cy = cyRef?.current;
-    if (cy) {
+    const cyInstance = cyRef?.current;
+    if (cyInstance) {
       const nodeId = address;
       if (!cy.getElementById(nodeId).length && !processedNodesRef?.current?.has(nodeId)) {
         console.log(`➕ [GRAPH_BUILD] Adding minimal account node for ${address} (no transactions)`);
-        cy.add({
+        cyInstance.add({
           data: {
             id: nodeId,
             label: shortenString(address),
@@ -821,7 +821,6 @@ export async function addAccountToGraph(
     console.log(`  - Graph nodes added: ${newElements ? newElements.size : 'unknown'}`);
     
     // Count and log nodes/edges generated for debugging empty graphs
-    const cy = cyRef?.current;
     if (cy) {
       const allNodes = cy.nodes();
       const allEdges = cy.edges();
@@ -958,7 +957,6 @@ export async function addAccountToGraph(
     });
     
     // Log current graph state
-    const cy = cyRef?.current;
     if (cy) {
       const nodes = cy.nodes();
       const edges = cy.edges();
@@ -977,7 +975,6 @@ export async function addAccountToGraph(
     pendingFetchesRef?.current?.delete(`${address}:${depth}`);
     
     // Still try to add a minimal error node so the account is represented
-    const cy = cyRef?.current;
     if (cy) {
       const nodeId = address;
       if (!cy.getElementById(nodeId).length && !processedNodesRef?.current?.has(nodeId)) {
