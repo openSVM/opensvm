@@ -199,6 +199,38 @@ function TransactionGraph({
     [shouldExcludeAddress]
   );
 
+  // Check for empty graph after loading completes
+  useEffect(() => {
+    if (!loading && !error && cyRef.current) {
+      const nodes = cyRef.current.nodes();
+      const transactions = nodes.filter(node => node.data('type') === 'transaction');
+      
+      console.log(`📊 [EMPTY_CHECK] Graph status: ${nodes.length} total nodes, ${transactions.length} transactions`);
+      
+      if (nodes.length === 0) {
+        console.log(`⚠️ [EMPTY_CHECK] Completely empty graph detected`);
+        setError({
+          message: 'No graph data could be loaded. This might be due to network issues or the account having no transaction history.',
+          severity: 'warning'
+        });
+      } else if (transactions.length === 0) {
+        console.log(`⚠️ [EMPTY_CHECK] Graph has nodes but no transactions`);
+        setError({
+          message: 'Graph loaded but no transactions found. This account might only have system operations that are not currently visualized.',
+          severity: 'warning'
+        });
+      } else if (transactions.length < 2) {
+        console.log(`ℹ️ [EMPTY_CHECK] Graph has very few transactions (${transactions.length})`);
+        setError({
+          message: `Limited transaction data found (${transactions.length} transaction${transactions.length === 1 ? '' : 's'}). This account might have limited SPL transfer activity.`,
+          severity: 'warning'
+        });
+      } else {
+        console.log(`✅ [EMPTY_CHECK] Graph has adequate data: ${transactions.length} transactions`);
+      }
+    }
+  }, [loading, error]);
+
   // Enhanced layout function with proper debouncing and cancellation
   const runLayoutOptimized = useCallback((fit = false, animate = false) => {
     if (!cyRef.current || layoutCooldown.current) return;
@@ -370,9 +402,26 @@ function TransactionGraph({
         hasSplTransfers = false;
       }
       
-      const effectiveMaxDepth = hasSplTransfers ? maxDepth : 0; // Depth 0 for non-SPL (no expansion)
+      // More lenient depth settings: allow depth 1 for non-SPL accounts instead of 0
+      const effectiveMaxDepth = hasSplTransfers ? maxDepth : Math.min(1, maxDepth); // Depth 1 for non-SPL (minimal expansion)
       
       console.log(`🎯 [CONFIG] Account ${address}: hasSplTransfers=${hasSplTransfers}, effectiveMaxDepth=${effectiveMaxDepth}`);
+      
+      // If no SPL transfers, show warning but still proceed
+      if (!hasSplTransfers) {
+        console.log(`⚠️ [CONFIG] Account ${address} has no SPL transfers, using reduced depth but still processing`);
+        
+        // Update the error state to show a helpful message
+        setError({
+          message: `Account ${address.slice(0, 8)}... has limited SPL transfer activity. Showing system transactions instead.`,
+          severity: 'warning'
+        });
+        
+        // Clear the warning after a few seconds
+        setTimeout(() => {
+          setError(null);
+        }, 5000);
+      }
       
       console.log(`🚀 [CALLING] Calling addAccountToGraphUtil for ${address}`);
       const result = await addAccountToGraphUtil(
@@ -485,32 +534,86 @@ function TransactionGraph({
 
     const nodes = cytoscapeNodes.map((node) => {
       const data = node.data();
+      
+      // Determine node color based on type and status
+      let color = '#64748b'; // Default gray
+      if (data.type === 'transaction') {
+        if (data.success === false || data.status === 'error') {
+          color = '#ef4444'; // Red for failed transactions
+        } else {
+          color = '#3b82f6'; // Blue for successful transactions
+        }
+      } else if (data.type === 'account') {
+        if (data.tracked) {
+          color = '#8b5cf6'; // Purple for tracked accounts
+        } else if (data.status === 'error' || data.hasError) {
+          color = '#f59e0b'; // Orange for accounts with errors
+        } else if (data.isEmpty || data.status === 'empty') {
+          color = '#6b7280'; // Gray for empty accounts
+        } else {
+          color = '#10b981'; // Green for normal accounts
+        }
+      }
+      
       const convertedNode = {
         id: data.id,
         type: data.type || 'account',
+        subType: data.subType || data.type || 'unknown',
         label: data.label || data.id,
         status: data.status,
         tracked: data.tracked || false,
-        color: data.type === 'transaction' ? '#3b82f6' : (data.tracked ? '#ef4444' : '#10b981')
+        isEmpty: data.isEmpty || false,
+        hasError: data.hasError || false,
+        transactionCount: data.transactionCount || 0,
+        accountCount: data.accountCount || 0,
+        color: color
       };
-      console.log(`🔄 [GPU_CONVERT] Converted node: ${data.id} (${data.type})`);
+      console.log(`🔄 [GPU_CONVERT] Converted node: ${data.id} (${data.type}/${data.subType || 'none'})`);
       return convertedNode;
     });
 
     const links = cytoscapeEdges.map((edge) => {
       const data = edge.data();
+      
+      // Determine edge color based on type
+      let color = '#64748b'; // Default gray
+      if (data.type === 'transfer') {
+        color = '#10b981'; // Green for transfers
+      } else if (data.type === 'tx-account') {
+        color = '#6b7280'; // Gray for tx-account relationships
+      } else if (data.type === 'account-tx') {
+        color = '#94a3b8'; // Light gray for account-tx relationships
+      }
+      
       const convertedLink = {
         source: data.source,
         target: data.target,
         type: data.type || 'interaction',
         value: data.value || 1,
-        color: '#64748b'
+        amount: data.amount,
+        label: data.label,
+        color: color
       };
       console.log(`🔄 [GPU_CONVERT] Converted edge: ${data.source} -> ${data.target} (${data.type})`);
       return convertedLink;
     });
 
     console.log(`✅ [GPU_CONVERT] Conversion complete: ${nodes.length} nodes, ${links.length} links`);
+    
+    // Log summary statistics
+    const nodeStats = nodes.reduce((stats: Record<string, number>, node) => {
+      const key = `${node.type}${node.subType ? `/${node.subType}` : ''}`;
+      stats[key] = (stats[key] || 0) + 1;
+      return stats;
+    }, {});
+    console.log(`✅ [GPU_CONVERT] Node statistics:`, nodeStats);
+    
+    const linkStats = links.reduce((stats: Record<string, number>, link) => {
+      stats[link.type] = (stats[link.type] || 0) + 1;
+      return stats;
+    }, {});
+    console.log(`✅ [GPU_CONVERT] Link statistics:`, linkStats);
+    
     return { nodes, links };
   }, []);
 
@@ -520,8 +623,21 @@ function TransactionGraph({
       console.log('🔄 [GPU_UPDATE] Updating GPU graph data...');
       const newData = convertToGPUGraphData();
       console.log(`🔄 [GPU_UPDATE] Setting GPU graph data: ${newData.nodes.length} nodes, ${newData.links.length} links`);
+      
+      // Log what types of nodes we have
+      const nodeTypes = newData.nodes.reduce((types: Record<string, number>, node) => {
+        types[node.type] = (types[node.type] || 0) + 1;
+        return types;
+      }, {});
+      console.log(`🔄 [GPU_UPDATE] Node types:`, nodeTypes);
+      
       setGpuGraphData(newData);
       console.log('✅ [GPU_UPDATE] GPU graph data updated successfully');
+      
+      // Show warning if graph is empty
+      if (newData.nodes.length === 0) {
+        console.log('⚠️ [GPU_UPDATE] GPU graph is empty after update');
+      }
     } else {
       console.log('🔄 [GPU_UPDATE] GPU graph disabled, skipping update');
     }

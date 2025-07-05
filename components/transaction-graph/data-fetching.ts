@@ -66,7 +66,7 @@ export const fetchAccountTransactions = async (
     }
 
     // First try to get SPL transfers (top 10 by volume)
-    console.log(`Trying SPL transfers for ${address}`);
+    console.log(`🔍 [FETCH] Trying SPL transfers for ${address}`);
     try {
       const transfersResponse = await fetch(`/api/account-transfers/${address}?limit=10`, {
         signal,
@@ -85,6 +85,7 @@ export const fetchAccountTransactions = async (
             slot: 0,
             err: null,
             success: true,
+            type: 'spl-transfer',
             accounts: [
               { pubkey: transfer.from, isSigner: false, isWritable: true },
               { pubkey: transfer.to, isSigner: false, isWritable: true }
@@ -96,27 +97,29 @@ export const fetchAccountTransactions = async (
             memo: null
           }));
           
-          console.log(`✓ Found ${transactions.length} SPL transfers for ${address}`);
+          console.log(`✅ [FETCH] Found ${transactions.length} SPL transfers for ${address}`);
           return { address, transactions };
+        } else {
+          console.log(`⚠️ [FETCH] No SPL transfers found for ${address}, will try regular transactions`);
         }
       } else {
-        console.warn(`SPL transfers API failed for ${address}: ${transfersResponse.status}`);
+        console.warn(`⚠️ [FETCH] SPL transfers API failed for ${address}: ${transfersResponse.status}`);
       }
     } catch (transferError) {
-      console.warn(`SPL transfers fetch failed for ${address}:`, transferError);
+      console.warn(`❌ [FETCH] SPL transfers fetch failed for ${address}:`, transferError);
     }
 
-    // Fallback: Get very limited regular transactions (reduced scope)
-    console.log(`Falling back to limited regular transactions for ${address}`);
+    // Fallback: Get regular transactions with more inclusive filtering
+    console.log(`🔄 [FETCH] Falling back to regular transactions for ${address} (more inclusive)`);
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000); // Reduced to 5s for faster fallback
+      const timeoutId = setTimeout(() => controller.abort(), 8000); // Increased timeout for better data fetching
       
       // Use existing signal if provided, otherwise use our controller
       const fetchSignal = signal || controller.signal;
       
-      // Heavily limit fallback to prevent graph explosion - only 2 transactions
-      const response = await fetch(`/api/account-transactions/${address}?limit=2`, {
+      // Still limit but be more inclusive - allow up to 5 transactions
+      const response = await fetch(`/api/account-transactions/${address}?limit=5`, {
         signal: fetchSignal,
         headers: { 'Cache-Control': 'no-cache' }
       });
@@ -125,7 +128,7 @@ export const fetchAccountTransactions = async (
       
       if (!response.ok) {
         if (response.status === 400) {
-          console.warn(`Bad request for account ${address}, returning empty transactions`);
+          console.warn(`⚠️ [FETCH] Bad request for account ${address}, returning empty transactions`);
           return { address, transactions: [] };
         }
         throw new Error(`Error fetching transactions: ${response.statusText} (${response.status})`);
@@ -134,32 +137,70 @@ export const fetchAccountTransactions = async (
       const data = await response.json();
       const transactions = data.transactions || [];
       const transactionCount = transactions.length;
-      console.log(`✓ Fallback: Found ${transactionCount} limited regular transactions for ${address}`);
+      console.log(`📊 [FETCH] Fallback: Found ${transactionCount} regular transactions for ${address}`);
       
-      // For fallback mode, further limit by taking only transactions with fewer accounts
-      // to prevent graph explosion
-      const limitedTransactions = transactions
-        .filter((tx: any) => tx.accounts && tx.accounts.length <= 5) // Max 5 accounts per transaction
-        .slice(0, 2); // Absolute max of 2 transactions
+      // Process and enrich transaction data to be more inclusive
+      const enrichedTransactions = transactions.map((tx: any) => {
+        // Determine transaction type from available data
+        let txType = 'system';
+        if (tx.details?.instructions) {
+          const firstInstruction = tx.details.instructions[0];
+          if (firstInstruction?.programId === 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA') {
+            txType = 'spl-token';
+          } else if (firstInstruction?.programId === '11111111111111111111111111111111') {
+            txType = 'system';
+          } else {
+            txType = 'other';
+          }
+        }
+        
+        return {
+          ...tx,
+          type: txType,
+          success: tx.success !== false && !tx.err, // Default to success if not explicitly failed
+          accounts: tx.accounts || [],
+          transfers: tx.transfers || []
+        };
+      });
       
-      console.log(`✓ After filtering: ${limitedTransactions.length} transactions (reduced from ${transactionCount})`);
+      // More inclusive filtering - only exclude transactions that are clearly problematic
+      const filteredTransactions = enrichedTransactions.filter((tx: any) => {
+        // Include all transactions that have accounts, even if they're system transactions
+        const hasAccounts = tx.accounts && tx.accounts.length > 0;
+        const hasReasonableAccountCount = tx.accounts && tx.accounts.length <= 20; // Increased from 5 to 20
+        
+        if (!hasAccounts) {
+          console.log(`🚫 [FETCH] Filtering out transaction ${tx.signature}: no accounts`);
+          return false;
+        }
+        
+        if (!hasReasonableAccountCount) {
+          console.log(`🚫 [FETCH] Filtering out transaction ${tx.signature}: too many accounts (${tx.accounts.length})`);
+          return false;
+        }
+        
+        console.log(`✅ [FETCH] Including transaction ${tx.signature}: type=${tx.type}, accounts=${tx.accounts.length}, success=${tx.success}`);
+        return true;
+      });
+      
+      console.log(`✅ [FETCH] After filtering: ${filteredTransactions.length} transactions (reduced from ${transactionCount})`);
       
       // Always return valid data structure, even if empty
       return {
         address,
-        transactions: limitedTransactions
+        transactions: filteredTransactions
       };
       
     } catch (fallbackError) {
-      console.warn(`Regular transactions fallback failed for ${address}:`, fallbackError);
+      console.warn(`❌ [FETCH] Regular transactions fallback failed for ${address}:`, fallbackError);
     }
     
     // Final fallback: Return empty transactions but still mark account as processed
-    console.log(`All fetches failed for ${address}, returning empty transactions`);
+    console.log(`❌ [FETCH] All fetches failed for ${address}, returning empty transactions`);
     return { address, transactions: [] };
     
   } catch (err) {
-    console.error(`Critical error fetching transactions for ${address}:`, err);
+    console.error(`💥 [FETCH] Critical error fetching transactions for ${address}:`, err);
     // Always return a valid structure, never null
     return { address, transactions: [] };
   }
@@ -356,19 +397,29 @@ export const addAccountToGraph = async (
   setLoadingProgress?: (cb: (prev: number) => number) => void,
   queueAccountFetch?: (address: string, depth: number, parentSignature: string | null) => void
 ): Promise<GraphElementAddResult | undefined> => {
+  console.log(`🏗️ [GRAPH_BUILD] Starting addAccountToGraph for ${address}, depth: ${depth}, maxDepth: ${maxDepth}`);
+  
   // Stop if we've reached the maximum depth
-  if (depth >= maxDepth) return;
+  if (depth >= maxDepth) {
+    console.log(`🛑 [GRAPH_BUILD] Reached max depth ${maxDepth} for ${address}, stopping`);
+    return;
+  }
   
   // Skip if already loaded
   // Add safety check to ensure loadedAccountsRef.current is defined
-  if (loadedAccountsRef?.current?.has(address)) return;
+  if (loadedAccountsRef?.current?.has(address)) {
+    console.log(`⏭️ [GRAPH_BUILD] Account ${address} already loaded, skipping`);
+    return;
+  }
     
   // Skip excluded addresses
   if (shouldExcludeAddress && shouldExcludeAddress(address)) {
+    console.log(`🚫 [GRAPH_BUILD] Address ${address} is excluded, skipping`);
     return;
   }
   
   // Fetch transactions for this account
+  console.log(`📡 [GRAPH_BUILD] Fetching transactions for ${address}...`);
   const data = await fetchAccountTransactions?.(address);
   
   // Always mark account as processed and update progress, even if no data
@@ -386,7 +437,35 @@ export const addAccountToGraph = async (
   });
   
   if (!data || !data.transactions || data.transactions.length === 0) {
-    console.log(`No transactions found for account ${address}, but marked as processed`);
+    console.log(`⚠️ [GRAPH_BUILD] No transactions found for account ${address}, adding minimal node`);
+    
+    // Get cy instance and add minimal account node even with no transactions
+    const cy = cyRef?.current;
+    if (cy) {
+      const nodeId = address;
+      if (!cy.getElementById(nodeId).length && !processedNodesRef?.current?.has(nodeId)) {
+        console.log(`➕ [GRAPH_BUILD] Adding minimal account node for ${address} (no transactions)`);
+        cy.add({
+          data: {
+            id: nodeId,
+            label: shortenString(address),
+            type: 'account',
+            fullAddress: address,
+            status: 'empty',
+            transactionCount: 0,
+            isEmpty: true
+          },
+          classes: 'account empty'
+        });
+        processedNodesRef?.current?.add(nodeId);
+        
+        // Track new elements if set is provided
+        if (newElements) {
+          newElements.add(nodeId);
+        }
+      }
+    }
+    
     return { cy: cyRef?.current, address, newElements: new Set() };
   }
 
@@ -432,16 +511,41 @@ export const addAccountToGraph = async (
       return { cy, address, newElements };
     }
 
+    console.log(`📊 [GRAPH_BUILD] Processing ${data.transactions.length} transactions for ${address}`);
+
     // Add transaction nodes and edges
     const connectedAccounts = new Set<string>();
+    let processedTransactionCount = 0;
+    let skippedTransactionCount = 0;
+    
     for (const tx of data.transactions) {
-      // Skip if we've already loaded this transaction
-      if (loadedTransactionsRef?.current?.has(tx.signature)) continue;
+      console.log(`🔍 [TX_PROCESS] Processing transaction ${tx.signature} for ${address}`);
       
-      // Skip transactions involving excluded accounts
-      if (shouldIncludeTransaction && !shouldIncludeTransaction(tx.accounts)) {
+      // Skip if we've already loaded this transaction
+      if (loadedTransactionsRef?.current?.has(tx.signature)) {
+        console.log(`⏭️ [TX_PROCESS] Transaction ${tx.signature} already loaded, skipping`);
+        skippedTransactionCount++;
         continue;
       }
+      
+      // More inclusive transaction filtering - log what's being filtered and why
+      let shouldIncludeTx = true;
+      let filterReason = '';
+      
+      if (shouldIncludeTransaction && !shouldIncludeTransaction(tx.accounts)) {
+        shouldIncludeTx = false;
+        filterReason = 'Failed shouldIncludeTransaction filter';
+      }
+      
+      if (!shouldIncludeTx) {
+        console.log(`🚫 [TX_PROCESS] Excluding transaction ${tx.signature}: ${filterReason}`);
+        console.log(`🚫 [TX_PROCESS] Transaction details: accounts=${tx.accounts?.length || 0}, type=${tx.type || 'unknown'}`);
+        skippedTransactionCount++;
+        continue;
+      }
+
+      console.log(`✅ [TX_PROCESS] Including transaction ${tx.signature} in graph`);
+      processedTransactionCount++;
 
       // Mark transaction as loaded
       loadedTransactionsRef?.current?.add(tx.signature);
@@ -455,20 +559,33 @@ export const addAccountToGraph = async (
           newElements.add(txNodeId);
         }
         
+        // Determine transaction type and status for better visualization
+        const txType = tx.type || 'unknown';
+        const txSuccess = tx.success !== false && !tx.err; // More inclusive success check
+        const txClasses = txSuccess ? 'transaction success' : 'transaction error';
+        
+        console.log(`➕ [TX_PROCESS] Adding transaction node: ${tx.signature}, type: ${txType}, success: ${txSuccess}`);
+        
         cy.add({
           data: {
             id: txNodeId,
             label: shortenString(tx.signature),
             type: 'transaction',
+            subType: txType,
             status: 'loaded',
             timestamp: tx.timestamp,
             formattedTime: formatTimestamp(tx.timestamp),
-            success: tx.success,
-            fullSignature: tx.signature
+            success: txSuccess,
+            fullSignature: tx.signature,
+            accountCount: tx.accounts?.length || 0,
+            hasTransfers: (tx.transfers && tx.transfers.length > 0) || false
           },
-          classes: tx.success ? 'transaction success' : 'transaction error'
+          classes: txClasses
         });
         processedNodesRef?.current?.add(txNodeId);
+        console.log(`✅ [TX_PROCESS] Added transaction node: ${tx.signature}`);
+      } else {
+        console.log(`⏭️ [TX_PROCESS] Transaction node ${tx.signature} already exists, skipping`);
       }
 
       // Create a unique edge ID and check before adding
@@ -492,14 +609,25 @@ export const addAccountToGraph = async (
       }
 
       // Process accounts involved in this transaction
-      for (const acc of tx.accounts) {
+      console.log(`👥 [TX_PROCESS] Processing ${tx.accounts?.length || 0} accounts for transaction ${tx.signature}`);
+      
+      for (const acc of tx.accounts || []) {
+        console.log(`🔍 [ACCOUNT_PROCESS] Processing account ${acc.pubkey} in transaction ${tx.signature}`);
+        
         // Skip self-references
-        if (acc.pubkey === address) continue;
+        if (acc.pubkey === address) {
+          console.log(`⏭️ [ACCOUNT_PROCESS] Skipping self-reference: ${acc.pubkey}`);
+          continue;
+        }
         
         // Skip excluded addresses
-        if (shouldExcludeAddress && shouldExcludeAddress(acc.pubkey)) 
+        if (shouldExcludeAddress && shouldExcludeAddress(acc.pubkey)) {
+          console.log(`🚫 [ACCOUNT_PROCESS] Skipping excluded address: ${acc.pubkey}`);
           continue;
+        }
 
+        console.log(`✅ [ACCOUNT_PROCESS] Including account ${acc.pubkey} in graph`);
+        
         // Add to connected accounts for later processing
         connectedAccounts.add(acc.pubkey);
 
@@ -507,13 +635,16 @@ export const addAccountToGraph = async (
 
         // Add account node if it doesn't exist
         if (!cy.getElementById(accNodeId).length && !processedNodesRef?.current?.has(accNodeId)) {
+          console.log(`➕ [ACCOUNT_PROCESS] Adding account node: ${acc.pubkey}`);
           cy.add({
             data: {
               id: accNodeId,
               label: shortenString(acc.pubkey),
               type: 'account',
               fullAddress: acc.pubkey,
-              status: 'pending'
+              status: 'pending',
+              isSigner: acc.isSigner || false,
+              isWritable: acc.isWritable || false
             },
             classes: 'account'
           });
@@ -523,18 +654,23 @@ export const addAccountToGraph = async (
           if (newElements) {
             newElements.add(accNodeId);
           }
+          console.log(`✅ [ACCOUNT_PROCESS] Added account node: ${acc.pubkey}`);
+        } else {
+          console.log(`⏭️ [ACCOUNT_PROCESS] Account node ${acc.pubkey} already exists`);
         }
 
         // Add edge from transaction to account
         const txToAccEdgeId = `${tx.signature}-${acc.pubkey}`;
         if (!cy.getElementById(txToAccEdgeId).length && !processedEdgesRef?.current?.has(txToAccEdgeId)) {
+          console.log(`➕ [EDGE_PROCESS] Adding tx-to-account edge: ${tx.signature} -> ${acc.pubkey}`);
           cy.add({
             data: {
               id: txToAccEdgeId,
               source: tx.signature,              
               target: acc.pubkey,              
               type: 'tx-account',
-              status: 'loaded'
+              status: 'loaded',
+              role: acc.isSigner ? 'signer' : (acc.isWritable ? 'writable' : 'readonly')
             }
           });
           processedEdgesRef?.current?.add(txToAccEdgeId);
@@ -543,16 +679,23 @@ export const addAccountToGraph = async (
           if (newElements) {
             newElements.add(txToAccEdgeId);
           }
+          console.log(`✅ [EDGE_PROCESS] Added tx-to-account edge: ${tx.signature} -> ${acc.pubkey}`);
+        } else {
+          console.log(`⏭️ [EDGE_PROCESS] Edge ${txToAccEdgeId} already exists`);
         }
       }
 
-      // Process transfers
-      for (const transfer of tx.transfers) {
+      // Process transfers - make more inclusive to handle various transfer types
+      console.log(`💰 [TRANSFER_PROCESS] Processing ${tx.transfers?.length || 0} transfers for transaction ${tx.signature}`);
+      
+      for (const transfer of tx.transfers || []) {
         const targetAccount = transfer.account;
+        console.log(`🔍 [TRANSFER_PROCESS] Processing transfer to ${targetAccount}, amount: ${transfer.change}`);
         
         if (address !== targetAccount) {
           const transferEdgeId = `${tx.signature}-${targetAccount}-transfer`;
           if (!cy.getElementById(transferEdgeId).length && !processedEdgesRef?.current?.has(transferEdgeId)) {
+            console.log(`➕ [TRANSFER_PROCESS] Adding transfer edge: ${tx.signature} -> ${targetAccount}, amount: ${transfer.change}`);
             cy.add({
               data: {
                 id: transferEdgeId,
@@ -571,13 +714,27 @@ export const addAccountToGraph = async (
             if (newElements) {
               newElements.add(transferEdgeId);
             }
+            console.log(`✅ [TRANSFER_PROCESS] Added transfer edge: ${tx.signature} -> ${targetAccount}`);
+          } else {
+            console.log(`⏭️ [TRANSFER_PROCESS] Transfer edge ${transferEdgeId} already exists`);
           }
+        } else {
+          console.log(`⏭️ [TRANSFER_PROCESS] Skipping self-transfer: ${targetAccount}`);
         }
       }
     }
     
+    // Log processing summary
+    console.log(`📊 [GRAPH_BUILD] Transaction processing summary for ${address}:`);
+    console.log(`  - Total transactions: ${data.transactions.length}`);
+    console.log(`  - Processed: ${processedTransactionCount}`);
+    console.log(`  - Skipped: ${skippedTransactionCount}`);
+    console.log(`  - Connected accounts: ${connectedAccounts.size}`);
+    console.log(`  - Graph nodes added: ${newElements ? newElements.size : 'unknown'}`);
+    
     // Queue connected accounts for processing if within depth limit
     if (depth < maxDepth - 1) {
+      console.log(`🔄 [GRAPH_BUILD] Queueing ${connectedAccounts.size} connected accounts for next depth level`);
       for (const connectedAddress of connectedAccounts) {
         const nextDepth = depth + 1;
         const connectedAccountKey = `${connectedAddress}:${nextDepth}`;
@@ -585,18 +742,55 @@ export const addAccountToGraph = async (
         if (!loadedAccountsRef?.current?.has(connectedAddress) && 
             !pendingFetchesRef?.current?.has(connectedAccountKey) && 
             connectedAddress !== address) {
+          console.log(`📝 [GRAPH_BUILD] Queueing connected account: ${connectedAddress} at depth ${nextDepth}`);
           // Pass the current transaction signature as the parent signature instead of null
           queueAccountFetch?.(connectedAddress, nextDepth, parentSignature);
+        } else {
+          console.log(`⏭️ [GRAPH_BUILD] Skipping connected account: ${connectedAddress} (already processed or pending)`);
+        }
+      }
+    } else {
+      console.log(`🛑 [GRAPH_BUILD] Max depth reached, not queueing connected accounts`);
+    }
+    
+    console.log(`✅ [GRAPH_BUILD] Completed processing for ${address}`);
+    return { cy, address, newElements };
+  } catch (error) {
+    console.error(`❌ [GRAPH_BUILD] Error adding account ${address} to graph:`, error);
+    console.error(`❌ [GRAPH_BUILD] Error details: depth=${depth}, maxDepth=${maxDepth}, totalAccounts=${totalAccounts}`);
+    
+    // Clean up any partial state
+    pendingFetchesRef?.current?.delete(`${address}:${depth}`);
+    
+    // Still try to add a minimal error node so the account is represented
+    const cy = cyRef?.current;
+    if (cy) {
+      const nodeId = address;
+      if (!cy.getElementById(nodeId).length && !processedNodesRef?.current?.has(nodeId)) {
+        console.log(`🚨 [GRAPH_BUILD] Adding error node for ${address} due to processing failure`);
+        cy.add({
+          data: {
+            id: nodeId,
+            label: shortenString(address),
+            type: 'account',
+            fullAddress: address,
+            status: 'error',
+            transactionCount: 0,
+            hasError: true,
+            errorMessage: error.message || 'Processing failed'
+          },
+          classes: 'account error'
+        });
+        processedNodesRef?.current?.add(nodeId);
+        
+        // Track new elements if set is provided
+        if (newElements) {
+          newElements.add(nodeId);
         }
       }
     }
     
-    return { cy, address, newElements };
-  } catch (error) {
-    console.error(`Error adding account ${address} to graph:`, error);
-    // Clean up any partial state
-    pendingFetchesRef?.current?.delete(`${address}:${depth}`);
-    return;
+    return { cy: cyRef?.current, address, newElements: new Set() };
   }
 };
 
