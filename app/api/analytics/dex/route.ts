@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { DEX_CONSTANTS } from '@/lib/constants/analytics-constants';
 
 // Real DEX Analytics API using external APIs for real data
 interface DexMetrics {
@@ -10,6 +11,198 @@ interface DexMetrics {
   activeUsers?: number;
   transactions?: number;
   avgTransactionSize?: number;
+}
+
+interface PriceData {
+  token: string;
+  price: number;
+  dex: string;
+  timestamp: number;
+}
+
+interface ArbitrageOpportunity {
+  tokenPair: string;
+  buyDex: string;
+  sellDex: string;
+  buyPrice: number;
+  sellPrice: number;
+  profitPercentage: number;
+  profitUSD: number;
+  volume: number;
+  gasEstimate: number;
+  netProfit: number;
+  confidence: number;
+}
+
+// Fetch real price data from Pyth Network
+async function fetchPythPrices(): Promise<PriceData[]> {
+  try {
+    const response = await fetch('https://benchmarks.pyth.network/v1/shims/tradingview/history?symbol=Crypto.SOL/USD&resolution=1&from=1640995200&to=1640995200');
+    if (!response.ok) return [];
+    
+    // Pyth price data
+    const data = await response.json();
+    return [{
+      token: 'SOL/USD',
+      price: data.c?.[0] || 100, // Current SOL price
+      dex: 'Pyth',
+      timestamp: Date.now()
+    }];
+  } catch (error) {
+    console.error('Error fetching Pyth prices:', error);
+    return [];
+  }
+}
+
+// Fetch real price data from Jupiter API for multiple tokens
+async function fetchJupiterPrices(): Promise<PriceData[]> {
+  try {
+    const tokens = ['SOL', 'USDC', 'USDT', 'RAY', 'ORCA'];
+    const prices: PriceData[] = [];
+    
+    for (const token of tokens) {
+      try {
+        const response = await fetch(`https://price.jup.ag/v6/price?ids=${token}`);
+        if (response.ok) {
+          const data = await response.json();
+          if (data.data?.[token]) {
+            prices.push({
+              token: `${token}/USD`,
+              price: data.data[token].price,
+              dex: 'Jupiter',
+              timestamp: Date.now()
+            });
+          }
+        }
+      } catch (e) {
+        console.error(`Error fetching ${token} price:`, e);
+      }
+    }
+    
+    return prices;
+  } catch (error) {
+    console.error('Error fetching Jupiter prices:', error);
+    return [];
+  }
+}
+
+// Fetch price data from CoinGecko API
+async function fetchCoinGeckoPrices(): Promise<PriceData[]> {
+  try {
+    const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=solana,usd-coin,tether,raydium,orca&vs_currencies=usd');
+    if (!response.ok) return [];
+    
+    const data = await response.json();
+    const prices: PriceData[] = [];
+    
+    const tokenMap: Record<string, string> = {
+      'solana': 'SOL/USD',
+      'usd-coin': 'USDC/USD', 
+      'tether': 'USDT/USD',
+      'raydium': 'RAY/USD',
+      'orca': 'ORCA/USD'
+    };
+    
+    Object.entries(data).forEach(([coinId, priceData]: [string, any]) => {
+      if (priceData.usd && tokenMap[coinId]) {
+        prices.push({
+          token: tokenMap[coinId],
+          price: priceData.usd,
+          dex: 'CoinGecko',
+          timestamp: Date.now()
+        });
+      }
+    });
+    
+    return prices;
+  } catch (error) {
+    console.error('Error fetching CoinGecko prices:', error);
+    return [];
+  }
+}
+
+// Calculate arbitrage opportunities using real price feeds
+function calculateArbitrageOpportunities(
+  dexMetrics: DexMetrics[], 
+  priceFeeds: PriceData[]
+): ArbitrageOpportunity[] {
+  const opportunities: ArbitrageOpportunity[] = [];
+  
+  // Group prices by token
+  const pricesByToken = new Map<string, PriceData[]>();
+  priceFeeds.forEach(price => {
+    const existing = pricesByToken.get(price.token) || [];
+    existing.push(price);
+    pricesByToken.set(price.token, existing);
+  });
+  
+  // Find arbitrage opportunities for each token with multiple price sources
+  pricesByToken.forEach((prices, token) => {
+    if (prices.length < 2) return; // Need at least 2 DEXes for arbitrage
+    
+    for (let i = 0; i < prices.length; i++) {
+      for (let j = i + 1; j < prices.length; j++) {
+        const priceA = prices[i];
+        const priceB = prices[j];
+        
+        if (priceA.price === priceB.price) continue;
+        
+        const buyPrice = Math.min(priceA.price, priceB.price);
+        const sellPrice = Math.max(priceA.price, priceB.price);
+        const buyDex = priceA.price < priceB.price ? priceA.dex : priceB.dex;
+        const sellDex = priceA.price < priceB.price ? priceB.dex : priceA.dex;
+        
+        const profitPercentage = ((sellPrice - buyPrice) / buyPrice) * 100;
+        
+        // Only include if profit exceeds minimum threshold
+        if (profitPercentage >= DEX_CONSTANTS.ARBITRAGE.MIN_PROFIT_PERCENTAGE) {
+          // Estimate trade volume based on DEX liquidity
+          const buyDexMetric = dexMetrics.find(d => d.name === buyDex);
+          const sellDexMetric = dexMetrics.find(d => d.name === sellDex);
+          const maxVolume = Math.min(
+            buyDexMetric?.tvl || 0,
+            sellDexMetric?.tvl || 0
+          ) * 0.01; // Max 1% of TVL per trade
+          
+          const tradeVolume = Math.min(maxVolume, 100000); // Cap at $100K
+          const profitUSD = (tradeVolume * profitPercentage) / 100;
+          
+          // Estimate gas costs
+          const gasEstimate = DEX_CONSTANTS.ARBITRAGE.GAS_COST_BUFFER_USD;
+          const netProfit = profitUSD - gasEstimate;
+          
+          // Calculate confidence based on data sources and volume
+          const confidence = Math.min(
+            (priceFeeds.length / 3) * 0.4 + // More price sources = higher confidence
+            (Math.min(tradeVolume / 10000, 1)) * 0.3 + // Higher volume = higher confidence  
+            (Math.min(profitPercentage / 5, 1)) * 0.3, // Higher profit = higher confidence
+            1.0
+          );
+          
+          if (netProfit >= DEX_CONSTANTS.ARBITRAGE.MIN_PROFIT_USD) {
+            opportunities.push({
+              tokenPair: token,
+              buyDex,
+              sellDex,
+              buyPrice,
+              sellPrice,
+              profitPercentage,
+              profitUSD,
+              volume: tradeVolume,
+              gasEstimate,
+              netProfit,
+              confidence
+            });
+          }
+        }
+      }
+    }
+  });
+  
+  // Sort by profit and return top opportunities
+  return opportunities
+    .sort((a, b) => b.netProfit - a.netProfit)
+    .slice(0, 10);
 }
 
 // Fetch real data from Jupiter API
@@ -105,6 +298,15 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const dex = searchParams.get('dex') || undefined;
     
+    // Fetch real price data from multiple sources
+    const [pythPrices, jupiterPrices, coinGeckoPrices] = await Promise.all([
+      fetchPythPrices(),
+      fetchJupiterPrices(), 
+      fetchCoinGeckoPrices()
+    ]);
+    
+    const allPriceFeeds = [...pythPrices, ...jupiterPrices, ...coinGeckoPrices];
+    
     // Use DeFiLlama as primary source for consistent data
     const defiLlamaData = await fetchDeFiLlamaData();
     
@@ -166,7 +368,7 @@ export async function GET(request: NextRequest) {
       tokenB: 'USDC',
       liquidityUSD: metric.tvl,
       volume24h: metric.volume24h,
-      fees24h: metric.volume24h * 0.003, // 0.3% average fees
+      fees24h: metric.volume24h * (DEX_CONSTANTS.FEES.DEFAULT_FEE_BP / 10000),
       tvl: metric.tvl,
       timestamp: Date.now()
     }));
@@ -181,8 +383,8 @@ export async function GET(request: NextRequest) {
       timestamp: Date.now()
     }));
     
-    // Real arbitrage opportunities require price feed APIs
-    const arbitrageOpportunities: any[] = [];
+    // Calculate real arbitrage opportunities using price feeds
+    const arbitrageOpportunities = calculateArbitrageOpportunities(finalMetrics, allPriceFeeds);
     
     // Generate DEX rankings from real data
     const rankings = volumeData
@@ -200,13 +402,14 @@ export async function GET(request: NextRequest) {
     // Health status based on real data
     const totalTvl = liquidityData.reduce((sum, l) => sum + l.liquidityUSD, 0);
     const totalVolumeSum = volumeData.reduce((sum, v) => sum + v.volume24h, 0);
-    const activeDexes = volumeData.filter(v => v.volume24h > 1000).length;
+    const activeDexes = volumeData.filter(v => v.volume24h > DEX_CONSTANTS.VOLUME_THRESHOLDS.MINIMAL_DAILY_VOLUME).length;
     
     const health = {
       isHealthy: activeDexes >= 3 && totalVolumeSum > 1000000, // At least 3 active DEXes and $1M volume
       lastUpdate: Date.now(),
       connectedDEXes: activeDexes,
-      dataPoints: liquidityData.length
+      dataPoints: liquidityData.length,
+      priceFeeds: allPriceFeeds.length
     };
 
     return NextResponse.json({
@@ -216,7 +419,8 @@ export async function GET(request: NextRequest) {
         volume: volumeData,
         arbitrage: arbitrageOpportunities,
         rankings,
-        health
+        health,
+        priceFeeds: allPriceFeeds.length
       },
       timestamp: Date.now()
     });

@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { SolanaDEXTab } from '@/components/solana/solana-dex-tab';
 import { CrossChainTab } from '@/components/solana/cross-chain-tab';
 import { DeFiHealthTab } from '@/components/solana/defi-health-tab';
 import { ValidatorTab } from '@/components/solana/validator-tab';
+import { OverviewMetrics, QuickActions } from '@/components/analytics/overview-components';
 
 type TabType = 'overview' | 'dex' | 'cross-chain' | 'defi-health' | 'validators';
 
@@ -13,6 +14,40 @@ export default function AnalyticsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<TabType>('overview');
+
+  // Memoize tabs array to avoid needless re-computation
+  const tabs = useMemo(() => [
+    { 
+      id: 'overview' as TabType, 
+      label: 'Overview', 
+      description: 'Network overview and key metrics',
+      ariaLabel: 'Overview tab - Network overview and key metrics'
+    },
+    { 
+      id: 'dex' as TabType, 
+      label: 'Solana DEX', 
+      description: 'DEX volume, liquidity, and arbitrage',
+      ariaLabel: 'Solana DEX tab - DEX volume, liquidity, and arbitrage opportunities'
+    },
+    { 
+      id: 'cross-chain' as TabType, 
+      label: 'Cross-Chain', 
+      description: 'Bridge flows and migrations',
+      ariaLabel: 'Cross-Chain tab - Bridge flows and asset migrations'
+    },
+    { 
+      id: 'defi-health' as TabType, 
+      label: 'DeFi Health', 
+      description: 'Protocol health and risk monitoring',
+      ariaLabel: 'DeFi Health tab - Protocol health and risk monitoring'
+    },
+    { 
+      id: 'validators' as TabType, 
+      label: 'Validators', 
+      description: 'Validator performance and decentralization',
+      ariaLabel: 'Validators tab - Validator performance and decentralization analytics'
+    },
+  ], []);
 
   // Handle URL tab parameter
   useEffect(() => {
@@ -23,120 +58,50 @@ export default function AnalyticsPage() {
   }, [searchParams]);
 
   // Update URL when tab changes
-  const handleTabChange = (tab: TabType) => {
+  const handleTabChange = useCallback((tab: TabType) => {
     setActiveTab(tab);
     const newUrl = `/analytics?tab=${tab}`;
     router.push(newUrl, { scroll: false });
-  };
+  }, [router]);
 
-  const tabs = [
-    { id: 'overview' as TabType, label: 'Overview', description: 'Network overview and key metrics' },
-    { id: 'dex' as TabType, label: 'Solana DEX', description: 'DEX volume, liquidity, and arbitrage' },
-    { id: 'cross-chain' as TabType, label: 'Cross-Chain', description: 'Bridge flows and migrations' },
-    { id: 'defi-health' as TabType, label: 'DeFi Health', description: 'Protocol health and risk monitoring' },
-    { id: 'validators' as TabType, label: 'Validators', description: 'Validator performance and decentralization' },
-  ];
+  // Handle keyboard navigation for tabs
+  const handleTabKeyDown = useCallback((event: React.KeyboardEvent, tab: TabType) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      handleTabChange(tab);
+    }
+  }, [handleTabChange]);
+
+  // Memoized overview data to avoid recalculation
+  const overviewData = useMemo(() => ({
+    networkMetrics: [
+      { label: 'TPS', value: '~2,500' },
+      { label: 'Validators', value: '1,500+' },
+      { label: 'Total Supply', value: '580M SOL' },
+    ],
+    defiMetrics: [
+      { label: 'Total TVL', value: '$2.1B' },
+      { label: 'Active Protocols', value: '50+' },
+      { label: '24h Volume', value: '$450M' },
+    ],
+    crossChainMetrics: [
+      { label: 'Active Bridges', value: '5' },
+      { label: '24h Volume', value: '$85M' },
+      { label: 'Top Asset', value: 'USDC' },
+    ],
+  }), []);
 
   const renderTabContent = () => {
     switch (activeTab) {
       case 'overview':
         return (
           <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="bg-background border p-6 rounded-lg shadow">
-                <h3 className="text-lg font-semibold mb-2">Network Performance</h3>
-                <p className="text-muted-foreground mb-4">Real-time Solana network metrics</p>
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span>TPS:</span>
-                    <span className="font-medium">~2,500</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Validators:</span>
-                    <span className="font-medium">1,500+</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Total Supply:</span>
-                    <span className="font-medium">580M SOL</span>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="bg-background border p-6 rounded-lg shadow">
-                <h3 className="text-lg font-semibold mb-2">DeFi Ecosystem</h3>
-                <p className="text-muted-foreground mb-4">Total Value Locked across protocols</p>
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span>Total TVL:</span>
-                    <span className="font-medium">$2.1B</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Active Protocols:</span>
-                    <span className="font-medium">50+</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>24h Volume:</span>
-                    <span className="font-medium">$450M</span>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="bg-background border p-6 rounded-lg shadow">
-                <h3 className="text-lg font-semibold mb-2">Cross-Chain Activity</h3>
-                <p className="text-muted-foreground mb-4">Bridge flows and asset migrations</p>
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span>Active Bridges:</span>
-                    <span className="font-medium">5</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>24h Volume:</span>
-                    <span className="font-medium">$85M</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Top Asset:</span>
-                    <span className="font-medium">USDC</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <div className="bg-background border p-6 rounded-lg shadow">
-              <h3 className="text-lg font-semibold mb-4">Quick Actions</h3>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <button
-                  onClick={() => handleTabChange('dex')}
-                  className="p-4 text-left bg-primary/10 hover:bg-primary/20 rounded-lg transition-colors"
-                >
-                  <h4 className="font-medium text-primary">Explore DEX Analytics</h4>
-                  <p className="text-sm text-muted-foreground">View live DEX data and arbitrage opportunities</p>
-                </button>
-                
-                <button
-                  onClick={() => handleTabChange('cross-chain')}
-                  className="p-4 text-left bg-secondary/50 hover:bg-secondary/70 rounded-lg transition-colors"
-                >
-                  <h4 className="font-medium text-secondary-foreground">Cross-Chain Flows</h4>
-                  <p className="text-sm text-muted-foreground">Monitor bridge activity and migrations</p>
-                </button>
-                
-                <button
-                  onClick={() => handleTabChange('defi-health')}
-                  className="p-4 text-left bg-accent/20 hover:bg-accent/30 rounded-lg transition-colors"
-                >
-                  <h4 className="font-medium text-accent-foreground">DeFi Health Monitor</h4>
-                  <p className="text-sm text-muted-foreground">Track protocol health and risks</p>
-                </button>
-                
-                <button
-                  onClick={() => handleTabChange('validators')}
-                  className="p-4 text-left bg-muted hover:bg-muted/80 rounded-lg transition-colors"
-                >
-                  <h4 className="font-medium text-foreground">Validator Analytics</h4>
-                  <p className="text-sm text-muted-foreground">Analyze validator performance and stake</p>
-                </button>
-              </div>
-            </div>
+            <OverviewMetrics
+              networkMetrics={overviewData.networkMetrics}
+              defiMetrics={overviewData.defiMetrics}
+              crossChainMetrics={overviewData.crossChainMetrics}
+            />
+            <QuickActions onNavigate={handleTabChange} />
           </div>
         );
       
@@ -161,31 +126,37 @@ export default function AnalyticsPage() {
     <div className="container mx-auto py-8">
       <div className="mb-8">
         <h1 className="text-4xl font-bold mb-2">Solana Ecosystem Analytics</h1>
-        <p className="text-muted-foreground">&nbsp;
+        <p className="text-muted-foreground">
           Comprehensive analytics for DEXes, cross-chain flows, DeFi protocols, and validator performance.
         </p>
       </div>
 
-      {/* Tab Navigation */}
+      {/* Tab Navigation with proper ARIA roles and keyboard support */}
       <div className="mb-8">
         <div className="border-b border-gray-200">
-          <nav className="-mb-px flex space-x-8">
+          <nav 
+            className="-mb-px flex space-x-8" 
+            role="tablist" 
+            aria-label="Analytics navigation tabs"
+          >
             {tabs.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => handleTabChange(tab.id)}
-                className={`py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${
+                onKeyDown={(event) => handleTabKeyDown(event, tab.id)}
+                className={`py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
                   activeTab === tab.id
                     ? 'border-primary text-primary'
                     : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
-                } ${tab.comingSoon ? 'opacity-60' : ''}`}
-                disabled={tab.comingSoon}
+                }`}
+                role="tab"
+                aria-selected={activeTab === tab.id}
+                aria-controls={`tabpanel-${tab.id}`}
+                aria-label={tab.ariaLabel}
+                tabIndex={activeTab === tab.id ? 0 : -1}
               >
                 <div className="flex flex-col items-center">
                   <span>{tab.label}</span>
-                  {tab.comingSoon && (
-                    <span className="text-xs text-gray-400 mt-1">Coming Soon</span>
-                  )}
                 </div>
               </button>
             ))}
@@ -193,8 +164,14 @@ export default function AnalyticsPage() {
         </div>
       </div>
 
-      {/* Tab Content */}
-      <div className="min-h-[600px]">
+      {/* Tab Content with proper ARIA labeling */}
+      <div 
+        className="min-h-[600px]"
+        role="tabpanel"
+        id={`tabpanel-${activeTab}`}
+        aria-labelledby={`tab-${activeTab}`}
+        tabIndex={0}
+      >
         {renderTabContent()}
       </div>
     </div>

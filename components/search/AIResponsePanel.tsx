@@ -54,12 +54,6 @@ const AIResponsePanel: React.FC<AIResponsePanelProps> = ({ query, onClose }) => 
     console.log(`User gave ${type === 'up' ? 'positive' : 'negative'} feedback for query: ${query}`);
   }, [query]);
 
-  // Function to refresh the AI response
-  const refreshResponse = useCallback(() => {
-    setIsRefreshing(true);
-    generateAIResponse(query);
-  }, [query, generateAIResponse]);
-
   // Main function to generate AI response
   const generateAIResponse = useCallback(async (searchQuery: string) => {
     if (!searchQuery) return;
@@ -125,6 +119,12 @@ const AIResponsePanel: React.FC<AIResponsePanelProps> = ({ query, onClose }) => 
       setIsRefreshing(false);
     }
   }, []);
+
+  // Function to refresh the AI response
+  const refreshResponse = useCallback(() => {
+    setIsRefreshing(true);
+    generateAIResponse(query);
+  }, [query, generateAIResponse]);
   
   // Initialize AI response when query changes
   useEffect(() => {

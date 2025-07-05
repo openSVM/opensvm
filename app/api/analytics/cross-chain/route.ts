@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { CROSS_CHAIN_CONSTANTS } from '@/lib/constants/analytics-constants';
 
 // Real Cross-Chain Analytics API using external bridge data sources
 interface BridgeData {
@@ -7,6 +8,58 @@ interface BridgeData {
   volumeChange: number;
   totalVolume: number;
   supportedChains: string[];
+}
+
+// Weighted distribution algorithm for cross-chain flows
+function calculateWeightedFlowDistribution(bridgeVolume: number, sourceChain: string, targetChain: string): number {
+  const weights = CROSS_CHAIN_CONSTANTS.CHAIN_WEIGHTS;
+  const sourceWeight = weights[sourceChain.toLowerCase() as keyof typeof weights] || 0.05;
+  const targetWeight = weights[targetChain.toLowerCase() as keyof typeof weights] || 0.05;
+  
+  // Flow volume based on chain weights and bridge TVL
+  const flowMultiplier = Math.sqrt(sourceWeight * targetWeight);
+  
+  // Additional factors based on chain characteristics
+  const ethereumBonus = (sourceChain === 'Ethereum' || targetChain === 'Ethereum') ? 1.5 : 1;
+  const solanaBonus = (sourceChain === 'Solana' || targetChain === 'Solana') ? 1.2 : 1;
+  
+  return bridgeVolume * flowMultiplier * ethereumBonus * solanaBonus;
+}
+
+// Get bridge fee for specific protocol
+function getBridgeFee(bridgeName: string, volume: number): number {
+  const bridgeKey = bridgeName.toLowerCase();
+  const fees = CROSS_CHAIN_CONSTANTS.BRIDGE_FEES;
+  
+  let feeBasisPoints = 0;
+  if (bridgeKey.includes('wormhole')) feeBasisPoints = fees.WORMHOLE_FEE_BP;
+  else if (bridgeKey.includes('portal')) feeBasisPoints = fees.PORTAL_FEE_BP;
+  else if (bridgeKey.includes('allbridge')) feeBasisPoints = fees.ALLBRIDGE_FEE_BP;
+  else if (bridgeKey.includes('multichain')) feeBasisPoints = fees.MULTICHAIN_FEE_BP;
+  else if (bridgeKey.includes('satellite')) feeBasisPoints = fees.SATELLITE_FEE_BP;
+  else feeBasisPoints = 50; // Default 0.5% fee
+  
+  return volume * (feeBasisPoints / 10000);
+}
+
+// Determine primary asset for chain pair
+function getPrimaryAsset(sourceChain: string, targetChain: string): string {
+  // Asset preference based on chain ecosystem
+  const assetPreference: Record<string, string> = {
+    'ethereum': 'USDC',
+    'polygon': 'USDT', 
+    'avalanche': 'USDC',
+    'bsc': 'BUSD',
+    'arbitrum': 'USDC',
+    'optimism': 'USDC',
+    'solana': 'SOL'
+  };
+  
+  // If bridging from Solana, use SOL; otherwise use target chain's primary
+  if (sourceChain.toLowerCase() === 'solana') return 'SOL';
+  if (targetChain.toLowerCase() === 'solana') return assetPreference[sourceChain.toLowerCase()] || 'USDC';
+  
+  return assetPreference[targetChain.toLowerCase()] || 'USDC';
 }
 
 // Fetch real bridge data from DeFiLlama
@@ -66,11 +119,11 @@ export async function GET(request: NextRequest) {
     const bridgeData = await fetchBridgeData();
     const crossChainVolume = await fetchCrossChainVolume();
     
-    // Generate flows data from real bridge information
+    // Generate flows data from real bridge information with weighted distribution
     const flowsData: any[] = [];
     
     for (const bridge of bridgeData) {
-      // Create flows between supported chains
+      // Create flows between supported chains using weighted algorithm
       for (let i = 0; i < bridge.supportedChains.length; i++) {
         for (let j = 0; j < bridge.supportedChains.length; j++) {
           if (i !== j) {
@@ -79,21 +132,32 @@ export async function GET(request: NextRequest) {
             
             // Only include flows involving Solana
             if (sourceChain === 'Solana' || targetChain === 'Solana') {
-              // Estimate directional flow based on volume
-              const flowVolume = bridge.volume24h / (bridge.supportedChains.length - 1);
+              // Calculate weighted flow volume using improved algorithm
+              const flowVolume = calculateWeightedFlowDistribution(
+                bridge.volume24h, 
+                sourceChain, 
+                targetChain
+              );
+              
+              const primaryAsset = getPrimaryAsset(sourceChain, targetChain);
+              const bridgeFees = getBridgeFee(bridge.name, flowVolume);
+              
+              // Estimate transaction metrics based on asset type and chains
+              const avgTxSize = primaryAsset === 'SOL' ? 15000 : 
+                               primaryAsset === 'USDC' ? 8000 : 12000;
+              const txCount = Math.max(Math.floor(flowVolume / avgTxSize), 1);
               
               flowsData.push({
                 bridgeProtocol: bridge.name,
                 sourceChain,
                 targetChain,
-                asset: sourceChain === 'Ethereum' ? 'USDC' : 
-                       sourceChain === 'Polygon' ? 'USDT' : 
-                       sourceChain === 'BSC' ? 'BUSD' : 'SOL',
+                asset: primaryAsset,
                 volume24h: flowVolume,
                 volumeChange: bridge.volumeChange / 100, // Convert to decimal
-                avgTransactionSize: flowVolume / Math.max(Math.floor(flowVolume / 25000), 1),
-                transactionCount: Math.floor(flowVolume / 25000),
-                bridgeFees: flowVolume * 0.001, // 0.1% estimated fees
+                avgTransactionSize: avgTxSize,
+                transactionCount: txCount,
+                bridgeFees: bridgeFees,
+                feePercentage: (bridgeFees / flowVolume) * 100,
                 timestamp: Date.now()
               });
             }
