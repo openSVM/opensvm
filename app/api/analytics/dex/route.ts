@@ -150,6 +150,7 @@ export async function GET(request: NextRequest) {
       .map((v, index) => ({
         rank: index + 1,
         dex: v.dex,
+        totalVolume: v.volume24h, // Match the interface expectation
         volume24h: v.volume24h,
         volumeChange: v.volumeChange,
         tvl: liquidityData.find(l => l.dex === v.dex)?.tvl || 0,

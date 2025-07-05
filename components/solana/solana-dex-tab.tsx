@@ -105,14 +105,16 @@ export function SolanaDEXTab() {
     return () => clearInterval(interval);
   }, []);
 
-  const formatCurrency = (value: number) => {
+  const formatCurrency = (value: number | undefined | null) => {
+    if (value == null || isNaN(value)) return '$0.00';
     if (value >= 1e9) return `$${(value / 1e9).toFixed(2)}B`;
     if (value >= 1e6) return `$${(value / 1e6).toFixed(2)}M`;
     if (value >= 1e3) return `$${(value / 1e3).toFixed(2)}K`;
     return `$${value.toFixed(2)}`;
   };
 
-  const formatPercent = (value: number) => {
+  const formatPercent = (value: number | undefined | null) => {
+    if (value == null || isNaN(value)) return '0.00%';
     const formatted = (value * 100).toFixed(2);
     return value >= 0 ? `+${formatted}%` : `${formatted}%`;
   };
@@ -298,10 +300,10 @@ export function SolanaDEXTab() {
                           <div className="w-16 bg-muted rounded-full h-2">
                             <div
                               className="bg-primary h-2 rounded-full"
-                              style={{ width: `${ranking.marketShare * 100}%` }}
+                              style={{ width: `${(ranking.marketShare || 0) * 100}%` }}
                             />
                           </div>
-                          {(ranking.marketShare * 100).toFixed(1)}%
+                          {((ranking.marketShare || 0) * 100).toFixed(1)}%
                         </div>
                       </td>
                       <td className="py-3">
@@ -357,7 +359,9 @@ export function SolanaDEXTab() {
               </thead>
               <tbody>
                 {data.liquidity.slice(0, 10).map((pool, index) => {
-                  const apr = (pool.fees24h * 365) / pool.tvl * 100;
+                  const apr = (pool.fees24h && pool.tvl && pool.tvl > 0) 
+                    ? (pool.fees24h * 365) / pool.tvl * 100 
+                    : 0;
                   return (
                     <tr key={`${pool.dex}-${pool.poolAddress}-${index}`} className="border-b border-border">
                       <td className="py-3">
