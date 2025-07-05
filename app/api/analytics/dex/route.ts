@@ -213,7 +213,7 @@ async function fetchJupiterData(): Promise<DexMetrics | null> {
     const data = await response.json();
     
     return {
-      name: 'Jupiter',
+      name: 'jupiter',
       volume24h: data.total_volume || 0,
       tvl: data.market_cap || 0,
       volumeChange: data.price_change_percentage_24h || 0,
@@ -233,7 +233,7 @@ async function fetchRaydiumData(): Promise<DexMetrics | null> {
     const data = await response.json();
     
     return {
-      name: 'Raydium',
+      name: 'raydium',
       volume24h: parseFloat(data.totalvolume || '0'),
       tvl: parseFloat(data.tvl || '0'),
       volumeChange: 0, // Would need historical data
@@ -245,6 +245,30 @@ async function fetchRaydiumData(): Promise<DexMetrics | null> {
   }
 }
 
+// Standardize DEX names to lowercase single words
+function standardizeDexName(name: string): string {
+  const nameMap: Record<string, string> = {
+    'jupiter': 'jupiter',
+    'raydium': 'raydium',
+    'orca': 'orca',
+    'serum': 'serum',
+    'phoenix': 'phoenix',
+    'meteora': 'meteora',
+    'lifinity': 'lifinity',
+    'aldrin': 'aldrin',
+    'mango markets': 'mango',
+    'mango': 'mango',
+    'mercurial': 'mercurial',
+    'cropper': 'cropper',
+    'saber': 'saber',
+    'tulip': 'tulip',
+    'step': 'step'
+  };
+  
+  const lowerName = name.toLowerCase().trim();
+  return nameMap[lowerName] || lowerName.split(' ')[0].toLowerCase();
+}
+
 // Fetch real data from DeFiLlama for multiple DEXes
 async function fetchDeFiLlamaData(): Promise<DexMetrics[]> {
   try {
@@ -253,7 +277,7 @@ async function fetchDeFiLlamaData(): Promise<DexMetrics[]> {
     const data = await response.json();
     
     return data.protocols?.map((protocol: any) => ({
-      name: protocol.name,
+      name: standardizeDexName(protocol.name),
       volume24h: protocol.total24h || 0,
       tvl: protocol.tvl || 0,
       volumeChange: protocol.change_1d || 0,
@@ -312,11 +336,14 @@ export async function GET(request: NextRequest) {
     
     // Add some additional estimated data for DEXes not in DeFiLlama
     const additionalDexes: DexMetrics[] = [
-      { name: 'Aldrin', volume24h: 2500000, tvl: 15000000, volumeChange: -12.5, marketShare: 0 },
-      { name: 'Serum', volume24h: 8500000, tvl: 45000000, volumeChange: 5.2, marketShare: 0 },
-      { name: 'Mango Markets', volume24h: 3200000, tvl: 25000000, volumeChange: -8.1, marketShare: 0 },
-      { name: 'Mercurial', volume24h: 1800000, tvl: 12000000, volumeChange: 15.3, marketShare: 0 },
-      { name: 'Cropper', volume24h: 950000, tvl: 8500000, volumeChange: -22.7, marketShare: 0 }
+      { name: 'aldrin', volume24h: 2500000, tvl: 15000000, volumeChange: -12.5, marketShare: 0 },
+      { name: 'serum', volume24h: 8500000, tvl: 45000000, volumeChange: 5.2, marketShare: 0 },
+      { name: 'mango', volume24h: 3200000, tvl: 25000000, volumeChange: -8.1, marketShare: 0 },
+      { name: 'mercurial', volume24h: 1800000, tvl: 12000000, volumeChange: 15.3, marketShare: 0 },
+      { name: 'cropper', volume24h: 950000, tvl: 8500000, volumeChange: -22.7, marketShare: 0 },
+      { name: 'lifinity', volume24h: 1200000, tvl: 9500000, volumeChange: 8.7, marketShare: 0 },
+      { name: 'meteora', volume24h: 3800000, tvl: 18000000, volumeChange: 12.3, marketShare: 0 },
+      { name: 'phoenix', volume24h: 2100000, tvl: 11000000, volumeChange: -5.8, marketShare: 0 }
     ];
     
     const allMetrics = [...defiLlamaData, ...additionalDexes];
@@ -324,24 +351,27 @@ export async function GET(request: NextRequest) {
     // Remove duplicates and ensure reasonable data distribution
     const mergedMetrics = new Map<string, DexMetrics>();
     allMetrics.forEach(metric => {
-      const existing = mergedMetrics.get(metric.name);
+      const standardizedName = standardizeDexName(metric.name);
+      const existing = mergedMetrics.get(standardizedName);
       if (existing) {
         // For duplicates, use the one with more reasonable volume (under 10B)
         if (metric.volume24h < 10000000000 && existing.volume24h >= 10000000000) {
-          mergedMetrics.set(metric.name, metric);
+          mergedMetrics.set(standardizedName, { ...metric, name: standardizedName });
         } else if (existing.volume24h < 10000000000 && metric.volume24h >= 10000000000) {
           // Keep existing
         } else if (metric.volume24h > existing.volume24h) {
-          mergedMetrics.set(metric.name, {
+          mergedMetrics.set(standardizedName, {
             ...existing,
             ...metric,
+            name: standardizedName,
             tvl: Math.max(existing.tvl, metric.tvl)
           });
         }
       } else {
         // Cap volume at 10B to prevent single DEX dominance
-        mergedMetrics.set(metric.name, {
+        mergedMetrics.set(standardizedName, {
           ...metric,
+          name: standardizedName,
           volume24h: Math.min(metric.volume24h, 10000000000)
         });
       }
