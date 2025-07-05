@@ -180,39 +180,24 @@ export async function GET(
     // Fetch signatures with proper pagination
     console.log(`Fetching signatures for ${address} (offset: ${offset}, limit: ${limit})`);
     
-    // Create a unique identifier for the "before" signature if offset > 0
-    let beforeSignature = undefined;
-    if (offset > 0) {
-      try {
-        // Try to get the signature at the previous page boundary
-        const prevPageSignature = await connection.getSignaturesForAddress(
-          pubkey,
-          { limit: 1, until: undefined, before: undefined }
-        );
-        
-        // If we found a valid signature and offset is greater than 0, use it as the "before" parameter
-        if (prevPageSignature.length > 0 && offset > 0) {
-          beforeSignature = prevPageSignature[0].signature;
-          console.log(`Using pagination signature: ${beforeSignature.substring(0, 10)}...`);
-        }
-      } catch (paginationError) {
-        console.warn('Failed to get pagination signature:', paginationError);
-        // Continue without pagination if this fails
-      }
-    }
+    // For proper pagination, we need to track the last signature from the previous page
+    // The offset-based pagination requires getting a beforeSignature from URL params
+    // since Solana doesn't support direct offset pagination
+    const beforeSignature = searchParams.get('beforeSignature');
     
     const signatures = await connection.getSignaturesForAddress(
       pubkey,
       {
         limit,
-        before: beforeSignature
+        before: beforeSignature || undefined
       }
     );
 
     if (signatures.length === 0) {
       return NextResponse.json({
         data: [],
-        hasMore: false
+        hasMore: false,
+        nextPageSignature: null
       }, { headers: corsHeaders });
     }
 
@@ -242,11 +227,15 @@ export async function GET(
 
     console.log(`Filtered to top ${filteredAndSortedTransfers.length} transfers by volume`);
 
+    // Get the last signature for pagination
+    const nextPageSignature = signatures.length > 0 ? signatures[signatures.length - 1].signature : null;
+
     return NextResponse.json({
       data: filteredAndSortedTransfers,
       hasMore: signatures.length === limit,
       total: filteredAndSortedTransfers.length,
-      originalTotal: transfers.length
+      originalTotal: transfers.length,
+      nextPageSignature
     }, { headers: corsHeaders });
 
   } catch (error) {

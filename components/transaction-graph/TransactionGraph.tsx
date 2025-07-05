@@ -22,7 +22,9 @@ import {
   processAccountFetchQueue as processAccountFetchQueueUtil,
   addAccountToGraph as addAccountToGraphUtil,
   expandTransactionGraph as expandTransactionGraphUtil,
-  focusOnTransaction as focusOnTransactionUtil
+  focusOnTransaction as focusOnTransactionUtil,
+  debugLog,
+  errorLog
 } from './';
 
 // Register the dagre layout extension
@@ -107,12 +109,12 @@ function TransactionGraph({
   
   // Debug GPU graph data changes
   useEffect(() => {
-    console.log(`🔄 [GPU_STATE] GPU graph data changed: ${gpuGraphData.nodes.length} nodes, ${gpuGraphData.links.length} links`);
+    debugLog(`🔄 [GPU_STATE] GPU graph data changed: ${gpuGraphData.nodes.length} nodes, ${gpuGraphData.links.length} links`);
     gpuGraphData.nodes.forEach(node => {
-      console.log(`🔄 [GPU_STATE] Node: ${node.id} (${node.type})`);
+      debugLog(`🔄 [GPU_STATE] Node: ${node.id} (${node.type})`);
     });
     gpuGraphData.links.forEach(link => {
-      console.log(`🔄 [GPU_STATE] Link: ${link.source} -> ${link.target}`);
+      debugLog(`🔄 [GPU_STATE] Link: ${link.source} -> ${link.target}`);
     });
   }, [gpuGraphData]);
   
@@ -750,14 +752,14 @@ function TransactionGraph({
 
   // Queue an account for fetching
   const queueAccountFetch = useCallback((address: string, depth = 0, parentSignature: string | null = null) => {
-    console.log(`📝 [QUEUE] Attempting to queue account: ${address}, depth: ${depth}, parent: ${parentSignature}`);
+    debugLog(`📝 [QUEUE] Attempting to queue account: ${address}, depth: ${depth}, parent: ${parentSignature}`);
     
     if (!address || loadedAccountsRef.current.has(address) || pendingFetchesRef.current.has(`${address}:${depth}`)) {
-      console.log(`⏭️ [QUEUE] Skipping ${address}: already loaded or pending`);
+      debugLog(`⏭️ [QUEUE] Skipping ${address}: already loaded or pending`);
       return;
     }
     
-    console.log(`✅ [QUEUE] Queuing account ${address} for processing`);
+    debugLog(`✅ [QUEUE] Queuing account ${address} for processing`);
     queueAccountFetchUtil(
       address,
       depth,
@@ -770,7 +772,7 @@ function TransactionGraph({
       isProcessingQueueRef
     );
     
-    console.log(`📊 [QUEUE] Queue status - Length: ${fetchQueueRef.current.length}, Total accounts: ${totalAccounts}`);
+    debugLog(`📊 [QUEUE] Queue status - Length: ${fetchQueueRef.current.length}, Total accounts: ${totalAccounts}`);
   }, [processAccountFetchQueue, totalAccounts]);
 
   // Set the ref to the queueAccountFetch function
