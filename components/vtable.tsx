@@ -1,48 +1,53 @@
 import { useCallback, useEffect, useRef, useState, ReactNode } from 'react';
 import { ListTable } from '@visactor/vtable';
 import * as VTable from '@visactor/vtable';
-import '../app/styles/vtable.css';
 import { useRouter, usePathname } from 'next/navigation';
 import { useTheme } from '@/lib/theme';
 
 type Theme = 'paper' | 'high-contrast' | 'dos-blue' | 'cyberpunk' | 'solarized';
 
+// Track if themes have been registered globally
+let themesRegistered = false;
+
 // Register VTable themes using the proper VTable.register.theme method
 function registerVTableThemes() {
+  if (themesRegistered) return;
+  
+  console.log('Registering VTable themes...');
   // Paper Theme
   VTable.register.theme('opensvm-paper', {
     defaultStyle: {
-      borderLineWidth: 1
+      borderLineWidth: 0
     },
     headerStyle: {
-      bgColor: '#f9fafb',
-      borderColor: '#e5e7eb',
-      fontWeight: 600,
-      color: '#1f2937',
+      bgColor: '#f8fafc',
+      borderColor: '#e2e8f0',
+      fontWeight: 'bold',
+      color: '#1e293b',
       fontSize: 14,
-      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+      fontFamily: 'ui-sans-serif, system-ui, sans-serif'
     },
     rowHeaderStyle: {
-      bgColor: '#f9fafb',
-      borderColor: '#e5e7eb',
+      bgColor: '#f8fafc',
+      borderColor: '#e2e8f0',
       borderLineWidth: 1,
       fontWeight: 'normal',
-      color: '#1f2937'
+      color: '#1e293b'
     },
     cornerHeaderStyle: {
-      bgColor: '#f9fafb',
-      fontWeight: 600,
-      color: '#1f2937'
+      bgColor: '#f8fafc',
+      fontWeight: 'bold',
+      color: '#1e293b'
     },
     bodyStyle: {
-      borderColor: '#e5e7eb',
+      borderColor: '#f1f5f9',
       borderLineWidth: 1,
-      color: '#1f2937',
+      color: '#334155',
       fontSize: 14,
-      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+      fontFamily: 'ui-sans-serif, system-ui, sans-serif',
       bgColor: (args: any) => {
         if (args.row % 2 === 1) {
-          return '#f9fafb';
+          return '#f8fafc';
         }
         return '#ffffff';
       }
@@ -52,39 +57,39 @@ function registerVTableThemes() {
   // High Contrast Theme
   VTable.register.theme('opensvm-high-contrast', {
     defaultStyle: {
-      borderLineWidth: 1
+      borderLineWidth: 0
     },
     headerStyle: {
-      bgColor: '#0a0a0a',
-      borderColor: '#262626',
-      fontWeight: 600,
-      color: '#fafafa',
+      bgColor: '#0f172a',
+      borderColor: '#334155',
+      fontWeight: 'bold',
+      color: '#f1f5f9',
       fontSize: 14,
-      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+      fontFamily: 'ui-sans-serif, system-ui, sans-serif'
     },
     rowHeaderStyle: {
-      bgColor: '#0a0a0a',
-      borderColor: '#262626',
+      bgColor: '#0f172a',
+      borderColor: '#334155',
       borderLineWidth: 1,
       fontWeight: 'normal',
-      color: '#fafafa'
+      color: '#f1f5f9'
     },
     cornerHeaderStyle: {
-      bgColor: '#0a0a0a',
-      fontWeight: 600,
-      color: '#fafafa'
+      bgColor: '#0f172a',
+      fontWeight: 'bold',
+      color: '#f1f5f9'
     },
     bodyStyle: {
-      borderColor: '#262626',
+      borderColor: '#334155',
       borderLineWidth: 1,
-      color: '#fafafa',
+      color: '#e2e8f0',
       fontSize: 14,
-      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+      fontFamily: 'ui-sans-serif, system-ui, sans-serif',
       bgColor: (args: any) => {
         if (args.row % 2 === 1) {
-          return '#171717';
+          return '#1e293b';
         }
-        return '#0a0a0a';
+        return '#0f172a';
       }
     }
   });
@@ -92,39 +97,39 @@ function registerVTableThemes() {
   // DOS Blue Theme
   VTable.register.theme('opensvm-dos-blue', {
     defaultStyle: {
-      borderLineWidth: 1
+      borderLineWidth: 0
     },
     headerStyle: {
-      bgColor: '#000066',
-      borderColor: '#0000cc',
-      fontWeight: 600,
-      color: '#ffffe6',
+      bgColor: '#000080',
+      borderColor: '#0000ff',
+      fontWeight: 'bold',
+      color: '#ffff00',
       fontSize: 14,
-      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+      fontFamily: 'ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Consolas, "DejaVu Sans Mono", monospace'
     },
     rowHeaderStyle: {
-      bgColor: '#000066',
-      borderColor: '#0000cc',
+      bgColor: '#000080',
+      borderColor: '#0000ff',
       borderLineWidth: 1,
       fontWeight: 'normal',
-      color: '#ffffe6'
+      color: '#ffff00'
     },
     cornerHeaderStyle: {
-      bgColor: '#000066',
-      fontWeight: 600,
-      color: '#ffffe6'
+      bgColor: '#000080',
+      fontWeight: 'bold',
+      color: '#ffff00'
     },
     bodyStyle: {
-      borderColor: '#0000cc',
+      borderColor: '#0000ff',
       borderLineWidth: 1,
-      color: '#ffffe6',
+      color: '#ffffff',
       fontSize: 14,
-      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+      fontFamily: 'ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Consolas, "DejaVu Sans Mono", monospace',
       bgColor: (args: any) => {
         if (args.row % 2 === 1) {
-          return '#000099';
+          return '#000060';
         }
-        return '#000066';
+        return '#000080';
       }
     }
   });
@@ -132,39 +137,39 @@ function registerVTableThemes() {
   // Cyberpunk Theme
   VTable.register.theme('opensvm-cyberpunk', {
     defaultStyle: {
-      borderLineWidth: 1
+      borderLineWidth: 0
     },
     headerStyle: {
-      bgColor: '#330033',
-      borderColor: '#660066',
-      fontWeight: 600,
-      color: '#ff66ff',
+      bgColor: '#1a0033',
+      borderColor: '#ff00ff',
+      fontWeight: 'bold',
+      color: '#00ffff',
       fontSize: 14,
-      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+      fontFamily: 'ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Consolas, "DejaVu Sans Mono", monospace'
     },
     rowHeaderStyle: {
-      bgColor: '#330033',
-      borderColor: '#660066',
+      bgColor: '#1a0033',
+      borderColor: '#ff00ff',
       borderLineWidth: 1,
       fontWeight: 'normal',
-      color: '#ff66ff'
+      color: '#00ffff'
     },
     cornerHeaderStyle: {
-      bgColor: '#330033',
-      fontWeight: 600,
-      color: '#ff66ff'
+      bgColor: '#1a0033',
+      fontWeight: 'bold',
+      color: '#00ffff'
     },
     bodyStyle: {
-      borderColor: '#660066',
+      borderColor: '#ff00ff',
       borderLineWidth: 1,
       color: '#ff66ff',
       fontSize: 14,
-      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+      fontFamily: 'ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Consolas, "DejaVu Sans Mono", monospace',
       bgColor: (args: any) => {
         if (args.row % 2 === 1) {
-          return '#4d0040';
+          return '#330066';
         }
-        return '#330033';
+        return '#1a0033';
       }
     }
   });
@@ -172,34 +177,34 @@ function registerVTableThemes() {
   // Solarized Theme
   VTable.register.theme('opensvm-solarized', {
     defaultStyle: {
-      borderLineWidth: 1
+      borderLineWidth: 0
     },
     headerStyle: {
       bgColor: '#002b36',
-      borderColor: '#073642',
-      fontWeight: 600,
-      color: '#839496',
+      borderColor: '#586e75',
+      fontWeight: 'bold',
+      color: '#93a1a1',
       fontSize: 14,
-      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+      fontFamily: 'ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Consolas, "DejaVu Sans Mono", monospace'
     },
     rowHeaderStyle: {
       bgColor: '#002b36',
-      borderColor: '#073642',
+      borderColor: '#586e75',
       borderLineWidth: 1,
       fontWeight: 'normal',
-      color: '#839496'
+      color: '#93a1a1'
     },
     cornerHeaderStyle: {
       bgColor: '#002b36',
-      fontWeight: 600,
-      color: '#839496'
+      fontWeight: 'bold',
+      color: '#93a1a1'
     },
     bodyStyle: {
-      borderColor: '#073642',
+      borderColor: '#586e75',
       borderLineWidth: 1,
       color: '#839496',
       fontSize: 14,
-      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+      fontFamily: 'ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Consolas, "DejaVu Sans Mono", monospace',
       bgColor: (args: any) => {
         if (args.row % 2 === 1) {
           return '#073642';
@@ -208,6 +213,9 @@ function registerVTableThemes() {
       }
     }
   });
+
+  themesRegistered = true;
+  console.log('VTable themes registered successfully');
 }
 
 // Get the registered theme name for a given OpenSVM theme
@@ -257,7 +265,6 @@ export function VTableWrapper({
   const containerRef = useRef<HTMLDivElement>(null);
   const tableRef = useRef<any>(null);
   const [mounted, setMounted] = useState(false);
-  const [themesRegistered, setThemesRegistered] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
   const { theme } = useTheme();
@@ -277,18 +284,15 @@ export function VTableWrapper({
     }
   }, [onRowSelect, rowKey]);
 
-  // Register themes once on mount
+  // Register themes once globally
   useEffect(() => {
-    if (!themesRegistered) {
-      registerVTableThemes();
-      setThemesRegistered(true);
-    }
+    registerVTableThemes();
     setMounted(true);
     return () => setMounted(false);
-  }, [themesRegistered]);
+  }, []);
 
   useEffect(() => {
-    if (!mounted || !themesRegistered || !containerRef.current || !data.length) { return; }
+    if (!mounted || !containerRef.current || !data.length) { return; }
 
     const initTable = () => {
       if (!containerRef.current) { return; }
@@ -323,6 +327,8 @@ export function VTableWrapper({
 
           // Get the registered theme name for current theme
           const vtableThemeName = getVTableThemeName(theme);
+          
+          console.log('Creating VTable with theme:', vtableThemeName, 'for OpenSVM theme:', theme);
           
           // Create table configuration with registered theme
           const tableConfig = {
@@ -444,7 +450,7 @@ export function VTableWrapper({
           const table = new ListTable(tableConfig);
 
           // Log theme application for debugging
-          console.log('Applied VTable theme:', vtableThemeName, 'for OpenSVM theme:', theme);
+          console.log('VTable created successfully with theme:', vtableThemeName, 'Table instance:', table);
 
           if (onLoadMore) {
             (table as any).on('scroll', (args: any) => {
@@ -508,7 +514,7 @@ export function VTableWrapper({
         }
       }
     };
-  }, [columns, data, mounted, themesRegistered, onLoadMore, onSort, handleNavigation, selectedRowId, pinnedRowIds, rowKey, onRowSelect, handleRowClick, theme]);
+  }, [columns, data, mounted, onLoadMore, onSort, handleNavigation, selectedRowId, pinnedRowIds, rowKey, onRowSelect, handleRowClick, theme]);
 
   if (error) {
     return (
@@ -548,7 +554,7 @@ export function VTableWrapper({
   };
 
   return (
-    <div className={`vtable-container relative theme-${theme}`} style={{ height: '100%' }} key={`vtable-${theme}`}>
+    <div className="vtable-container relative" style={{ height: '100%' }} key={`vtable-${theme}`}>
       <div 
         className="vtable" 
         ref={containerRef} 

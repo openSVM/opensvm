@@ -1,4 +1,4 @@
-/* VTable Styles */
+/* VTable Container Styles - Only for positioning, not styling the table itself */
 .vtable-container {
   position: relative;
   width: 100%;
@@ -13,70 +13,6 @@
   height: 100%;
   cursor: pointer;
   position: relative;
-}
-
-/* Base table styles */
-.vtable .vc-table {
-  width: 100%;
-  height: 100%;
-  border-collapse: collapse;
-  background: transparent;
-}
-
-/* Header styling */
-.vtable .vc-table-header {
-  position: sticky;
-  top: 0;
-  z-index: 2;
-  background-color: var(--background);
-}
-
-.vtable .vc-table-header-cell {
-  padding: 12px 16px;
-  font-weight: 600;
-  text-align: left;
-  border-bottom: 1px solid var(--border);
-  background-color: var(--muted);
-  color: var(--foreground);
-  transition: background-color 0.2s ease;
-}
-
-/* Cell styling */
-.vtable .vc-table-cell {
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--border);
-  color: var(--foreground);
-  transition: background-color 0.2s ease;
-}
-
-.vtable-cell {
-  display: flex;
-  align-items: center;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  min-height: 24px;
-  line-height: 1.5;
-}
-
-/* Row styling */
-.vtable .vc-table-row {
-  transition: background-color 0.2s ease;
-}
-
-.vtable .vc-table-row:hover {
-  background-color: var(--muted);
-}
-
-/* Hover and selected row styling */
-.vtable-row-selected {
-  background-color: hsl(var(--primary) / 0.1) !important;
-  border-color: hsl(var(--primary) / 0.4);
-}
-
-.vtable-row-pinned {
-  background-color: hsl(var(--warning) / 0.1) !important;
-  border-color: hsl(var(--warning) / 0.4);
 }
 
 /* Floating pin button */
@@ -100,22 +36,24 @@
   }
 }
 
-/* Link styling within cells */
-.vtable a, .vtable [data-href] {
-  color: hsl(var(--primary));
-  text-decoration: none;
-  transition: color 0.2s ease-in-out;
-}
-
-.vtable a:hover, .vtable [data-href]:hover {
-  color: hsl(var(--primary) / 0.8);
-  text-decoration: underline;
-}
-
 /* Loading state */
 .vtable-loading {
-  opacity: 0.6;
-  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  color: var(--muted-foreground);
+  font-size: 0.9em;
+}
+
+/* Error state */
+.vtable-error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  color: var(--destructive);
+  font-size: 0.9em;
 }
 
 /* Empty state */
@@ -126,108 +64,4 @@
   height: 200px;
   color: var(--muted-foreground);
   font-size: 0.9em;
-}
-
-/* Theme-specific customizations */
-
-/* Paper Theme */
-.theme-paper .vtable .vc-table-header-cell {
-  background-color: hsl(210 40% 98%);
-  border-bottom: 1px solid hsl(214.3 31.8% 91.4%);
-}
-
-.theme-paper .vtable .vc-table-cell {
-  border-bottom: 1px solid hsl(214.3 31.8% 91.4%);
-}
-
-.theme-paper .vtable .vc-table-row:hover {
-  background-color: hsl(210 40% 98%);
-}
-
-/* High Contrast Theme */
-.theme-high-contrast .vtable .vc-table-header-cell {
-  background-color: hsl(0 0% 3.9%);
-  border-bottom: 1px solid hsl(215 27.9% 16.9%);
-  color: hsl(0 0% 98%);
-}
-
-.theme-high-contrast .vtable .vc-table-cell {
-  border-bottom: 1px solid hsl(215 27.9% 16.9%);
-  color: hsl(0 0% 98%);
-}
-
-.theme-high-contrast .vtable .vc-table-row:hover {
-  background-color: hsl(215 27.9% 16.9%);
-}
-
-/* DOS Blue Theme */
-.theme-dos-blue .vtable .vc-table-header-cell {
-  background-color: hsl(240 100% 20%);
-  border-bottom: 1px solid hsl(240 100% 30%);
-  color: hsl(60 100% 90%);
-}
-
-.theme-dos-blue .vtable .vc-table-cell {
-  border-bottom: 1px solid hsl(240 100% 30%);
-  color: hsl(60 100% 90%);
-}
-
-.theme-dos-blue .vtable .vc-table-row:hover {
-  background-color: hsl(240 100% 25%);
-}
-
-.theme-dos-blue .vtable a, .theme-dos-blue .vtable [data-href] {
-  color: hsl(60 100% 70%);
-}
-
-.theme-dos-blue .vtable a:hover, .theme-dos-blue .vtable [data-href]:hover {
-  color: hsl(60 100% 90%);
-}
-
-/* Cyberpunk Theme */
-.theme-cyberpunk .vtable .vc-table-header-cell {
-  background-color: hsl(300 100% 10%);
-  border-bottom: 1px solid hsl(300 100% 25%);
-  color: hsl(300 100% 80%);
-}
-
-.theme-cyberpunk .vtable .vc-table-cell {
-  border-bottom: 1px solid hsl(300 100% 25%);
-  color: hsl(300 100% 80%);
-}
-
-.theme-cyberpunk .vtable .vc-table-row:hover {
-  background-color: hsl(300 100% 15%);
-}
-
-.theme-cyberpunk .vtable a, .theme-cyberpunk .vtable [data-href] {
-  color: hsl(180 100% 60%);
-}
-
-.theme-cyberpunk .vtable a:hover, .theme-cyberpunk .vtable [data-href]:hover {
-  color: hsl(180 100% 80%);
-}
-
-/* Solarized Theme */
-.theme-solarized .vtable .vc-table-header-cell {
-  background-color: hsl(192 81% 14%);
-  border-bottom: 1px solid hsl(194 14% 40%);
-  color: hsl(180 7% 60%);
-}
-
-.theme-solarized .vtable .vc-table-cell {
-  border-bottom: 1px solid hsl(194 14% 40%);
-  color: hsl(180 7% 60%);
-}
-
-.theme-solarized .vtable .vc-table-row:hover {
-  background-color: hsl(192 81% 18%);
-}
-
-.theme-solarized .vtable a, .theme-solarized .vtable [data-href] {
-  color: hsl(196 13% 60%);
-}
-
-.theme-solarized .vtable a:hover, .theme-solarized .vtable [data-href]:hover {
-  color: hsl(196 13% 80%);
 }
