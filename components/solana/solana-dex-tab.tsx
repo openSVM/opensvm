@@ -240,7 +240,14 @@ export function SolanaDEXTab() {
                           <div className="w-8 h-8 bg-gradient-to-r from-primary to-secondary rounded-full flex items-center justify-center text-primary-foreground font-bold text-sm">
                             {ranking.dex.charAt(0)}
                           </div>
-                          {ranking.dex}
+                          <a
+                            href={`/dex/${encodeURIComponent(ranking.dex)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-primary hover:text-primary/80 transition-colors underline font-medium"
+                          >
+                            {ranking.dex}
+                          </a>
                         </div>
                       </td>
                       <td className="py-3">{formatCurrency(ranking.totalVolume)}</td>
@@ -314,9 +321,14 @@ export function SolanaDEXTab() {
                   return (
                     <tr key={`${pool.dex}-${pool.poolAddress}-${index}`} className="border-b border-border">
                       <td className="py-3">
-                        <span className="px-2 py-1 bg-primary/10 text-primary rounded text-sm font-medium">
+                        <a
+                          href={`/dex/${encodeURIComponent(pool.dex)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-2 py-1 bg-primary/10 text-primary rounded text-sm font-medium hover:bg-primary/20 transition-colors"
+                        >
                           {pool.dex}
-                        </span>
+                        </a>
                       </td>
                       <td className="py-3 font-medium">{pool.tokenA}/{pool.tokenB}</td>
                       <td className="py-3">{formatCurrency(pool.tvl)}</td>
