@@ -701,7 +701,7 @@ export async function addAccountToGraph(
         }
       }
 
-      // Process transfers - make more inclusive to handle various transfer types
+      // Process transfers - enhanced to handle plain SOL transfers better
       console.log(`💰 [TRANSFER_PROCESS] Processing ${tx.transfers?.length || 0} transfers for transaction ${tx.signature}`);
       
       for (const transfer of tx.transfers || []) {
@@ -709,6 +709,30 @@ export async function addAccountToGraph(
         console.log(`🔍 [TRANSFER_PROCESS] Processing transfer to ${targetAccount}, amount: ${transfer.change}`);
         
         if (address !== targetAccount) {
+          // Ensure target account node exists (especially important for plain SOL transfers)
+          const targetNodeId = targetAccount;
+          if (!cy.getElementById(targetNodeId).length && !processedNodesRef?.current?.has(targetNodeId)) {
+            console.log(`➕ [TRANSFER_PROCESS] Adding missing target account node: ${targetAccount}`);
+            cy.add({
+              data: {
+                id: targetNodeId,
+                label: shortenString(targetAccount),
+                type: 'account',
+                fullAddress: targetAccount,
+                status: 'pending',
+                fromTransfer: true // Mark as coming from transfer processing
+              },
+              classes: 'account transfer-target'
+            });
+            processedNodesRef?.current?.add(targetNodeId);
+            
+            // Track new account node elements if set is provided
+            if (newElements) {
+              newElements.add(targetNodeId);
+            }
+            console.log(`✅ [TRANSFER_PROCESS] Added transfer target account node: ${targetAccount}`);
+          }
+          
           const transferEdgeId = `${tx.signature}-${targetAccount}-transfer`;
           if (!cy.getElementById(transferEdgeId).length && !processedEdgesRef?.current?.has(transferEdgeId)) {
             console.log(`➕ [TRANSFER_PROCESS] Adding transfer edge: ${tx.signature} -> ${targetAccount}, amount: ${transfer.change}`);
@@ -740,13 +764,115 @@ export async function addAccountToGraph(
       }
     }
     
-    // Log processing summary
+    // Enhanced processing summary with node/edge generation counts
     console.log(`📊 [GRAPH_BUILD] Transaction processing summary for ${address}:`);
     console.log(`  - Total transactions: ${data.transactions.length}`);
     console.log(`  - Processed: ${processedTransactionCount}`);
     console.log(`  - Skipped: ${skippedTransactionCount}`);
     console.log(`  - Connected accounts: ${connectedAccounts.size}`);
     console.log(`  - Graph nodes added: ${newElements ? newElements.size : 'unknown'}`);
+    
+    // Count and log nodes/edges generated for debugging empty graphs
+    const cy = cyRef?.current;
+    if (cy) {
+      const allNodes = cy.nodes();
+      const allEdges = cy.edges();
+      const transactionNodes = allNodes.filter(node => node.data('type') === 'transaction');
+      const accountNodes = allNodes.filter(node => node.data('type') === 'account');
+      const transferEdges = allEdges.filter(edge => edge.data('type') === 'transfer');
+      const txAccountEdges = allEdges.filter(edge => edge.data('type') === 'tx-account');
+      const accountTxEdges = allEdges.filter(edge => edge.data('type') === 'account-tx');
+      
+      console.log(`📊 [GRAPH_BUILD] Current graph statistics after processing ${address}:`);
+      console.log(`  📈 Nodes: ${allNodes.length} total (${accountNodes.length} accounts, ${transactionNodes.length} transactions)`);
+      console.log(`  🔗 Edges: ${allEdges.length} total (${transferEdges.length} transfers, ${txAccountEdges.length} tx→account, ${accountTxEdges.length} account→tx)`);
+      
+      // Special fallback check for transactions with transfers but no transfer edges
+      if (processedTransactionCount > 0 && transferEdges.length === 0) {
+        console.log(`⚠️ [GRAPH_BUILD] FALLBACK WARNING: Processed ${processedTransactionCount} transactions but no transfer edges created`);
+        console.log(`⚠️ [GRAPH_BUILD] This may indicate plain SOL transfers are not being visualized properly`);
+        
+        // Log transfer data for debugging
+        for (const tx of data.transactions.slice(0, 3)) { // Only log first 3 for brevity
+          if (tx.transfers && tx.transfers.length > 0) {
+            console.log(`🔍 [GRAPH_BUILD] Transaction ${tx.signature} has ${tx.transfers.length} transfers:`, 
+              tx.transfers.map(t => ({ account: t.account, change: t.change })));
+          }
+        }
+      }
+      
+      // Enhanced fallback for plain transfers - ensure ANY transaction with transfers creates visual elements
+      if (processedTransactionCount > 0 && allNodes.length < 2) {
+        console.log(`🚨 [GRAPH_BUILD] CRITICAL FALLBACK: Processed transactions but graph is nearly empty - creating minimal visualization`);
+        
+        // Find the first transaction with transfers and ensure it's represented
+        const txWithTransfers = data.transactions.find(tx => tx.transfers && tx.transfers.length > 0);
+        if (txWithTransfers) {
+          console.log(`🔧 [GRAPH_BUILD] Creating minimal nodes for transaction ${txWithTransfers.signature} with ${txWithTransfers.transfers.length} transfers`);
+          
+          // Ensure transaction node exists
+          const txNodeId = txWithTransfers.signature;
+          if (!cy.getElementById(txNodeId).length) {
+            cy.add({
+              data: {
+                id: txNodeId,
+                label: `Transfer: ${shortenString(txWithTransfers.signature)}`,
+                type: 'transaction',
+                subType: 'transfer',
+                status: 'loaded',
+                fallbackCreated: true
+              },
+              classes: 'transaction fallback'
+            });
+            processedNodesRef?.current?.add(txNodeId);
+            console.log(`🔧 [GRAPH_BUILD] Created fallback transaction node: ${txNodeId}`);
+          }
+          
+          // Ensure transfer target accounts exist
+          for (const transfer of txWithTransfers.transfers || []) {
+            const targetAccount = transfer.account;
+            if (targetAccount !== address) {
+              const accNodeId = targetAccount;
+              if (!cy.getElementById(accNodeId).length) {
+                cy.add({
+                  data: {
+                    id: accNodeId,
+                    label: `${transfer.change > 0 ? 'Received' : 'Sent'}: ${shortenString(targetAccount)}`,
+                    type: 'account',
+                    fullAddress: targetAccount,
+                    status: 'pending',
+                    fallbackCreated: true
+                  },
+                  classes: 'account fallback'
+                });
+                processedNodesRef?.current?.add(accNodeId);
+                console.log(`🔧 [GRAPH_BUILD] Created fallback account node: ${accNodeId}`);
+              }
+              
+              // Create transfer edge
+              const transferEdgeId = `${txNodeId}-${targetAccount}-transfer-fallback`;
+              if (!cy.getElementById(transferEdgeId).length) {
+                cy.add({
+                  data: {
+                    id: transferEdgeId,
+                    source: txNodeId,
+                    target: targetAccount,
+                    type: 'transfer',
+                    amount: transfer.change,
+                    label: formatSolChange(transfer.change),
+                    status: 'loaded',
+                    fallbackCreated: true
+                  },
+                  classes: 'transfer fallback'
+                });
+                processedEdgesRef?.current?.add(transferEdgeId);
+                console.log(`🔧 [GRAPH_BUILD] Created fallback transfer edge: ${txNodeId} -> ${targetAccount} (${formatSolChange(transfer.change)})`);
+              }
+            }
+          }
+        }
+      }
+    }
     
     // Queue connected accounts for processing if within depth limit
     if (depth < maxDepth - 1) {
