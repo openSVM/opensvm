@@ -158,7 +158,7 @@ export function TransfersTable({ address }: TransfersTableProps) {
           <div className="truncate font-mono text-xs" data-test="from">
             <Link
               href={row.from ? `/account/${row.from}?tab=transactions` : '#'}
-              className="hover:underline hover:text-blue-400 text-blue-500 transition-colors"
+              className="hover:underline hover:text-primary text-primary/80 transition-colors"
               onClick={(e) => handleAddressClick(e, row.from || '')}
               data-address={row.from || ''}
             >
@@ -178,7 +178,7 @@ export function TransfersTable({ address }: TransfersTableProps) {
           <div className="truncate font-mono text-xs" data-test="to">
             <Link
               href={row.to ? `/account/${row.to}?tab=transactions` : '#'}
-              className="hover:underline hover:text-blue-400 text-blue-500 transition-colors"
+              className="hover:underline hover:text-primary text-primary/80 transition-colors"
               onClick={(e) => handleAddressClick(e, row.to || '')}
               data-address={row.to || ''}
             >
@@ -199,7 +199,7 @@ export function TransfersTable({ address }: TransfersTableProps) {
             {row.signature ? (
               <Link
                 href={`/tx/${row.signature}`}
-                className="hover:underline hover:text-blue-400 text-blue-500 transition-colors"
+                className="hover:underline hover:text-primary text-primary/80 transition-colors"
                 prefetch={false}
                 data-signature={row.signature}
               >
@@ -314,8 +314,8 @@ export function TransfersTable({ address }: TransfersTableProps) {
   }, [pinnedRowIds, handlePinRow]);
   if (error) {
     return (
-      <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg" role="alert" aria-live="assertive">
-        <p className="text-red-600 dark:text-red-400">{error}</p>
+      <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg" role="alert" aria-live="assertive">
+        <p className="text-destructive">{error}</p>
       </div>
     );
   }
@@ -338,19 +338,19 @@ export function TransfersTable({ address }: TransfersTableProps) {
         {/* Search Input */}
         <div className="relative">
           <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-            <Search className="h-4 w-4 text-gray-400" />
+            <Search className="h-4 w-4 text-muted-foreground" />
           </div>
           <input
             type="text"
             placeholder="Search transfers by address, token symbol, or signature..."
-            className="w-full pl-10 pr-10 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+            className="w-full pl-10 pr-10 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
           {searchTerm && (
             <button
               onClick={() => setSearchTerm('')}
-              className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+              className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground hover:text-foreground"
             >
               <X className="h-4 w-4" />
             </button>
@@ -361,11 +361,11 @@ export function TransfersTable({ address }: TransfersTableProps) {
         <div className="flex flex-wrap gap-4">
           {/* Type Filter */}
           <div className="flex items-center gap-2">
-            <Filter className="h-4 w-4 text-gray-400" />
+            <Filter className="h-4 w-4 text-muted-foreground" />
             <select
               value={typeFilter}
               onChange={(e) => setTypeFilter(e.target.value)}
-              className="border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-1 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="border border-border rounded-lg px-3 py-1 bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
             >
               <option value="all">All Types</option>
               {uniqueTypes.map(type => (
@@ -379,7 +379,7 @@ export function TransfersTable({ address }: TransfersTableProps) {
             <select
               value={tokenFilter}
               onChange={(e) => setTokenFilter(e.target.value)}
-              className="border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-1 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="border border-border rounded-lg px-3 py-1 bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
             >
               <option value="all">All Tokens</option>
               {uniqueTokens.map(token => (
@@ -395,15 +395,15 @@ export function TransfersTable({ address }: TransfersTableProps) {
               placeholder="Min Amount"
               value={amountFilter.min}
               onChange={(e) => setAmountFilter(prev => ({ ...prev, min: e.target.value }))}
-              className="w-24 border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-1 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-24 border border-border rounded-lg px-2 py-1 bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
             />
-            <span className="text-gray-400">-</span>
+            <span className="text-muted-foreground">-</span>
             <input
               type="number"
               placeholder="Max Amount"
               value={amountFilter.max}
               onChange={(e) => setAmountFilter(prev => ({ ...prev, max: e.target.value }))}
-              className="w-24 border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-1 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-24 border border-border rounded-lg px-2 py-1 bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
             />
           </div>
 
@@ -416,7 +416,7 @@ export function TransfersTable({ address }: TransfersTableProps) {
                 setAmountFilter({ min: '', max: '' });
                 setSearchTerm('');
               }}
-              className="px-3 py-1 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+              className="px-3 py-1 text-sm bg-muted text-muted-foreground rounded-lg hover:bg-muted/80 transition-colors"
             >
               Clear Filters
             </button>
@@ -426,7 +426,7 @@ export function TransfersTable({ address }: TransfersTableProps) {
 
       {/* Search Results Count */}
       {(searchTerm || typeFilter !== 'all' || tokenFilter !== 'all' || amountFilter.min || amountFilter.max) && (
-        <div className="text-sm text-gray-600 dark:text-gray-400">
+        <div className="text-sm text-muted-foreground">
           Found {sortedTransfers.length} transfers
           {searchTerm && ` matching "${searchTerm}"`}
           {typeFilter !== 'all' && ` of type "${typeFilter}"`}

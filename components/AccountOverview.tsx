@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Loader2 } from 'lucide-react';
 import { type TokenAccount } from '@/lib/solana';
 import AccountExplorerLinks from './AccountExplorerLinks';
+import { useTheme } from '@/lib/theme';
 import { 
   PieChart,
   Pie,
@@ -33,6 +34,7 @@ export default function AccountOverview({
     tokenTransfers: number | null;
   }>({ totalTransactions: null, tokenTransfers: null });
   const [statsLoading, setStatsLoading] = useState(true);
+  const { theme } = useTheme();
 
   useEffect(() => {
     async function fetchAccountStats() {
@@ -58,8 +60,76 @@ export default function AccountOverview({
 
   // Calculate portfolio breakdown for pie chart
   const portfolioData = useMemo(() => {
-    // Colors for pie chart
-    const CHART_COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d', '#ffc658', '#ff7300', '#00ff00', '#ff00ff'];
+    // Generate theme-aware colors for the pie chart
+    const getThemeAwareColors = (theme: string) => {
+      const colorSchemes = {
+        paper: [
+          '#22c55e', // green-500
+          '#3b82f6', // blue-500
+          '#f59e0b', // amber-500
+          '#ef4444', // red-500
+          '#8b5cf6', // violet-500
+          '#06b6d4', // cyan-500
+          '#f97316', // orange-500
+          '#ec4899', // pink-500
+          '#84cc16', // lime-500
+          '#6366f1', // indigo-500
+        ],
+        'high-contrast': [
+          '#00ff00', // bright green
+          '#00ffff', // cyan
+          '#ffff00', // yellow
+          '#ff0000', // red
+          '#ff00ff', // magenta
+          '#0080ff', // bright blue
+          '#ff8000', // orange
+          '#80ff00', // lime
+          '#8000ff', // purple
+          '#ff0080', // hot pink
+        ],
+        'dos-blue': [
+          '#ffff00', // yellow (primary)
+          '#00ffff', // cyan
+          '#ff00ff', // magenta
+          '#00ff00', // green
+          '#ff8000', // orange
+          '#8080ff', // light blue
+          '#ff8080', // light red
+          '#80ff80', // light green
+          '#ffff80', // light yellow
+          '#ff80ff', // light magenta
+        ],
+        cyberpunk: [
+          '#ff00ff', // magenta primary
+          '#00ffff', // cyan
+          '#ff0080', // hot pink
+          '#8000ff', // purple
+          '#ff4080', // pink
+          '#40ff80', // neon green
+          '#ff8040', // orange
+          '#4080ff', // blue
+          '#80ff40', // lime
+          '#ff4040', // red
+        ],
+        solarized: [
+          '#268bd2', // blue
+          '#2aa198', // cyan
+          '#859900', // green
+          '#b58900', // yellow
+          '#cb4b16', // orange
+          '#d33682', // magenta
+          '#dc322f', // red
+          '#6c71c4', // violet
+          '#586e75', // base01
+          '#657b83', // base00
+        ],
+      };
+
+      return colorSchemes[theme as keyof typeof colorSchemes] || colorSchemes.paper;
+    };
+    
+    // Get theme-aware colors for pie chart
+    const themeColors = getThemeAwareColors(theme);
     
     const data = [];
     
@@ -70,12 +140,12 @@ export default function AccountOverview({
         name: 'SOL',
         value: solBalance,
         usdValue: solBalance * SOL_PRICE,
-        color: '#9945FF' // Solana purple
+        color: themeColors[0] // Use first theme color for SOL
       });
     }
     
     // Add token balances with USD values (mock prices for now)
-    tokenAccounts.forEach((token) => {
+    tokenAccounts.forEach((token, index) => {
       if (token.uiAmount && token.uiAmount > 0) {
         // Mock USD price calculation - in real implementation this would come from API
         const mockPrice = token.symbol === 'USDC' ? 1 : 
@@ -88,7 +158,7 @@ export default function AccountOverview({
           name: token.symbol || 'Unknown',
           value: token.uiAmount,
           usdValue: token.uiAmount * mockPrice,
-          color: CHART_COLORS[data.length % CHART_COLORS.length]
+          color: themeColors[(index + 1) % themeColors.length]
         });
       }
     });
@@ -117,7 +187,7 @@ export default function AccountOverview({
     }
     
     return data;
-  }, [solBalance, tokenAccounts]);
+  }, [solBalance, tokenAccounts, theme]);
 
   return (
     <div className="rounded-lg border bg-card text-card-foreground">

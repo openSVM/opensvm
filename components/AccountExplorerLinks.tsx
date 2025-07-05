@@ -23,7 +23,7 @@ export default function AccountExplorerLinks({ address, className = '' }: Accoun
 
   return (
     <div className={`flex flex-col gap-2 ${className}`}>
-      <div className="text-sm text-neutral-400 mb-1">External Explorers</div>
+      <div className="text-sm text-muted-foreground mb-1">External Explorers</div>
       <div className="flex flex-wrap gap-2">
         {explorerLinks.map((link) => (
           <a
@@ -31,7 +31,7 @@ export default function AccountExplorerLinks({ address, className = '' }: Accoun
             href={link.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 px-3 py-1 text-sm bg-neutral-800 hover:bg-neutral-700 text-white rounded-md transition-colors"
+            className="inline-flex items-center gap-1 px-3 py-1 text-sm bg-muted hover:bg-muted/80 text-muted-foreground hover:text-foreground rounded-md transition-colors border border-border"
             title={link.description}
           >
             {link.name}
