@@ -447,11 +447,13 @@ function TransactionGraph({
     depth = 0,
     parentSignature: string | null = null
   ) => {
-    console.log(`🔄 [FETCH_PROCESS] Starting fetch and process for account: ${address}`);
+    console.log(`🔄 [FETCH_PROCESS] Starting fetch and process for account: ${address}, depth: ${depth}, parent: ${parentSignature}`);
     try {
       // Use current totalAccounts state value instead of closure value
       const currentTotalAccounts = totalAccounts || 1; // Ensure minimum of 1
       console.log(`📊 [FETCH_PROCESS] Current total accounts: ${currentTotalAccounts}`);
+      
+      console.log(`🚀 [FETCH_PROCESS] Calling addAccountToGraph for ${address}...`);
       await addAccountToGraph(address, currentTotalAccounts, depth, parentSignature);
       console.log(`✅ [FETCH_PROCESS] Successfully processed account: ${address}`);
     } catch (e) {
@@ -1006,8 +1008,11 @@ function TransactionGraph({
               const txNode = cyRef.current.getElementById(initialSignature);
               if (txNode.length) {
                 txNode.data('status', 'loaded');
-                txNode.data('timestamp', txData.details?.blockTime || Date.now());
-                txNode.data('success', !txData.details?.err);
+                txNode.data('timestamp', txData.timestamp || Date.now());
+                txNode.data('success', txData.success);
+                
+                console.log(`✅ [TX_UPDATE] Updated transaction node: ${initialSignature}`);
+                console.log(`✅ [TX_UPDATE] Success: ${txData.success}, Type: ${txData.type}, Timestamp: ${txData.timestamp}`);
               }
             }
             
@@ -1027,6 +1032,14 @@ function TransactionGraph({
                     // Queue the first account and provide immediate feedback
                     console.log(`📝 [QUEUE] Queuing account: ${firstAccount}`);
                     queueAccountFetch(firstAccount, 0, initialSignature);
+                    
+                    // Force queue processing immediately to ensure it starts
+                    console.log(`🔄 [QUEUE] Force processing queue immediately`);
+                    setTimeout(() => {
+                      if (!signal.aborted) {
+                        processAccountFetchQueue();
+                      }
+                    }, 100);
                   
                   // Set a more aggressive progress update with guaranteed completion
                   setLoadingProgress(85);
