@@ -2,6 +2,18 @@ import { NextRequest, NextResponse } from 'next/server';
 import { PublicKey, Connection } from '@solana/web3.js';
 import { getConnection } from '@/lib/solana-connection';
 import { isValidSolanaAddress } from '@/lib/utils';
+import { 
+  MIN_TRANSFER_SOL, 
+  TRANSACTION_BATCH_SIZE, 
+  MAX_SIGNATURES_LIMIT, 
+  MAX_RETRIES, 
+  INITIAL_BACKOFF_MS, 
+  BATCH_DELAY_MS,
+  MAX_TRANSFER_COUNT,
+  isSpamAddress,
+  isAboveDustThreshold,
+  MIN_WALLET_ADDRESS_LENGTH
+} from '@/lib/transaction-constants';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -34,31 +46,18 @@ async function fetchTransactionBatch(
   const transfers: Transfer[] = [];
   const startTime = Date.now();
   
-  // Known spam/analytics addresses to filter out
-  const SPAM_ADDRESSES = new Set([
-    'FetTyW8xAYfd33x4GMHoE7hTuEdWLj1fNnhJuyVMUGGa',
-    'WaLLeTaS7qTaSnKFTYJNGAeu7VzoLMUV9QCMfKxFsgt', 
-    'RecipienTEKQQQQQQQQQQQQQQQQQQQQQQQQQQFrThs',
-    'ComputeBudget111111111111111111111111111111',
-    // Add other known spam/bot addresses
-    '11111111111111111111111111111112', // System program
-    'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA', // Token program
-    'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL' // Associated Token program
-  ]);
-  
-  // Process in small batches of 10 transactions to avoid connection overload
-  const BATCH_SIZE = 10;
+  // Process in small batches to avoid connection overload
   const batches = [];
   
-  for (let i = 0; i < signatures.length; i += BATCH_SIZE) {
-    batches.push(signatures.slice(i, i + BATCH_SIZE));
+  for (let i = 0; i < signatures.length; i += TRANSACTION_BATCH_SIZE) {
+    batches.push(signatures.slice(i, i + TRANSACTION_BATCH_SIZE));
   }
   
   for (const batch of batches) {
     const batchResults = await Promise.all(
       batch.map(async (signature) => {
-        let retries = 3;
-        let backoff = 1000; // Start with 1s backoff
+        let retries = MAX_RETRIES;
+        let backoff = INITIAL_BACKOFF_MS;
         
         while (retries > 0) {
           try {
@@ -92,12 +91,12 @@ async function fetchTransactionBatch(
               const amount = Math.abs(delta / 1e9);
               
               // Skip if this is a spam address
-              if (SPAM_ADDRESSES.has(account) || SPAM_ADDRESSES.has(firstAccount)) {
+              if (isSpamAddress(account) || isSpamAddress(firstAccount)) {
                 continue;
               }
               
-              // Skip dust transactions (less than 0.001 SOL)
-              if (amount < 0.001) {
+              // Skip dust transactions
+              if (!isAboveDustThreshold(amount, MIN_TRANSFER_SOL)) {
                 continue;
               }
 
@@ -138,7 +137,7 @@ async function fetchTransactionBatch(
     
     // Small delay between batches to avoid rate limiting
     if (batches.length > 1) {
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise(resolve => setTimeout(resolve, BATCH_DELAY_MS));
     }
   }
 
@@ -161,7 +160,7 @@ export async function GET(
     const searchParams = request.nextUrl.searchParams;
     const offset = parseInt(searchParams.get('offset') || '0');
     // Limit batch size to improve performance
-    const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 50);
+    const limit = Math.min(parseInt(searchParams.get('limit') || '50'), MAX_SIGNATURES_LIMIT);
 
     // Validate address
     if (!isValidSolanaAddress(address)) {
@@ -227,18 +226,19 @@ export async function GET(
 
     console.log(`Total transfers found: ${transfers.length}`);
 
-    // Sort by volume (amount) and limit to top 10 SPL transfers only
+    // Sort by volume (amount) and limit to top transfers only
     const filteredAndSortedTransfers = transfers
       .filter(transfer => {
         const amount = parseFloat(transfer.tokenAmount);
-        // Only include significant transfers (minimum 0.01 SOL) and filter out potential trading/DEX activity
+        // Only include significant transfers and filter out potential trading/DEX activity
         // Simple heuristic: transfers between user wallets typically have cleaner amounts
-        return amount >= 0.01 && 
+        return isAboveDustThreshold(amount, MIN_TRANSFER_SOL) && 
                transfer.from !== transfer.to && // Prevent self-transfers
-               transfer.from.length >= 32 && transfer.to.length >= 32; // Ensure full wallet addresses
+               transfer.from.length >= MIN_WALLET_ADDRESS_LENGTH && 
+               transfer.to.length >= MIN_WALLET_ADDRESS_LENGTH; // Ensure full wallet addresses
       })
       .sort((a, b) => parseFloat(b.tokenAmount) - parseFloat(a.tokenAmount))
-      .slice(0, 10); // Limit to top 10 by volume
+      .slice(0, MAX_TRANSFER_COUNT); // Limit to top transfers by volume
 
     console.log(`Filtered to top ${filteredAndSortedTransfers.length} transfers by volume`);
 

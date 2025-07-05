@@ -1,4 +1,16 @@
 import { NextResponse } from 'next/server';
+import { 
+  MIN_TRANSFER_SOL, 
+  MAX_TRANSFER_COUNT,
+  isSpamAddress,
+  isSpamToken,
+  isDexLikeAddress,
+  isAboveDustThreshold,
+  AI_MODEL,
+  AI_MAX_TOKENS,
+  AI_TEMPERATURE,
+  SPAM_TOKEN_KEYWORDS
+} from '@/lib/transaction-constants';
 
 export async function POST(request: Request) {
   try {
@@ -11,22 +23,8 @@ export async function POST(request: Request) {
       );
     }
 
-    // Known spam/analytics tokens and addresses to filter out
-    const SPAM_TOKENS = new Set([
-      'FLiP', 'FLIP', 'flipside',
-      'Bot', 'BOT', 'SPAM', 'DUST',
-      'Airdrop', 'AIRDROP', 'FREE',
-      'Test', 'TEST', 'DEMO'
-    ]);
-
-    const SPAM_ADDRESSES = new Set([
-      // Flipside/analytics addresses
-      'FetTyW8xAYfd33x4GMHoE7hTuEdWLj1fNnhJuyVMUGGa',
-      'WaLLeTaS7qTaSnKFTYJNGAeu7VzoLMUV9QCMfKxFsgt',
-      'RecipienTEKQQQQQQQQQQQQQQQQQQQQQQQQQQFrThs',
-      // Add other known spam addresses
-      'ComputeBudget111111111111111111111111111111'
-    ]);
+    // Known spam/analytics tokens and addresses to filter out - now using shared constants
+    // (Legacy code kept for backward compatibility, but migrating to shared constants)
 
     // Pre-filter obvious spam before AI analysis and prioritize by volume
     const preFiltered = transactions
@@ -36,32 +34,22 @@ export async function POST(request: Request) {
         const from = tx.from || '';
         const to = tx.to || '';
         
-        // Filter out dust transactions (increased threshold)
-        if (amount < 0.01) return false;
+        // Filter out dust transactions (using named constant)
+        if (!isAboveDustThreshold(amount, MIN_TRANSFER_SOL)) return false;
         
-        // Filter out spam tokens
-        if (SPAM_TOKENS.has(tx.tokenSymbol) || 
-            [...SPAM_TOKENS].some(spam => token.includes(spam.toLowerCase()))) {
-          return false;
-        }
+        // Filter out spam tokens (using shared function)
+        if (isSpamToken(tx.tokenSymbol)) return false;
         
-        // Filter out spam addresses
-        if (SPAM_ADDRESSES.has(from) || SPAM_ADDRESSES.has(to)) {
-          return false;
-        }
+        // Filter out spam addresses (using shared function)
+        if (isSpamAddress(from) || isSpamAddress(to)) return false;
         
         // Only include simple wallet-to-wallet transfers (filter out DEX/trading activity)
-        // DEX transactions often involve program accounts with specific patterns
-        const isDexLike = from.length < 32 || to.length < 32 || // Program accounts are often shorter
-                          from.includes('Program') || to.includes('Program') ||
-                          from.includes('111111111') || to.includes('111111111'); // System programs
-        
-        if (isDexLike) return false;
+        if (isDexLikeAddress(from) || isDexLikeAddress(to)) return false;
         
         return true;
       })
       .sort((a, b) => parseFloat(b.tokenAmount || '0') - parseFloat(a.tokenAmount || '0')) // Sort by volume desc
-      .slice(0, 10); // Limit to top 10 by volume
+      .slice(0, MAX_TRANSFER_COUNT); // Limit to top transfers by volume
 
     // If too many transactions were filtered, use the pre-filtered results (already limited to top 10)
     if (preFiltered.length < transactions.length * 0.5 || preFiltered.length <= 10) {
@@ -92,17 +80,17 @@ Transactions to analyze:
 ${JSON.stringify(transactionSummary, null, 2)}
 
 Criteria for filtering:
-1. Remove transactions with amounts < 0.01 tokens (increased threshold for performance)
+1. Remove transactions with amounts < ${MIN_TRANSFER_SOL} tokens (increased threshold for performance)
 2. Remove transactions to/from known spam addresses or analytics services
 3. Remove repetitive bot-like patterns (same amounts, regular intervals)
-4. Remove transactions with suspicious token names containing: flip, spam, bot, airdrop, test
+4. Remove transactions with suspicious token names containing: ${SPAM_TOKEN_KEYWORDS.join(', ')}
 5. Remove DEX/trading activity (keep only simple wallet-to-wallet transfers)
-6. Keep only top 10 transfers by volume for performance
+6. Keep only top ${MAX_TRANSFER_COUNT} transfers by volume for performance
 7. Keep legitimate transfers between user wallets with significant amounts
 
-Return only a JSON array of transaction IDs for the top 10 transfers by volume that should be kept, like: ["txId1", "txId2", ...]`;
+Return only a JSON array of transaction IDs for the top ${MAX_TRANSFER_COUNT} transfers by volume that should be kept, like: ["txId1", "txId2", ...]`;
 
-    // Use GPT-4.1-nano or similar model for analysis
+    // Use correct AI model instead of non-existent gpt-4.1-nano
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -110,7 +98,7 @@ Return only a JSON array of transaction IDs for the top 10 transfers by volume t
         'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
       },
       body: JSON.stringify({
-        model: 'gpt-4.1-nano', // Using available model instead of non-existent gpt-4.1-nano
+        model: AI_MODEL, // Using available model instead of non-existent gpt-4.1-nano
         messages: [
           {
             role: 'system',
@@ -121,46 +109,33 @@ Return only a JSON array of transaction IDs for the top 10 transfers by volume t
             content: prompt
           }
         ],
-        max_tokens: 32000,
-        temperature: 0.1,
+        max_tokens: AI_MAX_TOKENS,
+        temperature: AI_TEMPERATURE,
         response_format: { type: 'json_object' }
       }),
     });
 
     if (!response.ok) {
-      // Fallback: if AI analysis fails, apply enhanced basic filtering with top 10 volume limit
+      // Fallback: if AI analysis fails, apply enhanced basic filtering with top transfer limit
       const basicFiltered = transactions
         .filter(tx => {
           const amount = parseFloat(tx.tokenAmount || '0');
-          const token = (tx.tokenSymbol || '').toLowerCase();
           const from = tx.from || '';
           const to = tx.to || '';
           
-          // Filter out dust transactions (increased threshold)
-          if (amount < 0.01) return false;
+          // Filter out dust transactions (using named constant)
+          if (!isAboveDustThreshold(amount, MIN_TRANSFER_SOL)) return false;
           
-          // Filter out spam tokens and addresses (same as above)
-          const SPAM_TOKENS = ['flip', 'bot', 'spam', 'dust', 'airdrop', 'free', 'test', 'demo'];
-          const SPAM_ADDRESSES = [
-            'FetTyW8xAYfd33x4GMHoE7hTuEdWLj1fNnhJuyVMUGGa',
-            'WaLLeTaS7qTaSnKFTYJNGAeu7VzoLMUV9QCMfKxFsgt',
-            'RecipienTEKQQQQQQQQQQQQQQQQQQQQQQQQQQFrThs',
-            'ComputeBudget111111111111111111111111111111'
-          ];
+          // Filter out spam tokens and addresses (using shared functions)
+          if (isSpamToken(tx.tokenSymbol) || isSpamAddress(from) || isSpamAddress(to)) return false;
           
-          if (SPAM_TOKENS.some(spam => token.includes(spam))) return false;
-          if (SPAM_ADDRESSES.includes(from) || SPAM_ADDRESSES.includes(to)) return false;
-          
-          // Filter out DEX/trading activity
-          const isDexLike = from.length < 32 || to.length < 32 ||
-                            from.includes('Program') || to.includes('Program') ||
-                            from.includes('111111111') || to.includes('111111111');
-          if (isDexLike) return false;
+          // Filter out DEX/trading activity (using shared function)
+          if (isDexLikeAddress(from) || isDexLikeAddress(to)) return false;
           
           return true;
         })
         .sort((a, b) => parseFloat(b.tokenAmount || '0') - parseFloat(a.tokenAmount || '0'))
-        .slice(0, 10); // Limit to top 10 by volume
+        .slice(0, MAX_TRANSFER_COUNT); // Limit to top transfers by volume
       
       return NextResponse.json({ 
         filteredTransactions: basicFiltered,
@@ -180,24 +155,14 @@ Return only a JSON array of transaction IDs for the top 10 transfers by volume t
       console.warn('Failed to parse AI response, using fallback filtering');
       const basicFiltered = transactions.filter(tx => {
         const amount = parseFloat(tx.tokenAmount || '0');
-        const token = (tx.tokenSymbol || '').toLowerCase();
         const from = tx.from || '';
         const to = tx.to || '';
         
-        // Filter out dust transactions
-        if (amount < 0.001) return false;
+        // Filter out dust transactions (using named constant)
+        if (!isAboveDustThreshold(amount, MIN_TRANSFER_SOL)) return false;
         
-        // Filter out spam tokens and addresses
-        const SPAM_TOKENS = ['flip', 'bot', 'spam', 'dust', 'airdrop', 'free', 'test', 'demo'];
-        const SPAM_ADDRESSES = [
-          'FetTyW8xAYfd33x4GMHoE7hTuEdWLj1fNnhJuyVMUGGa',
-          'WaLLeTaS7qTaSnKFTYJNGAeu7VzoLMUV9QCMfKxFsgt',
-          'RecipienTEKQQQQQQQQQQQQQQQQQQQQQQQQQQFrThs',
-          'ComputeBudget111111111111111111111111111111'
-        ];
-        
-        if (SPAM_TOKENS.some(spam => token.includes(spam))) return false;
-        if (SPAM_ADDRESSES.includes(from) || SPAM_ADDRESSES.includes(to)) return false;
+        // Filter out spam tokens and addresses (using shared functions)
+        if (isSpamToken(tx.tokenSymbol) || isSpamAddress(from) || isSpamAddress(to)) return false;
         
         return true;
       });
@@ -228,24 +193,14 @@ Return only a JSON array of transaction IDs for the top 10 transfers by volume t
       const { transactions } = await request.json();
       const basicFiltered = transactions.filter(tx => {
         const amount = parseFloat(tx.tokenAmount || '0');
-        const token = (tx.tokenSymbol || '').toLowerCase();
         const from = tx.from || '';
         const to = tx.to || '';
         
-        // Filter out dust transactions
-        if (amount < 0.001) return false;
+        // Filter out dust transactions (using named constant)
+        if (!isAboveDustThreshold(amount, MIN_TRANSFER_SOL)) return false;
         
-        // Filter out spam tokens and addresses
-        const SPAM_TOKENS = ['flip', 'bot', 'spam', 'dust', 'airdrop', 'free', 'test', 'demo'];
-        const SPAM_ADDRESSES = [
-          'FetTyW8xAYfd33x4GMHoE7hTuEdWLj1fNnhJuyVMUGGa',
-          'WaLLeTaS7qTaSnKFTYJNGAeu7VzoLMUV9QCMfKxFsgt',
-          'RecipienTEKQQQQQQQQQQQQQQQQQQQQQQQQQQFrThs',
-          'ComputeBudget111111111111111111111111111111'
-        ];
-        
-        if (SPAM_TOKENS.some(spam => token.includes(spam))) return false;
-        if (SPAM_ADDRESSES.includes(from) || SPAM_ADDRESSES.includes(to)) return false;
+        // Filter out spam tokens and addresses (using shared functions)
+        if (isSpamToken(tx.tokenSymbol) || isSpamAddress(from) || isSpamAddress(to)) return false;
         
         return true;
       });
