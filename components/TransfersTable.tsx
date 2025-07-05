@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { formatNumber, truncateMiddle } from '@/lib/utils';
 import { Tooltip } from '@/components/ui/tooltip';
 import { useRouter, usePathname } from 'next/navigation';
-import { PinIcon, Search, X } from 'lucide-react';
+import { PinIcon, Search, X, Filter } from 'lucide-react';
 import { useCallback as useStableCallback } from 'react';
 import Link from 'next/link';
 
@@ -23,6 +23,9 @@ export function TransfersTable({ address }: TransfersTableProps) {
   const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
   const [pinnedRowIds, setPinnedRowIds] = useState<Set<string>>(new Set());
   const [searchTerm, setSearchTerm] = useState('');
+  const [typeFilter, setTypeFilter] = useState<string>('all');
+  const [tokenFilter, setTokenFilter] = useState<string>('all');
+  const [amountFilter, setAmountFilter] = useState<{ min: string; max: string }>({ min: '', max: '' });
 
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
@@ -228,6 +231,28 @@ export function TransfersTable({ address }: TransfersTableProps) {
       );
     }
 
+    // Filter by type
+    if (typeFilter !== 'all') {
+      filtered = filtered.filter(transfer => transfer.type === typeFilter);
+    }
+
+    // Filter by token
+    if (tokenFilter !== 'all') {
+      filtered = filtered.filter(transfer => 
+        (transfer.tokenSymbol || transfer.token || 'SOL') === tokenFilter
+      );
+    }
+
+    // Filter by amount range
+    if (amountFilter.min || amountFilter.max) {
+      filtered = filtered.filter(transfer => {
+        const amount = transfer.amount || 0;
+        const min = amountFilter.min ? parseFloat(amountFilter.min) : -Infinity;
+        const max = amountFilter.max ? parseFloat(amountFilter.max) : Infinity;
+        return amount >= min && amount <= max;
+      });
+    }
+
     // Then sort the filtered results
     const sorted = [...filtered].sort((a, b) => {
       const aValue = a[sortField];
@@ -256,7 +281,18 @@ export function TransfersTable({ address }: TransfersTableProps) {
     });
     
     return sorted;
-  }, [transfers, sortField, sortDirection, searchTerm]);
+  }, [transfers, sortField, sortDirection, searchTerm, typeFilter, tokenFilter, amountFilter]);
+
+  // Get unique values for filter dropdowns
+  const uniqueTypes = useMemo(() => {
+    const types = [...new Set(transfers.map(t => t.type || 'transfer'))];
+    return types.sort();
+  }, [transfers]);
+
+  const uniqueTokens = useMemo(() => {
+    const tokens = [...new Set(transfers.map(t => t.tokenSymbol || t.token || 'SOL'))];
+    return tokens.sort();
+  }, [transfers]);
 
   // Row identity function for selection
   const getRowId = useCallback((row: Transfer) => row.signature || '', []);
@@ -297,32 +333,105 @@ export function TransfersTable({ address }: TransfersTableProps) {
         </h2>
       </div>
 
-      {/* Search Input */}
-      <div className="relative">
-        <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-          <Search className="h-4 w-4 text-gray-400" />
+      {/* Search and Filters */}
+      <div className="space-y-4">
+        {/* Search Input */}
+        <div className="relative">
+          <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+            <Search className="h-4 w-4 text-gray-400" />
+          </div>
+          <input
+            type="text"
+            placeholder="Search transfers by address, token symbol, or signature..."
+            className="w-full pl-10 pr-10 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+          {searchTerm && (
+            <button
+              onClick={() => setSearchTerm('')}
+              className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
         </div>
-        <input
-          type="text"
-          placeholder="Search transfers by address, token symbol, or signature..."
-          className="w-full pl-10 pr-10 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
-        {searchTerm && (
-          <button
-            onClick={() => setSearchTerm('')}
-            className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        )}
+
+        {/* Filters Row */}
+        <div className="flex flex-wrap gap-4">
+          {/* Type Filter */}
+          <div className="flex items-center gap-2">
+            <Filter className="h-4 w-4 text-gray-400" />
+            <select
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value)}
+              className="border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-1 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">All Types</option>
+              {uniqueTypes.map(type => (
+                <option key={type} value={type}>{type}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Token Filter */}
+          <div className="flex items-center gap-2">
+            <select
+              value={tokenFilter}
+              onChange={(e) => setTokenFilter(e.target.value)}
+              className="border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-1 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">All Tokens</option>
+              {uniqueTokens.map(token => (
+                <option key={token} value={token}>{token}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Amount Range Filter */}
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              placeholder="Min Amount"
+              value={amountFilter.min}
+              onChange={(e) => setAmountFilter(prev => ({ ...prev, min: e.target.value }))}
+              className="w-24 border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-1 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <span className="text-gray-400">-</span>
+            <input
+              type="number"
+              placeholder="Max Amount"
+              value={amountFilter.max}
+              onChange={(e) => setAmountFilter(prev => ({ ...prev, max: e.target.value }))}
+              className="w-24 border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-1 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          {/* Clear Filters */}
+          {(typeFilter !== 'all' || tokenFilter !== 'all' || amountFilter.min || amountFilter.max || searchTerm) && (
+            <button
+              onClick={() => {
+                setTypeFilter('all');
+                setTokenFilter('all');
+                setAmountFilter({ min: '', max: '' });
+                setSearchTerm('');
+              }}
+              className="px-3 py-1 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+            >
+              Clear Filters
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Search Results Count */}
-      {searchTerm && (
+      {(searchTerm || typeFilter !== 'all' || tokenFilter !== 'all' || amountFilter.min || amountFilter.max) && (
         <div className="text-sm text-gray-600 dark:text-gray-400">
-          Found {sortedTransfers.length} transfers matching "{searchTerm}"
+          Found {sortedTransfers.length} transfers
+          {searchTerm && ` matching "${searchTerm}"`}
+          {typeFilter !== 'all' && ` of type "${typeFilter}"`}
+          {tokenFilter !== 'all' && ` with token "${tokenFilter}"`}
+          {(amountFilter.min || amountFilter.max) && ` within amount range`}
         </div>
       )}
 

@@ -2,6 +2,7 @@ import { getConnection } from '@/lib/solana-connection';
 import { PublicKey } from '@solana/web3.js';
 import { validateSolanaAddress, getAccountInfo as getSolanaAccountInfo } from '@/lib/solana';
 import AccountInfo from '@/components/AccountInfo';
+import AccountOverview from '@/components/AccountOverview';
 import AccountTabs from './tabs';
 
 interface AccountData {
@@ -13,6 +14,7 @@ interface AccountData {
     mint: string;
     balance: number;
   }[];
+  tokenAccounts: any[]; // For AccountOverview component compatibility
 }
 
 async function getAccountData(address: string): Promise<AccountData> {
@@ -31,12 +33,20 @@ async function getAccountData(address: string): Promise<AccountData> {
       balance: account.account.data.parsed.info.tokenAmount.uiAmount,
     }));
 
+    // Convert token balances to token accounts format for AccountOverview
+    const tokenAccountsForOverview = tokenAccounts.value.map(account => ({
+      mint: account.account.data.parsed.info.mint,
+      uiAmount: account.account.data.parsed.info.tokenAmount.uiAmount,
+      symbol: 'UNK', // Default symbol - would be fetched from token registry in real app
+    }));
+
     return {
       address,
       isSystemProgram: !accountInfo?.owner || accountInfo.owner.equals(PublicKey.default),
       parsedOwner: accountInfo?.owner?.toBase58() || PublicKey.default.toBase58(),
       solBalance: balance / 1e9,
       tokenBalances,
+      tokenAccounts: tokenAccountsForOverview,
     };
   } catch (error) {
     console.error('Error fetching account info:', error);
@@ -46,6 +56,7 @@ async function getAccountData(address: string): Promise<AccountData> {
       parsedOwner: PublicKey.default.toBase58(),
       solBalance: 0,
       tokenBalances: [],
+      tokenAccounts: [],
     };
   }
 }
@@ -96,6 +107,15 @@ export default async function AccountPage({ params, searchParams }: PageProps) {
             isSystemProgram={accountInfo.isSystemProgram}
             parsedOwner={accountInfo.parsedOwner}
           />
+          <div className="mt-6">
+            <AccountOverview
+              address={accountInfo.address}
+              solBalance={accountInfo.solBalance}
+              tokenAccounts={accountInfo.tokenAccounts}
+              isSystemProgram={accountInfo.isSystemProgram}
+              parsedOwner={accountInfo.parsedOwner}
+            />
+          </div>
           <AccountTabs
             address={accountInfo.address}
             solBalance={accountInfo.solBalance}

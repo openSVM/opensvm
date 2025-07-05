@@ -56,11 +56,11 @@ export default function AccountOverview({
     fetchAccountStats();
   }, [address]);
 
-  // Colors for pie chart
-  const CHART_COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
-
   // Calculate portfolio breakdown for pie chart
   const portfolioData = useMemo(() => {
+    // Colors for pie chart
+    const CHART_COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
+    
     const data = [];
     
     // Add SOL balance
@@ -84,7 +84,7 @@ export default function AccountOverview({
     });
     
     return data;
-  }, [solBalance, tokenAccounts, CHART_COLORS]);
+  }, [solBalance, tokenAccounts]);
 
   return (
     <div className="rounded-lg border border-neutral-800 bg-black">
