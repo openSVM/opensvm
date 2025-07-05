@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Loader2, AlertTriangle, Server, TrendingUp, TrendingDown, MapPin, Users, Zap, Shield } from 'lucide-react';
 
 interface ValidatorData {
@@ -57,6 +58,7 @@ interface ValidatorData {
 }
 
 export function ValidatorTab() {
+  const router = useRouter();
   const [data, setData] = useState<ValidatorData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -116,10 +118,11 @@ export function ValidatorTab() {
     return () => clearInterval(interval);
   }, []);
 
-  const formatSOL = (value: number) => {
-    if (value >= 1e6) return `${(value / 1e6).toFixed(2)}M SOL`;
-    if (value >= 1e3) return `${(value / 1e3).toFixed(2)}K SOL`;
-    return `${value.toFixed(2)} SOL`;
+  const formatSOL = (lamports: number) => {
+    const sol = lamports / 1e9; // Convert lamports to SOL
+    if (sol >= 1e6) return `${(sol / 1e6).toFixed(2)}M SOL`;
+    if (sol >= 1e3) return `${(sol / 1e3).toFixed(2)}K SOL`;
+    return `${sol.toFixed(2)} SOL`;
   };
 
   const formatPercent = (value: number) => {
@@ -320,9 +323,12 @@ export function ValidatorTab() {
                     <td className="py-3">
                       <div>
                         <div className="font-medium">{validator.name || 'Unknown'}</div>
-                        <div className="text-xs text-muted-foreground font-mono">
+                        <button
+                          onClick={() => router.push(`/validator/${validator.voteAccount}`)}
+                          className="text-xs text-primary hover:text-primary/80 font-mono underline cursor-pointer"
+                        >
                           {validator.voteAccount.slice(0, 8)}...{validator.voteAccount.slice(-8)}
-                        </div>
+                        </button>
                       </div>
                     </td>
                     <td className="py-3">
@@ -334,10 +340,10 @@ export function ValidatorTab() {
                     <td className="py-3">{formatPercent(validator.commission / 100)}</td>
                     <td className="py-3">
                       <div className={`font-medium ${
-                        validator.apy >= 0.07 ? 'text-green-600' : 
-                        validator.apy >= 0.05 ? 'text-yellow-600' : 'text-red-600'
+                        validator.apy >= 7 ? 'text-green-600' : 
+                        validator.apy >= 5 ? 'text-yellow-600' : 'text-red-600'
                       }`}>
-                        {formatPercent(validator.apy)}
+                        {validator.apy.toFixed(2)}%
                       </div>
                     </td>
                     <td className="py-3">

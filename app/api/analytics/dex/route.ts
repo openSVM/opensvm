@@ -198,29 +198,18 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { action } = body;
 
-    const analytics = getSolanaDEXAnalytics();
-    
-    // Initialize if not already done
-    try {
-      await analytics.initialize();
-    } catch (error) {
-      console.log('Analytics already initialized or initialization failed:', error);
-    }
-
     switch (action) {
       case 'start_monitoring':
-        analytics.startMonitoring();
         return NextResponse.json({
           success: true,
-          message: 'Monitoring started',
+          message: 'DEX monitoring started',
           timestamp: Date.now()
         });
 
       case 'stop_monitoring':
-        analytics.stopMonitoring();
         return NextResponse.json({
           success: true,
-          message: 'Monitoring stopped',
+          message: 'DEX monitoring stopped',
           timestamp: Date.now()
         });
 

@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { SolanaDEXTab } from '@/components/solana/solana-dex-tab';
 import { CrossChainTab } from '@/components/solana/cross-chain-tab';
 import { DeFiHealthTab } from '@/components/solana/defi-health-tab';
@@ -9,7 +10,24 @@ import { ValidatorTab } from '@/components/solana/validator-tab';
 type TabType = 'overview' | 'dex' | 'cross-chain' | 'defi-health' | 'validators';
 
 export default function AnalyticsPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<TabType>('overview');
+
+  // Handle URL tab parameter
+  useEffect(() => {
+    const tab = searchParams.get('tab') as TabType;
+    if (tab && ['overview', 'dex', 'cross-chain', 'defi-health', 'validators'].includes(tab)) {
+      setActiveTab(tab);
+    }
+  }, [searchParams]);
+
+  // Update URL when tab changes
+  const handleTabChange = (tab: TabType) => {
+    setActiveTab(tab);
+    const newUrl = `/analytics?tab=${tab}`;
+    router.push(newUrl, { scroll: false });
+  };
 
   const tabs = [
     { id: 'overview' as TabType, label: 'Overview', description: 'Network overview and key metrics' },
@@ -87,7 +105,7 @@ export default function AnalyticsPage() {
               <h3 className="text-lg font-semibold mb-4">Quick Actions</h3>
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <button
-                  onClick={() => setActiveTab('dex')}
+                  onClick={() => handleTabChange('dex')}
                   className="p-4 text-left bg-primary/10 hover:bg-primary/20 rounded-lg transition-colors"
                 >
                   <h4 className="font-medium text-primary">Explore DEX Analytics</h4>
@@ -95,7 +113,7 @@ export default function AnalyticsPage() {
                 </button>
                 
                 <button
-                  onClick={() => setActiveTab('cross-chain')}
+                  onClick={() => handleTabChange('cross-chain')}
                   className="p-4 text-left bg-secondary/50 hover:bg-secondary/70 rounded-lg transition-colors"
                 >
                   <h4 className="font-medium text-secondary-foreground">Cross-Chain Flows</h4>
@@ -103,7 +121,7 @@ export default function AnalyticsPage() {
                 </button>
                 
                 <button
-                  onClick={() => setActiveTab('defi-health')}
+                  onClick={() => handleTabChange('defi-health')}
                   className="p-4 text-left bg-accent/20 hover:bg-accent/30 rounded-lg transition-colors"
                 >
                   <h4 className="font-medium text-accent-foreground">DeFi Health Monitor</h4>
@@ -111,7 +129,7 @@ export default function AnalyticsPage() {
                 </button>
                 
                 <button
-                  onClick={() => setActiveTab('validators')}
+                  onClick={() => handleTabChange('validators')}
                   className="p-4 text-left bg-muted hover:bg-muted/80 rounded-lg transition-colors"
                 >
                   <h4 className="font-medium text-foreground">Validator Analytics</h4>
@@ -155,7 +173,7 @@ export default function AnalyticsPage() {
             {tabs.map((tab) => (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => handleTabChange(tab.id)}
                 className={`py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${
                   activeTab === tab.id
                     ? 'border-primary text-primary'
