@@ -293,7 +293,7 @@ const EnhancedTransactionVisualizer = function({ tx }: EnhancedTransactionVisual
         svg.on('.drag', null);
       }
     };
-  }, [tx]);
+  }, [tx, dragstarted, dragged, dragended, getNodeColor, getNodeLabel, getNodeRadius, getNodeTooltip]);
 
   return (
     <div className="w-full h-[600px] bg-neutral-900 rounded-lg overflow-hidden">

@@ -292,7 +292,7 @@ export const optimizeCytoscapeContainer = (container: HTMLElement): void => {
   });
 };
 
-export default {
+const gpuUtils = {
   enableGPUAcceleration,
   setupGPUCanvas,
   GPUAnimationScheduler,
@@ -301,3 +301,5 @@ export default {
   createGPUTransform,
   optimizeCytoscapeContainer
 };
+
+export default gpuUtils;

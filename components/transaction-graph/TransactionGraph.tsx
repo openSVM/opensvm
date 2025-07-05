@@ -882,7 +882,6 @@ function TransactionGraph({
     clientSideNavigation,
     isNavigatingHistory,
     currentHistoryIndex,
-    queueAccountFetch,
     currentSignature
   ]);
 
@@ -1032,7 +1031,7 @@ function TransactionGraph({
       }
       isInitializingRef.current = false;
     };
-  }, []); // No dependencies to prevent re-initialization
+  }, [setupGraphInteractionsCallback]); // Add setupGraphInteractionsCallback to dependencies
 
   // Update GPU graph data when Cytoscape graph changes
   useEffect(() => {
@@ -1348,7 +1347,7 @@ function TransactionGraph({
     };
 
     loadInitialSignature();
-  }, [initialSignature, focusOnTransaction, queueAccountFetch, runLayoutOptimized, updateGPUGraphData]);
+  }, [initialSignature, focusOnTransaction, queueAccountFetch, runLayoutOptimized, updateGPUGraphData, processAccountFetchQueue]);
 
   // Handle initial account loading with enhanced race condition protection  
   useEffect(() => {
@@ -1462,9 +1461,10 @@ function TransactionGraph({
 
   // Cleanup tracking on unmount
   useEffect(() => {
+    const intervalRef = trackingIntervalRef;
     return () => {
-      if (trackingIntervalRef.current) {
-        clearInterval(trackingIntervalRef.current);
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
       }
     };
   }, []);
