@@ -41,6 +41,18 @@ export function TransfersTable({ address }: TransfersTableProps) {
     });
   }, [router]);
 
+  // Handle transaction hash clicks
+  const handleTransactionClick = useStableCallback((e: React.MouseEvent<HTMLAnchorElement>, signature: string) => {
+    if (!signature) return;
+    
+    e.preventDefault();
+    
+    // Navigate to transaction page
+    router.push(`/tx/${signature}`, { 
+      scroll: false 
+    });
+  }, [router]);
+
   // Map API data to the expected Transfer format
   const transfers = useMemo(() => {
     return rawTransfers.map(item => {
@@ -199,6 +211,7 @@ export function TransfersTable({ address }: TransfersTableProps) {
             {row.signature ? (
               <Link
                 href={`/tx/${row.signature}`}
+                onClick={(e) => handleTransactionClick(e, row.signature || '')}
                 className="hover:underline hover:text-primary text-primary/80 transition-colors"
                 prefetch={false}
                 data-signature={row.signature}
@@ -212,7 +225,7 @@ export function TransfersTable({ address }: TransfersTableProps) {
         </Tooltip>
       )
     }
-  ], [handleAddressClick]);
+  ], [handleAddressClick, handleTransactionClick]);
 
 
   const sortedTransfers = useMemo(() => {
