@@ -1,169 +1,206 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Connection, PublicKey } from '@solana/web3.js';
 
-// Real DEX Analytics API using on-chain data
-const SOLANA_RPC_URL = process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com';
+// Real DEX Analytics API using external APIs for real data
+interface DexMetrics {
+  name: string;
+  volume24h: number;
+  tvl: number;
+  volumeChange: number;
+  marketShare: number;
+  activeUsers?: number;
+  transactions?: number;
+  avgTransactionSize?: number;
+}
 
-// Known Solana DEX protocols with their information
-const KNOWN_DEXES = [
-  {
-    name: 'Jupiter',
-    programId: 'JUP4Fb2cqiRUcaTHdrPC8h2gNsA2ETXiPDD33WcGuJB',
-    estimatedTvl: 150000000, // $150M
-    avgTurnover: 2.5 // 250% daily turnover
-  },
-  {
-    name: 'Raydium',
-    programId: '675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8',
-    estimatedTvl: 500000000, // $500M
-    avgTurnover: 0.8 // 80% daily turnover
-  },
-  {
-    name: 'Orca',
-    programId: '9W959DqEETiGZocYWisQaEdchymCAUcHJg4fKW9NJyHv',
-    estimatedTvl: 200000000, // $200M
-    avgTurnover: 0.6 // 60% daily turnover
-  },
-  {
-    name: 'Serum',
-    programId: 'srmqPiDkd6jx6jZSJXNP3HqJiJzaKgUhP5K2GKksJ4e',
-    estimatedTvl: 100000000, // $100M
-    avgTurnover: 0.4 // 40% daily turnover
-  },
-  {
-    name: 'Phoenix',
-    programId: 'PhoeNiXZ8ByJGLkxNfZRnkUfjvmuYqLR89jjFHGqdXY',
-    estimatedTvl: 25000000, // $25M
-    avgTurnover: 0.3 // 30% daily turnover
-  },
-  {
-    name: 'Meteora',
-    programId: 'Eo7WjKq67rjJQSZxS6z3YkapzY3eMj6Xy8X5EQVn5UaB',
-    estimatedTvl: 80000000, // $80M
-    avgTurnover: 0.5 // 50% daily turnover
+// Fetch real data from Jupiter API
+async function fetchJupiterData(): Promise<DexMetrics | null> {
+  try {
+    const response = await fetch('https://stats-api.jup.ag/coingecko/coins/jupiter-exchange-solana');
+    if (!response.ok) return null;
+    const data = await response.json();
+    
+    return {
+      name: 'Jupiter',
+      volume24h: data.total_volume || 0,
+      tvl: data.market_cap || 0,
+      volumeChange: data.price_change_percentage_24h || 0,
+      marketShare: 0 // Will be calculated later
+    };
+  } catch (error) {
+    console.error('Error fetching Jupiter data:', error);
+    return null;
   }
-];
+}
+
+// Fetch real data from Raydium API
+async function fetchRaydiumData(): Promise<DexMetrics | null> {
+  try {
+    const response = await fetch('https://api.raydium.io/v2/main/info');
+    if (!response.ok) return null;
+    const data = await response.json();
+    
+    return {
+      name: 'Raydium',
+      volume24h: parseFloat(data.totalvolume || '0'),
+      tvl: parseFloat(data.tvl || '0'),
+      volumeChange: 0, // Would need historical data
+      marketShare: 0
+    };
+  } catch (error) {
+    console.error('Error fetching Raydium data:', error);
+    return null;
+  }
+}
+
+// Fetch real data from DeFiLlama for multiple DEXes
+async function fetchDeFiLlamaData(): Promise<DexMetrics[]> {
+  try {
+    const response = await fetch('https://api.llama.fi/overview/dexs/solana');
+    if (!response.ok) return [];
+    const data = await response.json();
+    
+    return data.protocols?.map((protocol: any) => ({
+      name: protocol.name,
+      volume24h: protocol.total24h || 0,
+      tvl: protocol.tvl || 0,
+      volumeChange: protocol.change_1d || 0,
+      marketShare: 0
+    })) || [];
+  } catch (error) {
+    console.error('Error fetching DeFiLlama data:', error);
+    return [];
+  }
+}
+
+// Fetch real Solana ecosystem data
+async function fetchSolanaEcosystemData(): Promise<DexMetrics[]> {
+  try {
+    const response = await fetch('https://api.coingecko.com/api/v3/exchanges');
+    if (!response.ok) return [];
+    const data = await response.json();
+    
+    // Filter for Solana-based exchanges
+    const solanaExchanges = data.filter((exchange: any) => 
+      exchange.name?.toLowerCase().includes('solana') ||
+      exchange.name?.toLowerCase().includes('raydium') ||
+      exchange.name?.toLowerCase().includes('orca') ||
+      exchange.name?.toLowerCase().includes('serum')
+    );
+    
+    return solanaExchanges.map((exchange: any) => ({
+      name: exchange.name,
+      volume24h: parseFloat(exchange.trade_volume_24h_btc || '0') * 50000, // Estimate USD
+      tvl: 0, // Not available from this endpoint
+      volumeChange: 0,
+      marketShare: 0
+    }));
+  } catch (error) {
+    console.error('Error fetching Solana ecosystem data:', error);
+    return [];
+  }
+}
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const dex = searchParams.get('dex') || undefined;
     
-    const connection = new Connection(SOLANA_RPC_URL, 'confirmed');
+    // Fetch real data from multiple sources
+    const allMetrics: DexMetrics[] = [];
     
-    // Fetch real on-chain data for each DEX
-    const liquidityData = [];
-    const volumeData = [];
-    const dexHealthData = [];
+    // Fetch from Jupiter API
+    const jupiterData = await fetchJupiterData();
+    if (jupiterData) allMetrics.push(jupiterData);
     
-    for (const dexInfo of KNOWN_DEXES) {
-      try {
-        // Check if DEX program exists and is active
-        const programInfo = await connection.getAccountInfo(
-          new PublicKey(dexInfo.programId)
-        );
-        
-        const isActive = programInfo !== null;
-        const activityMultiplier = isActive ? 1.0 : 0.1;
-        
-        // Calculate real-time adjusted metrics
-        const currentTvl = dexInfo.estimatedTvl * activityMultiplier;
-        const volume24h = currentTvl * dexInfo.avgTurnover;
-        const volumeChange = (Math.random() - 0.5) * 0.2; // ±10%
-        
-        // Liquidity data
-        liquidityData.push({
-          dex: dexInfo.name,
-          poolAddress: `${dexInfo.name.toLowerCase()}_aggregated_pools`,
-          tokenA: 'SOL',
-          tokenB: 'USDC',
-          liquidityUSD: currentTvl,
-          volume24h,
-          fees24h: volume24h * 0.003, // 0.3% average fees
-          tvl: currentTvl,
-          timestamp: Date.now()
-        });
-        
-        // Volume metrics
-        volumeData.push({
-          dex: dexInfo.name,
-          volume24h,
-          volumeChange,
-          activeUsers: Math.floor(currentTvl / 50000), // Estimate users
-          transactions: Math.floor(volume24h / 5000), // Estimate transactions
-          avgTransactionSize: volume24h > 0 ? Math.floor(volume24h / Math.max(Math.floor(volume24h / 5000), 1)) : 0,
-          timestamp: Date.now()
-        });
-        
-        // DEX health data
-        dexHealthData.push({
-          dex: dexInfo.name,
-          isActive,
-          tvl: currentTvl,
-          volume24h
-        });
-        
-      } catch (error) {
-        console.error(`Error processing DEX ${dexInfo.name}:`, error);
-      }
-    }
+    // Fetch from Raydium API
+    const raydiumData = await fetchRaydiumData();
+    if (raydiumData) allMetrics.push(raydiumData);
     
-    // Filter by DEX if specified
-    const filteredLiquidity = dex 
-      ? liquidityData.filter(l => l.dex.toLowerCase() === dex.toLowerCase())
-      : liquidityData;
-    const filteredVolume = dex 
-      ? volumeData.filter(v => v.dex.toLowerCase() === dex.toLowerCase())
-      : volumeData;
+    // Fetch from DeFiLlama
+    const defiLlamaData = await fetchDeFiLlamaData();
+    allMetrics.push(...defiLlamaData);
     
-    // Calculate arbitrage opportunities (simplified)
-    const arbitrageOpportunities = [];
-    for (let i = 0; i < liquidityData.length; i++) {
-      for (let j = i + 1; j < liquidityData.length; j++) {
-        const pool1 = liquidityData[i];
-        const pool2 = liquidityData[j];
-        
-        // Simple arbitrage calculation based on liquidity differences
-        const priceDiff = Math.abs(pool1.liquidityUSD - pool2.liquidityUSD) / Math.min(pool1.liquidityUSD, pool2.liquidityUSD);
-        
-        if (priceDiff > 0.005) { // 0.5% threshold
-          arbitrageOpportunities.push({
-            tokenPair: `${pool1.tokenA}/${pool1.tokenB}`,
-            dexA: pool1.dex,
-            dexB: pool2.dex,
-            priceDifference: priceDiff,
-            potentialProfit: Math.min(pool1.volume24h, pool2.volume24h) * priceDiff * 0.1,
-            liquidityA: pool1.liquidityUSD,
-            liquidityB: pool2.liquidityUSD,
-            timestamp: Date.now()
+    // Fetch from CoinGecko
+    const ecosystemData = await fetchSolanaEcosystemData();
+    allMetrics.push(...ecosystemData);
+    
+    // Remove duplicates and merge data by name
+    const mergedMetrics = new Map<string, DexMetrics>();
+    allMetrics.forEach(metric => {
+      const existing = mergedMetrics.get(metric.name);
+      if (existing) {
+        // Merge data, taking the highest volume as primary source
+        if (metric.volume24h > existing.volume24h) {
+          mergedMetrics.set(metric.name, {
+            ...existing,
+            ...metric,
+            tvl: Math.max(existing.tvl, metric.tvl)
           });
         }
+      } else {
+        mergedMetrics.set(metric.name, metric);
       }
-    }
+    });
     
-    // Sort arbitrage opportunities by potential profit
-    arbitrageOpportunities.sort((a, b) => b.potentialProfit - a.potentialProfit);
+    const finalMetrics = Array.from(mergedMetrics.values()).filter(m => m.volume24h > 0);
     
-    // Generate DEX rankings
+    // Calculate market share
+    const totalVolume = finalMetrics.reduce((sum, m) => sum + m.volume24h, 0);
+    finalMetrics.forEach(metric => {
+      metric.marketShare = totalVolume > 0 ? metric.volume24h / totalVolume : 0;
+    });
+    
+    // Filter by DEX if specified
+    const filteredMetrics = dex 
+      ? finalMetrics.filter(m => m.name.toLowerCase() === dex.toLowerCase())
+      : finalMetrics;
+    
+    // Convert to required format
+    const liquidityData = filteredMetrics.map(metric => ({
+      dex: metric.name,
+      poolAddress: `${metric.name.toLowerCase()}_real_pools`,
+      tokenA: 'SOL',
+      tokenB: 'USDC',
+      liquidityUSD: metric.tvl,
+      volume24h: metric.volume24h,
+      fees24h: metric.volume24h * 0.003, // 0.3% average fees
+      tvl: metric.tvl,
+      timestamp: Date.now()
+    }));
+    
+    const volumeData = filteredMetrics.map(metric => ({
+      dex: metric.name,
+      volume24h: metric.volume24h,
+      volumeChange: metric.volumeChange,
+      activeUsers: metric.activeUsers || Math.floor(metric.volume24h / 50000),
+      transactions: metric.transactions || Math.floor(metric.volume24h / 5000),
+      avgTransactionSize: metric.avgTransactionSize || (metric.volume24h > 0 ? 5000 : 0),
+      timestamp: Date.now()
+    }));
+    
+    // Real arbitrage opportunities require price feed APIs
+    const arbitrageOpportunities: any[] = [];
+    
+    // Generate DEX rankings from real data
     const rankings = volumeData
       .sort((a, b) => b.volume24h - a.volume24h)
       .map((v, index) => ({
         rank: index + 1,
         dex: v.dex,
-        totalVolume: v.volume24h, // Match the interface expectation
+        totalVolume: v.volume24h,
         volume24h: v.volume24h,
         volumeChange: v.volumeChange,
         tvl: liquidityData.find(l => l.dex === v.dex)?.tvl || 0,
-        marketShare: v.volume24h / volumeData.reduce((sum, vol) => sum + vol.volume24h, 0)
+        marketShare: finalMetrics.find(m => m.name === v.dex)?.marketShare || 0
       }));
     
-    // Health status
+    // Health status based on real data
     const totalTvl = liquidityData.reduce((sum, l) => sum + l.liquidityUSD, 0);
-    const totalVolume = volumeData.reduce((sum, v) => sum + v.volume24h, 0);
-    const activeDexes = dexHealthData.filter(d => d.isActive).length;
+    const totalVolumeSum = volumeData.reduce((sum, v) => sum + v.volume24h, 0);
+    const activeDexes = volumeData.filter(v => v.volume24h > 1000).length;
     
     const health = {
-      isHealthy: activeDexes >= 3 && totalTvl > 100000000, // At least 3 active DEXes and $100M TVL
+      isHealthy: activeDexes >= 3 && totalVolumeSum > 1000000, // At least 3 active DEXes and $1M volume
       lastUpdate: Date.now(),
       connectedDEXes: activeDexes,
       dataPoints: liquidityData.length
@@ -172,9 +209,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       data: {
-        liquidity: filteredLiquidity,
-        volume: filteredVolume,
-        arbitrage: arbitrageOpportunities.slice(0, 10), // Top 10 opportunities
+        liquidity: liquidityData,
+        volume: volumeData,
+        arbitrage: arbitrageOpportunities,
         rankings,
         health
       },
@@ -186,7 +223,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: error instanceof Error ? error.message : 'Failed to fetch real DEX data',
         timestamp: Date.now()
       },
       { status: 500 }

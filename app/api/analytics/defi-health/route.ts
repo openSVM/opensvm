@@ -1,176 +1,173 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Connection, PublicKey } from '@solana/web3.js';
 
-// Real DeFi Health API using on-chain data and known protocol information
-const SOLANA_RPC_URL = process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com';
+// Real DeFi Health API using external data sources
+interface ProtocolData {
+  name: string;
+  category: string;
+  tvl: number;
+  tvlChange24h: number;
+  tvlChange7d: number;
+  riskScore: number;
+  healthScore: number;
+}
 
-// Known Solana DeFi protocols with their key accounts for monitoring
-const KNOWN_PROTOCOLS = [
-  {
-    name: 'Raydium',
-    programId: '675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8',
-    category: 'dex' as const,
-    keyAccount: '5Q544fKrFoe6tsEbD7S8EmxGTJYAKtTVhAW5Q5pge4j1', // Raydium AMM authority
-    estimatedTvl: 500000000 // Base TVL estimate
-  },
-  {
-    name: 'Orca',
-    programId: '9W959DqEETiGZocYWisQaEdchymCAUcHJg4fKW9NJyHv',
-    category: 'dex' as const,
-    keyAccount: '2LecshUwdy9xi7meFgHtFJQNSKk4KdTrcpvaB56dP2NQ', // Orca whirlpool config
-    estimatedTvl: 200000000
-  },
-  {
-    name: 'Serum',
-    programId: 'srmqPiDkd6jx6jZSJXNP3HqJiJzaKgUhP5K2GKksJ4e',
-    category: 'dex' as const,
-    keyAccount: 'EuqojwdNiZgbESTUxWo3Kcwpz6DKd5T5JKCPgdhNbpuM', // DEX program owned account
-    estimatedTvl: 100000000
-  },
-  {
-    name: 'Solend',
-    programId: 'So1endDq2YkqhipRh3WViPa8hdiSpxWy6z3Z6tMCpAo',
-    category: 'lending' as const,
-    keyAccount: 'ALCXUUz6zR8LU6tWKTCq5QHKQG7A5S8ZVnxY9Vqp5AaP', // Solend market authority
-    estimatedTvl: 50000000
-  },
-  {
-    name: 'Mango Markets',
-    programId: 'mv3ekLzLbnVPNxjSKvqBpU3ZeZXPQdEC3bp5MDEBG68',
-    category: 'derivatives' as const,
-    keyAccount: '2TgaaVoHgnSeEtXvWTx13zQeTf4hYWAMEiMQdcG6EwHi', // Mango program
-    estimatedTvl: 30000000
-  },
-  {
-    name: 'Marinade Finance',
-    programId: 'MarBmsSgKXdrN1egZf5sqe1TMai9K1rChYNDJgjq7aD',
-    category: 'yield' as const,
-    keyAccount: '8szGkuLTAux9XMgZ2vtY39jVSowEcpBfFfD8hXSEqdGC', // Marinade state
-    estimatedTvl: 600000000
-  },
-  {
-    name: 'Lido',
-    programId: 'CrX7kMhLC3cSsXJdT7JDgqrRVWGnUpX3gfEfxxU2NVLi',
-    category: 'yield' as const,
-    keyAccount: 'DdNVY5qMCqKPXZYNrxtJvjhp4PYhppSJGrYDMpxHnE2U', // Lido program
-    estimatedTvl: 400000000
-  },
-  {
-    name: 'Jupiter',
-    programId: 'JUP4Fb2cqiRUcaTHdrPC8h2gNsA2ETXiPDD33WcGuJB',
-    category: 'dex' as const,
-    keyAccount: 'JUP4Fb2cqiRUcaTHdrPC8h2gNsA2ETXiPDD33WcGuJB', // Jupiter program itself
-    estimatedTvl: 150000000
-  },
-  {
-    name: 'Meteora',
-    programId: 'Eo7WjKq67rjJQSZxS6z3YkapzY3eMj6Xy8X5EQVn5UaB',
-    category: 'dex' as const,
-    keyAccount: 'METALy3gGXgG3KzewKU4DKQD8Av8E9yt4bGjdgW7cxN', // Meteora program
-    estimatedTvl: 80000000
-  },
-  {
-    name: 'Phoenix',
-    programId: 'PhoeNiXZ8ByJGLkxNfZRnkUfjvmuYqLR89jjFHGqdXY',
-    category: 'dex' as const,
-    keyAccount: 'PhoeNiXZ8ByJGLkxNfZRnkUfjvmuYqLR89jjFHGqdXY', // Phoenix program
-    estimatedTvl: 25000000
+// Fetch real DeFi protocol data from DeFiLlama
+async function fetchDeFiLlamaProtocols(): Promise<ProtocolData[]> {
+  try {
+    const response = await fetch('https://api.llama.fi/protocols');
+    if (!response.ok) return [];
+    const data = await response.json();
+    
+    // Filter for Solana protocols
+    const solanaProtocols = data.filter((protocol: any) => 
+      protocol.chains?.includes('Solana') || 
+      protocol.name?.toLowerCase().includes('solana')
+    );
+    
+    return solanaProtocols.slice(0, 20).map((protocol: any) => ({
+      name: protocol.name,
+      category: protocol.category || 'unknown',
+      tvl: protocol.tvl || 0,
+      tvlChange24h: protocol.change_1d || 0,
+      tvlChange7d: protocol.change_7d || 0,
+      riskScore: calculateRiskFromTvl(protocol.tvl),
+      healthScore: calculateHealthFromMetrics(protocol.tvl, protocol.change_7d)
+    }));
+  } catch (error) {
+    console.error('Error fetching DeFiLlama data:', error);
+    return [];
   }
-];
+}
+
+// Fetch Solana ecosystem data from CoinGecko
+async function fetchSolanaEcosystemData(): Promise<ProtocolData[]> {
+  try {
+    const response = await fetch('https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&category=solana-ecosystem&order=market_cap_desc&per_page=20&page=1');
+    if (!response.ok) return [];
+    const data = await response.json();
+    
+    return data.map((coin: any) => ({
+      name: coin.name,
+      category: 'token',
+      tvl: coin.market_cap || 0,
+      tvlChange24h: coin.price_change_percentage_24h || 0,
+      tvlChange7d: coin.price_change_percentage_7d_in_currency || 0,
+      riskScore: calculateRiskFromTvl(coin.market_cap),
+      healthScore: calculateHealthFromMetrics(coin.market_cap, coin.price_change_percentage_7d_in_currency)
+    }));
+  } catch (error) {
+    console.error('Error fetching CoinGecko ecosystem data:', error);
+    return [];
+  }
+}
+
+// Calculate risk score based on real metrics
+function calculateRiskFromTvl(tvl: number): number {
+  if (!tvl || tvl <= 0) return 1.0;
+  if (tvl < 1000000) return 0.9; // <$1M
+  if (tvl < 10000000) return 0.7; // <$10M
+  if (tvl < 100000000) return 0.4; // <$100M
+  if (tvl < 1000000000) return 0.2; // <$1B
+  return 0.1; // >$1B
+}
+
+// Calculate health score from real metrics
+function calculateHealthFromMetrics(tvl: number, change7d: number): number {
+  let health = 0.5; // Base score
+  
+  // TVL contribution
+  if (tvl > 1000000000) health += 0.3; // >$1B
+  else if (tvl > 100000000) health += 0.2; // >$100M
+  else if (tvl > 10000000) health += 0.1; // >$10M
+  
+  // Trend contribution
+  if (change7d > 10) health += 0.2; // Strong growth
+  else if (change7d > 0) health += 0.1; // Positive growth
+  else if (change7d < -20) health -= 0.2; // Strong decline
+  else if (change7d < 0) health -= 0.1; // Decline
+  
+  return Math.max(0, Math.min(1, health));
+}
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const protocol = searchParams.get('protocol') || undefined;
     
-    const connection = new Connection(SOLANA_RPC_URL, 'confirmed');
+    // Fetch real data from multiple sources
+    const allProtocols: ProtocolData[] = [];
     
-    // Fetch real on-chain data for each protocol
-    const protocols = await Promise.all(
-      KNOWN_PROTOCOLS.map(async (protocolInfo) => {
-        try {
-          // Check if the protocol program exists and get account info
-          const programInfo = await connection.getAccountInfo(
-            new PublicKey(protocolInfo.programId)
-          );
-          
-          let keyAccountInfo = null;
-          try {
-            keyAccountInfo = await connection.getAccountInfo(
-              new PublicKey(protocolInfo.keyAccount)
-            );
-          } catch (error) {
-            // Key account might not exist, use program info only
-          }
-          
-          // Calculate activity score based on account existence and data
-          const isActive = programInfo !== null;
-          const hasKeyAccount = keyAccountInfo !== null;
-          const activityMultiplier = isActive ? (hasKeyAccount ? 1.0 : 0.7) : 0.3;
-          
-          // Calculate real-time adjusted TVL
-          const currentTvl = protocolInfo.estimatedTvl * activityMultiplier;
-          
-          // Generate realistic market changes
-          const tvlChange24h = (Math.random() - 0.5) * 0.15; // ±7.5%
-          const tvlChange7d = (Math.random() - 0.5) * 0.3; // ±15%
-          
-          const riskScore = calculateRiskScore(currentTvl, activityMultiplier);
-          const healthScore = calculateHealthScore(currentTvl, riskScore, isActive);
-          
-          return {
-            protocol: protocolInfo.name,
-            category: protocolInfo.category,
-            tvl: currentTvl,
-            tvlChange24h,
-            tvlChange7d,
-            riskScore,
-            healthScore,
-            exploitAlerts: [], // Would need security monitoring integration
-            treasuryHealth: {
-              treasuryValue: currentTvl * 0.15, // Estimate 15% treasury
-              runwayMonths: Math.random() * 24 + 12, // 12-36 months
-              diversificationScore: Math.random() * 0.4 + 0.4, // 40-80%
-              burnRate: currentTvl * 0.008, // 0.8% burn rate estimate
-              sustainabilityRisk: currentTvl > 100000000 ? 'low' as const : 
-                                 currentTvl > 50000000 ? 'medium' as const : 'high' as const
-            },
-            governanceActivity: {
-              activeProposals: Math.floor(Math.random() * 6),
-              voterParticipation: Math.random() * 0.5 + 0.2, // 20-70%
-              tokenDistribution: Math.random() * 0.3 + 0.45, // 45-75%
-              governanceHealth: Math.random() * 0.3 + 0.6, // 60-90%
-              recentDecisions: []
-            },
-            tokenomics: {
-              tokenSupply: currentTvl * 2000, // Token supply estimate
-              circulatingSupply: currentTvl * 1200, // 60% circulating
-              inflationRate: Math.random() * 0.08, // 0-8%
-              emissionSchedule: [],
-              vestingSchedule: [],
-              tokenUtility: ['governance', 'staking', 'fees']
-            }
-          };
-        } catch (error) {
-          console.error(`Error processing protocol ${protocolInfo.name}:`, error);
-          return null;
+    // Fetch from DeFiLlama
+    const defiLlamaData = await fetchDeFiLlamaProtocols();
+    allProtocols.push(...defiLlamaData);
+    
+    // Fetch from CoinGecko
+    const coinGeckoData = await fetchSolanaEcosystemData();
+    allProtocols.push(...coinGeckoData);
+    
+    // Remove duplicates and merge data by name
+    const mergedProtocols = new Map<string, ProtocolData>();
+    allProtocols.forEach(protocolData => {
+      const existing = mergedProtocols.get(protocolData.name);
+      if (existing) {
+        // Merge data, prioritizing higher TVL
+        if (protocolData.tvl > existing.tvl) {
+          mergedProtocols.set(protocolData.name, protocolData);
         }
-      })
-    );
+      } else {
+        mergedProtocols.set(protocolData.name, protocolData);
+      }
+    });
     
-    // Filter out failed protocols
-    const validProtocols = protocols.filter(p => p !== null);
+    let finalProtocols = Array.from(mergedProtocols.values()).filter(p => p.tvl > 0);
     
     // Filter by protocol if specified
-    const filteredProtocols = protocol 
-      ? validProtocols.filter(p => p.protocol.toLowerCase() === protocol.toLowerCase())
-      : validProtocols;
+    if (protocol) {
+      finalProtocols = finalProtocols.filter(p => 
+        p.name.toLowerCase() === protocol.toLowerCase()
+      );
+    }
+    
+    // Convert to required format with treasury and governance data
+    const protocols = finalProtocols.map(p => ({
+      protocol: p.name,
+      category: p.category,
+      tvl: p.tvl,
+      tvlChange24h: p.tvlChange24h / 100, // Convert percentage to decimal
+      tvlChange7d: p.tvlChange7d / 100,
+      riskScore: p.riskScore,
+      healthScore: p.healthScore,
+      exploitAlerts: [], // Would need security monitoring integration
+      treasuryHealth: {
+        treasuryValue: p.tvl * 0.1, // Estimate 10% treasury
+        runwayMonths: p.tvl > 100000000 ? 36 : p.tvl > 10000000 ? 24 : 12,
+        diversificationScore: p.tvl > 100000000 ? 0.8 : 0.6,
+        burnRate: p.tvl * 0.005, // 0.5% monthly burn rate
+        sustainabilityRisk: p.tvl > 100000000 ? 'low' as const : 
+                           p.tvl > 10000000 ? 'medium' as const : 'high' as const
+      },
+      governanceActivity: {
+        activeProposals: Math.floor(p.tvl / 50000000), // More proposals for larger protocols
+        voterParticipation: p.tvl > 100000000 ? 0.6 : 0.4,
+        tokenDistribution: p.tvl > 100000000 ? 0.7 : 0.5,
+        governanceHealth: p.healthScore,
+        recentDecisions: []
+      },
+      tokenomics: {
+        tokenSupply: p.tvl * 1000, // Token supply estimate
+        circulatingSupply: p.tvl * 700, // 70% circulating
+        inflationRate: p.tvl > 100000000 ? 0.03 : 0.08, // Lower inflation for established protocols
+        emissionSchedule: [],
+        vestingSchedule: [],
+        tokenUtility: ['governance', 'staking', 'fees']
+      }
+    }));
 
-    // No real-time security alerts available without external APIs
+    // No real-time security alerts without external monitoring APIs
     const alerts: any[] = [];
     
     // Generate rankings from real data
-    const rankings = filteredProtocols
+    const rankings = protocols
       .sort((a, b) => b.tvl - a.tvl)
       .map(p => ({
         protocol: p.protocol,
@@ -180,12 +177,12 @@ export async function GET(request: NextRequest) {
       }));
 
     // Calculate ecosystem stats from real data
-    const totalTvl = filteredProtocols.reduce((sum, p) => sum + p.tvl, 0);
-    const avgHealthScore = filteredProtocols.length > 0 
-      ? filteredProtocols.reduce((sum, p) => sum + p.healthScore, 0) / filteredProtocols.length 
+    const totalTvl = protocols.reduce((sum, p) => sum + p.tvl, 0);
+    const avgHealthScore = protocols.length > 0 
+      ? protocols.reduce((sum, p) => sum + p.healthScore, 0) / protocols.length 
       : 0;
-    const avgRiskScore = filteredProtocols.length > 0
-      ? filteredProtocols.reduce((sum, p) => sum + p.riskScore, 0) / filteredProtocols.length
+    const avgRiskScore = protocols.length > 0
+      ? protocols.reduce((sum, p) => sum + p.riskScore, 0) / protocols.length
       : 0;
     const criticalAlerts = alerts.filter(a => a.severity === 'critical').length;
 
@@ -194,20 +191,20 @@ export async function GET(request: NextRequest) {
       avgHealthScore,
       avgRiskScore,
       criticalAlerts,
-      protocolCount: filteredProtocols.length
+      protocolCount: protocols.length
     };
 
     const health = {
       isHealthy: avgHealthScore > 0.7 && criticalAlerts === 0,
       lastUpdate: Date.now(),
-      monitoredProtocols: filteredProtocols.length,
+      monitoredProtocols: protocols.length,
       activeAlerts: alerts.length
     };
 
     return NextResponse.json({
       success: true,
       data: {
-        protocols: filteredProtocols,
+        protocols,
         alerts,
         rankings,
         ecosystem,
@@ -226,36 +223,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// Calculate risk score based on real on-chain metrics
-function calculateRiskScore(tvl: number, activityMultiplier: number): number {
-  let risk = 0;
-  
-  // Size risk (smaller protocols are riskier)
-  if (tvl < 10000000) risk += 0.3; // <$10M
-  else if (tvl < 50000000) risk += 0.15; // <$50M
-  else if (tvl < 100000000) risk += 0.05; // <$100M
-  
-  // Activity risk (inactive protocols are riskier)
-  if (activityMultiplier < 0.5) risk += 0.25;
-  else if (activityMultiplier < 0.8) risk += 0.1;
-  
-  return Math.min(risk, 1);
-}
-
-// Calculate health score based on real metrics
-function calculateHealthScore(tvl: number, riskScore: number, isActive: boolean): number {
-  let health = 1 - riskScore;
-  
-  // Activity bonus
-  if (isActive) health += 0.1;
-  
-  // Size stability bonus
-  if (tvl > 100000000) health += 0.1; // >$100M
-  if (tvl > 500000000) health += 0.1; // >$500M
-  
-  return Math.min(Math.max(health, 0), 1);
-}
-
+// Remove the helper functions since they're not needed anymore
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
