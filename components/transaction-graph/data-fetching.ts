@@ -812,13 +812,46 @@ export async function addAccountToGraph(
       }
     }
     
-    // Enhanced processing summary with node/edge generation counts
+    // Enhanced processing summary with comprehensive filtering analysis
     console.log(`📊 [GRAPH_BUILD] Transaction processing summary for ${address}:`);
     console.log(`  - Total transactions: ${data.transactions.length}`);
     console.log(`  - Processed: ${processedTransactionCount}`);
     console.log(`  - Skipped: ${skippedTransactionCount}`);
     console.log(`  - Connected accounts: ${connectedAccounts.size}`);
     console.log(`  - Graph nodes added: ${newElements ? newElements.size : 'unknown'}`);
+
+    // Analyze skipped transactions to provide detailed filtering explanation
+    const skippedReasons: Record<string, number> = {};
+    for (const tx of data.transactions) {
+      if (!shouldIncludeTransaction || shouldIncludeTransaction(tx)) {
+        continue; // This transaction was processed
+      }
+      
+      // Analyze why this transaction was skipped
+      if (!tx.success && tx.err) {
+        skippedReasons['Failed transactions'] = (skippedReasons['Failed transactions'] || 0) + 1;
+      } else if (!tx.transfers || tx.transfers.length === 0) {
+        skippedReasons['No transfers'] = (skippedReasons['No transfers'] || 0) + 1;
+      } else {
+        skippedReasons['Other filters'] = (skippedReasons['Other filters'] || 0) + 1;
+      }
+    }
+    
+    if (Object.keys(skippedReasons).length > 0) {
+      console.log(`🚫 [GRAPH_BUILD] Transactions skipped by category:`, skippedReasons);
+    }
+
+    // Enhanced console summary for easy debugging
+    console.log(`
+╔══════════════════════════════════════════════════════════════════╗
+║                      🔍 GRAPH DEBUG SUMMARY                      ║
+╠══════════════════════════════════════════════════════════════════╣
+║ Account: ${address.slice(0, 16)}...                              ║
+║ Total Transactions: ${data.transactions.length.toString().padStart(3)}                                  ║
+║ Processed: ${processedTransactionCount.toString().padStart(3)}  |  Skipped: ${skippedTransactionCount.toString().padStart(3)}                      ║
+║ Connected Accounts: ${connectedAccounts.size.toString().padStart(3)}                                  ║
+║ Graph Elements Added: ${newElements ? newElements.size.toString().padStart(3) : 'unk'}                            ║
+╚══════════════════════════════════════════════════════════════════╝`);
     
     // Count and log nodes/edges generated for debugging empty graphs
     if (cy) {
@@ -834,6 +867,23 @@ export async function addAccountToGraph(
       console.log(`📊 [GRAPH_BUILD] Current graph statistics after processing ${address}:`);
       console.log(`  📈 Nodes: ${allNodes.length} total (${accountNodes.length} accounts, ${transactionNodes.length} transactions)`);
       console.log(`  🔗 Edges: ${allEdges.length} total (${transferEdges.length} transfers, ${selfTransferEdges.length} self-transfers, ${txAccountEdges.length} tx→account, ${accountTxEdges.length} account→tx)`);
+      
+      // Enhanced console visualization summary
+      console.log(`
+╔══════════════════════════════════════════════════════════════════╗
+║                    📊 VISUALIZATION SUMMARY                     ║
+╠══════════════════════════════════════════════════════════════════╣
+║ Nodes Total: ${allNodes.length.toString().padStart(3)} | Accounts: ${accountNodes.length.toString().padStart(3)} | Transactions: ${transactionNodes.length.toString().padStart(3)}    ║
+║ Edges Total: ${allEdges.length.toString().padStart(3)} | Transfers: ${transferEdges.length.toString().padStart(2)} | Self: ${selfTransferEdges.length.toString().padStart(2)} | Relations: ${(txAccountEdges.length + accountTxEdges.length).toString().padStart(2)} ║
+║                                                                  ║
+║ ${allNodes.length === 0 ? '🚨 EMPTY GRAPH - NO VISUALIZATION POSSIBLE' : 
+   allNodes.length === 1 && allEdges.length === 0 ? '⚠️  ISOLATED NODE - LIMITED VISUALIZATION' :
+   allEdges.length === 0 ? '⚠️  DISCONNECTED GRAPH - NO RELATIONSHIPS' :
+   '✅ GRAPH READY FOR VISUALIZATION'}${' '.repeat(Math.max(0, 43 - (allNodes.length === 0 ? 'EMPTY GRAPH - NO VISUALIZATION POSSIBLE'.length : 
+   allNodes.length === 1 && allEdges.length === 0 ? 'ISOLATED NODE - LIMITED VISUALIZATION'.length :
+   allEdges.length === 0 ? 'DISCONNECTED GRAPH - NO RELATIONSHIPS'.length :
+   'GRAPH READY FOR VISUALIZATION'.length)))} ║
+╚══════════════════════════════════════════════════════════════════╝`);
       
       // Special fallback check for transactions with transfers but no transfer edges
       const totalTransferEdges = transferEdges.length + selfTransferEdges.length;
@@ -852,74 +902,156 @@ export async function addAccountToGraph(
         console.log(`✅ [GRAPH_BUILD] Successfully created ${totalTransferEdges} transfer-related edges (${transferEdges.length} regular + ${selfTransferEdges.length} self-transfers)`);
       }
       
-      // Enhanced fallback for plain transfers - ensure ANY transaction with transfers creates visual elements
-      if (processedTransactionCount > 0 && allNodes.length < 2) {
-        console.log(`🚨 [GRAPH_BUILD] CRITICAL FALLBACK: Processed transactions but graph is nearly empty - creating minimal visualization`);
+      // GUARANTEED VISUALIZATION: Always create at least one meaningful visualization element
+      if (allNodes.length === 0 || (allNodes.length === 1 && allEdges.length === 0)) {
+        console.log(`🚨 [GRAPH_BUILD] CRITICAL: Graph is empty or has isolated nodes - implementing guaranteed fallback visualization`);
         
-        // Find the first transaction with transfers and ensure it's represented
-        const txWithTransfers = data.transactions.find(tx => tx.transfers && tx.transfers.length > 0);
+        // Strategy 1: Find ANY transaction with transfers (even if previously filtered)
+        let txWithTransfers = data.transactions.find(tx => tx.transfers && tx.transfers.length > 0);
+        
+        // Strategy 2: If no transfers, find the most recent successful transaction
+        if (!txWithTransfers) {
+          txWithTransfers = data.transactions.find(tx => tx.success !== false);
+        }
+        
+        // Strategy 3: Take the first transaction regardless of status
+        if (!txWithTransfers && data.transactions.length > 0) {
+          txWithTransfers = data.transactions[0];
+        }
+        
         if (txWithTransfers) {
-          console.log(`🔧 [GRAPH_BUILD] Creating minimal nodes for transaction ${txWithTransfers.signature} with ${txWithTransfers.transfers.length} transfers`);
+          console.log(`🔧 [GRAPH_BUILD] Creating guaranteed visualization for transaction ${txWithTransfers.signature}`);
           
-          // Ensure transaction node exists
+          // Always create the transaction node
           const txNodeId = txWithTransfers.signature;
           if (!cy.getElementById(txNodeId).length) {
             cy.add({
               data: {
                 id: txNodeId,
-                label: `Transfer: ${shortenString(txWithTransfers.signature)}`,
+                label: `TX: ${shortenString(txWithTransfers.signature)}`,
                 type: 'transaction',
-                subType: 'transfer',
-                status: 'loaded',
-                fallbackCreated: true
+                subType: txWithTransfers.transfers?.length > 0 ? 'transfer' : 'other',
+                status: txWithTransfers.success === false ? 'failed' : 'loaded',
+                timestamp: txWithTransfers.timestamp,
+                success: txWithTransfers.success,
+                fallbackCreated: true,
+                reason: 'guaranteed_visualization'
               },
-              classes: 'transaction fallback'
+              classes: 'transaction fallback guaranteed'
             });
             processedNodesRef?.current?.add(txNodeId);
-            console.log(`🔧 [GRAPH_BUILD] Created fallback transaction node: ${txNodeId}`);
+            console.log(`🔧 [GRAPH_BUILD] Created guaranteed transaction node: ${txNodeId}`);
           }
           
-          // Ensure transfer target accounts exist
-          for (const transfer of txWithTransfers.transfers || []) {
-            const targetAccount = transfer.account;
-            if (targetAccount !== address) {
-              const accNodeId = targetAccount;
-              if (!cy.getElementById(accNodeId).length) {
-                cy.add({
-                  data: {
-                    id: accNodeId,
-                    label: `${transfer.change > 0 ? 'Received' : 'Sent'}: ${shortenString(targetAccount)}`,
-                    type: 'account',
-                    fullAddress: targetAccount,
-                    status: 'pending',
-                    fallbackCreated: true
-                  },
-                  classes: 'account fallback'
-                });
-                processedNodesRef?.current?.add(accNodeId);
-                console.log(`🔧 [GRAPH_BUILD] Created fallback account node: ${accNodeId}`);
-              }
+          // Create account node for the primary address
+          const primaryAccNodeId = address;
+          if (!cy.getElementById(primaryAccNodeId).length) {
+            cy.add({
+              data: {
+                id: primaryAccNodeId,
+                label: `Account: ${shortenString(address)}`,
+                type: 'account',
+                fullAddress: address,
+                status: 'primary',
+                fallbackCreated: true,
+                reason: 'guaranteed_visualization'
+              },
+              classes: 'account primary fallback guaranteed'
+            });
+            processedNodesRef?.current?.add(primaryAccNodeId);
+            console.log(`🔧 [GRAPH_BUILD] Created guaranteed primary account node: ${primaryAccNodeId}`);
+          }
+          
+          // Create edge between transaction and primary account
+          const primaryEdgeId = `${txNodeId}-${primaryAccNodeId}-guaranteed`;
+          if (!cy.getElementById(primaryEdgeId).length) {
+            cy.add({
+              data: {
+                id: primaryEdgeId,
+                source: txNodeId,
+                target: primaryAccNodeId,
+                type: 'tx-account',
+                label: 'Transaction participant',
+                fallbackCreated: true,
+                reason: 'guaranteed_visualization'
+              },
+              classes: 'interaction fallback guaranteed'
+            });
+            processedEdgesRef?.current?.add(primaryEdgeId);
+            console.log(`🔧 [GRAPH_BUILD] Created guaranteed edge: ${txNodeId} -> ${primaryAccNodeId}`);
+          }
+          
+          // If transaction has transfers, create transfer visualization
+          if (txWithTransfers.transfers && txWithTransfers.transfers.length > 0) {
+            for (const transfer of txWithTransfers.transfers.slice(0, 3)) { // Limit to first 3 transfers
+              const targetAccount = transfer.account;
               
-              // Create transfer edge
-              const transferEdgeId = `${txNodeId}-${targetAccount}-transfer-fallback`;
-              if (!cy.getElementById(transferEdgeId).length) {
-                cy.add({
-                  data: {
-                    id: transferEdgeId,
-                    source: txNodeId,
-                    target: targetAccount,
-                    type: 'transfer',
-                    amount: transfer.change,
-                    label: formatSolChange(transfer.change),
-                    status: 'loaded',
-                    fallbackCreated: true
-                  },
-                  classes: 'transfer fallback'
-                });
-                processedEdgesRef?.current?.add(transferEdgeId);
-                console.log(`🔧 [GRAPH_BUILD] Created fallback transfer edge: ${txNodeId} -> ${targetAccount} (${formatSolChange(transfer.change)})`);
+              // Create target account node if different from primary
+              if (targetAccount !== address) {
+                const accNodeId = targetAccount;
+                if (!cy.getElementById(accNodeId).length) {
+                  cy.add({
+                    data: {
+                      id: accNodeId,
+                      label: `${transfer.change > 0 ? '📈' : '📉'} ${shortenString(targetAccount)}`,
+                      type: 'account',
+                      fullAddress: targetAccount,
+                      status: 'transfer_target',
+                      transferAmount: transfer.change,
+                      fallbackCreated: true,
+                      reason: 'guaranteed_visualization'
+                    },
+                    classes: 'account transfer-target fallback guaranteed'
+                  });
+                  processedNodesRef?.current?.add(accNodeId);
+                  console.log(`🔧 [GRAPH_BUILD] Created guaranteed transfer target: ${accNodeId} (${formatSolChange(transfer.change)})`);
+                }
+                
+                // Create transfer edge
+                const transferEdgeId = `${txNodeId}-${targetAccount}-guaranteed-transfer`;
+                if (!cy.getElementById(transferEdgeId).length) {
+                  cy.add({
+                    data: {
+                      id: transferEdgeId,
+                      source: txNodeId,
+                      target: targetAccount,
+                      type: 'transfer',
+                      amount: transfer.change,
+                      label: formatSolChange(transfer.change),
+                      status: 'guaranteed',
+                      fallbackCreated: true,
+                      reason: 'guaranteed_visualization'
+                    },
+                    classes: 'transfer guaranteed fallback'
+                  });
+                  processedEdgesRef?.current?.add(transferEdgeId);
+                  console.log(`🔧 [GRAPH_BUILD] Created guaranteed transfer: ${txNodeId} -> ${targetAccount} (${formatSolChange(transfer.change)})`);
+                }
               }
             }
+          }
+          
+          console.log(`✅ [GRAPH_BUILD] Guaranteed visualization complete - graph now has ${cy.nodes().length} nodes and ${cy.edges().length} edges`);
+        } else {
+          console.log(`🚨 [GRAPH_BUILD] CRITICAL: No transactions available for guaranteed visualization`);
+          
+          // Last resort: Create a placeholder node
+          const placeholderNodeId = `placeholder-${address}`;
+          if (!cy.getElementById(placeholderNodeId).length) {
+            cy.add({
+              data: {
+                id: placeholderNodeId,
+                label: `No data: ${shortenString(address)}`,
+                type: 'account',
+                fullAddress: address,
+                status: 'no_data',
+                fallbackCreated: true,
+                reason: 'no_transactions_found'
+              },
+              classes: 'account placeholder fallback'
+            });
+            processedNodesRef?.current?.add(placeholderNodeId);
+            console.log(`🔧 [GRAPH_BUILD] Created placeholder node for empty dataset: ${placeholderNodeId}`);
           }
         }
       }

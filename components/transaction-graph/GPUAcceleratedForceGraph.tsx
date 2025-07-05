@@ -199,6 +199,46 @@ export const GPUAcceleratedForceGraph: React.FC<GPUAcceleratedForceGraphProps> =
   useEffect(() => {
     console.log(`🎮 [GPU_GRAPH] Data update received: ${graphData.nodes.length} nodes, ${graphData.links.length} links`);
     
+    // Log detailed information about the received data
+    if (graphData.nodes.length > 0) {
+      console.log(`🎮 [GPU_GRAPH] Sample node data:`, graphData.nodes[0]);
+      const nodeTypes = graphData.nodes.reduce((types: Record<string, number>, node) => {
+        types[node.type] = (types[node.type] || 0) + 1;
+        return types;
+      }, {});
+      console.log(`🎮 [GPU_GRAPH] Node type distribution:`, nodeTypes);
+    } else {
+      console.log(`⚠️ [GPU_GRAPH] WARNING: No nodes received for rendering`);
+    }
+    
+    if (graphData.links.length > 0) {
+      console.log(`🎮 [GPU_GRAPH] Sample link data:`, graphData.links[0]);
+      const linkTypes = graphData.links.reduce((types: Record<string, number>, link) => {
+        types[link.type || 'unknown'] = (types[link.type || 'unknown'] || 0) + 1;
+        return types;
+      }, {});
+      console.log(`🎮 [GPU_GRAPH] Link type distribution:`, linkTypes);
+    } else {
+      console.log(`⚠️ [GPU_GRAPH] WARNING: No links received for rendering`);
+    }
+    
+    // Force a re-render if we have data but the graph might not be showing
+    if (graphData.nodes.length > 0 && graphRef.current) {
+      console.log(`🔄 [GPU_GRAPH] Forcing graph re-render with new data`);
+      
+      // Trigger force simulation restart
+      setTimeout(() => {
+        if (graphRef.current) {
+          console.log(`🔄 [GPU_GRAPH] Restarting force simulation`);
+          try {
+            (graphRef.current as any).d3ReheatSimulation?.();
+          } catch (error) {
+            console.warn(`⚠️ [GPU_GRAPH] Could not restart simulation:`, error);
+          }
+        }
+      }, 100);
+    }
+    
     // Log node types for debugging
     const nodeTypes = graphData.nodes.reduce((types: Record<string, number>, node) => {
       types[node.type] = (types[node.type] || 0) + 1;

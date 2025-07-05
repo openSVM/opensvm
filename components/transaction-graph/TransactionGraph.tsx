@@ -479,6 +479,13 @@ function TransactionGraph({
       }, {});
       console.log(`🔄 [GPU_UPDATE] Node types:`, nodeTypes);
       
+      // Log what types of links we have
+      const linkTypes = newData.links.reduce((types: Record<string, number>, link) => {
+        types[link.type] = (types[link.type] || 0) + 1;
+        return types;
+      }, {});
+      console.log(`🔄 [GPU_UPDATE] Link types:`, linkTypes);
+      
       // Log sample data for debugging
       if (newData.nodes.length > 0) {
         console.log(`🔄 [GPU_UPDATE] Sample node:`, newData.nodes[0]);
@@ -490,11 +497,49 @@ function TransactionGraph({
       setGpuGraphData(newData);
       console.log('✅ [GPU_UPDATE] GPU graph data updated successfully');
       
-      // Show warning if graph is empty
+      // Enhanced feedback for empty graphs
       if (newData.nodes.length === 0) {
-        console.log('⚠️ [GPU_UPDATE] GPU graph is empty after update');
-        console.log('⚠️ [GPU_UPDATE] Cytoscape elements count:', cyRef.current?.elements().length || 0);
+        console.log('🚨 [GPU_UPDATE] CRITICAL: GPU graph is empty after update');
+        console.log('🚨 [GPU_UPDATE] Cytoscape elements count:', cyRef.current?.elements().length || 0);
+        
+        // Force an error message to show user why graph is empty
+        setError({
+          message: 'No transaction data could be visualized. The account may have no recent activity or only system transactions.',
+          severity: 'warning'
+        });
+        
+        // Clear the warning after some time
+        setTimeout(() => {
+          setError(null);
+        }, 8000);
+      } else if (newData.nodes.length === 1 && newData.links.length === 0) {
+        console.log('⚠️ [GPU_UPDATE] WARNING: GPU graph has only isolated node');
+        
+        // Show informative message about limited data
+        setError({
+          message: `Showing limited data: Found ${newData.nodes.length} node(s) but no connections. This account may have minimal transaction activity.`,
+          severity: 'info'
+        });
+        
+        // Clear the info message after some time
+        setTimeout(() => {
+          setError(null);
+        }, 6000);
+      } else {
+        console.log(`✅ [GPU_UPDATE] Good data: ${newData.nodes.length} nodes and ${newData.links.length} links`);
+        
+        // Clear any previous error messages
+        setError(null);
       }
+      
+      // Force a UI re-render to ensure the graph component updates
+      setTimeout(() => {
+        if (containerRef.current) {
+          console.log('🔄 [GPU_UPDATE] Forcing container resize to trigger re-render');
+          const resizeEvent = new Event('resize');
+          window.dispatchEvent(resizeEvent);
+        }
+      }, 100);
     } else {
       console.log('🔄 [GPU_UPDATE] GPU graph disabled, skipping update');
     }
@@ -1622,17 +1667,38 @@ function TransactionGraph({
   return (
     <div className={`transaction-graph-wrapper relative w-full h-full transition-all flex flex-col ${isFullscreen ? 'bg-background' : ''}`}>
       {error && (
-        <div className={`absolute bottom-4 right-4 p-4 rounded-md shadow-lg z-20 ${
-          error.severity === 'error' ? 'bg-destructive/90 text-destructive-foreground' : 'bg-warning/90 text-warning-foreground'
+        <div className={`absolute bottom-4 right-4 p-4 rounded-md shadow-lg z-20 max-w-md ${
+          error.severity === 'error' ? 'bg-destructive/90 text-destructive-foreground' : 
+          error.severity === 'info' ? 'bg-blue-500/90 text-white' : 
+          'bg-warning/90 text-warning-foreground'
         }`}>
           <div className="flex items-start">
-            <div className="flex-1">{error.message}</div>
+            <div className="flex-1 text-sm">{error.message}</div>
             <button
               onClick={() => setError(null)}
               className="ml-4 text-current hover:text-current/80"
             >
               ✕
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Debug Information Panel - only show when graph is empty */}
+      {(gpuGraphData.nodes.length === 0 || (gpuGraphData.nodes.length === 1 && gpuGraphData.links.length === 0)) && (
+        <div className="absolute top-4 right-4 p-3 bg-background/95 border border-border rounded-md shadow-lg z-20 max-w-sm text-xs">
+          <div className="font-semibold mb-2 text-muted-foreground">🔍 Debug Information</div>
+          <div className="space-y-1 text-muted-foreground">
+            <div>• Nodes: {gpuGraphData.nodes.length}</div>
+            <div>• Links: {gpuGraphData.links.length}</div>
+            <div>• Cytoscape elements: {cyRef.current?.elements().length || 0}</div>
+            <div>• Loading: {loading ? 'Yes' : 'No'}</div>
+            <div>• Progress: {loadingProgress}%</div>
+          </div>
+          <div className="mt-2 pt-2 border-t border-border text-xs">
+            <div className="text-muted-foreground">
+              Check browser console for detailed logs
+            </div>
           </div>
         </div>
       )}
@@ -1693,6 +1759,34 @@ function TransactionGraph({
             pointerEvents: useGPUGraph ? 'none' : 'auto'
           }}
         />
+        
+        {/* Empty state message */}
+        {!loading && gpuGraphData.nodes.length === 0 && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="text-center p-8">
+              <div className="text-4xl mb-4">📊</div>
+              <div className="text-lg font-semibold text-muted-foreground mb-2">No Data to Visualize</div>
+              <div className="text-sm text-muted-foreground max-w-md">
+                This account appears to have no recent transaction activity that can be visualized. 
+                This could be due to:
+              </div>
+              <div className="text-xs text-muted-foreground mt-3 text-left max-w-md space-y-1">
+                <div>• No recent transactions</div>
+                <div>• Only system/program transactions</div>
+                <div>• Transactions with no transfers</div>
+                <div>• All transactions filtered out</div>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* Minimal data message */}
+        {!loading && gpuGraphData.nodes.length === 1 && gpuGraphData.links.length === 0 && (
+          <div className="absolute top-4 left-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-md text-xs text-blue-600">
+            <div className="font-semibold">ℹ️ Minimal Data</div>
+            <div>Only one node found - limited connectivity available</div>
+          </div>
+        )}
       </div>
 
       {/* Controls overlay */}
