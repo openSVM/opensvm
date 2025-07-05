@@ -6,9 +6,12 @@ import { SolanaDEXTab } from '@/components/solana/solana-dex-tab';
 import { CrossChainTab } from '@/components/solana/cross-chain-tab';
 import { DeFiHealthTab } from '@/components/solana/defi-health-tab';
 import { ValidatorTab } from '@/components/solana/validator-tab';
+import { LaunchpadsTab } from '@/components/solana/launchpads-tab';
+import { BotsTab } from '@/components/solana/bots-tab';
+import { AggregatorsTab, MarketplacesTab, SocialFiTab, InfoFiTab, DeFAITab } from '@/components/solana/analytics-tabs';
 import { OverviewMetrics, QuickActions } from '@/components/analytics/overview-components';
 
-type TabType = 'overview' | 'dex' | 'cross-chain' | 'defi-health' | 'validators';
+type TabType = 'overview' | 'dex' | 'cross-chain' | 'defi-health' | 'validators' | 'launchpads' | 'bots' | 'aggregators' | 'marketplaces' | 'socialfi' | 'infofi' | 'defai';
 
 export default function AnalyticsPage() {
   const router = useRouter();
@@ -47,12 +50,54 @@ export default function AnalyticsPage() {
       description: 'Validator performance and decentralization',
       ariaLabel: 'Validators tab - Validator performance and decentralization analytics'
     },
+    { 
+      id: 'launchpads' as TabType, 
+      label: 'Launchpads', 
+      description: 'Token launch platforms and IDO analytics',
+      ariaLabel: 'Launchpads tab - Token launch platforms and IDO analytics'
+    },
+    { 
+      id: 'bots' as TabType, 
+      label: 'Bots', 
+      description: 'Trading and analytics bots',
+      ariaLabel: 'Bots tab - Telegram, Discord, and Matrix trading bots'
+    },
+    { 
+      id: 'aggregators' as TabType, 
+      label: 'Aggregators', 
+      description: 'DEX and liquidity aggregators',
+      ariaLabel: 'Aggregators tab - DEX and liquidity aggregation platforms'
+    },
+    { 
+      id: 'marketplaces' as TabType, 
+      label: 'Marketplaces', 
+      description: 'NFT and asset marketplaces',
+      ariaLabel: 'Marketplaces tab - NFT and digital asset marketplaces'
+    },
+    { 
+      id: 'socialfi' as TabType, 
+      label: 'Social Fi', 
+      description: 'Social finance platforms',
+      ariaLabel: 'Social Fi tab - Social finance and community platforms'
+    },
+    { 
+      id: 'infofi' as TabType, 
+      label: 'Info Fi', 
+      description: 'Information and analytics platforms',
+      ariaLabel: 'Info Fi tab - Blockchain information and analytics platforms'
+    },
+    { 
+      id: 'defai' as TabType, 
+      label: 'DeFAI', 
+      description: 'AI-powered DeFi tools',
+      ariaLabel: 'DeFAI tab - AI-powered DeFi and trading tools'
+    },
   ], []);
 
   // Handle URL tab parameter
   useEffect(() => {
     const tab = searchParams.get('tab') as TabType;
-    if (tab && ['overview', 'dex', 'cross-chain', 'defi-health', 'validators'].includes(tab)) {
+    if (tab && ['overview', 'dex', 'cross-chain', 'defi-health', 'validators', 'launchpads', 'bots', 'aggregators', 'marketplaces', 'socialfi', 'infofi', 'defai'].includes(tab)) {
       setActiveTab(tab);
     }
   }, [searchParams]);
@@ -101,7 +146,7 @@ export default function AnalyticsPage() {
               defiMetrics={overviewData.defiMetrics}
               crossChainMetrics={overviewData.crossChainMetrics}
             />
-            <QuickActions onNavigate={handleTabChange} />
+            <QuickActions onNavigate={(tab: string) => handleTabChange(tab as TabType)} />
           </div>
         );
       
@@ -116,6 +161,27 @@ export default function AnalyticsPage() {
       
       case 'validators':
         return <ValidatorTab />;
+        
+      case 'launchpads':
+        return <LaunchpadsTab />;
+        
+      case 'bots':
+        return <BotsTab />;
+        
+      case 'aggregators':
+        return <AggregatorsTab />;
+        
+      case 'marketplaces':
+        return <MarketplacesTab />;
+        
+      case 'socialfi':
+        return <SocialFiTab />;
+        
+      case 'infofi':
+        return <InfoFiTab />;
+        
+      case 'defai':
+        return <DeFAITab />;
       
       default:
         return null;
