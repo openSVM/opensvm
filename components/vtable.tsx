@@ -1,168 +1,189 @@
 import { useCallback, useEffect, useRef, useState, ReactNode } from 'react';
 import { ListTable } from '@visactor/vtable';
+import * as VTable from '@visactor/vtable';
 import '../app/styles/vtable.css';
 import { useRouter, usePathname } from 'next/navigation';
 import { useTheme } from '@/lib/theme';
-import type { ITableThemeDefine } from '@visactor/vtable';
 
 type Theme = 'paper' | 'high-contrast' | 'dos-blue' | 'cyberpunk' | 'solarized';
 
-// Create VTable theme configurations for each OpenSVM theme
-function createVTableTheme(theme: Theme): ITableThemeDefine {
-  const themes = {
+// Create VTable theme configurations for each OpenSVM theme using VTable's built-in theme system
+function createVTableTheme(theme: Theme) {
+  const themeConfigs = {
     paper: {
-      underlayBackgroundColor: 'hsl(0 0% 100%)',
-      headerStyle: {
-        bgColor: 'hsl(210 40% 98%)',
-        color: 'hsl(222.2 84% 4.9%)',
-        fontSize: 14,
-        fontWeight: 600,
-        frameStyle: {
-          borderColor: 'hsl(214.3 31.8% 91.4%)',
-          borderLineWidth: 1,
+      // Use BRIGHT theme as base for light theme
+      baseTheme: VTable.themes.BRIGHT,
+      customizations: {
+        underlayBackgroundColor: 'hsl(0 0% 100%)',
+        headerStyle: {
+          bgColor: 'hsl(210 40% 98%)',
+          color: 'hsl(222.2 84% 4.9%)',
+          fontSize: 14,
+          fontWeight: 600,
+          frameStyle: {
+            borderColor: 'hsl(214.3 31.8% 91.4%)',
+            borderLineWidth: 1,
+          },
         },
-      },
-      bodyStyle: {
-        bgColor: 'hsl(0 0% 100%)',
-        color: 'hsl(222.2 84% 4.9%)',
-        fontSize: 14,
-        frameStyle: {
-          borderColor: 'hsl(214.3 31.8% 91.4%)',
-          borderLineWidth: 1,
+        bodyStyle: {
+          bgColor: 'hsl(0 0% 100%)',
+          color: 'hsl(222.2 84% 4.9%)',
+          fontSize: 14,
+          frameStyle: {
+            borderColor: 'hsl(214.3 31.8% 91.4%)',
+            borderLineWidth: 1,
+          },
+          hover: {
+            cellBgColor: 'hsl(210 40% 98%)',
+          },
         },
-        hover: {
-          cellBgColor: 'hsl(210 40% 98%)',
+        selectionStyle: {
+          cellBorderColor: 'hsl(221.2 83.2% 53.3%)',
+          cellBorderLineWidth: 2,
+          cellBgColor: 'hsl(221.2 83.2% 53.3% / 0.1)',
         },
-      },
-      selectionStyle: {
-        cellBorderColor: 'hsl(221.2 83.2% 53.3%)',
-        cellBorderLineWidth: 2,
-        cellBgColor: 'hsl(221.2 83.2% 53.3% / 0.1)',
-      },
+      }
     },
     'high-contrast': {
-      underlayBackgroundColor: 'hsl(0 0% 3.9%)',
-      headerStyle: {
-        bgColor: 'hsl(0 0% 3.9%)',
-        color: 'hsl(0 0% 98%)',
-        fontSize: 14,
-        fontWeight: 600,
-        frameStyle: {
-          borderColor: 'hsl(215 27.9% 16.9%)',
-          borderLineWidth: 1,
+      // Use DARK theme as base for high contrast
+      baseTheme: VTable.themes.DARK,
+      customizations: {
+        underlayBackgroundColor: 'hsl(0 0% 3.9%)',
+        headerStyle: {
+          bgColor: 'hsl(0 0% 3.9%)',
+          color: 'hsl(0 0% 98%)',
+          fontSize: 14,
+          fontWeight: 600,
+          frameStyle: {
+            borderColor: 'hsl(215 27.9% 16.9%)',
+            borderLineWidth: 1,
+          },
         },
-      },
-      bodyStyle: {
-        bgColor: 'hsl(0 0% 3.9%)',
-        color: 'hsl(0 0% 98%)',
-        fontSize: 14,
-        frameStyle: {
-          borderColor: 'hsl(215 27.9% 16.9%)',
-          borderLineWidth: 1,
+        bodyStyle: {
+          bgColor: 'hsl(0 0% 3.9%)',
+          color: 'hsl(0 0% 98%)',
+          fontSize: 14,
+          frameStyle: {
+            borderColor: 'hsl(215 27.9% 16.9%)',
+            borderLineWidth: 1,
+          },
+          hover: {
+            cellBgColor: 'hsl(215 27.9% 16.9%)',
+          },
         },
-        hover: {
-          cellBgColor: 'hsl(215 27.9% 16.9%)',
+        selectionStyle: {
+          cellBorderColor: 'hsl(0 0% 98%)',
+          cellBorderLineWidth: 2,
+          cellBgColor: 'hsl(0 0% 98% / 0.1)',
         },
-      },
-      selectionStyle: {
-        cellBorderColor: 'hsl(0 0% 98%)',
-        cellBorderLineWidth: 2,
-        cellBgColor: 'hsl(0 0% 98% / 0.1)',
-      },
+      }
     },
     'dos-blue': {
-      underlayBackgroundColor: 'hsl(240 100% 20%)',
-      headerStyle: {
-        bgColor: 'hsl(240 100% 20%)',
-        color: 'hsl(60 100% 90%)',
-        fontSize: 14,
-        fontWeight: 600,
-        frameStyle: {
-          borderColor: 'hsl(240 100% 30%)',
-          borderLineWidth: 1,
+      // Use DARK theme as base for dos-blue
+      baseTheme: VTable.themes.DARK,
+      customizations: {
+        underlayBackgroundColor: 'hsl(240 100% 20%)',
+        headerStyle: {
+          bgColor: 'hsl(240 100% 20%)',
+          color: 'hsl(60 100% 90%)',
+          fontSize: 14,
+          fontWeight: 600,
+          frameStyle: {
+            borderColor: 'hsl(240 100% 30%)',
+            borderLineWidth: 1,
+          },
         },
-      },
-      bodyStyle: {
-        bgColor: 'hsl(240 100% 20%)',
-        color: 'hsl(60 100% 90%)',
-        fontSize: 14,
-        frameStyle: {
-          borderColor: 'hsl(240 100% 30%)',
-          borderLineWidth: 1,
+        bodyStyle: {
+          bgColor: 'hsl(240 100% 20%)',
+          color: 'hsl(60 100% 90%)',
+          fontSize: 14,
+          frameStyle: {
+            borderColor: 'hsl(240 100% 30%)',
+            borderLineWidth: 1,
+          },
+          hover: {
+            cellBgColor: 'hsl(240 100% 25%)',
+          },
         },
-        hover: {
-          cellBgColor: 'hsl(240 100% 25%)',
+        selectionStyle: {
+          cellBorderColor: 'hsl(60 100% 70%)',
+          cellBorderLineWidth: 2,
+          cellBgColor: 'hsl(60 100% 70% / 0.1)',
         },
-      },
-      selectionStyle: {
-        cellBorderColor: 'hsl(60 100% 70%)',
-        cellBorderLineWidth: 2,
-        cellBgColor: 'hsl(60 100% 70% / 0.1)',
-      },
+      }
     },
     cyberpunk: {
-      underlayBackgroundColor: 'hsl(300 100% 10%)',
-      headerStyle: {
-        bgColor: 'hsl(300 100% 10%)',
-        color: 'hsl(300 100% 80%)',
-        fontSize: 14,
-        fontWeight: 600,
-        frameStyle: {
-          borderColor: 'hsl(300 100% 25%)',
-          borderLineWidth: 1,
+      // Use DARK theme as base for cyberpunk
+      baseTheme: VTable.themes.DARK,
+      customizations: {
+        underlayBackgroundColor: 'hsl(300 100% 10%)',
+        headerStyle: {
+          bgColor: 'hsl(300 100% 10%)',
+          color: 'hsl(300 100% 80%)',
+          fontSize: 14,
+          fontWeight: 600,
+          frameStyle: {
+            borderColor: 'hsl(300 100% 25%)',
+            borderLineWidth: 1,
+          },
         },
-      },
-      bodyStyle: {
-        bgColor: 'hsl(300 100% 10%)',
-        color: 'hsl(300 100% 80%)',
-        fontSize: 14,
-        frameStyle: {
-          borderColor: 'hsl(300 100% 25%)',
-          borderLineWidth: 1,
+        bodyStyle: {
+          bgColor: 'hsl(300 100% 10%)',
+          color: 'hsl(300 100% 80%)',
+          fontSize: 14,
+          frameStyle: {
+            borderColor: 'hsl(300 100% 25%)',
+            borderLineWidth: 1,
+          },
+          hover: {
+            cellBgColor: 'hsl(300 100% 15%)',
+          },
         },
-        hover: {
-          cellBgColor: 'hsl(300 100% 15%)',
+        selectionStyle: {
+          cellBorderColor: 'hsl(180 100% 60%)',
+          cellBorderLineWidth: 2,
+          cellBgColor: 'hsl(180 100% 60% / 0.1)',
         },
-      },
-      selectionStyle: {
-        cellBorderColor: 'hsl(180 100% 60%)',
-        cellBorderLineWidth: 2,
-        cellBgColor: 'hsl(180 100% 60% / 0.1)',
-      },
+      }
     },
     solarized: {
-      underlayBackgroundColor: 'hsl(192 81% 14%)',
-      headerStyle: {
-        bgColor: 'hsl(192 81% 14%)',
-        color: 'hsl(180 7% 60%)',
-        fontSize: 14,
-        fontWeight: 600,
-        frameStyle: {
-          borderColor: 'hsl(194 14% 40%)',
-          borderLineWidth: 1,
+      // Use DARK theme as base for solarized
+      baseTheme: VTable.themes.DARK,
+      customizations: {
+        underlayBackgroundColor: 'hsl(192 81% 14%)',
+        headerStyle: {
+          bgColor: 'hsl(192 81% 14%)',
+          color: 'hsl(180 7% 60%)',
+          fontSize: 14,
+          fontWeight: 600,
+          frameStyle: {
+            borderColor: 'hsl(194 14% 40%)',
+            borderLineWidth: 1,
+          },
         },
-      },
-      bodyStyle: {
-        bgColor: 'hsl(192 81% 14%)',
-        color: 'hsl(180 7% 60%)',
-        fontSize: 14,
-        frameStyle: {
-          borderColor: 'hsl(194 14% 40%)',
-          borderLineWidth: 1,
+        bodyStyle: {
+          bgColor: 'hsl(192 81% 14%)',
+          color: 'hsl(180 7% 60%)',
+          fontSize: 14,
+          frameStyle: {
+            borderColor: 'hsl(194 14% 40%)',
+            borderLineWidth: 1,
+          },
+          hover: {
+            cellBgColor: 'hsl(192 81% 18%)',
+          },
         },
-        hover: {
-          cellBgColor: 'hsl(192 81% 18%)',
+        selectionStyle: {
+          cellBorderColor: 'hsl(196 13% 60%)',
+          cellBorderLineWidth: 2,
+          cellBgColor: 'hsl(196 13% 60% / 0.1)',
         },
-      },
-      selectionStyle: {
-        cellBorderColor: 'hsl(196 13% 60%)',
-        cellBorderLineWidth: 2,
-        cellBgColor: 'hsl(196 13% 60% / 0.1)',
-      },
+      }
     },
   };
 
-  return themes[theme];
+  const config = themeConfigs[theme];
+  return config.baseTheme.extends(config.customizations);
 }
 
 interface Column {
@@ -389,11 +410,9 @@ export function VTableWrapper({
           // Create the table with the configuration
           const table = new ListTable(tableConfig);
 
-          // Force theme application after table creation
+          // Force theme application after table creation using VTable's updateTheme method
           try {
-            if (table.setTheme) {
-              table.setTheme(vtableTheme);
-            } else if (table.updateTheme) {
+            if (table.updateTheme) {
               table.updateTheme(vtableTheme);
             }
           } catch (themeError) {
