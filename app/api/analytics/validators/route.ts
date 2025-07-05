@@ -269,9 +269,9 @@ export async function GET(request: NextRequest) {
         const baseAPY = 7; // Base Solana staking APY
         const apy = baseAPY * (1 - validator.commission / 100) * performanceScore;
         
-        // Calculate uptime percentage
+        // Calculate uptime percentage (as decimal 0-1 for consistency)
         const maxCredits = 440000; // Approximate max credits per epoch
-        const uptimePercent = Math.min((currentEpochCredits / maxCredits) * 100, 100);
+        const uptimeDecimal = Math.min(currentEpochCredits / maxCredits, 1.0); // Keep as 0-1
         
         return {
           voteAccount: validator.votePubkey,
@@ -293,7 +293,7 @@ export async function GET(request: NextRequest) {
           coordinates: geoData.lat && geoData.lon ? { lat: geoData.lat, lon: geoData.lon } : undefined,
           apy: Math.round(apy * 100) / 100,
           performanceScore: Math.round(performanceScore * 100) / 100,
-          uptimePercent: Math.round(uptimePercent * 100) / 100
+          uptimePercent: Math.round(uptimeDecimal * 10000) / 100 // Store as percentage (0-100) with 2 decimal precision
         };
       })
     );
@@ -304,7 +304,7 @@ export async function GET(request: NextRequest) {
     const delinquentValidators = voteAccounts.delinquent.length;
     const totalStake = allValidators.reduce((sum, v) => sum + v.activatedStake, 0);
     const averageCommission = allValidators.reduce((sum, v) => sum + v.commission, 0) / totalValidators;
-    const averageUptime = validatorsWithGeo.reduce((sum, v) => sum + v.uptimePercent, 0) / validatorsWithGeo.length;
+    const averageUptime = validatorsWithGeo.reduce((sum, v) => sum + (v.uptimePercent / 100), 0) / validatorsWithGeo.length; // Convert back to decimal for internal calculations
 
     // Calculate Nakamoto coefficient from real stake distribution using standardized threshold
     const sortedByStake = [...allValidators].sort((a, b) => b.activatedStake - a.activatedStake);

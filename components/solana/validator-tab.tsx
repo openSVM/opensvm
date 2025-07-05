@@ -98,9 +98,16 @@ export function ValidatorTab() {
     return `${sol.toFixed(2)} SOL`;
   };
 
-  const formatPercent = (value: number | undefined | null) => {
+  const formatPercent = (value: number | undefined | null, isAlreadyPercent: boolean = false) => {
     if (value == null || isNaN(value)) return '0.00%';
-    return `${(value * 100).toFixed(2)}%`;
+    
+    // If value is already a percentage (0-100), don't multiply by 100
+    const percent = isAlreadyPercent ? value : value * 100;
+    
+    // Ensure percentage doesn't exceed 100%
+    const clampedPercent = Math.min(Math.max(percent, 0), 100);
+    
+    return `${clampedPercent.toFixed(2)}%`;
   };
 
   const getStatusColor = (status: string) => {
@@ -287,7 +294,7 @@ export function ValidatorTab() {
                       </span>
                     </td>
                     <td className="py-3">{formatSOL(validator.activatedStake)}</td>
-                    <td className="py-3">{formatPercent(validator.commission / 100)}</td>
+                    <td className="py-3">{formatPercent(validator.commission, true)}</td> {/* Commission is already a percentage 0-100 */}
                     <td className="py-3">
                       <div className={`font-medium ${
                         validator.apy >= 7 ? 'text-accent' : 
@@ -311,7 +318,7 @@ export function ValidatorTab() {
                     </td>
                     <td className="py-3">
                       <span className={`font-medium ${getPerformanceColor(validator.uptimePercent / 100)}`}>
-                        {validator.uptimePercent ? validator.uptimePercent.toFixed(1) : '0.0'}%
+                        {formatPercent(validator.uptimePercent, true)} {/* uptimePercent is already 0-100 */}
                       </span>
                     </td>
                     <td className="py-3">
@@ -352,7 +359,7 @@ export function ValidatorTab() {
                   </div>
                   <div className="text-right">
                     <span className="text-sm font-medium">{item.validatorCount}</span>
-                    <div className="text-xs text-muted-foreground">{formatPercent(item.stakePercent)}</div>
+                    <div className="text-xs text-muted-foreground">{formatPercent(item.stakePercent, true)}</div>
                   </div>
                 </div>
               ))}
@@ -374,7 +381,7 @@ export function ValidatorTab() {
                   </div>
                   <div className="text-right">
                     <span className="text-sm font-medium">{item.validatorCount}</span>
-                    <div className="text-xs text-muted-foreground">{formatPercent(item.stakePercent)}</div>
+                    <div className="text-xs text-muted-foreground">{formatPercent(item.stakePercent, true)}</div>
                   </div>
                 </div>
               ))}
@@ -396,7 +403,7 @@ export function ValidatorTab() {
                   </div>
                   <div className="text-right">
                     <span className="text-sm font-medium">{item.validatorCount}</span>
-                    <div className="text-xs text-muted-foreground">{formatPercent(item.percent)}</div>
+                    <div className="text-xs text-muted-foreground">{formatPercent(item.percent, true)}</div>
                   </div>
                 </div>
               ))}

@@ -349,11 +349,19 @@ export async function GET(request: NextRequest) {
     
     const finalMetrics = Array.from(mergedMetrics.values()).filter(m => m.volume24h > 0);
     
-    // Calculate market share
+    // Calculate market share with proper normalization to ensure sum = 1.0
     const totalVolume = finalMetrics.reduce((sum, m) => sum + m.volume24h, 0);
     finalMetrics.forEach(metric => {
       metric.marketShare = totalVolume > 0 ? metric.volume24h / totalVolume : 0;
     });
+    
+    // Normalize market shares to ensure they sum to exactly 1.0 (avoid floating point precision issues)
+    const totalMarketShare = finalMetrics.reduce((sum, m) => sum + m.marketShare, 0);
+    if (totalMarketShare > 0 && Math.abs(totalMarketShare - 1.0) > 0.001) {
+      finalMetrics.forEach(metric => {
+        metric.marketShare = metric.marketShare / totalMarketShare;
+      });
+    }
     
     // Filter by DEX if specified
     const filteredMetrics = dex 

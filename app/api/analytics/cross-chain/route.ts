@@ -171,12 +171,13 @@ export async function GET(request: NextRequest) {
       ? flowsData.filter(f => f.bridgeProtocol.toLowerCase() === bridgeProtocol.toLowerCase())
       : flowsData;
     
-    // Generate bridge rankings from real data
+    // Generate bridge rankings from real data with proper market share normalization
     const bridgeVolumes = new Map<string, number>();
     bridgeData.forEach(bridge => {
       bridgeVolumes.set(bridge.name, bridge.volume24h);
     });
     
+    const totalBridgeVolume = Array.from(bridgeVolumes.values()).reduce((sum, vol) => sum + vol, 0);
     const rankings = Array.from(bridgeVolumes.entries())
       .map(([bridge, volume24h]) => {
         const bridgeInfo = bridgeData.find(b => b.name === bridge);
@@ -184,13 +185,21 @@ export async function GET(request: NextRequest) {
           bridge,
           totalVolume: volume24h,
           volume24h,
-          marketShare: volume24h / Array.from(bridgeVolumes.values()).reduce((sum, vol) => sum + vol, 0),
+          marketShare: totalBridgeVolume > 0 ? volume24h / totalBridgeVolume : 0,
           transactionCount: Math.floor(volume24h / 25000),
           avgTransactionSize: 25000,
           volumeChange: bridgeInfo?.volumeChange || 0
         };
       })
       .sort((a, b) => b.totalVolume - a.totalVolume);
+    
+    // Normalize market shares to ensure they sum to exactly 1.0 (avoid floating point precision issues)
+    const totalMarketShare = rankings.reduce((sum, r) => sum + r.marketShare, 0);
+    if (totalMarketShare > 0 && Math.abs(totalMarketShare - 1.0) > 0.001) {
+      rankings.forEach(ranking => {
+        ranking.marketShare = ranking.marketShare / totalMarketShare;
+      });
+    }
     
     // Top assets being bridged (from real flow data)
     const assetVolumes = new Map<string, number>();

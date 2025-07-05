@@ -93,10 +93,17 @@ export function DeFiHealthTab() {
     return `$${value.toFixed(2)}`;
   };
 
-  const formatPercent = (value: number | undefined | null) => {
+  const formatPercent = (value: number | undefined | null, isAlreadyPercent: boolean = false) => {
     if (value == null || isNaN(value)) return '0.00%';
-    const formatted = (value * 100).toFixed(2);
-    return value >= 0 ? `+${formatted}%` : `${formatted}%`;
+    
+    // If value is already a percentage (0-100), don't multiply by 100
+    const percent = isAlreadyPercent ? value : value * 100;
+    
+    // Ensure percentage doesn't exceed reasonable bounds 
+    const clampedPercent = Math.min(Math.max(percent, -100), 100);
+    const formatted = clampedPercent.toFixed(2);
+    
+    return clampedPercent >= 0 ? `+${formatted}%` : `${formatted}%`;
   };
 
   const getHealthScoreColor = (score: number) => {
