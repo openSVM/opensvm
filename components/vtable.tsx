@@ -2,6 +2,168 @@ import { useCallback, useEffect, useRef, useState, ReactNode } from 'react';
 import { ListTable } from '@visactor/vtable';
 import '../app/styles/vtable.css';
 import { useRouter, usePathname } from 'next/navigation';
+import { useTheme } from '@/lib/theme';
+import type { ITableThemeDefine } from '@visactor/vtable';
+
+type Theme = 'paper' | 'high-contrast' | 'dos-blue' | 'cyberpunk' | 'solarized';
+
+// Create VTable theme configurations for each OpenSVM theme
+function createVTableTheme(theme: Theme): ITableThemeDefine {
+  const themes = {
+    paper: {
+      underlayBackgroundColor: 'hsl(0 0% 100%)',
+      headerStyle: {
+        bgColor: 'hsl(210 40% 98%)',
+        color: 'hsl(222.2 84% 4.9%)',
+        fontSize: 14,
+        fontWeight: 600,
+        frameStyle: {
+          borderColor: 'hsl(214.3 31.8% 91.4%)',
+          borderLineWidth: 1,
+        },
+      },
+      bodyStyle: {
+        bgColor: 'hsl(0 0% 100%)',
+        color: 'hsl(222.2 84% 4.9%)',
+        fontSize: 14,
+        frameStyle: {
+          borderColor: 'hsl(214.3 31.8% 91.4%)',
+          borderLineWidth: 1,
+        },
+        hover: {
+          cellBgColor: 'hsl(210 40% 98%)',
+        },
+      },
+      selectionStyle: {
+        cellBorderColor: 'hsl(221.2 83.2% 53.3%)',
+        cellBorderLineWidth: 2,
+        cellBgColor: 'hsl(221.2 83.2% 53.3% / 0.1)',
+      },
+    },
+    'high-contrast': {
+      underlayBackgroundColor: 'hsl(0 0% 3.9%)',
+      headerStyle: {
+        bgColor: 'hsl(0 0% 3.9%)',
+        color: 'hsl(0 0% 98%)',
+        fontSize: 14,
+        fontWeight: 600,
+        frameStyle: {
+          borderColor: 'hsl(215 27.9% 16.9%)',
+          borderLineWidth: 1,
+        },
+      },
+      bodyStyle: {
+        bgColor: 'hsl(0 0% 3.9%)',
+        color: 'hsl(0 0% 98%)',
+        fontSize: 14,
+        frameStyle: {
+          borderColor: 'hsl(215 27.9% 16.9%)',
+          borderLineWidth: 1,
+        },
+        hover: {
+          cellBgColor: 'hsl(215 27.9% 16.9%)',
+        },
+      },
+      selectionStyle: {
+        cellBorderColor: 'hsl(0 0% 98%)',
+        cellBorderLineWidth: 2,
+        cellBgColor: 'hsl(0 0% 98% / 0.1)',
+      },
+    },
+    'dos-blue': {
+      underlayBackgroundColor: 'hsl(240 100% 20%)',
+      headerStyle: {
+        bgColor: 'hsl(240 100% 20%)',
+        color: 'hsl(60 100% 90%)',
+        fontSize: 14,
+        fontWeight: 600,
+        frameStyle: {
+          borderColor: 'hsl(240 100% 30%)',
+          borderLineWidth: 1,
+        },
+      },
+      bodyStyle: {
+        bgColor: 'hsl(240 100% 20%)',
+        color: 'hsl(60 100% 90%)',
+        fontSize: 14,
+        frameStyle: {
+          borderColor: 'hsl(240 100% 30%)',
+          borderLineWidth: 1,
+        },
+        hover: {
+          cellBgColor: 'hsl(240 100% 25%)',
+        },
+      },
+      selectionStyle: {
+        cellBorderColor: 'hsl(60 100% 70%)',
+        cellBorderLineWidth: 2,
+        cellBgColor: 'hsl(60 100% 70% / 0.1)',
+      },
+    },
+    cyberpunk: {
+      underlayBackgroundColor: 'hsl(300 100% 10%)',
+      headerStyle: {
+        bgColor: 'hsl(300 100% 10%)',
+        color: 'hsl(300 100% 80%)',
+        fontSize: 14,
+        fontWeight: 600,
+        frameStyle: {
+          borderColor: 'hsl(300 100% 25%)',
+          borderLineWidth: 1,
+        },
+      },
+      bodyStyle: {
+        bgColor: 'hsl(300 100% 10%)',
+        color: 'hsl(300 100% 80%)',
+        fontSize: 14,
+        frameStyle: {
+          borderColor: 'hsl(300 100% 25%)',
+          borderLineWidth: 1,
+        },
+        hover: {
+          cellBgColor: 'hsl(300 100% 15%)',
+        },
+      },
+      selectionStyle: {
+        cellBorderColor: 'hsl(180 100% 60%)',
+        cellBorderLineWidth: 2,
+        cellBgColor: 'hsl(180 100% 60% / 0.1)',
+      },
+    },
+    solarized: {
+      underlayBackgroundColor: 'hsl(192 81% 14%)',
+      headerStyle: {
+        bgColor: 'hsl(192 81% 14%)',
+        color: 'hsl(180 7% 60%)',
+        fontSize: 14,
+        fontWeight: 600,
+        frameStyle: {
+          borderColor: 'hsl(194 14% 40%)',
+          borderLineWidth: 1,
+        },
+      },
+      bodyStyle: {
+        bgColor: 'hsl(192 81% 14%)',
+        color: 'hsl(180 7% 60%)',
+        fontSize: 14,
+        frameStyle: {
+          borderColor: 'hsl(194 14% 40%)',
+          borderLineWidth: 1,
+        },
+        hover: {
+          cellBgColor: 'hsl(192 81% 18%)',
+        },
+      },
+      selectionStyle: {
+        cellBorderColor: 'hsl(196 13% 60%)',
+        cellBorderLineWidth: 2,
+        cellBgColor: 'hsl(196 13% 60% / 0.1)',
+      },
+    },
+  };
+
+  return themes[theme];
+}
 
 interface Column {
   field: string;
@@ -47,6 +209,7 @@ export function VTableWrapper({
   const [mounted, setMounted] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
+  const { theme } = useTheme();
 
   // Client-side navigation handler
   const handleNavigation = useCallback((href: string) => {
@@ -99,6 +262,7 @@ export function VTableWrapper({
         const table = new ListTable({
           container: containerRef.current,
           records: processedData,
+          theme: createVTableTheme(theme),
           columns: columns.map(col => ({
             field: col.field,
             title: col.header || col.title,
@@ -270,7 +434,7 @@ export function VTableWrapper({
         }
       }
     };
-  }, [columns, data, mounted, onLoadMore, onSort, handleNavigation, selectedRowId, pinnedRowIds, rowKey, onRowSelect, handleRowClick]);
+  }, [columns, data, mounted, onLoadMore, onSort, handleNavigation, selectedRowId, pinnedRowIds, rowKey, onRowSelect, handleRowClick, theme]);
 
   if (error) {
     return (
