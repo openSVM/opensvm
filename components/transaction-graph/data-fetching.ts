@@ -520,6 +520,15 @@ export async function addAccountToGraph(
     
     for (const tx of data.transactions) {
       console.log(`🔍 [TX_PROCESS] Processing transaction ${tx.signature} for ${address}`);
+      console.log(`🔍 [TX_PROCESS] Transaction data:`, {
+        signature: tx.signature,
+        success: tx.success,
+        err: tx.err,
+        type: tx.type,
+        accountsCount: tx.accounts?.length || 0,
+        transfersCount: tx.transfers?.length || 0,
+        timestamp: tx.timestamp
+      });
       
       // Skip if we've already loaded this transaction
       if (loadedTransactionsRef?.current?.has(tx.signature)) {
@@ -532,9 +541,16 @@ export async function addAccountToGraph(
       let shouldIncludeTx = true;
       let filterReason = '';
       
-      if (shouldIncludeTransaction && !shouldIncludeTransaction(tx.accounts)) {
-        shouldIncludeTx = false;
-        filterReason = 'Failed shouldIncludeTransaction filter';
+      // Check transaction filter only if we have accounts to check
+      if (shouldIncludeTransaction && tx.accounts && Array.isArray(tx.accounts)) {
+        if (!shouldIncludeTransaction(tx.accounts)) {
+          shouldIncludeTx = false;
+          filterReason = 'Failed shouldIncludeTransaction filter';
+          console.log(`🚫 [TX_FILTER] Transaction ${tx.signature} accounts:`, tx.accounts.map(acc => acc.pubkey));
+        }
+      } else if (!tx.accounts || !Array.isArray(tx.accounts)) {
+        // If no accounts array, still include the transaction (system transactions might not have accounts)
+        console.log(`⚠️ [TX_PROCESS] Transaction ${tx.signature} has no accounts array, but including anyway`);
       }
       
       if (!shouldIncludeTx) {
@@ -754,6 +770,26 @@ export async function addAccountToGraph(
     }
     
     console.log(`✅ [GRAPH_BUILD] Completed processing for ${address}`);
+    console.log(`📊 [GRAPH_BUILD] Summary for ${address}:`, {
+      totalTransactions: data.transactions.length,
+      processedTransactions: processedTransactionCount,
+      skippedTransactions: skippedTransactionCount,
+      connectedAccounts: connectedAccounts.size,
+      currentDepth: depth,
+      maxDepth: maxDepth
+    });
+    
+    // Log current graph state
+    const cy = cyRef?.current;
+    if (cy) {
+      const nodes = cy.nodes();
+      const edges = cy.edges();
+      const transactions = nodes.filter(node => node.data('type') === 'transaction');
+      const accounts = nodes.filter(node => node.data('type') === 'account');
+      
+      console.log(`📊 [GRAPH_STATE] Current graph state: ${nodes.length} total nodes (${accounts.length} accounts, ${transactions.length} transactions), ${edges.length} edges`);
+    }
+    
     return { cy, address, newElements };
   } catch (error) {
     console.error(`❌ [GRAPH_BUILD] Error adding account ${address} to graph:`, error);

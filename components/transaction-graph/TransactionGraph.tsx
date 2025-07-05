@@ -477,12 +477,21 @@ function TransactionGraph({
       }, {});
       console.log(`🔄 [GPU_UPDATE] Node types:`, nodeTypes);
       
+      // Log sample data for debugging
+      if (newData.nodes.length > 0) {
+        console.log(`🔄 [GPU_UPDATE] Sample node:`, newData.nodes[0]);
+      }
+      if (newData.links.length > 0) {
+        console.log(`🔄 [GPU_UPDATE] Sample link:`, newData.links[0]);
+      }
+      
       setGpuGraphData(newData);
       console.log('✅ [GPU_UPDATE] GPU graph data updated successfully');
       
       // Show warning if graph is empty
       if (newData.nodes.length === 0) {
         console.log('⚠️ [GPU_UPDATE] GPU graph is empty after update');
+        console.log('⚠️ [GPU_UPDATE] Cytoscape elements count:', cyRef.current?.elements().length || 0);
       }
     } else {
       console.log('🔄 [GPU_UPDATE] GPU graph disabled, skipping update');

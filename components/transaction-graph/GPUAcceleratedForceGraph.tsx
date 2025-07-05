@@ -197,7 +197,26 @@ export const GPUAcceleratedForceGraph: React.FC<GPUAcceleratedForceGraphProps> =
 
   // Optimize graph performance on data changes
   useEffect(() => {
-    if (!graphRef.current) return;
+    console.log(`🎮 [GPU_GRAPH] Data update received: ${graphData.nodes.length} nodes, ${graphData.links.length} links`);
+    
+    // Log node types for debugging
+    const nodeTypes = graphData.nodes.reduce((types: Record<string, number>, node) => {
+      types[node.type] = (types[node.type] || 0) + 1;
+      return types;
+    }, {});
+    console.log(`🎮 [GPU_GRAPH] Node types:`, nodeTypes);
+    
+    // Log link types for debugging
+    const linkTypes = graphData.links.reduce((types: Record<string, number>, link) => {
+      types[link.type || 'unknown'] = (types[link.type || 'unknown'] || 0) + 1;
+      return types;
+    }, {});
+    console.log(`🎮 [GPU_GRAPH] Link types:`, linkTypes);
+    
+    if (!graphRef.current) {
+      console.log(`🎮 [GPU_GRAPH] No graph ref available`);
+      return;
+    }
 
     // Warm up the simulation for better initial layout
     graphRef.current.d3ReheatSimulation();
