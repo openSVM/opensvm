@@ -12,10 +12,10 @@ import { GraphStateCache } from '@/lib/graph-state-cache';
  * @param transactionCache Cache for transaction data
  * @returns Transaction data
  */
-export const fetchTransactionData = async (
+export async function fetchTransactionData(
   signature: string,
   transactionCache: Map<string, any>
-): Promise<any> => {
+): Promise<any> {
   // Check if we have this in memory cache first
   const cachedData = transactionCache.get(signature);
   if (cachedData) {
@@ -50,10 +50,10 @@ export const fetchTransactionData = async (
  * @param signal Optional abort signal
  * @returns Account data with guaranteed non-null result
  */
-export const fetchAccountTransactions = async (
+export async function fetchAccountTransactions(
   address: string,
   signal?: AbortSignal
-): Promise<AccountData | null> => {
+): Promise<AccountData | null> {
   console.log(`Starting fetch for account: ${address}`);
   
   try {
@@ -288,11 +288,11 @@ export const queueAccountFetch = (
  * @param isProcessingQueueRef Reference to track if queue is being processed (optional)
  * @returns Promise that resolves when processing is complete
  */
-export const processAccountFetchQueue = async (
+export async function processAccountFetchQueue(
   fetchQueueRef: React.MutableRefObject<FetchQueueItem[]>,
   fetchAndProcessAccount: (address: string, depth: number, parentSignature: string | null) => Promise<void>,
   isProcessingQueueRef?: React.MutableRefObject<boolean>
-): Promise<void> => { 
+): Promise<void> { 
   // Early return if queue is empty or already processing
   if (fetchQueueRef.current.length === 0) {
     console.log(`📭 [PROCESS_QUEUE] Queue is empty, nothing to process`);
@@ -378,7 +378,7 @@ export const processAccountFetchQueue = async (
  * @param queueAccountFetch Function to queue an account for fetching
  * @returns Result object with cytoscape instance, address, and new elements
  */
-export const addAccountToGraph = async (
+export async function addAccountToGraph(
   address: string,
   totalAccounts: number,
   depth = 0,
@@ -396,7 +396,7 @@ export const addAccountToGraph = async (
   processedEdgesRef?: React.MutableRefObject<Set<string>>,
   setLoadingProgress?: (cb: (prev: number) => number) => void,
   queueAccountFetch?: (address: string, depth: number, parentSignature: string | null) => void
-): Promise<GraphElementAddResult | undefined> => {
+): Promise<GraphElementAddResult | undefined> {
   console.log(`🏗️ [GRAPH_BUILD] Starting addAccountToGraph for ${address}, depth: ${depth}, maxDepth: ${maxDepth}`);
   
   // Stop if we've reached the maximum depth
@@ -806,7 +806,7 @@ export const addAccountToGraph = async (
  * @param signal Optional AbortSignal for cancelling operations
  * @returns Promise that resolves to true if new elements were added
  */
-export const expandTransactionGraph = async (
+export async function expandTransactionGraph(
   signature: string,
   cyRef: React.MutableRefObject<cytoscape.Core | null>,
   fetchTransactionData: (signature: string) => Promise<any>,
@@ -815,7 +815,7 @@ export const expandTransactionGraph = async (
   setExpandedNodesCount: (cb: (prev: number) => number) => void,
   loadedTransactionsRef: React.MutableRefObject<Set<string>>,
   signal?: AbortSignal
-): Promise<boolean> => {
+): Promise<boolean> {
   const cy = cyRef.current;
   if (!cy) return false;
 

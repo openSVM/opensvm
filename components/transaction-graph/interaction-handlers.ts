@@ -21,7 +21,7 @@ import { gpuThrottle, optimizeCytoscapeContainer } from './gpu-utils';
  * @param incrementalLoad Whether to incrementally load connected nodes
  * @param preserveViewport Whether to preserve viewport position
  */
-export const focusOnTransaction = async (
+export async function focusOnTransaction(
   signature: string,
   cyRef: React.MutableRefObject<cytoscape.Core | null>,
   focusSignatureRef: React.MutableRefObject<string>,
@@ -34,7 +34,7 @@ export const focusOnTransaction = async (
   clientSideNavigation = true,
   incrementalLoad = false,
   preserveViewport = true
-): Promise<void> => {
+): Promise<void> {
   const cy = cyRef.current;
   if (!cy) return;
   
