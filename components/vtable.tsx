@@ -6,221 +6,131 @@ import { useTheme } from '@/lib/theme';
 
 type Theme = 'paper' | 'high-contrast' | 'dos-blue' | 'cyberpunk' | 'solarized';
 
-// Track if themes have been registered globally
-let themesRegistered = false;
+// Utility function to convert HSL to hex color
+function hslToHex(hsl: string): string {
+  const hslMatch = hsl.match(/hsl\((\d+(?:\.\d+)?),?\s*(\d+(?:\.\d+)?)%,?\s*(\d+(?:\.\d+)?)%\)/);
+  if (!hslMatch) {
+    // If it's already a hex color or other format, return as is
+    return hsl.startsWith('#') ? hsl : '#000000';
+  }
 
-// Register VTable themes using the proper VTable.register.theme method
-function registerVTableThemes() {
-  if (themesRegistered) return;
-  
-  console.log('Registering VTable themes...');
-  // Paper Theme
-  VTable.register.theme('opensvm-paper', {
-    defaultStyle: {
-      borderLineWidth: 0
-    },
-    headerStyle: {
-      bgColor: '#f8fafc',
-      borderColor: '#e2e8f0',
-      fontWeight: 'bold',
-      color: '#1e293b',
-      fontSize: 14,
-      fontFamily: 'ui-sans-serif, system-ui, sans-serif'
-    },
-    rowHeaderStyle: {
-      bgColor: '#f8fafc',
-      borderColor: '#e2e8f0',
-      borderLineWidth: 1,
-      fontWeight: 'normal',
-      color: '#1e293b'
-    },
-    cornerHeaderStyle: {
-      bgColor: '#f8fafc',
-      fontWeight: 'bold',
-      color: '#1e293b'
-    },
-    bodyStyle: {
-      borderColor: '#f1f5f9',
-      borderLineWidth: 1,
-      color: '#334155',
-      fontSize: 14,
-      fontFamily: 'ui-sans-serif, system-ui, sans-serif',
-      bgColor: (args: any) => {
-        if (args.row % 2 === 1) {
-          return '#f8fafc';
-        }
-        return '#ffffff';
-      }
-    }
-  });
+  const h = parseFloat(hslMatch[1]) / 360;
+  const s = parseFloat(hslMatch[2]) / 100;
+  const l = parseFloat(hslMatch[3]) / 100;
 
-  // High Contrast Theme
-  VTable.register.theme('opensvm-high-contrast', {
-    defaultStyle: {
-      borderLineWidth: 0
-    },
-    headerStyle: {
-      bgColor: '#0f172a',
-      borderColor: '#334155',
-      fontWeight: 'bold',
-      color: '#f1f5f9',
-      fontSize: 14,
-      fontFamily: 'ui-sans-serif, system-ui, sans-serif'
-    },
-    rowHeaderStyle: {
-      bgColor: '#0f172a',
-      borderColor: '#334155',
-      borderLineWidth: 1,
-      fontWeight: 'normal',
-      color: '#f1f5f9'
-    },
-    cornerHeaderStyle: {
-      bgColor: '#0f172a',
-      fontWeight: 'bold',
-      color: '#f1f5f9'
-    },
-    bodyStyle: {
-      borderColor: '#334155',
-      borderLineWidth: 1,
-      color: '#e2e8f0',
-      fontSize: 14,
-      fontFamily: 'ui-sans-serif, system-ui, sans-serif',
-      bgColor: (args: any) => {
-        if (args.row % 2 === 1) {
-          return '#1e293b';
-        }
-        return '#0f172a';
-      }
-    }
-  });
+  const hue2rgb = (p: number, q: number, t: number) => {
+    if (t < 0) t += 1;
+    if (t > 1) t -= 1;
+    if (t < 1/6) return p + (q - p) * 6 * t;
+    if (t < 1/2) return q;
+    if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+    return p;
+  };
 
-  // DOS Blue Theme
-  VTable.register.theme('opensvm-dos-blue', {
-    defaultStyle: {
-      borderLineWidth: 0
-    },
-    headerStyle: {
-      bgColor: '#000080',
-      borderColor: '#0000ff',
-      fontWeight: 'bold',
-      color: '#ffff00',
-      fontSize: 14,
-      fontFamily: 'ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Consolas, "DejaVu Sans Mono", monospace'
-    },
-    rowHeaderStyle: {
-      bgColor: '#000080',
-      borderColor: '#0000ff',
-      borderLineWidth: 1,
-      fontWeight: 'normal',
-      color: '#ffff00'
-    },
-    cornerHeaderStyle: {
-      bgColor: '#000080',
-      fontWeight: 'bold',
-      color: '#ffff00'
-    },
-    bodyStyle: {
-      borderColor: '#0000ff',
-      borderLineWidth: 1,
-      color: '#ffffff',
-      fontSize: 14,
-      fontFamily: 'ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Consolas, "DejaVu Sans Mono", monospace',
-      bgColor: (args: any) => {
-        if (args.row % 2 === 1) {
-          return '#000060';
-        }
-        return '#000080';
-      }
-    }
-  });
+  let r, g, b;
+  if (s === 0) {
+    r = g = b = l; // achromatic
+  } else {
+    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+    const p = 2 * l - q;
+    r = hue2rgb(p, q, h + 1/3);
+    g = hue2rgb(p, q, h);
+    b = hue2rgb(p, q, h - 1/3);
+  }
 
-  // Cyberpunk Theme
-  VTable.register.theme('opensvm-cyberpunk', {
-    defaultStyle: {
-      borderLineWidth: 0
-    },
-    headerStyle: {
-      bgColor: '#1a0033',
-      borderColor: '#ff00ff',
-      fontWeight: 'bold',
-      color: '#00ffff',
-      fontSize: 14,
-      fontFamily: 'ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Consolas, "DejaVu Sans Mono", monospace'
-    },
-    rowHeaderStyle: {
-      bgColor: '#1a0033',
-      borderColor: '#ff00ff',
-      borderLineWidth: 1,
-      fontWeight: 'normal',
-      color: '#00ffff'
-    },
-    cornerHeaderStyle: {
-      bgColor: '#1a0033',
-      fontWeight: 'bold',
-      color: '#00ffff'
-    },
-    bodyStyle: {
-      borderColor: '#ff00ff',
-      borderLineWidth: 1,
-      color: '#ff66ff',
-      fontSize: 14,
-      fontFamily: 'ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Consolas, "DejaVu Sans Mono", monospace',
-      bgColor: (args: any) => {
-        if (args.row % 2 === 1) {
-          return '#330066';
-        }
-        return '#1a0033';
-      }
-    }
-  });
+  const toHex = (c: number) => {
+    const hex = Math.round(c * 255).toString(16);
+    return hex.length === 1 ? '0' + hex : hex;
+  };
 
-  // Solarized Theme
-  VTable.register.theme('opensvm-solarized', {
-    defaultStyle: {
-      borderLineWidth: 0
-    },
-    headerStyle: {
-      bgColor: '#002b36',
-      borderColor: '#586e75',
-      fontWeight: 'bold',
-      color: '#93a1a1',
-      fontSize: 14,
-      fontFamily: 'ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Consolas, "DejaVu Sans Mono", monospace'
-    },
-    rowHeaderStyle: {
-      bgColor: '#002b36',
-      borderColor: '#586e75',
-      borderLineWidth: 1,
-      fontWeight: 'normal',
-      color: '#93a1a1'
-    },
-    cornerHeaderStyle: {
-      bgColor: '#002b36',
-      fontWeight: 'bold',
-      color: '#93a1a1'
-    },
-    bodyStyle: {
-      borderColor: '#586e75',
-      borderLineWidth: 1,
-      color: '#839496',
-      fontSize: 14,
-      fontFamily: 'ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Consolas, "DejaVu Sans Mono", monospace',
-      bgColor: (args: any) => {
-        if (args.row % 2 === 1) {
-          return '#073642';
-        }
-        return '#002b36';
-      }
-    }
-  });
-
-  themesRegistered = true;
-  console.log('VTable themes registered successfully');
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
 }
 
-// Get the registered theme name for a given OpenSVM theme
-function getVTableThemeName(theme: Theme): string {
-  return `opensvm-${theme}`;
+// Get computed CSS variable value and convert to hex
+function getCSSVariableAsHex(variable: string): string {
+  if (typeof window === 'undefined') return '#000000';
+  
+  const computedStyle = getComputedStyle(document.documentElement);
+  const value = computedStyle.getPropertyValue(variable).trim();
+  
+  if (!value) return '#000000';
+  
+  // If it's HSL format (like "240 100% 20%"), convert to proper HSL string
+  if (value.includes('%')) {
+    const parts = value.split(/\s+/);
+    if (parts.length >= 3) {
+      const hslString = `hsl(${parts[0]}, ${parts[1]}, ${parts[2]})`;
+      return hslToHex(hslString);
+    }
+  }
+  
+  // If it's already hex or other format, return as is
+  return value.startsWith('#') ? value : '#000000';
+}
+
+// Create VTable theme from current CSS variables
+function createVTableThemeFromCSS(): any {
+  const background = getCSSVariableAsHex('--background');
+  const foreground = getCSSVariableAsHex('--foreground');
+  const muted = getCSSVariableAsHex('--muted');
+  const mutedForeground = getCSSVariableAsHex('--muted-foreground');
+  const border = getCSSVariableAsHex('--border');
+  const card = getCSSVariableAsHex('--card');
+
+  return {
+    defaultStyle: {
+      borderLineWidth: 1
+    },
+    headerStyle: {
+      bgColor: muted,
+      borderColor: border,
+      fontWeight: 'bold',
+      color: foreground,
+      fontSize: 14,
+      fontFamily: 'ui-sans-serif, system-ui, sans-serif'
+    },
+    rowHeaderStyle: {
+      bgColor: muted,
+      borderColor: border,
+      borderLineWidth: 1,
+      fontWeight: 'normal',
+      color: foreground
+    },
+    cornerHeaderStyle: {
+      bgColor: muted,
+      fontWeight: 'bold',
+      color: foreground
+    },
+    bodyStyle: {
+      borderColor: border,
+      borderLineWidth: 1,
+      color: foreground,
+      fontSize: 14,
+      fontFamily: 'ui-sans-serif, system-ui, sans-serif',
+      bgColor: (args: any) => {
+        if (args.row % 2 === 1) {
+          return muted;
+        }
+        return background;
+      }
+    }
+  };
+}
+
+// Register a single dynamic VTable theme that uses current CSS variables
+function registerDynamicVTableTheme() {
+  if (typeof window === 'undefined') return;
+  
+  const themeConfig = createVTableThemeFromCSS();
+  console.log('Registering dynamic VTable theme with config:', themeConfig);
+  
+  // Register/re-register the theme with current CSS values
+  VTable.register.theme('opensvm-dynamic', themeConfig);
+}
+
+// Get the dynamic theme name
+function getVTableThemeName(): string {
+  return 'opensvm-dynamic';
 }
 
 interface Column {
@@ -284,9 +194,8 @@ export function VTableWrapper({
     }
   }, [onRowSelect, rowKey]);
 
-  // Register themes once globally
+  // Register dynamic theme and set mounted state
   useEffect(() => {
-    registerVTableThemes();
     setMounted(true);
     return () => setMounted(false);
   }, []);
@@ -307,6 +216,9 @@ export function VTableWrapper({
         // Clear the container to ensure fresh start
         containerRef.current.innerHTML = '';
         
+        // Register/update dynamic theme with current CSS values
+        registerDynamicVTableTheme();
+        
         // Wait for the next frame to ensure DOM is updated
         requestAnimationFrame(() => {
           if (!containerRef.current) { return; }
@@ -325,16 +237,16 @@ export function VTableWrapper({
             };
           });
 
-          // Get the registered theme name for current theme
-          const vtableThemeName = getVTableThemeName(theme);
+          // Get the dynamic theme name
+          const vtableThemeName = getVTableThemeName();
           
-          console.log('Creating VTable with theme:', vtableThemeName, 'for OpenSVM theme:', theme);
+          console.log('Creating VTable with dynamic theme:', vtableThemeName, 'for OpenSVM theme:', theme);
           
-          // Create table configuration with registered theme
+          // Create table configuration with dynamic theme
           const tableConfig = {
             container: containerRef.current,
             records: processedData,
-            theme: vtableThemeName, // Use the registered theme name
+            theme: vtableThemeName, // Use the dynamic theme name
             defaultRowHeight: 48,
             defaultHeaderRowHeight: 48,
             overscrollBehavior: 'none',
@@ -450,7 +362,7 @@ export function VTableWrapper({
           const table = new ListTable(tableConfig);
 
           // Log theme application for debugging
-          console.log('VTable created successfully with theme:', vtableThemeName, 'Table instance:', table);
+          console.log('VTable created successfully with dynamic theme:', vtableThemeName, 'Table instance:', table);
 
           if (onLoadMore) {
             (table as any).on('scroll', (args: any) => {
