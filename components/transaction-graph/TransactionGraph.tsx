@@ -105,6 +105,17 @@ function TransactionGraph({
   const [useGPUGraph, setUseGPUGraph] = useState<boolean>(true); // Always use GPU by default
   const [gpuGraphData, setGpuGraphData] = useState<{ nodes: any[]; links: any[] }>({ nodes: [], links: [] });
   
+  // Debug GPU graph data changes
+  useEffect(() => {
+    console.log(`🔄 [GPU_STATE] GPU graph data changed: ${gpuGraphData.nodes.length} nodes, ${gpuGraphData.links.length} links`);
+    gpuGraphData.nodes.forEach(node => {
+      console.log(`🔄 [GPU_STATE] Node: ${node.id} (${node.type})`);
+    });
+    gpuGraphData.links.forEach(link => {
+      console.log(`🔄 [GPU_STATE] Link: ${link.source} -> ${link.target}`);
+    });
+  }, [gpuGraphData]);
+  
   // Address tracking state
   const [trackedAddress, setTrackedAddress] = useState<string | null>(null);
   const [isTrackingMode, setIsTrackingMode] = useState<boolean>(false);
@@ -394,6 +405,10 @@ function TransactionGraph({
           console.log(`🎨 [LAYOUT] Running layout optimization (every 8 nodes)`);
           runLayoutOptimized(false, false);
         }
+        
+        // Update GPU graph after adding data
+        console.log(`🔄 [GPU_TRIGGER] Triggering GPU graph update after adding account ${address}`);
+        updateGPUGraphData();
       }
 
       return result;
@@ -422,7 +437,8 @@ function TransactionGraph({
     fetchAccountTransactionsWithError,
     runLayoutOptimized,
     maxDepth,
-    checkForSplTransfers
+    checkForSplTransfers,
+    updateGPUGraphData
   ]);
 
   // Fetch and process a single account
@@ -455,11 +471,19 @@ function TransactionGraph({
 
   // Convert Cytoscape data to GPU graph format
   const convertToGPUGraphData = useCallback(() => {
-    if (!cyRef.current) return { nodes: [], links: [] };
+    if (!cyRef.current) {
+      console.log('🔄 [GPU_CONVERT] No Cytoscape instance, returning empty data');
+      return { nodes: [], links: [] };
+    }
 
-    const nodes = cyRef.current.nodes().map((node) => {
+    const cytoscapeNodes = cyRef.current.nodes();
+    const cytoscapeEdges = cyRef.current.edges();
+    
+    console.log(`🔄 [GPU_CONVERT] Converting Cytoscape data: ${cytoscapeNodes.length} nodes, ${cytoscapeEdges.length} edges`);
+
+    const nodes = cytoscapeNodes.map((node) => {
       const data = node.data();
-      return {
+      const convertedNode = {
         id: data.id,
         type: data.type || 'account',
         label: data.label || data.id,
@@ -467,27 +491,37 @@ function TransactionGraph({
         tracked: data.tracked || false,
         color: data.type === 'transaction' ? '#3b82f6' : (data.tracked ? '#ef4444' : '#10b981')
       };
+      console.log(`🔄 [GPU_CONVERT] Converted node: ${data.id} (${data.type})`);
+      return convertedNode;
     });
 
-    const links = cyRef.current.edges().map((edge) => {
+    const links = cytoscapeEdges.map((edge) => {
       const data = edge.data();
-      return {
+      const convertedLink = {
         source: data.source,
         target: data.target,
         type: data.type || 'interaction',
         value: data.value || 1,
         color: '#64748b'
       };
+      console.log(`🔄 [GPU_CONVERT] Converted edge: ${data.source} -> ${data.target} (${data.type})`);
+      return convertedLink;
     });
 
+    console.log(`✅ [GPU_CONVERT] Conversion complete: ${nodes.length} nodes, ${links.length} links`);
     return { nodes, links };
   }, []);
 
   // Update GPU graph data when Cytoscape changes
   const updateGPUGraphData = useCallback(() => {
     if (useGPUGraph) {
+      console.log('🔄 [GPU_UPDATE] Updating GPU graph data...');
       const newData = convertToGPUGraphData();
+      console.log(`🔄 [GPU_UPDATE] Setting GPU graph data: ${newData.nodes.length} nodes, ${newData.links.length} links`);
       setGpuGraphData(newData);
+      console.log('✅ [GPU_UPDATE] GPU graph data updated successfully');
+    } else {
+      console.log('🔄 [GPU_UPDATE] GPU graph disabled, skipping update');
     }
   }, [useGPUGraph, convertToGPUGraphData]);
 
@@ -809,19 +843,25 @@ function TransactionGraph({
   // Update GPU graph data when Cytoscape graph changes
   useEffect(() => {
     if (cyRef.current && useGPUGraph) {
+      console.log('🔄 [GPU_LISTENER] Setting up GPU graph update listeners');
+      
       // Set up listener for graph changes
       const updateHandler = () => {
+        console.log('🔄 [GPU_LISTENER] Cytoscape graph changed, updating GPU graph');
         updateGPUGraphData();
       };
       
-      cyRef.current.on('add remove data', updateHandler);
+      // Listen to more events to ensure updates
+      cyRef.current.on('add remove data position', updateHandler);
       
       // Initial update
+      console.log('🔄 [GPU_LISTENER] Performing initial GPU graph update');
       updateGPUGraphData();
       
       return () => {
         if (cyRef.current) {
-          cyRef.current.off('add remove data', updateHandler);
+          console.log('🔄 [GPU_LISTENER] Removing GPU graph update listeners');
+          cyRef.current.off('add remove data position', updateHandler);
         }
       };
     }
@@ -914,6 +954,10 @@ function TransactionGraph({
             // Immediate progress update to show something is happening
             setLoadingProgress(20);
             console.log('🚀 [PROGRESS] Added initial transaction node, progress: 20%');
+            
+            // Update GPU graph immediately after adding initial node
+            console.log('🔄 [GPU_INITIAL] Updating GPU graph after adding initial transaction node');
+            updateGPUGraphData();
           }
         }
 
@@ -1099,7 +1143,7 @@ function TransactionGraph({
     };
 
     loadInitialSignature();
-  }, [initialSignature, focusOnTransaction, queueAccountFetch, runLayoutOptimized]);
+  }, [initialSignature, focusOnTransaction, queueAccountFetch, runLayoutOptimized, updateGPUGraphData]);
 
   // Handle initial account loading with enhanced race condition protection  
   useEffect(() => {
