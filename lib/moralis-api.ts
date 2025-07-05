@@ -518,7 +518,7 @@ export function clearCache() {
   Object.keys(apiCache).forEach(key => delete apiCache[key]);
 }
 
-export default {
+const MoralisAPI = {
   getNFTMetadata,
   getNFTsForAddress,
   getTokenMetadata,
@@ -542,3 +542,5 @@ export default {
   getComprehensiveBlockchainData,
   clearCache
 };
+
+export default MoralisAPI;
