@@ -34,6 +34,24 @@ const nextConfig = {
   // This ensures animation classes used by interactive components
   // are included in production builds
   webpack: (config, { dev, isServer }) => {
+    // Resolve Three.js to a single instance to prevent multiple imports
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      'three': 'three',
+      'three/examples/jsm/controls/OrbitControls': 'three/examples/jsm/controls/OrbitControls',
+      'three/examples/jsm/controls/OrbitControls.js': 'three/examples/jsm/controls/OrbitControls.js'
+    };
+    
+    // Configure externals to prevent multiple Three.js instances
+    if (!isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+        path: false,
+        os: false
+      };
+    }
+    
     // Only apply optimizations in production builds
     if (!dev && !isServer) {
       //config.optimization.splitChunks.cacheGroups = { ...config.optimization.splitChunks.cacheGroups };

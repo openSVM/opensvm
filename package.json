@@ -112,6 +112,9 @@
     "tailwindcss": "^3.4.1",
     "typescript": "^5.7.3"
   },
+  "resolutions": {
+    "three": "^0.173.0"
+  },
   "jest": {
     "testEnvironment": "jsdom",
     "setupFilesAfterEnv": [

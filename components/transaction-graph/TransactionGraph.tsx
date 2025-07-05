@@ -424,6 +424,24 @@ function TransactionGraph({
       }
       
       console.log(`🚀 [CALLING] Calling addAccountToGraphUtil for ${address}`);
+      
+      // Ensure all refs are initialized before calling the function
+      if (!processedNodesRef.current) {
+        processedNodesRef.current = new Set();
+      }
+      if (!processedEdgesRef.current) {
+        processedEdgesRef.current = new Set();
+      }
+      if (!loadedAccountsRef.current) {
+        loadedAccountsRef.current = new Set();
+      }
+      if (!loadedTransactionsRef.current) {
+        loadedTransactionsRef.current = new Set();
+      }
+      if (!pendingFetchesRef.current) {
+        pendingFetchesRef.current = new Set();
+      }
+      
       const result = await addAccountToGraphUtil(
         address,
         totalAccounts,
