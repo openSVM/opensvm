@@ -7,183 +7,267 @@ import { useTheme } from '@/lib/theme';
 
 type Theme = 'paper' | 'high-contrast' | 'dos-blue' | 'cyberpunk' | 'solarized';
 
-// Create VTable theme configurations for each OpenSVM theme using VTable's built-in theme system
+// Create VTable theme configurations for each OpenSVM theme using direct theme objects
 function createVTableTheme(theme: Theme) {
-  const themeConfigs = {
+  const baseThemes = {
     paper: {
-      // Use BRIGHT theme as base for light theme
-      baseTheme: VTable.themes.BRIGHT,
-      customizations: {
-        underlayBackgroundColor: '#ffffff',
-        headerStyle: {
-          bgColor: '#f9fafb',
-          color: '#1f2937',
-          fontSize: 14,
-          fontWeight: 600,
-          frameStyle: {
-            borderColor: '#e5e7eb',
-            borderLineWidth: 1,
-          },
-        },
-        bodyStyle: {
-          bgColor: '#ffffff',
-          color: '#1f2937',
-          fontSize: 14,
-          frameStyle: {
-            borderColor: '#e5e7eb',
-            borderLineWidth: 1,
-          },
-          hover: {
-            cellBgColor: '#f3f4f6',
-          },
-        },
-        selectionStyle: {
-          cellBorderColor: '#3b82f6',
-          cellBorderLineWidth: 2,
-          cellBgColor: 'rgba(59, 130, 246, 0.1)',
-        },
-      }
+      name: `OpenSVM-${theme}`,
+      underlayBackgroundColor: '#ffffff',
+      defaultStyle: {
+        color: '#1f2937',
+        bgColor: '#ffffff',
+        fontSize: 14,
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+        fontWeight: 400,
+        borderColor: '#e5e7eb',
+        padding: [8, 12, 8, 12],
+        hover: {
+          cellBgColor: '#f3f4f6',
+        }
+      },
+      headerStyle: {
+        color: '#1f2937',
+        bgColor: '#f9fafb',
+        fontSize: 14,
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+        fontWeight: 600,
+        borderColor: '#e5e7eb',
+        padding: [8, 12, 8, 12],
+        hover: {
+          cellBgColor: '#f3f4f6',
+        }
+      },
+      bodyStyle: {
+        color: '#1f2937',
+        bgColor: '#ffffff',
+        fontSize: 14,
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+        fontWeight: 400,
+        borderColor: '#e5e7eb',
+        padding: [8, 12, 8, 12],
+        hover: {
+          cellBgColor: '#f3f4f6',
+        }
+      },
+      frameStyle: {
+        borderColor: '#e5e7eb',
+        borderLineWidth: 1,
+        borderLineDash: [],
+        cornerRadius: 6,
+      },
+      selectionStyle: {
+        cellBorderColor: '#3b82f6',
+        cellBorderLineWidth: 2,
+        cellBgColor: 'rgba(59, 130, 246, 0.1)',
+      },
     },
     'high-contrast': {
-      // Use DARK theme as base for high contrast
-      baseTheme: VTable.themes.DARK,
-      customizations: {
-        underlayBackgroundColor: '#0a0a0a',
-        headerStyle: {
-          bgColor: '#0a0a0a',
-          color: '#fafafa',
-          fontSize: 14,
-          fontWeight: 600,
-          frameStyle: {
-            borderColor: '#262626',
-            borderLineWidth: 1,
-          },
-        },
-        bodyStyle: {
-          bgColor: '#0a0a0a',
-          color: '#fafafa',
-          fontSize: 14,
-          frameStyle: {
-            borderColor: '#262626',
-            borderLineWidth: 1,
-          },
-          hover: {
-            cellBgColor: '#171717',
-          },
-        },
-        selectionStyle: {
-          cellBorderColor: '#fafafa',
-          cellBorderLineWidth: 2,
-          cellBgColor: 'rgba(250, 250, 250, 0.1)',
-        },
-      }
+      name: `OpenSVM-${theme}`,
+      underlayBackgroundColor: '#0a0a0a',
+      defaultStyle: {
+        color: '#fafafa',
+        bgColor: '#0a0a0a',
+        fontSize: 14,
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+        fontWeight: 400,
+        borderColor: '#262626',
+        padding: [8, 12, 8, 12],
+        hover: {
+          cellBgColor: '#171717',
+        }
+      },
+      headerStyle: {
+        color: '#fafafa',
+        bgColor: '#0a0a0a',
+        fontSize: 14,
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+        fontWeight: 600,
+        borderColor: '#262626',
+        padding: [8, 12, 8, 12],
+        hover: {
+          cellBgColor: '#171717',
+        }
+      },
+      bodyStyle: {
+        color: '#fafafa',
+        bgColor: '#0a0a0a',
+        fontSize: 14,
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+        fontWeight: 400,
+        borderColor: '#262626',
+        padding: [8, 12, 8, 12],
+        hover: {
+          cellBgColor: '#171717',
+        }
+      },
+      frameStyle: {
+        borderColor: '#262626',
+        borderLineWidth: 1,
+        borderLineDash: [],
+        cornerRadius: 6,
+      },
+      selectionStyle: {
+        cellBorderColor: '#fafafa',
+        cellBorderLineWidth: 2,
+        cellBgColor: 'rgba(250, 250, 250, 0.1)',
+      },
     },
     'dos-blue': {
-      // Use DARK theme as base for dos-blue
-      baseTheme: VTable.themes.DARK,
-      customizations: {
-        underlayBackgroundColor: '#000066',
-        headerStyle: {
-          bgColor: '#000066',
-          color: '#ffffe6',
-          fontSize: 14,
-          fontWeight: 600,
-          frameStyle: {
-            borderColor: '#0000cc',
-            borderLineWidth: 1,
-          },
-        },
-        bodyStyle: {
-          bgColor: '#000066',
-          color: '#ffffe6',
-          fontSize: 14,
-          frameStyle: {
-            borderColor: '#0000cc',
-            borderLineWidth: 1,
-          },
-          hover: {
-            cellBgColor: '#000099',
-          },
-        },
-        selectionStyle: {
-          cellBorderColor: '#ffff66',
-          cellBorderLineWidth: 2,
-          cellBgColor: 'rgba(255, 255, 102, 0.1)',
-        },
-      }
+      name: `OpenSVM-${theme}`,
+      underlayBackgroundColor: '#000066',
+      defaultStyle: {
+        color: '#ffffe6',
+        bgColor: '#000066',
+        fontSize: 14,
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+        fontWeight: 400,
+        borderColor: '#0000cc',
+        padding: [8, 12, 8, 12],
+        hover: {
+          cellBgColor: '#000099',
+        }
+      },
+      headerStyle: {
+        color: '#ffffe6',
+        bgColor: '#000066',
+        fontSize: 14,
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+        fontWeight: 600,
+        borderColor: '#0000cc',
+        padding: [8, 12, 8, 12],
+        hover: {
+          cellBgColor: '#000099',
+        }
+      },
+      bodyStyle: {
+        color: '#ffffe6',
+        bgColor: '#000066',
+        fontSize: 14,
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+        fontWeight: 400,
+        borderColor: '#0000cc',
+        padding: [8, 12, 8, 12],
+        hover: {
+          cellBgColor: '#000099',
+        }
+      },
+      frameStyle: {
+        borderColor: '#0000cc',
+        borderLineWidth: 1,
+        borderLineDash: [],
+        cornerRadius: 6,
+      },
+      selectionStyle: {
+        cellBorderColor: '#ffff66',
+        cellBorderLineWidth: 2,
+        cellBgColor: 'rgba(255, 255, 102, 0.1)',
+      },
     },
     cyberpunk: {
-      // Use DARK theme as base for cyberpunk
-      baseTheme: VTable.themes.DARK,
-      customizations: {
-        underlayBackgroundColor: '#330033',
-        headerStyle: {
-          bgColor: '#330033',
-          color: '#ff66ff',
-          fontSize: 14,
-          fontWeight: 600,
-          frameStyle: {
-            borderColor: '#660066',
-            borderLineWidth: 1,
-          },
-        },
-        bodyStyle: {
-          bgColor: '#330033',
-          color: '#ff66ff',
-          fontSize: 14,
-          frameStyle: {
-            borderColor: '#660066',
-            borderLineWidth: 1,
-          },
-          hover: {
-            cellBgColor: '#4d0040',
-          },
-        },
-        selectionStyle: {
-          cellBorderColor: '#00ffff',
-          cellBorderLineWidth: 2,
-          cellBgColor: 'rgba(0, 255, 255, 0.1)',
-        },
-      }
+      name: `OpenSVM-${theme}`,
+      underlayBackgroundColor: '#330033',
+      defaultStyle: {
+        color: '#ff66ff',
+        bgColor: '#330033',
+        fontSize: 14,
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+        fontWeight: 400,
+        borderColor: '#660066',
+        padding: [8, 12, 8, 12],
+        hover: {
+          cellBgColor: '#4d0040',
+        }
+      },
+      headerStyle: {
+        color: '#ff66ff',
+        bgColor: '#330033',
+        fontSize: 14,
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+        fontWeight: 600,
+        borderColor: '#660066',
+        padding: [8, 12, 8, 12],
+        hover: {
+          cellBgColor: '#4d0040',
+        }
+      },
+      bodyStyle: {
+        color: '#ff66ff',
+        bgColor: '#330033',
+        fontSize: 14,
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+        fontWeight: 400,
+        borderColor: '#660066',
+        padding: [8, 12, 8, 12],
+        hover: {
+          cellBgColor: '#4d0040',
+        }
+      },
+      frameStyle: {
+        borderColor: '#660066',
+        borderLineWidth: 1,
+        borderLineDash: [],
+        cornerRadius: 6,
+      },
+      selectionStyle: {
+        cellBorderColor: '#00ffff',
+        cellBorderLineWidth: 2,
+        cellBgColor: 'rgba(0, 255, 255, 0.1)',
+      },
     },
     solarized: {
-      // Use DARK theme as base for solarized
-      baseTheme: VTable.themes.DARK,
-      customizations: {
-        underlayBackgroundColor: '#002b36',
-        headerStyle: {
-          bgColor: '#002b36',
-          color: '#839496',
-          fontSize: 14,
-          fontWeight: 600,
-          frameStyle: {
-            borderColor: '#073642',
-            borderLineWidth: 1,
-          },
-        },
-        bodyStyle: {
-          bgColor: '#002b36',
-          color: '#839496',
-          fontSize: 14,
-          frameStyle: {
-            borderColor: '#073642',
-            borderLineWidth: 1,
-          },
-          hover: {
-            cellBgColor: '#073642',
-          },
-        },
-        selectionStyle: {
-          cellBorderColor: '#586e75',
-          cellBorderLineWidth: 2,
-          cellBgColor: 'rgba(88, 110, 117, 0.1)',
-        },
-      }
+      name: `OpenSVM-${theme}`,
+      underlayBackgroundColor: '#002b36',
+      defaultStyle: {
+        color: '#839496',
+        bgColor: '#002b36',
+        fontSize: 14,
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+        fontWeight: 400,
+        borderColor: '#073642',
+        padding: [8, 12, 8, 12],
+        hover: {
+          cellBgColor: '#073642',
+        }
+      },
+      headerStyle: {
+        color: '#839496',
+        bgColor: '#002b36',
+        fontSize: 14,
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+        fontWeight: 600,
+        borderColor: '#073642',
+        padding: [8, 12, 8, 12],
+        hover: {
+          cellBgColor: '#073642',
+        }
+      },
+      bodyStyle: {
+        color: '#839496',
+        bgColor: '#002b36',
+        fontSize: 14,
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+        fontWeight: 400,
+        borderColor: '#073642',
+        padding: [8, 12, 8, 12],
+        hover: {
+          cellBgColor: '#073642',
+        }
+      },
+      frameStyle: {
+        borderColor: '#073642',
+        borderLineWidth: 1,
+        borderLineDash: [],
+        cornerRadius: 6,
+      },
+      selectionStyle: {
+        cellBorderColor: '#586e75',
+        cellBorderLineWidth: 2,
+        cellBgColor: 'rgba(88, 110, 117, 0.1)',
+      },
     },
   };
 
-  const config = themeConfigs[theme];
-  return config.baseTheme.extends(config.customizations);
+  return baseThemes[theme];
 }
 
 interface Column {
@@ -293,7 +377,7 @@ export function VTableWrapper({
           const tableConfig = {
             container: containerRef.current,
             records: processedData,
-            theme: vtableTheme,
+            theme: vtableTheme, // Use the direct theme object
             // Force theme application by setting explicit style options
             defaultRowHeight: 48,
             defaultHeaderRowHeight: 48,
@@ -410,7 +494,10 @@ export function VTableWrapper({
           // Create the table with the configuration
           const table = new ListTable(tableConfig);
 
-          // Force theme application after table creation using VTable's updateTheme method
+          // Log theme application for debugging
+          console.log('Applied VTable theme:', theme, vtableTheme);
+
+          // Additional theme enforcement - try to set theme after creation
           try {
             if (table.updateTheme) {
               table.updateTheme(vtableTheme);
