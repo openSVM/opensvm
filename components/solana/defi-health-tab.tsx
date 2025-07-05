@@ -113,14 +113,16 @@ export function DeFiHealthTab() {
     return () => clearInterval(interval);
   }, []);
 
-  const formatCurrency = (value: number) => {
+  const formatCurrency = (value: number | undefined | null) => {
+    if (value == null || isNaN(value)) return '$0.00';
     if (value >= 1e9) return `$${(value / 1e9).toFixed(2)}B`;
     if (value >= 1e6) return `$${(value / 1e6).toFixed(2)}M`;
     if (value >= 1e3) return `$${(value / 1e3).toFixed(2)}K`;
     return `$${value.toFixed(2)}`;
   };
 
-  const formatPercent = (value: number) => {
+  const formatPercent = (value: number | undefined | null) => {
+    if (value == null || isNaN(value)) return '0.00%';
     const formatted = (value * 100).toFixed(2);
     return value >= 0 ? `+${formatted}%` : `${formatted}%`;
   };
@@ -243,7 +245,7 @@ export function DeFiHealthTab() {
             <div>
               <p className="text-sm font-medium text-muted-foreground">Avg Health</p>
               <p className={`text-2xl font-bold ${getHealthScoreColor(data.ecosystem.avgHealthScore)}`}>
-                {(data.ecosystem.avgHealthScore * 100).toFixed(0)}%
+                {data.ecosystem.avgHealthScore ? (data.ecosystem.avgHealthScore * 100).toFixed(0) : '0'}%
               </p>
             </div>
             <Heart className="h-8 w-8 text-pink-600" />
@@ -255,7 +257,7 @@ export function DeFiHealthTab() {
             <div>
               <p className="text-sm font-medium text-muted-foreground">Avg Risk</p>
               <p className={`text-2xl font-bold ${getRiskScoreColor(data.ecosystem.avgRiskScore)}`}>
-                {(data.ecosystem.avgRiskScore * 100).toFixed(0)}%
+                {data.ecosystem.avgRiskScore ? (data.ecosystem.avgRiskScore * 100).toFixed(0) : '0'}%
               </p>
             </div>
             <Shield className="h-8 w-8 text-primary" />
@@ -372,19 +374,19 @@ export function DeFiHealthTab() {
                           />
                         </div>
                         <span className={`text-sm font-medium ${getHealthScoreColor(protocol.healthScore)}`}>
-                          {(protocol.healthScore * 100).toFixed(0)}%
+                          {protocol.healthScore ? (protocol.healthScore * 100).toFixed(0) : '0'}%
                         </span>
                       </div>
                     </td>
                     <td className="py-3">
                       <span className={`text-sm font-medium ${getRiskScoreColor(protocol.riskScore)}`}>
-                        {(protocol.riskScore * 100).toFixed(0)}%
+                        {protocol.riskScore ? (protocol.riskScore * 100).toFixed(0) : '0'}%
                       </span>
                     </td>
                     <td className="py-3">
                       <div className="text-sm">
                         <div>{formatCurrency(protocol.treasuryHealth.treasuryValue)}</div>
-                        <div className="text-muted-foreground">{protocol.treasuryHealth.runwayMonths.toFixed(0)}mo runway</div>
+                        <div className="text-muted-foreground">{protocol.treasuryHealth.runwayMonths ? protocol.treasuryHealth.runwayMonths.toFixed(0) : '0'}mo runway</div>
                       </div>
                     </td>
                     <td className="py-3">

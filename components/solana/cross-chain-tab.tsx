@@ -93,14 +93,16 @@ export function CrossChainTab() {
     return () => clearInterval(interval);
   }, []);
 
-  const formatCurrency = (value: number) => {
+  const formatCurrency = (value: number | undefined | null) => {
+    if (value == null || isNaN(value)) return '$0.00';
     if (value >= 1e9) return `$${(value / 1e9).toFixed(2)}B`;
     if (value >= 1e6) return `$${(value / 1e6).toFixed(2)}M`;
     if (value >= 1e3) return `$${(value / 1e3).toFixed(2)}K`;
     return `$${value.toFixed(2)}`;
   };
 
-  const formatPercent = (value: number) => {
+  const formatPercent = (value: number | undefined | null) => {
+    if (value == null || isNaN(value)) return '0.00%';
     const formatted = (value * 100).toFixed(2);
     return value >= 0 ? `+${formatted}%` : `${formatted}%`;
   };
@@ -268,7 +270,7 @@ export function CrossChainTab() {
                             style={{ width: `${ranking.marketShare * 100}%` }}
                           />
                         </div>
-                        {(ranking.marketShare * 100).toFixed(1)}%
+                        {ranking.marketShare ? (ranking.marketShare * 100).toFixed(1) : '0.0'}%
                       </div>
                     </td>
                     <td className="py-3">

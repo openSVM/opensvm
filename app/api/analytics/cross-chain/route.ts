@@ -110,12 +110,13 @@ export async function GET(request: NextRequest) {
     const rankings = Array.from(bridgeVolumes.entries())
       .map(([bridge, totalVolume]) => ({
         bridge,
+        totalVolume, // Changed from volume24h to totalVolume for consistency
         volume24h: totalVolume,
         marketShare: totalVolume / Array.from(bridgeVolumes.values()).reduce((sum, vol) => sum + vol, 0),
         transactionCount: Math.floor(totalVolume / 25000),
         avgTransactionSize: 25000 // Simplified
       }))
-      .sort((a, b) => b.volume24h - a.volume24h);
+      .sort((a, b) => b.totalVolume - a.totalVolume);
     
     // Top assets being bridged
     const assetVolumes = new Map<string, number>();
@@ -125,12 +126,13 @@ export async function GET(request: NextRequest) {
     });
     
     const topAssets = Array.from(assetVolumes.entries())
-      .map(([asset, volume]) => ({
+      .map(([asset, totalVolume]) => ({
         asset,
-        volume24h: volume,
+        totalVolume, // Changed from volume24h to totalVolume for consistency
+        volume24h: totalVolume,
         bridgeCount: new Set(flowsData.filter(f => f.asset === asset).map(f => f.bridgeProtocol)).size
       }))
-      .sort((a, b) => b.volume24h - a.volume24h)
+      .sort((a, b) => b.totalVolume - a.totalVolume)
       .slice(0, 10);
     
     // Health status

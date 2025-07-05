@@ -118,14 +118,16 @@ export function ValidatorTab() {
     return () => clearInterval(interval);
   }, []);
 
-  const formatSOL = (lamports: number) => {
+  const formatSOL = (lamports: number | undefined | null) => {
+    if (lamports == null || isNaN(lamports)) return '0.00 SOL';
     const sol = lamports / 1e9; // Convert lamports to SOL
     if (sol >= 1e6) return `${(sol / 1e6).toFixed(2)}M SOL`;
     if (sol >= 1e3) return `${(sol / 1e3).toFixed(2)}K SOL`;
     return `${sol.toFixed(2)} SOL`;
   };
 
-  const formatPercent = (value: number) => {
+  const formatPercent = (value: number | undefined | null) => {
+    if (value == null || isNaN(value)) return '0.00%';
     return `${(value * 100).toFixed(2)}%`;
   };
 
@@ -343,7 +345,7 @@ export function ValidatorTab() {
                         validator.apy >= 7 ? 'text-accent' : 
                         validator.apy >= 5 ? 'text-secondary' : 'text-destructive'
                       }`}>
-                        {validator.apy.toFixed(2)}%
+                        {validator.apy ? validator.apy.toFixed(2) : '0.00'}%
                       </div>
                     </td>
                     <td className="py-3">
@@ -361,7 +363,7 @@ export function ValidatorTab() {
                     </td>
                     <td className="py-3">
                       <span className={`font-medium ${getPerformanceColor(validator.uptimePercent / 100)}`}>
-                        {validator.uptimePercent.toFixed(1)}%
+                        {validator.uptimePercent ? validator.uptimePercent.toFixed(1) : '0.0'}%
                       </span>
                     </td>
                     <td className="py-3">
