@@ -85,10 +85,15 @@ function TransactionGraph({
   const timeoutIds = useRef<NodeJS.Timeout[]>([]);
   const cyRef = useRef<cytoscape.Core | null>(null);
   
-  // Layout control refs - prevent excessive layout runs
+  // Layout control refs - prevent excessive layout runs with proper debouncing
   const lastLayoutTime = useRef<number>(0);
   const layoutCooldown = useRef<boolean>(false);
   const pendingLayoutRef = useRef<NodeJS.Timeout | null>(null);
+  const layoutAbortControllerRef = useRef<AbortController | null>(null);
+  
+  // Enhanced initialization control to prevent race conditions
+  const initializationAbortControllerRef = useRef<AbortController | null>(null);
+  const isInitializingRef = useRef<boolean>(false);
   
   // Viewport state preservation
   const preservedViewport = useRef<{ zoom: number; pan: { x: number; y: number } } | null>(null);
@@ -183,24 +188,43 @@ function TransactionGraph({
     [shouldExcludeAddress]
   );
 
-  // Optimized layout function with throttling
+  // Enhanced layout function with proper debouncing and cancellation
   const runLayoutOptimized = useCallback((fit = false, animate = false) => {
     if (!cyRef.current || layoutCooldown.current) return;
     
-    // Clear any pending layout
+    // Cancel any pending layout
     if (pendingLayoutRef.current) {
       clearTimeout(pendingLayoutRef.current);
+      pendingLayoutRef.current = null;
     }
     
-    // Throttle layout calls to prevent excessive re-rendering
+    // Cancel any existing layout operation
+    if (layoutAbortControllerRef.current && !layoutAbortControllerRef.current.signal.aborted) {
+      layoutAbortControllerRef.current.abort();
+    }
+    
     const now = Date.now();
-    if (now - lastLayoutTime.current < 1000) { // 1 second cooldown
-      pendingLayoutRef.current = setTimeout(() => runLayoutOptimized(fit, animate), 500);
+    const timeSinceLastLayout = now - lastLayoutTime.current;
+    
+    // Enhanced debouncing: longer cooldown for rapid calls, shorter for normal operations
+    const minCooldown = fit ? 500 : 1500; // Longer cooldown for non-fit layouts to reduce thrashing
+    
+    if (timeSinceLastLayout < minCooldown) {
+      // Debounce with exponential backoff for rapid calls
+      const delay = Math.min(minCooldown - timeSinceLastLayout, 2000);
+      pendingLayoutRef.current = setTimeout(() => {
+        pendingLayoutRef.current = null;
+        runLayoutOptimized(fit, animate);
+      }, delay);
       return;
     }
     
     lastLayoutTime.current = now;
     layoutCooldown.current = true;
+    
+    // Create new abort controller for this layout operation
+    layoutAbortControllerRef.current = new AbortController();
+    const currentAbortController = layoutAbortControllerRef.current;
     
     // Preserve viewport if not fitting
     if (!fit && cyRef.current) {
@@ -219,6 +243,11 @@ function TransactionGraph({
       animate: animate,
       animationDuration: animate ? 300 : 0,
       stop: () => {
+        // Check if this layout operation was cancelled
+        if (currentAbortController.signal.aborted) {
+          return;
+        }
+        
         layoutCooldown.current = false;
         
         // Restore viewport if it was preserved
@@ -227,10 +256,18 @@ function TransactionGraph({
           cyRef.current.pan(preservedViewport.current.pan);
           preservedViewport.current = null;
         }
+        
+        // Clear the abort controller if this is the current one
+        if (layoutAbortControllerRef.current === currentAbortController) {
+          layoutAbortControllerRef.current = null;
+        }
       }
     });
     
-    layout.run();
+    // Check if operation was cancelled before running
+    if (!currentAbortController.signal.aborted) {
+      layout.run();
+    }
   }, []);
 
   // Enhanced fetch function with better error handling
@@ -349,12 +386,12 @@ function TransactionGraph({
       
       console.log(`✅ [RESULT] addAccountToGraphUtil completed for ${address}:`, result ? 'success' : 'failed');
 
-      // Only run layout every 5 nodes to reduce blinking
+      // Only run layout every 8 nodes to reduce blinking and improve performance
       if (cyRef.current) {
         const elementCount = cyRef.current.elements().length;
         console.log(`📊 [LAYOUT] Current element count: ${elementCount}`);
-        if (elementCount % 5 === 0) {
-          console.log(`🎨 [LAYOUT] Running layout optimization (every 5 nodes)`);
+        if (elementCount % 8 === 0) { // Increased from 5 to 8 for better performance
+          console.log(`🎨 [LAYOUT] Running layout optimization (every 8 nodes)`);
           runLayoutOptimized(false, false);
         }
       }
@@ -706,9 +743,9 @@ function TransactionGraph({
     );
   }, [focusOnTransaction, startAddressTracking]);
 
-  // Initialize graph once - no dependencies to prevent re-initialization
+  // Initialize graph once with enhanced race condition protection
   useEffect(() => {
-    if (!containerRef.current || cyRef.current) {
+    if (!containerRef.current || cyRef.current || isInitializingRef.current) {
       return;
     }
 
@@ -719,9 +756,17 @@ function TransactionGraph({
       return;
     }
 
+    // Set initializing flag to prevent race conditions
+    isInitializingRef.current = true;
     isInitialized.current = false;
     timeoutIds.current = [];
 
+    // Cancel any existing initialization
+    if (initializationAbortControllerRef.current) {
+      initializationAbortControllerRef.current.abort();
+    }
+    initializationAbortControllerRef.current = new AbortController();
+    
     // Clear all state
     processedNodesRef.current.clear();
     processedEdgesRef.current.clear();
@@ -734,16 +779,30 @@ function TransactionGraph({
     const cy = initializeCytoscape(cytoscapeContainer);
     cyRef.current = cy;
     setupGraphInteractionsCallback(cy);
+    
+    // Mark initialization as complete
+    isInitializingRef.current = false;
 
     return () => {
+      // Cancel initialization if in progress
+      if (initializationAbortControllerRef.current) {
+        initializationAbortControllerRef.current.abort();
+      }
+      
       timeoutIds.current.forEach(clearTimeout);
       if (pendingLayoutRef.current) {
         clearTimeout(pendingLayoutRef.current);
+        pendingLayoutRef.current = null;
+      }
+      if (layoutAbortControllerRef.current) {
+        layoutAbortControllerRef.current.abort();
+        layoutAbortControllerRef.current = null;
       }
       if (cyRef.current) {
         cyRef.current.destroy();
         cyRef.current = null;
       }
+      isInitializingRef.current = false;
     };
   }, []); // No dependencies to prevent re-initialization
 
@@ -797,34 +856,50 @@ function TransactionGraph({
     };
   }, [loadingProgress, loading]);
 
-  // Handle initial signature loading
+  // Handle initial signature loading with enhanced race condition protection
   useEffect(() => {
-    if (!cyRef.current || !initialSignature || initialSignature === initialSignatureRef.current) {
+    if (!cyRef.current || !initialSignature || initialSignature === initialSignatureRef.current || isInitializingRef.current) {
+      return;
+    }
+
+    // Prevent overlapping initialization
+    if (isInitialized.current) {
+      console.log('🔄 [INIT] Initialization already in progress, skipping');
       return;
     }
 
     initialSignatureRef.current = initialSignature;
     
     const loadInitialSignature = async () => {
-      if (isInitialized.current) return;
-      isInitialized.current = true;
-
-      setLoading(true);
-      setError(null);
-      setTotalAccounts(1);
-      setLoadingProgress(0);
+      // Create abort controller for this specific initialization
+      const abortController = new AbortController();
+      const signal = abortController.signal;
       
-      // Force immediate progress update to ensure UI responsiveness
-      setTimeout(() => {
-        console.log('🔄 [FORCE_PROGRESS] Forcing initial progress update');
-        setLoadingProgress(10);
-      }, 100);
-
       try {
+        if (isInitialized.current) return;
+        isInitialized.current = true;
+
+        if (signal.aborted) return;
+
+        setLoading(true);
+        setError(null);
+        setTotalAccounts(1);
+        setLoadingProgress(0);
+        
+        // Force immediate progress update to ensure UI responsiveness
+        setTimeout(() => {
+          if (!signal.aborted) {
+            console.log('🔄 [FORCE_PROGRESS] Forcing initial progress update');
+            setLoadingProgress(10);
+          }
+        }, 100);
+
+        if (signal.aborted) return;
+
         const cachedState = GraphStateCache.loadState(initialSignature);
         
         // Create initial transaction node and immediate progress update
-        if (cyRef.current && !cyRef.current.getElementById(initialSignature).length) {
+        if (cyRef.current && !cyRef.current.getElementById(initialSignature).length && !signal.aborted) {
           cyRef.current.add({ 
             data: { 
               id: initialSignature, 
@@ -835,49 +910,55 @@ function TransactionGraph({
             classes: 'transaction highlight-transaction' 
           });
           
-          // Immediate progress update to show something is happening
-          setLoadingProgress(20);
-          console.log('🚀 [PROGRESS] Added initial transaction node, progress: 20%');
+          if (!signal.aborted) {
+            // Immediate progress update to show something is happening
+            setLoadingProgress(20);
+            console.log('🚀 [PROGRESS] Added initial transaction node, progress: 20%');
+          }
         }
 
+        if (signal.aborted) return;
+
         // Restore cached state if available
-        if (cachedState && Array.isArray(cachedState.nodes) && cachedState.nodes.length > 0) {
+        if (cachedState && Array.isArray(cachedState.nodes) && cachedState.nodes.length > 0 && !signal.aborted) {
           try {
             const typedState = cachedState as unknown as CachedState;
             typedState.nodes.forEach(node => {
-              if (node.data && !cyRef.current?.getElementById(node.data.id).length) {
+              if (node.data && !cyRef.current?.getElementById(node.data.id).length && !signal.aborted) {
                 cyRef.current?.add(node);
               }
             });
             
-            if (typedState.edges) {
+            if (typedState.edges && !signal.aborted) {
               typedState.edges.forEach(edge => {
-                if (edge.data && !cyRef.current?.getElementById(edge.data.id).length) {
+                if (edge.data && !cyRef.current?.getElementById(edge.data.id).length && !signal.aborted) {
                   cyRef.current?.add(edge);
                 }
               });
             }
             
-            runLayoutOptimized(false, false);
-            setLoadingProgress(100);
-            console.log('Restored cached state, progress: 100%');
+            if (!signal.aborted) {
+              runLayoutOptimized(false, false);
+              setLoadingProgress(100);
+              console.log('Restored cached state, progress: 100%');
+            }
           } catch (err) {
             console.warn('Error restoring cached state:', err);
           }
-        } else {
+        } else if (!signal.aborted) {
           // Fetch transaction data with simplified processing
           console.log('🔄 [FETCH] Fetching transaction data...');
           setLoadingProgress(40);
           
-          const response = await fetch(`/api/transaction/${initialSignature}`);
+          const response = await fetch(`/api/transaction/${initialSignature}`, { signal });
           
-          if (response.ok) {
+          if (response.ok && !signal.aborted) {
             const txData = await response.json();
             console.log('✅ [FETCH] Transaction data fetched, progress: 60%');
             setLoadingProgress(60);
             
             // Update transaction node with fetched data
-            if (cyRef.current) {
+            if (cyRef.current && !signal.aborted) {
               const txNode = cyRef.current.getElementById(initialSignature);
               if (txNode.length) {
                 txNode.data('status', 'loaded');
@@ -886,7 +967,7 @@ function TransactionGraph({
               }
             }
             
-            if (txData.details?.accounts?.length > 0) {
+            if (txData.details?.accounts?.length > 0 && !signal.aborted) {
               const firstAccount = txData.details.accounts[0].pubkey;
               if (firstAccount) {
                 console.log(`🎯 [ACCOUNT] Starting graph build from account: ${firstAccount}`);
@@ -897,10 +978,11 @@ function TransactionGraph({
                   loadedAccountsRef.current = new Set();
                 }
                 
-                try {
-                  // Queue the first account and provide immediate feedback
-                  console.log(`📝 [QUEUE] Queuing account: ${firstAccount}`);
-                  queueAccountFetch(firstAccount, 0, initialSignature);
+                if (!signal.aborted) {
+                  try {
+                    // Queue the first account and provide immediate feedback
+                    console.log(`📝 [QUEUE] Queuing account: ${firstAccount}`);
+                    queueAccountFetch(firstAccount, 0, initialSignature);
                   
                   // Set a more aggressive progress update with guaranteed completion
                   setLoadingProgress(85);
@@ -955,9 +1037,10 @@ function TransactionGraph({
                     console.log('⚠️ [WARNING] Graph build completed with limited data, progress: 100%');
                     setLoadingProgress(100);
                   }
-                } catch (error) {
-                  console.error('❌ [ERROR] Error during graph building:', error);
-                  setLoadingProgress(100);
+                  } catch (error) {
+                    console.error('❌ [ERROR] Error during graph building:', error);
+                    setLoadingProgress(100);
+                  }
                 }
               } else {
                 console.log('⚠️ [WARNING] No valid account found in transaction data');
@@ -1018,24 +1101,36 @@ function TransactionGraph({
     loadInitialSignature();
   }, [initialSignature, focusOnTransaction, queueAccountFetch, runLayoutOptimized]);
 
-  // Handle initial account loading
+  // Handle initial account loading with enhanced race condition protection  
   useEffect(() => {
-    if (!cyRef.current || !initialAccount || initialAccount === initialAccountRef.current) {
+    if (!cyRef.current || !initialAccount || initialAccount === initialAccountRef.current || isInitializingRef.current) {
+      return;
+    }
+
+    // Prevent overlapping initialization
+    if (isInitialized.current) {
+      console.log('🔄 [INIT] Initialization already in progress for account, skipping');
       return;
     }
 
     initialAccountRef.current = initialAccount;
     
     const loadInitialAccount = async () => {
-      if (isInitialized.current) return;
-      isInitialized.current = true;
-
-      setLoading(true);
-      setError(null);
-      setTotalAccounts(1);
-      setLoadingProgress(0);
-
+      // Create abort controller for this specific initialization
+      const abortController = new AbortController();
+      const signal = abortController.signal;
+      
       try {
+        if (isInitialized.current || signal.aborted) return;
+        isInitialized.current = true;
+
+        setLoading(true);
+        setError(null);
+        setTotalAccounts(1);
+        setLoadingProgress(0);
+
+        if (signal.aborted) return;
+
         console.log(`Loading initial account: ${initialAccount}`);
         setLoadingProgress(20);
         
@@ -1044,56 +1139,76 @@ function TransactionGraph({
           loadedAccountsRef.current = new Set();
         }
         
-        queueAccountFetch(initialAccount, 0, null);
-        setLoadingProgress(50);
-        
-        // Give more time for limited processing to complete and provide feedback
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        
-        const elements = cyRef.current?.elements().length || 0;
-        console.log(`Account loading complete. Elements: ${elements}`);
-        
-        if (elements === 0) {
-          setError({
-            message: `No transaction data found for account ${initialAccount.substring(0, 8)}... Account may have no recent activity or only contains non-transferable transactions.`,
-            severity: 'warning'
-          });
-        } else if (elements === 1) {
-          setError({
-            message: `Limited data available for account ${initialAccount.substring(0, 8)}... Only the account node is shown. This account may have minimal transaction activity.`,
-            severity: 'info'
-          });
-        }
-        
-        setLoadingProgress(100);
-        
-        // Set initial viewport
-        if (cyRef.current && cyRef.current.elements().length > 0) {
-          requestAnimationFrame(() => {
-            if (cyRef.current) {
-              runLayoutOptimized(true, false);
-              setTimeout(() => {
-                if (cyRef.current) {
-                  cyRef.current.zoom(0.8);
+        if (!signal.aborted) {
+          queueAccountFetch(initialAccount, 0, null);
+          setLoadingProgress(50);
+          
+          // Give more time for limited processing to complete and provide feedback
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          
+          if (signal.aborted) return;
+          
+          const elements = cyRef.current?.elements().length || 0;
+          console.log(`Account loading complete. Elements: ${elements}`);
+          
+          if (elements === 0 && !signal.aborted) {
+            setError({
+              message: `No transaction data found for account ${initialAccount.substring(0, 8)}... Account may have no recent activity or only contains non-transferable transactions.`,
+              severity: 'warning'
+            });
+          } else if (elements === 1 && !signal.aborted) {
+            setError({
+              message: `Limited data available for account ${initialAccount.substring(0, 8)}... Only the account node is shown. This account may have minimal transaction activity.`,
+              severity: 'info'
+            });
+          }
+          
+          if (!signal.aborted) {
+            setLoadingProgress(100);
+            
+            // Set initial viewport
+            if (cyRef.current && cyRef.current.elements().length > 0) {
+              requestAnimationFrame(() => {
+                if (cyRef.current && !signal.aborted) {
+                  runLayoutOptimized(true, false);
+                  setTimeout(() => {
+                    if (cyRef.current && !signal.aborted) {
+                      cyRef.current.zoom(0.8);
+                    }
+                  }, 100);
                 }
-              }, 100);
+              });
             }
-          });
+          }
         }
       } catch (err) {
         console.error('Error loading initial account:', err);
-        setError({
-          message: `Failed to load account: ${err}`,
-          severity: 'error'
-        });
-        setLoadingProgress(100);
+        if (!signal.aborted) {
+          setError({
+            message: `Failed to load account: ${err}`,
+            severity: 'error'
+          });
+          setLoadingProgress(100);
+        }
       } finally {
-        setLoading(false);
-        console.log('Account loading completed');
+        if (!signal.aborted) {
+          setLoading(false);
+          console.log('Account loading completed');
+        }
       }
+      
+      // Cleanup function to cancel operation
+      return () => {
+        abortController.abort();
+      };
     };
 
-    loadInitialAccount();
+    const cleanup = loadInitialAccount();
+    return () => {
+      if (cleanup && typeof cleanup.then === 'function') {
+        cleanup.then(cleanupFn => cleanupFn && cleanupFn());
+      }
+    };
   }, [initialAccount, queueAccountFetch, runLayoutOptimized]);
 
   // Cleanup tracking on unmount
