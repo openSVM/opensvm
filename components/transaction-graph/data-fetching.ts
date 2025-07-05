@@ -189,41 +189,54 @@ export const queueAccountFetch = (
   isProcessingQueueRef?: React.MutableRefObject<boolean>
 ): void => {
   const accountKey = `${address}:${depth}`;
+  console.log(`📝 [QUEUE_UTIL] Queuing account: ${address}, depth: ${depth}, key: ${accountKey}`);
+  
   // Validate address to prevent null/empty values
   if (!address || typeof address !== 'string') {
-    console.warn('Attempted to queue invalid address:', address);
+    console.warn('⚠️ [QUEUE_UTIL] Attempted to queue invalid address:', address);
     return;
   }
   
   // Skip if we've already loaded this account
   // Check if we've already loaded or queued this account at this depth or lower
   if (loadedAccountsRef.current?.has(address)) {
+    console.log(`⏭️ [QUEUE_UTIL] Skipping ${address}: already loaded`);
     return;
   }
 
   if (pendingFetchesRef.current?.has(accountKey)) {
+    console.log(`⏭️ [QUEUE_UTIL] Skipping ${address}: already pending`);
     return;
   }
   
   // Enforce maximum queue size to prevent unbounded growth
   const MAX_QUEUE_SIZE = 50; // Heavily reduced from 250 to prevent graph explosion
   if (fetchQueueRef.current.length >= MAX_QUEUE_SIZE) {
-    console.warn(`Queue size limit reached (${MAX_QUEUE_SIZE}), skipping ${address}`);
+    console.warn(`⚠️ [QUEUE_UTIL] Queue size limit reached (${MAX_QUEUE_SIZE}), skipping ${address}`);
     return;
   }
   
   // Mark as pending before adding to queue
   pendingFetchesRef.current.add(accountKey);
+  console.log(`📌 [QUEUE_UTIL] Marked ${accountKey} as pending`);
   
   // Add to queue
   fetchQueueRef.current.push({ address, depth, parentSignature });
+  console.log(`📝 [QUEUE_UTIL] Added to queue: ${address}. Queue length: ${fetchQueueRef.current.length}`);
   
   // Update total accounts count for progress tracking
-  setTotalAccounts(prev => prev + 1);
+  setTotalAccounts(prev => {
+    const newTotal = prev + 1;
+    console.log(`📊 [QUEUE_UTIL] Updated total accounts: ${prev} -> ${newTotal}`);
+    return newTotal;
+  });
   
   // Process queue if not already processing
   if (!isProcessingQueueRef || !isProcessingQueueRef.current) {
+    console.log(`🚀 [QUEUE_UTIL] Starting queue processing for ${address}`);
     processAccountFetchQueue();
+  } else {
+    console.log(`⏳ [QUEUE_UTIL] Queue already processing, ${address} will be processed next`);
   }
 };
 
@@ -240,23 +253,35 @@ export const processAccountFetchQueue = async (
   isProcessingQueueRef?: React.MutableRefObject<boolean>
 ): Promise<void> => { 
   // Early return if queue is empty or already processing
-  if (fetchQueueRef.current.length === 0) return;
-  if (isProcessingQueueRef && isProcessingQueueRef.current) return;
+  if (fetchQueueRef.current.length === 0) {
+    console.log(`📭 [PROCESS_QUEUE] Queue is empty, nothing to process`);
+    return;
+  }
+  
+  if (isProcessingQueueRef && isProcessingQueueRef.current) {
+    console.log(`⏳ [PROCESS_QUEUE] Already processing queue, skipping`);
+    return;
+  }
+  
+  console.log(`🚀 [PROCESS_QUEUE] Starting to process queue with ${fetchQueueRef.current.length} items`);
   
   try {
     // Set processing flag to true if it exists
     if (isProcessingQueueRef) {
       isProcessingQueueRef.current = true;
+      console.log(`🔒 [PROCESS_QUEUE] Set processing flag to true`);
     }
     
     // Use iterative approach instead of recursion to avoid stack overflow
     while (fetchQueueRef.current.length > 0) {
       // Process batches of 10 accounts in parallel
       const batch = fetchQueueRef.current.splice(0, 10);
+      console.log(`📦 [PROCESS_QUEUE] Processing batch of ${batch.length} accounts`);
       
       // Fetch all accounts in parallel with timeout protection
-      await Promise.allSettled(
+      const results = await Promise.allSettled(
         batch.map(item => {
+          console.log(`🔄 [PROCESS_QUEUE] Processing account: ${item.address}`);
           // Add timeout protection for each fetch operation
           const fetchPromise = fetchAndProcessAccount(item.address, item.depth, item.parentSignature);
           const timeoutPromise = new Promise<void>((_, reject) => 
@@ -264,21 +289,29 @@ export const processAccountFetchQueue = async (
           );
           
           return Promise.race([fetchPromise, timeoutPromise])
+            .then(() => {
+              console.log(`✅ [PROCESS_QUEUE] Successfully processed account: ${item.address}`);
+            })
             .catch(err => {
-              console.error(`Error processing account ${item.address}:`, err);
+              console.error(`❌ [PROCESS_QUEUE] Error processing account ${item.address}:`, err);
             });
         })
       );
       
+      console.log(`📊 [PROCESS_QUEUE] Batch completed. Results: ${results.map(r => r.status).join(', ')}`);
+      
       // Add small delay between batches to prevent overwhelming the API
       await new Promise(resolve => setTimeout(resolve, 50));
     }
+    
+    console.log(`🎉 [PROCESS_QUEUE] Queue processing completed`);
   } catch (error) {
-    console.error('Error processing fetch queue:', error);
+    console.error('❌ [PROCESS_QUEUE] Error processing fetch queue:', error);
   } finally {
     // Always reset processing flag when done
     if (isProcessingQueueRef) {
       isProcessingQueueRef.current = false;
+      console.log(`🔓 [PROCESS_QUEUE] Reset processing flag to false`);
     }
   }
 };
@@ -348,7 +381,7 @@ export const addAccountToGraph = async (
     const total = Math.max(totalAccounts, 1);
     const progress = Math.min(loadedCount / total, 1);
     const newProgress = Math.floor(progress * 100);
-    console.log(`Progress update: ${loadedCount}/${total} accounts (${newProgress}%)`);
+    console.log(`📈 [PROGRESS_UTIL] Progress update: ${loadedCount}/${total} accounts (${newProgress}%)`);
     return newProgress;
   });
   

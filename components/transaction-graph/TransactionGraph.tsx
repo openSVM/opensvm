@@ -249,29 +249,39 @@ function TransactionGraph({
 
   // Helper function to check if an account has SPL transfers with timeout
   const checkForSplTransfers = useCallback(async (address: string): Promise<boolean> => {
+    console.log(`🔍 [SPL_CHECK] Starting SPL transfer check for ${address}`);
     try {
       // Add a timeout to prevent hanging
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
+      const timeoutId = setTimeout(() => {
+        console.log(`⏰ [SPL_CHECK] Timeout reached for ${address}, aborting...`);
+        controller.abort();
+      }, 3000); // 3 second timeout
       
+      console.log(`🌐 [SPL_CHECK] Making API request for ${address}`);
       const response = await fetch(`/api/account-transfers/${address}?limit=1`, {
         headers: { 'Cache-Control': 'no-cache' },
         signal: controller.signal
       });
       
       clearTimeout(timeoutId);
+      console.log(`📡 [SPL_CHECK] API response for ${address}: ${response.status} ${response.statusText}`);
       
       if (response.ok) {
         const data = await response.json();
-        return (data.data && data.data.length > 0);
+        const hasSplTransfers = (data.data && data.data.length > 0);
+        console.log(`✅ [SPL_CHECK] Result for ${address}: ${hasSplTransfers ? 'HAS' : 'NO'} SPL transfers`);
+        return hasSplTransfers;
       }
+      console.log(`⚠️ [SPL_CHECK] Non-OK response for ${address}, returning false`);
       return false;
     } catch (error) {
       if (error.name === 'AbortError') {
-        console.warn(`SPL transfer check timed out for ${address}`);
+        console.warn(`⏰ [SPL_CHECK] SPL transfer check timed out for ${address}`);
       } else {
-        console.warn(`Could not check SPL transfers for ${address}:`, error);
+        console.warn(`❌ [SPL_CHECK] Could not check SPL transfers for ${address}:`, error);
       }
+      console.log(`🔄 [SPL_CHECK] Defaulting to false for ${address}`);
       return false; // Default to no SPL transfers on error/timeout
     }
   }, []);
@@ -284,7 +294,7 @@ function TransactionGraph({
     parentSignature: string | null = null
   ) => {
     try {
-      console.log(`Adding account to graph: ${address}, depth: ${depth}`);
+      console.log(`🏗️ [ADD_ACCOUNT] Adding account to graph: ${address}, depth: ${depth}, totalAccounts: ${totalAccounts}`);
       
       // Always mark account as processed first to guarantee progress
       if (!loadedAccountsRef.current) {
@@ -299,21 +309,24 @@ function TransactionGraph({
       const progressPercent = Math.min((loadedCount / currentTotalAccounts) * 80 + 20, 100);
       
       setLoadingProgress(Math.floor(progressPercent));
-      console.log(`Progress updated: ${loadedCount}/${currentTotalAccounts} accounts (${Math.floor(progressPercent)}%)`);
+      console.log(`📈 [PROGRESS] Progress updated: ${loadedCount}/${currentTotalAccounts} accounts (${Math.floor(progressPercent)}%)`);
       
       // Check if this account has SPL transfers first to determine max depth
       let hasSplTransfers = false;
       try {
+        console.log(`🔍 [SPL_CHECK] Checking SPL transfers for ${address}...`);
         hasSplTransfers = await checkForSplTransfers(address);
+        console.log(`✅ [SPL_CHECK] SPL check result for ${address}: ${hasSplTransfers}`);
       } catch (error) {
-        console.warn(`SPL transfer check failed for ${address}, proceeding with fallback`);
+        console.warn(`⚠️ [SPL_CHECK] SPL transfer check failed for ${address}, proceeding with fallback:`, error);
         hasSplTransfers = false;
       }
       
       const effectiveMaxDepth = hasSplTransfers ? maxDepth : 0; // Depth 0 for non-SPL (no expansion)
       
-      console.log(`Account ${address}: hasSplTransfers=${hasSplTransfers}, effectiveMaxDepth=${effectiveMaxDepth}`);
+      console.log(`🎯 [CONFIG] Account ${address}: hasSplTransfers=${hasSplTransfers}, effectiveMaxDepth=${effectiveMaxDepth}`);
       
+      console.log(`🚀 [CALLING] Calling addAccountToGraphUtil for ${address}`);
       const result = await addAccountToGraphUtil(
         address,
         totalAccounts,
@@ -333,18 +346,22 @@ function TransactionGraph({
         setLoadingProgress,
         queueAccountFetchRef.current
       );
+      
+      console.log(`✅ [RESULT] addAccountToGraphUtil completed for ${address}:`, result ? 'success' : 'failed');
 
       // Only run layout every 5 nodes to reduce blinking
       if (cyRef.current) {
         const elementCount = cyRef.current.elements().length;
+        console.log(`📊 [LAYOUT] Current element count: ${elementCount}`);
         if (elementCount % 5 === 0) {
+          console.log(`🎨 [LAYOUT] Running layout optimization (every 5 nodes)`);
           runLayoutOptimized(false, false);
         }
       }
 
       return result;
     } catch (error) {
-      console.error(`Error in addAccountToGraph for ${address}:`, error);
+      console.error(`❌ [ERROR] Error in addAccountToGraph for ${address}:`, error);
       // Ensure account is marked as processed even if there's an error
       if (!loadedAccountsRef.current) {
         loadedAccountsRef.current = new Set();
@@ -358,7 +375,7 @@ function TransactionGraph({
       const progressPercent = Math.min((loadedCount / currentTotalAccounts) * 80 + 20, 100);
       
       setLoadingProgress(Math.floor(progressPercent));
-      console.log(`Progress update (error recovery): ${loadedCount}/${currentTotalAccounts} accounts (${Math.floor(progressPercent)}%)`);
+      console.log(`📈 [ERROR_RECOVERY] Progress update (error recovery): ${loadedCount}/${currentTotalAccounts} accounts (${Math.floor(progressPercent)}%)`);
       
       return undefined;
     }
@@ -377,15 +394,25 @@ function TransactionGraph({
     depth = 0,
     parentSignature: string | null = null
   ) => {
+    console.log(`🔄 [FETCH_PROCESS] Starting fetch and process for account: ${address}`);
     try {
       // Use current totalAccounts state value instead of closure value
       const currentTotalAccounts = totalAccounts || 1; // Ensure minimum of 1
+      console.log(`📊 [FETCH_PROCESS] Current total accounts: ${currentTotalAccounts}`);
       await addAccountToGraph(address, currentTotalAccounts, depth, parentSignature);
+      console.log(`✅ [FETCH_PROCESS] Successfully processed account: ${address}`);
     } catch (e) {
       const accountKey = `${address}:${depth}`;
-      console.error(`Error processing account ${address}:`, e);
+      console.error(`❌ [FETCH_PROCESS] Error processing account ${address}:`, e);
       pendingFetchesRef.current?.delete(accountKey);
       loadedAccountsRef.current?.add(address); // Still mark as processed to avoid getting stuck
+      
+      // Force progress update even on error
+      const loadedCount = loadedAccountsRef.current?.size || 0;
+      const currentTotalAccounts = Math.max(totalAccounts, 1);
+      const progressPercent = Math.min((loadedCount / currentTotalAccounts) * 80 + 20, 100);
+      setLoadingProgress(Math.floor(progressPercent));
+      console.log(`📈 [FETCH_PROCESS] Force progress update on error: ${Math.floor(progressPercent)}%`);
     }
   }, [addAccountToGraph, totalAccounts]);
 
@@ -458,9 +485,14 @@ function TransactionGraph({
 
   // Queue an account for fetching
   const queueAccountFetch = useCallback((address: string, depth = 0, parentSignature: string | null = null) => {
+    console.log(`📝 [QUEUE] Attempting to queue account: ${address}, depth: ${depth}, parent: ${parentSignature}`);
+    
     if (!address || loadedAccountsRef.current.has(address) || pendingFetchesRef.current.has(`${address}:${depth}`)) {
+      console.log(`⏭️ [QUEUE] Skipping ${address}: already loaded or pending`);
       return;
     }
+    
+    console.log(`✅ [QUEUE] Queuing account ${address} for processing`);
     queueAccountFetchUtil(
       address,
       depth,
@@ -472,7 +504,9 @@ function TransactionGraph({
       processAccountFetchQueue,
       isProcessingQueueRef
     );
-  }, [processAccountFetchQueue]);
+    
+    console.log(`📊 [QUEUE] Queue status - Length: ${fetchQueueRef.current.length}, Total accounts: ${totalAccounts}`);
+  }, [processAccountFetchQueue, totalAccounts]);
 
   // Set the ref to the queueAccountFetch function
   useEffect(() => {
@@ -734,6 +768,35 @@ function TransactionGraph({
     }
   }, [useGPUGraph, updateGPUGraphData]);
 
+  // Progress monitoring with force updates to prevent 0% stuck state
+  useEffect(() => {
+    if (!loading) return;
+    
+    console.log(`📊 [PROGRESS_MONITOR] Progress: ${loadingProgress}%, Loading: ${loading}`);
+    
+    // If progress is stuck at 0% for more than 3 seconds, force it forward
+    const progressTimeout = setTimeout(() => {
+      if (loadingProgress === 0 && loading) {
+        console.log('🚨 [PROGRESS_MONITOR] Progress stuck at 0%, forcing update to 30%');
+        setLoadingProgress(30);
+      }
+    }, 3000);
+    
+    // If progress is stuck at any value for more than 10 seconds, complete it
+    const completionTimeout = setTimeout(() => {
+      if (loading) {
+        console.log('🚨 [PROGRESS_MONITOR] Loading taking too long, forcing completion');
+        setLoadingProgress(100);
+        setLoading(false);
+      }
+    }, 10000);
+    
+    return () => {
+      clearTimeout(progressTimeout);
+      clearTimeout(completionTimeout);
+    };
+  }, [loadingProgress, loading]);
+
   // Handle initial signature loading
   useEffect(() => {
     if (!cyRef.current || !initialSignature || initialSignature === initialSignatureRef.current) {
@@ -750,6 +813,12 @@ function TransactionGraph({
       setError(null);
       setTotalAccounts(1);
       setLoadingProgress(0);
+      
+      // Force immediate progress update to ensure UI responsiveness
+      setTimeout(() => {
+        console.log('🔄 [FORCE_PROGRESS] Forcing initial progress update');
+        setLoadingProgress(10);
+      }, 100);
 
       try {
         const cachedState = GraphStateCache.loadState(initialSignature);
@@ -768,7 +837,7 @@ function TransactionGraph({
           
           // Immediate progress update to show something is happening
           setLoadingProgress(20);
-          console.log('Added initial transaction node, progress: 20%');
+          console.log('🚀 [PROGRESS] Added initial transaction node, progress: 20%');
         }
 
         // Restore cached state if available
@@ -797,14 +866,14 @@ function TransactionGraph({
           }
         } else {
           // Fetch transaction data with simplified processing
-          console.log('Fetching transaction data...');
+          console.log('🔄 [FETCH] Fetching transaction data...');
           setLoadingProgress(40);
           
           const response = await fetch(`/api/transaction/${initialSignature}`);
           
           if (response.ok) {
             const txData = await response.json();
-            console.log('Transaction data fetched, progress: 60%');
+            console.log('✅ [FETCH] Transaction data fetched, progress: 60%');
             setLoadingProgress(60);
             
             // Update transaction node with fetched data
@@ -820,7 +889,7 @@ function TransactionGraph({
             if (txData.details?.accounts?.length > 0) {
               const firstAccount = txData.details.accounts[0].pubkey;
               if (firstAccount) {
-                console.log(`Starting graph build from account: ${firstAccount}`);
+                console.log(`🎯 [ACCOUNT] Starting graph build from account: ${firstAccount}`);
                 setLoadingProgress(80);
                 
                 // Initialize refs to ensure they exist
@@ -830,49 +899,72 @@ function TransactionGraph({
                 
                 try {
                   // Queue the first account and provide immediate feedback
+                  console.log(`📝 [QUEUE] Queuing account: ${firstAccount}`);
                   queueAccountFetch(firstAccount, 0, initialSignature);
                   
                   // Set a more aggressive progress update with guaranteed completion
                   setLoadingProgress(85);
+                  console.log('📈 [PROGRESS] Queued first account, progress: 85%');
+                  
+                  // Add multiple fallback mechanisms to ensure progress moves
+                  let progressCheckCount = 0;
+                  const maxChecks = 10;
+                  
+                  // Create a promise that resolves when progress is complete or times out
+                  const progressPromise = new Promise<void>((resolve) => {
+                    const checkProgress = () => {
+                      progressCheckCount++;
+                      const currentProgress = 85 + (progressCheckCount * 1.5);
+                      setLoadingProgress(Math.min(currentProgress, 99));
+                      console.log(`🔄 [PROGRESS CHECK ${progressCheckCount}] Progress: ${Math.min(currentProgress, 99)}%`);
+                      
+                      const elements = cyRef.current?.elements().length || 0;
+                      const accounts = loadedAccountsRef.current?.size || 0;
+                      console.log(`📊 [STATS] Elements: ${elements}, Loaded accounts: ${accounts}`);
+                      
+                      if (progressCheckCount >= maxChecks || elements > 2 || accounts > 0) {
+                        console.log('✅ [COMPLETE] Progress checks complete');
+                        resolve();
+                      } else {
+                        setTimeout(checkProgress, 500);
+                      }
+                    };
+                    checkProgress();
+                  });
                   
                   // Add a backup timeout to ensure loading always completes
                   const backupTimeout = setTimeout(() => {
-                    console.log('Backup timeout triggered - completing loading');
+                    console.log('⏰ [BACKUP] Backup timeout triggered - completing loading');
                     setLoadingProgress(100);
                     setLoading(false);
-                  }, 5000); // 5 seconds backup
+                  }, 8000); // 8 seconds backup
                   
-                  // Wait for processing with multiple progress checks
-                  for (let i = 0; i < 3; i++) {
-                    await new Promise(resolve => setTimeout(resolve, 500));
-                    const currentProgress = 85 + (i * 5);
-                    setLoadingProgress(currentProgress);
-                    console.log(`Progress check ${i + 1}: ${currentProgress}%`);
-                  }
+                  // Wait for processing with progress monitoring
+                  await Promise.race([progressPromise, new Promise(resolve => setTimeout(resolve, 7000))]);
                   
                   clearTimeout(backupTimeout);
                   
                   const elements = cyRef.current?.elements().length || 0;
-                  console.log(`Graph elements after processing: ${elements}`);
+                  console.log(`🎭 [FINAL] Graph elements after processing: ${elements}`);
                   
                   if (elements > 1) {
                     setLoadingProgress(100);
-                    console.log('Graph build successful, progress: 100%');
+                    console.log('🎉 [SUCCESS] Graph build successful, progress: 100%');
                   } else {
                     // Complete loading even with minimal data
-                    console.log('Graph build completed with limited data, progress: 100%');
+                    console.log('⚠️ [WARNING] Graph build completed with limited data, progress: 100%');
                     setLoadingProgress(100);
                   }
                 } catch (error) {
-                  console.error('Error during graph building:', error);
+                  console.error('❌ [ERROR] Error during graph building:', error);
                   setLoadingProgress(100);
                 }
               } else {
-                console.log('No valid account found in transaction data');
+                console.log('⚠️ [WARNING] No valid account found in transaction data');
                 setLoadingProgress(100);
               }
             } else {
-              console.log('No accounts found in transaction data');
+              console.log('⚠️ [WARNING] No accounts found in transaction data');
               setLoadingProgress(100);
             }
           } else {
@@ -899,15 +991,27 @@ function TransactionGraph({
           }
         }
       } catch (err) {
-        console.error('Error loading initial transaction:', err);
+        console.error('❌ [CRITICAL] Error loading initial transaction:', err);
         setError({
           message: `Failed to load transaction: ${err}`,
           severity: 'error'
         });
         setLoadingProgress(100);
       } finally {
+        console.log('🎯 [FINAL] Loading completed, ensuring progress is 100%');
+        setLoadingProgress(100);
         setLoading(false);
-        console.log('Loading completed');
+        
+        if (cyRef.current) {
+          updateGPUGraphData();
+        }
+        
+        // Add final progress guarantee
+        setTimeout(() => {
+          console.log('🛡️ [GUARANTEE] Final progress guarantee check');
+          setLoadingProgress(100);
+          setLoading(false);
+        }, 1000);
       }
     };
 
