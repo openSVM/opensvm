@@ -174,36 +174,3 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json();
-    const { action } = body;
-    
-    switch (action) {
-      case 'start_monitoring':
-        return NextResponse.json({
-          success: true,
-          message: 'Validator monitoring started'
-        });
-        
-      case 'stop_monitoring':
-        return NextResponse.json({
-          success: true,
-          message: 'Validator monitoring stopped'
-        });
-        
-      default:
-        return NextResponse.json({
-          success: false,
-          error: 'Invalid action'
-        }, { status: 400 });
-    }
-    
-  } catch (error) {
-    console.error('Error in validator analytics POST:', error);
-    return NextResponse.json({
-      success: false,
-      error: error instanceof Error ? error.message : 'Internal server error'
-    }, { status: 500 });
-  }
-}

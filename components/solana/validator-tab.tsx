@@ -62,8 +62,6 @@ export function ValidatorTab() {
   const [data, setData] = useState<ValidatorData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [monitoringActive, setMonitoringActive] = useState(false);
-  const [toggleLoading, setToggleLoading] = useState(false);
   const [sortBy, setSortBy] = useState<'stake' | 'commission' | 'performance' | 'uptime'>('stake');
 
   const fetchValidatorData = async () => {
@@ -84,33 +82,7 @@ export function ValidatorTab() {
     }
   };
 
-  const toggleMonitoring = async () => {
-    if (toggleLoading) return;
-    
-    setToggleLoading(true);
-    try {
-      const action = monitoringActive ? 'stop_monitoring' : 'start_monitoring';
-      const response = await fetch('/api/analytics/validators', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ action }),
-      });
-      
-      const result = await response.json();
-      if (result.success) {
-        setMonitoringActive(!monitoringActive);
-      } else {
-        setError(result.error || 'Failed to toggle monitoring');
-      }
-    } catch (err) {
-      console.error('Error toggling validator monitoring:', err);
-      setError('Failed to toggle monitoring');
-    } finally {
-      setToggleLoading(false);
-    }
-  };
+
 
   useEffect(() => {
     fetchValidatorData();
@@ -200,35 +172,11 @@ export function ValidatorTab() {
 
   return (
     <div className="space-y-6">
-      {/* Header with Controls */}
+      {/* Header */}
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-bold">Validator Performance Analytics</h2>
           <p className="text-muted-foreground">Real-time validator metrics, performance tracking, and network decentralization</p>
-        </div>
-        <div className="flex items-center gap-4">
-          <button
-            onClick={toggleMonitoring}
-            disabled={toggleLoading}
-            className={`px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition-colors ${
-              monitoringActive
-                ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90 disabled:bg-destructive/50'
-                : 'bg-primary text-primary-foreground hover:bg-primary/90 disabled:bg-primary/50'
-            } ${toggleLoading ? 'cursor-not-allowed' : 'cursor-pointer'}`}
-          >
-            {toggleLoading && <Loader2 className="h-4 w-4 animate-spin" />}
-            {monitoringActive ? 'Stop Monitoring' : 'Start Monitoring'}
-          </button>
-          {data && (
-            <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-sm ${
-              data.health.isHealthy ? 'bg-primary/10 text-primary' : 'bg-destructive/10 text-destructive'
-            }`}>
-              <div className={`w-2 h-2 rounded-full ${
-                data.health.isHealthy ? 'bg-primary' : 'bg-destructive'
-              }`} />
-              {data.health.isHealthy ? 'Healthy' : 'Unhealthy'}
-            </div>
-          )}
         </div>
       </div>
 
