@@ -366,6 +366,129 @@ function TransactionGraph({
     }
   }, []);
 
+  // Convert Cytoscape data to GPU graph format
+  const convertToGPUGraphData = useCallback(() => {
+    if (!cyRef.current) {
+      console.log('🔄 [GPU_CONVERT] No Cytoscape instance, returning empty data');
+      return { nodes: [], links: [] };
+    }
+
+    const cytoscapeNodes = cyRef.current.nodes();
+    const cytoscapeEdges = cyRef.current.edges();
+    
+    console.log(`🔄 [GPU_CONVERT] Converting Cytoscape data: ${cytoscapeNodes.length} nodes, ${cytoscapeEdges.length} edges`);
+
+    const nodes = cytoscapeNodes.map((node) => {
+      const data = node.data();
+      
+      // Determine node color based on type and status
+      let color = '#64748b'; // Default gray
+      if (data.type === 'transaction') {
+        if (data.success === false || data.status === 'error') {
+          color = '#ef4444'; // Red for failed transactions
+        } else {
+          color = '#3b82f6'; // Blue for successful transactions
+        }
+      } else if (data.type === 'account') {
+        if (data.tracked) {
+          color = '#8b5cf6'; // Purple for tracked accounts
+        } else if (data.status === 'error' || data.hasError) {
+          color = '#f59e0b'; // Orange for accounts with errors
+        } else if (data.isEmpty || data.status === 'empty') {
+          color = '#6b7280'; // Gray for empty accounts
+        } else {
+          color = '#10b981'; // Green for normal accounts
+        }
+      }
+      
+      const convertedNode = {
+        id: data.id,
+        type: data.type || 'account',
+        subType: data.subType || data.type || 'unknown',
+        label: data.label || data.id,
+        status: data.status,
+        tracked: data.tracked || false,
+        isEmpty: data.isEmpty || false,
+        hasError: data.hasError || false,
+        transactionCount: data.transactionCount || 0,
+        accountCount: data.accountCount || 0,
+        color: color
+      };
+      console.log(`🔄 [GPU_CONVERT] Converted node: ${data.id} (${data.type}/${data.subType || 'none'})`);
+      return convertedNode;
+    });
+
+    const links = cytoscapeEdges.map((edge) => {
+      const data = edge.data();
+      
+      // Determine edge color based on type
+      let color = '#64748b'; // Default gray
+      if (data.type === 'transfer') {
+        color = '#10b981'; // Green for transfers
+      } else if (data.type === 'tx-account') {
+        color = '#6b7280'; // Gray for tx-account relationships
+      } else if (data.type === 'account-tx') {
+        color = '#94a3b8'; // Light gray for account-tx relationships
+      }
+      
+      const convertedLink = {
+        source: data.source,
+        target: data.target,
+        type: data.type || 'interaction',
+        value: data.value || 1,
+        amount: data.amount,
+        label: data.label,
+        color: color
+      };
+      console.log(`🔄 [GPU_CONVERT] Converted edge: ${data.source} -> ${data.target} (${data.type})`);
+      return convertedLink;
+    });
+
+    console.log(`✅ [GPU_CONVERT] Conversion complete: ${nodes.length} nodes, ${links.length} links`);
+    
+    // Log summary statistics
+    const nodeStats = nodes.reduce((stats: Record<string, number>, node) => {
+      const key = `${node.type}${node.subType ? `/${node.subType}` : ''}`;
+      stats[key] = (stats[key] || 0) + 1;
+      return stats;
+    }, {});
+    console.log(`✅ [GPU_CONVERT] Node statistics:`, nodeStats);
+    
+    const linkStats = links.reduce((stats: Record<string, number>, link) => {
+      stats[link.type] = (stats[link.type] || 0) + 1;
+      return stats;
+    }, {});
+    console.log(`✅ [GPU_CONVERT] Link statistics:`, linkStats);
+    
+    return { nodes, links };
+  }, []);
+
+  // Update GPU graph data when Cytoscape changes
+  const updateGPUGraphData = useCallback(() => {
+    if (useGPUGraph) {
+      console.log('🔄 [GPU_UPDATE] Updating GPU graph data...');
+      const newData = convertToGPUGraphData();
+      console.log(`🔄 [GPU_UPDATE] Setting GPU graph data: ${newData.nodes.length} nodes, ${newData.links.length} links`);
+      
+      // Log what types of nodes we have
+      const nodeTypes = newData.nodes.reduce((types: Record<string, number>, node) => {
+        types[node.type] = (types[node.type] || 0) + 1;
+        return types;
+      }, {});
+      console.log(`🔄 [GPU_UPDATE] Node types:`, nodeTypes);
+      
+      setGpuGraphData(newData);
+      console.log('✅ [GPU_UPDATE] GPU graph data updated successfully');
+      
+      // Show warning if graph is empty
+      if (newData.nodes.length === 0) {
+        console.log('⚠️ [GPU_UPDATE] GPU graph is empty after update');
+      }
+    } else {
+      console.log('🔄 [GPU_UPDATE] GPU graph disabled, skipping update');
+    }
+  }, [useGPUGraph, convertToGPUGraphData]);
+
   // Optimized addAccountToGraph with reduced layout calls and fallback depth
   const addAccountToGraph = useCallback(async (
     address: string,
@@ -538,128 +661,7 @@ function TransactionGraph({
     }
   }, [addAccountToGraph, totalAccounts]);
 
-  // Convert Cytoscape data to GPU graph format
-  const convertToGPUGraphData = useCallback(() => {
-    if (!cyRef.current) {
-      console.log('🔄 [GPU_CONVERT] No Cytoscape instance, returning empty data');
-      return { nodes: [], links: [] };
-    }
 
-    const cytoscapeNodes = cyRef.current.nodes();
-    const cytoscapeEdges = cyRef.current.edges();
-    
-    console.log(`🔄 [GPU_CONVERT] Converting Cytoscape data: ${cytoscapeNodes.length} nodes, ${cytoscapeEdges.length} edges`);
-
-    const nodes = cytoscapeNodes.map((node) => {
-      const data = node.data();
-      
-      // Determine node color based on type and status
-      let color = '#64748b'; // Default gray
-      if (data.type === 'transaction') {
-        if (data.success === false || data.status === 'error') {
-          color = '#ef4444'; // Red for failed transactions
-        } else {
-          color = '#3b82f6'; // Blue for successful transactions
-        }
-      } else if (data.type === 'account') {
-        if (data.tracked) {
-          color = '#8b5cf6'; // Purple for tracked accounts
-        } else if (data.status === 'error' || data.hasError) {
-          color = '#f59e0b'; // Orange for accounts with errors
-        } else if (data.isEmpty || data.status === 'empty') {
-          color = '#6b7280'; // Gray for empty accounts
-        } else {
-          color = '#10b981'; // Green for normal accounts
-        }
-      }
-      
-      const convertedNode = {
-        id: data.id,
-        type: data.type || 'account',
-        subType: data.subType || data.type || 'unknown',
-        label: data.label || data.id,
-        status: data.status,
-        tracked: data.tracked || false,
-        isEmpty: data.isEmpty || false,
-        hasError: data.hasError || false,
-        transactionCount: data.transactionCount || 0,
-        accountCount: data.accountCount || 0,
-        color: color
-      };
-      console.log(`🔄 [GPU_CONVERT] Converted node: ${data.id} (${data.type}/${data.subType || 'none'})`);
-      return convertedNode;
-    });
-
-    const links = cytoscapeEdges.map((edge) => {
-      const data = edge.data();
-      
-      // Determine edge color based on type
-      let color = '#64748b'; // Default gray
-      if (data.type === 'transfer') {
-        color = '#10b981'; // Green for transfers
-      } else if (data.type === 'tx-account') {
-        color = '#6b7280'; // Gray for tx-account relationships
-      } else if (data.type === 'account-tx') {
-        color = '#94a3b8'; // Light gray for account-tx relationships
-      }
-      
-      const convertedLink = {
-        source: data.source,
-        target: data.target,
-        type: data.type || 'interaction',
-        value: data.value || 1,
-        amount: data.amount,
-        label: data.label,
-        color: color
-      };
-      console.log(`🔄 [GPU_CONVERT] Converted edge: ${data.source} -> ${data.target} (${data.type})`);
-      return convertedLink;
-    });
-
-    console.log(`✅ [GPU_CONVERT] Conversion complete: ${nodes.length} nodes, ${links.length} links`);
-    
-    // Log summary statistics
-    const nodeStats = nodes.reduce((stats: Record<string, number>, node) => {
-      const key = `${node.type}${node.subType ? `/${node.subType}` : ''}`;
-      stats[key] = (stats[key] || 0) + 1;
-      return stats;
-    }, {});
-    console.log(`✅ [GPU_CONVERT] Node statistics:`, nodeStats);
-    
-    const linkStats = links.reduce((stats: Record<string, number>, link) => {
-      stats[link.type] = (stats[link.type] || 0) + 1;
-      return stats;
-    }, {});
-    console.log(`✅ [GPU_CONVERT] Link statistics:`, linkStats);
-    
-    return { nodes, links };
-  }, []);
-
-  // Update GPU graph data when Cytoscape changes
-  const updateGPUGraphData = useCallback(() => {
-    if (useGPUGraph) {
-      console.log('🔄 [GPU_UPDATE] Updating GPU graph data...');
-      const newData = convertToGPUGraphData();
-      console.log(`🔄 [GPU_UPDATE] Setting GPU graph data: ${newData.nodes.length} nodes, ${newData.links.length} links`);
-      
-      // Log what types of nodes we have
-      const nodeTypes = newData.nodes.reduce((types: Record<string, number>, node) => {
-        types[node.type] = (types[node.type] || 0) + 1;
-        return types;
-      }, {});
-      console.log(`🔄 [GPU_UPDATE] Node types:`, nodeTypes);
-      
-      setGpuGraphData(newData);
-      console.log('✅ [GPU_UPDATE] GPU graph data updated successfully');
-      
-      // Show warning if graph is empty
-      if (newData.nodes.length === 0) {
-        console.log('⚠️ [GPU_UPDATE] GPU graph is empty after update');
-      }
-    } else {
-      console.log('🔄 [GPU_UPDATE] GPU graph disabled, skipping update');
-    }
-  }, [useGPUGraph, convertToGPUGraphData]);
 
   // GPU Graph event handlers
   const handleGPUNodeClick = useCallback((node: any) => {
