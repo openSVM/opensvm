@@ -474,7 +474,7 @@ export function VTableWrapper({
   };
 
   return (
-    <div className="vtable-container relative" style={{ height: '100%' }}>
+    <div className={`vtable-container relative theme-${theme}`} style={{ height: '100%' }}>
       <div 
         className="vtable" 
         ref={containerRef} 
