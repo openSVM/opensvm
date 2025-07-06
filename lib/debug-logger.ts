@@ -43,7 +43,7 @@ export class Logger {
   debug(message: string, data?: any): void {
     if (currentLogLevel <= LogLevel.DEBUG && DEBUG_ENABLED) {
       const timestamp = new Date().toISOString();
-      console.log(`[${timestamp}] [${this.component}] [DEBUG] ${message}`, data || '');
+      console.log(`[${timestamp}] [${this.component}] [DEBUG] %s`, message, data || '');
     }
   }
 
@@ -53,7 +53,7 @@ export class Logger {
   info(message: string, data?: any): void {
     if (currentLogLevel <= LogLevel.INFO) {
       const timestamp = new Date().toISOString();
-      console.info(`[${timestamp}] [${this.component}] [INFO] ${message}`, data || '');
+      console.info(`[${timestamp}] [${this.component}] [INFO] %s`, message, data || '');
     }
   }
 
@@ -63,7 +63,7 @@ export class Logger {
   warn(message: string, data?: any): void {
     if (currentLogLevel <= LogLevel.WARN) {
       const timestamp = new Date().toISOString();
-      console.warn(`[${timestamp}] [${this.component}] [WARN] ${message}`, data || '');
+      console.warn(`[${timestamp}] [${this.component}] [WARN] %s`, message, data || '');
     }
   }
 
