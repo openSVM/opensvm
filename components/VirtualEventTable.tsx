@@ -1,11 +1,12 @@
 /**
  * Virtual Event Table Component
  * High-performance table using @visactor/vtable for displaying blockchain events
+ * Integrated with OpenSVM theme system for consistent styling
  */
 
 'use client';
 
-import React, { useEffect, useRef, useMemo } from 'react';
+import React, { useEffect, useRef, useMemo, useCallback } from 'react';
 import { ListTable } from '@visactor/vtable';
 import { BlockchainEvent } from './LiveEventMonitor';
 import { lamportsToSol } from '@/components/transaction-graph/utils';
@@ -16,11 +17,37 @@ interface VirtualEventTableProps {
   height?: number;
 }
 
-export function VirtualEventTable({ events, onEventClick, height = 400 }: VirtualEventTableProps) {
+export const VirtualEventTable = React.memo(function VirtualEventTable({ 
+  events, 
+  onEventClick, 
+  height = 400 
+}: VirtualEventTableProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const tableInstanceRef = useRef<ListTable | null>(null);
 
-  // Transform events to table data format
+  // Get theme colors from CSS variables
+  const getThemeColors = useCallback(() => {
+    const computedStyle = getComputedStyle(document.documentElement);
+    return {
+      background: `hsl(${computedStyle.getPropertyValue('--background')})`,
+      foreground: `hsl(${computedStyle.getPropertyValue('--foreground')})`,
+      card: `hsl(${computedStyle.getPropertyValue('--card')})`,
+      cardForeground: `hsl(${computedStyle.getPropertyValue('--card-foreground')})`,
+      primary: `hsl(${computedStyle.getPropertyValue('--primary')})`,
+      primaryForeground: `hsl(${computedStyle.getPropertyValue('--primary-foreground')})`,
+      secondary: `hsl(${computedStyle.getPropertyValue('--secondary')})`,
+      secondaryForeground: `hsl(${computedStyle.getPropertyValue('--secondary-foreground')})`,
+      muted: `hsl(${computedStyle.getPropertyValue('--muted')})`,
+      mutedForeground: `hsl(${computedStyle.getPropertyValue('--muted-foreground')})`,
+      accent: `hsl(${computedStyle.getPropertyValue('--accent')})`,
+      accentForeground: `hsl(${computedStyle.getPropertyValue('--accent-foreground')})`,
+      border: `hsl(${computedStyle.getPropertyValue('--border')})`,
+      input: `hsl(${computedStyle.getPropertyValue('--input')})`,
+      ring: `hsl(${computedStyle.getPropertyValue('--ring')})`,
+    };
+  }, []);
+
+  // Transform events to table data format with memoization
   const tableData = useMemo(() => {
     return events.map((event, index) => ({
       id: index,
@@ -40,106 +67,116 @@ export function VirtualEventTable({ events, onEventClick, height = 400 }: Virtua
     }));
   }, [events]);
 
-  // Table columns configuration
-  const columns = [
-    {
-      field: 'type',
-      title: 'Type',
-      width: 80,
-      style: {
-        color: (args: any) => {
-          switch (args.value) {
-            case 'transaction': return '#059669';
-            case 'block': return '#2563eb';
-            case 'account_change': return '#7c3aed';
-            default: return '#374151';
+  // Table columns configuration with theme-aware styling
+  const getColumnsConfig = useCallback(() => {
+    const theme = getThemeColors();
+    
+    return [
+      {
+        field: 'type',
+        title: 'Type',
+        width: 80,
+        style: {
+          color: (args: any) => {
+            switch (args.value) {
+              case 'transaction': return theme.primary;
+              case 'block': return theme.accent;
+              case 'account_change': return theme.secondary;
+              default: return theme.foreground;
+            }
+          },
+          fontWeight: 'bold',
+          fontFamily: 'Berkeley Mono, monospace'
+        }
+      },
+      {
+        field: 'timestamp',
+        title: 'Time',
+        width: 90,
+        style: {
+          fontSize: 12,
+          color: theme.mutedForeground,
+          fontFamily: 'Berkeley Mono, monospace'
+        }
+      },
+      {
+        field: 'signature',
+        title: 'Signature',
+        width: 120,
+        style: {
+          fontFamily: 'Berkeley Mono, monospace',
+          fontSize: 11,
+          color: theme.foreground
+        }
+      },
+      {
+        field: 'status',
+        title: 'Status',
+        width: 90,
+        style: {
+          fontSize: 12,
+          fontFamily: 'Berkeley Mono, monospace'
+        }
+      },
+      {
+        field: 'fee',
+        title: 'Fee',
+        width: 100,
+        style: {
+          fontFamily: 'Berkeley Mono, monospace',
+          fontSize: 11,
+          textAlign: 'right',
+          color: theme.foreground
+        }
+      },
+      {
+        field: 'program',
+        title: 'Program',
+        width: 80,
+        style: {
+          fontSize: 11,
+          fontFamily: 'Berkeley Mono, monospace',
+          color: (args: any) => {
+            switch (args.value) {
+              case 'raydium': return '#7c3aed';
+              case 'meteora': return '#2563eb';
+              case 'aldrin': return '#ea580c';
+              case 'pumpswap': return '#ec4899';
+              case 'SPL': return theme.primary;
+              default: return theme.foreground;
+            }
+          },
+          fontWeight: (args: any) => {
+            return ['raydium', 'meteora', 'aldrin', 'pumpswap'].includes(args.value) ? 'bold' : 'normal';
           }
-        },
-        fontWeight: 'bold'
-      }
-    },
-    {
-      field: 'timestamp',
-      title: 'Time',
-      width: 90,
-      style: {
-        fontSize: 12,
-        color: '#6b7280'
-      }
-    },
-    {
-      field: 'signature',
-      title: 'Signature',
-      width: 120,
-      style: {
-        fontFamily: 'monospace',
-        fontSize: 11,
-        color: '#374151'
-      }
-    },
-    {
-      field: 'status',
-      title: 'Status',
-      width: 90,
-      style: {
-        fontSize: 12
-      }
-    },
-    {
-      field: 'fee',
-      title: 'Fee',
-      width: 100,
-      style: {
-        fontFamily: 'monospace',
-        fontSize: 11,
-        textAlign: 'right'
-      }
-    },
-    {
-      field: 'program',
-      title: 'Program',
-      width: 80,
-      style: {
-        fontSize: 11,
-        color: (args: any) => {
-          switch (args.value) {
-            case 'raydium': return '#7c3aed';
-            case 'meteora': return '#2563eb';
-            case 'aldrin': return '#ea580c';
-            case 'pumpswap': return '#ec4899';
-            case 'SPL': return '#059669';
-            default: return '#374151';
-          }
-        },
-        fontWeight: (args: any) => {
-          return ['raydium', 'meteora', 'aldrin', 'pumpswap'].includes(args.value) ? 'bold' : 'normal';
+        }
+      },
+      {
+        field: 'slot',
+        title: 'Slot',
+        width: 100,
+        style: {
+          fontFamily: 'Berkeley Mono, monospace',
+          fontSize: 11,
+          textAlign: 'right',
+          color: theme.mutedForeground
+        }
+      },
+      {
+        field: 'logs',
+        title: 'Logs',
+        width: 60,
+        style: {
+          fontSize: 11,
+          textAlign: 'center',
+          color: theme.mutedForeground,
+          fontFamily: 'Berkeley Mono, monospace'
         }
       }
-    },
-    {
-      field: 'slot',
-      title: 'Slot',
-      width: 100,
-      style: {
-        fontFamily: 'monospace',
-        fontSize: 11,
-        textAlign: 'right',
-        color: '#6b7280'
-      }
-    },
-    {
-      field: 'logs',
-      title: 'Logs',
-      width: 60,
-      style: {
-        fontSize: 11,
-        textAlign: 'center',
-        color: '#6b7280'
-      }
-    }
-  ];
+    ];
+  }, [getThemeColors]);
 
-  // Initialize and manage table instance
+  // Initialize and manage table instance with theme integration
   useEffect(() => {
     if (!containerRef.current) return;
 
@@ -150,26 +187,31 @@ export function VirtualEventTable({ events, onEventClick, height = 400 }: Virtua
     }
 
     try {
+      const theme = getThemeColors();
+      const columns = getColumnsConfig();
+
       const table = new ListTable(containerRef.current, {
         records: tableData,
         columns,
         height,
         theme: {
           headerStyle: {
-            bgColor: '#f8fafc',
-            color: '#374151',
+            bgColor: theme.card,
+            color: theme.cardForeground,
             fontSize: 12,
             fontWeight: 'bold',
-            borderColor: '#e5e7eb'
+            borderColor: theme.border,
+            fontFamily: 'Berkeley Mono, monospace'
           },
           bodyStyle: {
-            bgColor: '#ffffff',
-            hoverColor: '#f1f5f9',
-            borderColor: '#e5e7eb'
+            bgColor: theme.background,
+            hoverColor: theme.accent,
+            borderColor: theme.border,
+            fontFamily: 'Berkeley Mono, monospace'
           },
           selectionStyle: {
-            cellBgColor: '#dbeafe',
-            cellBorderColor: '#3b82f6'
+            cellBgColor: theme.primary,
+            cellBorderColor: theme.ring
           }
         },
         hover: {
@@ -208,9 +250,9 @@ export function VirtualEventTable({ events, onEventClick, height = 400 }: Virtua
         tableInstanceRef.current = null;
       }
     };
-  }, [tableData, height, onEventClick]);
+  }, [tableData, height, onEventClick, getThemeColors, getColumnsConfig]);
 
-  // Update table data when events change
+  // Update table data when events change (optimized)
   useEffect(() => {
     if (tableInstanceRef.current && tableData) {
       try {
@@ -226,11 +268,11 @@ export function VirtualEventTable({ events, onEventClick, height = 400 }: Virtua
       <div 
         ref={containerRef} 
         style={{ height: `${height}px` }}
-        className="border rounded-lg overflow-hidden bg-white"
+        className="border rounded-lg overflow-hidden bg-card"
       />
-      <div className="text-xs text-gray-500 mt-2 px-2">
+      <div className="text-xs text-muted-foreground mt-2 px-2 font-mono">
         Showing {tableData.length} events • Click row to view details • Virtual scrolling enabled
       </div>
     </div>
   );
-}
+});

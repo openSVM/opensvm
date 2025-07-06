@@ -181,7 +181,7 @@ function TransactionGraph({
   const loadedAccountsRef = useRef<Set<string>>(new Set());
   const transactionCache = useRef<Map<string, any>>(new Map());
   const pendingFetchesRef = useRef<Set<string>>(new Set());
-  const isProcessingQueueRef = useRef<boolean>(false);=
+  const isProcessingQueueRef = useRef<boolean>(false);
   
   // Add fullscreen state
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
@@ -839,24 +839,6 @@ function TransactionGraph({
     debugLog(`📊 [QUEUE] Queue status - Length: ${fetchQueueRef.current.length}, Total accounts: ${totalAccounts}`);
   }, [processAccountFetchQueue, totalAccounts]);
 
-if (cyRef.current) {
-  cyRef.current.layout({
-    name: 'dagre',
-    // @ts-ignore - dagre layout options are not fully typed
-    rankDir: 'TB', // Changed from 'LR' to 'TB' to rotate 90 degrees to the right
-    fit: true,
-    padding: 50
-  }).run();
-}
-
-return result;
-  }, [
-    maxDepth,
-    shouldExcludeAddress,
-    shouldIncludeTransaction,
-    fetchAccountTransactionsWithError,
-    queueAccountFetch
-  ]);
   // Set the ref to the queueAccountFetch function
   useEffect(() => {
     queueAccountFetchRef.current = queueAccountFetch;
@@ -1227,7 +1209,6 @@ return result;
             classes: 'transaction highlight-transaction' 
           });
           
-\
           if (!signal.aborted) {
             // Immediate progress update to show something is happening
             setLoadingProgress(20);

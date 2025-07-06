@@ -33,10 +33,10 @@ interface LiveMonitorProps {
   refreshInterval?: number;
 }
 
-export function LiveEventMonitor({ 
-  maxEvents = 10000,  // Increased to 10,000 as requested
+export const LiveEventMonitor = React.memo(function LiveEventMonitor({ 
+  maxEvents = 10000,
   autoRefresh = true, 
-  refreshInterval = 5000 // Reduced to 5s for more real-time feel
+  refreshInterval = 5000
 }: LiveMonitorProps) {
   const [eventQueue] = useState(() => new FIFOQueue<BlockchainEvent>(maxEvents));
   const [events, setEvents] = useState<BlockchainEvent[]>([]);
@@ -44,6 +44,7 @@ export function LiveEventMonitor({
   const [stats, setStats] = useState<any>(null);
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [lastSlot, setLastSlot] = useState<number | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [filters, setFilters] = useState<EventFilters>({
     showTransactions: true,
     showBlocks: true,
@@ -60,14 +61,15 @@ export function LiveEventMonitor({
       pumpswap: true
     },
     minFee: 0,
-    maxFee: 1000000000, // 1 SOL in lamports
+    maxFee: 1000000000,
     timeRange: 'all'
   });
+  
   const connectionRef = useRef<any>(null);
   const eventCountRef = useRef(0);
   const clientId = useRef(`client_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
 
-  // Use SSE for anomaly alerts instead of polling
+  // Use SSE for anomaly alerts
   const {
     alerts,
     systemStatus,
@@ -93,12 +95,12 @@ export function LiveEventMonitor({
 
   // System programs to filter out
   const SYSTEM_PROGRAMS = new Set([
-    'Vote111111111111111111111111111111111111111', // Vote program
-    '11111111111111111111111111111111', // System program  
-    'ComputeBudget111111111111111111111111111111', // Compute budget program
-    'AddressLookupTab1e1111111111111111111111111', // Address lookup table program
-    'Config1111111111111111111111111111111111111', // Config program
-    'Stake11111111111111111111111111111111111111', // Stake program
+    'Vote111111111111111111111111111111111111111',
+    '11111111111111111111111111111111',
+    'ComputeBudget111111111111111111111111111111',
+    'AddressLookupTab1e1111111111111111111111111',
+    'Config1111111111111111111111111111111111111',
+    'Stake11111111111111111111111111111111111111',
   ]);
 
   // Known programs to highlight
@@ -109,7 +111,7 @@ export function LiveEventMonitor({
     pumpswap: ['6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P'],
   };
 
-  // Connect to real Solana blockchain data
+  // Connect to Solana blockchain
   const connectToSolana = useCallback(async () => {
     try {
       setConnectionError(null);
@@ -117,7 +119,6 @@ export function LiveEventMonitor({
       setIsConnected(true);
       console.log('Connected to Solana RPC for real-time monitoring');
       
-      // Get initial slot
       const currentSlot = await connectionRef.current.getSlot();
       setLastSlot(currentSlot);
       
@@ -135,14 +136,12 @@ export function LiveEventMonitor({
     try {
       const currentSlot = await connectionRef.current.getSlot();
       
-      // Check for new blocks
       if (lastSlot && currentSlot > lastSlot) {
         const newSlots = [];
         for (let slot = lastSlot + 1; slot <= Math.min(lastSlot + 5, currentSlot); slot++) {
           newSlots.push(slot);
         }
         
-        // Fetch blocks in parallel
         const blockPromises = newSlots.map(async (slot) => {
           try {
             const block = await connectionRef.current.getBlock(slot, {
@@ -178,24 +177,21 @@ export function LiveEventMonitor({
           
           addEvent(blockEvent);
           
-          // Process transactions in this block
+          // Process transactions
           if (block.transactions) {
-            for (const tx of block.transactions.slice(0, 10)) { // Limit to first 10 transactions per block
+            for (const tx of block.transactions.slice(0, 10)) {
               if (!tx.transaction || !tx.meta) continue;
               
               const signature = tx.transaction.signatures[0];
               if (!signature) continue;
               
-              // Get account keys for filtering
               const accountKeys = tx.transaction.message.accountKeys?.map(key => key.toString()) || [];
               
-              // Filter out vote transactions and system-only transactions
               const isVoteTransaction = accountKeys.some(key => key === 'Vote111111111111111111111111111111111111111');
               const isSystemOnly = accountKeys.every(key => SYSTEM_PROGRAMS.has(key) || key.startsWith('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA'));
               
               if (isVoteTransaction || isSystemOnly) continue;
               
-              // Check for SPL transfers or custom programs
               const logs = tx.meta.logMessages || [];
               const isSplTransfer = logs.some(log => 
                 log.includes('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA') ||
@@ -207,7 +203,6 @@ export function LiveEventMonitor({
                 !key.startsWith('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA')
               );
               
-              // Only include transactions that are SPL transfers or custom program calls
               if (!isSplTransfer && !hasCustomProgram) continue;
               
               const transactionEvent: BlockchainEvent = {
@@ -221,7 +216,7 @@ export function LiveEventMonitor({
                   logs: logs,
                   knownProgram: identifyKnownProgram(accountKeys),
                   transactionType: classifyTransaction(logs, accountKeys),
-                  accountKeys: accountKeys.slice(0, 5) // Limit for display
+                  accountKeys: accountKeys.slice(0, 5)
                 }
               };
               
@@ -238,17 +233,16 @@ export function LiveEventMonitor({
     }
   }, [lastSlot, isConnected]);
 
-  const identifyKnownProgram = (accountKeys: string[]): string | null => {
+  const identifyKnownProgram = useCallback((accountKeys: string[]): string | null => {
     for (const [programName, programIds] of Object.entries(KNOWN_PROGRAMS)) {
       if (programIds.some(id => accountKeys.includes(id))) {
         return programName;
       }
     }
     return null;
-  };
+  }, []);
 
-  const classifyTransaction = (logs: string[], accountKeys: string[]): string => {
-    // Check for SPL token transfer
+  const classifyTransaction = useCallback((logs: string[], accountKeys: string[]): string => {
     if (logs.some(log => 
       log.includes('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA') ||
       log.includes('Program log: Instruction: Transfer')
@@ -256,23 +250,21 @@ export function LiveEventMonitor({
       return 'spl-transfer';
     }
 
-    // Check for custom program calls
     if (accountKeys.some(key => !SYSTEM_PROGRAMS.has(key))) {
       return 'custom-program';
     }
 
     return 'other';
-  };
+  }, []);
 
-  const addEvent = (event: BlockchainEvent) => {
+  const addEvent = useCallback((event: BlockchainEvent) => {
     eventQueue.enqueue(event);
     setEvents(eventQueue.getAll());
     eventCountRef.current = eventQueue.size();
-  };
+  }, [eventQueue]);
 
-  const processEventForAnomalies = async (event: BlockchainEvent) => {
+  const processEventForAnomalies = useCallback(async (event: BlockchainEvent) => {
     try {
-      // Only analyze 10% of events to reduce API load (SSE will push alerts)
       if (Math.random() > 0.1) return;
       
       const response = await fetch('/api/anomaly', {
@@ -288,35 +280,31 @@ export function LiveEventMonitor({
 
       if (response.ok) {
         const result = await response.json();
-        // No need to set alerts here - SSE will push them automatically
         console.log('Event analyzed for anomalies:', result);
       }
     } catch (error) {
       console.error('Failed to analyze event for anomalies:', error);
     }
-  };
+  }, []);
 
-  // Disconnect function
   const disconnect = useCallback(() => {
     if (connectionRef.current) {
       connectionRef.current = null;
     }
     setIsConnected(false);
     setConnectionError(null);
-    disconnectSSE(); // Disconnect SSE as well
+    disconnectSSE();
     console.log('Disconnected from Solana monitoring');
   }, [disconnectSSE]);
 
-  // Initial connection and polling setup
+  // Effects
   useEffect(() => {
     connectToSolana();
-    
     return () => {
       disconnect();
     };
   }, [connectToSolana, disconnect]);
 
-  // Real-time polling for new events
   useEffect(() => {
     if (!isConnected || !autoRefresh) return;
     
@@ -324,7 +312,6 @@ export function LiveEventMonitor({
       fetchRealtimeEvents();
     }, refreshInterval);
     
-    // Initial fetch
     fetchRealtimeEvents();
     
     return () => {
@@ -332,17 +319,15 @@ export function LiveEventMonitor({
     };
   }, [isConnected, autoRefresh, refreshInterval, fetchRealtimeEvents]);
 
-  // Fetch anomaly stats periodically (but not alerts - SSE handles those)
   useEffect(() => {
     let interval: NodeJS.Timeout;
     
     if (autoRefresh) {
       interval = setInterval(() => {
         fetchAnomalyStats();
-      }, 60000); // Every minute for stats only
+      }, 60000);
     }
     
-    // Initial fetch
     fetchAnomalyStats();
     
     return () => {
@@ -350,7 +335,7 @@ export function LiveEventMonitor({
     };
   }, [autoRefresh]);
 
-  // Apply filters to events
+  // Apply filters with memoization
   const filteredEvents = useMemo(() => {
     const now = Date.now();
     let timeThreshold = 0;
@@ -363,26 +348,20 @@ export function LiveEventMonitor({
     }
     
     return events.filter(event => {
-      // Time filter
       if (timeThreshold > 0 && event.timestamp < timeThreshold) return false;
       
-      // Type filters
       if (!filters.showTransactions && event.type === 'transaction') return false;
       if (!filters.showBlocks && event.type === 'block') return false;
       if (!filters.showAccountChanges && event.type === 'account_change') return false;
       
-      // Transaction-specific filters
       if (event.type === 'transaction' && event.data) {
-        // Status filters
         if (filters.showSuccessOnly && event.data.err) return false;
         if (filters.showFailedOnly && !event.data.err) return false;
         
-        // Fee filters
         if (event.data.fee) {
           if (event.data.fee < filters.minFee || event.data.fee > filters.maxFee) return false;
         }
         
-        // Program type filters
         const isSystemProgram = event.data.accountKeys?.some((key: string) => 
           SYSTEM_PROGRAMS.has(key)
         );
@@ -393,7 +372,6 @@ export function LiveEventMonitor({
         if (!filters.showSPLTransfers && isSPLTransfer) return false;
         if (!filters.showCustomPrograms && isCustomProgram) return false;
         
-        // Known program filters
         if (event.data.knownProgram) {
           const program = event.data.knownProgram as keyof EventFilters['showKnownPrograms'];
           if (!filters.showKnownPrograms[program]) return false;
@@ -404,7 +382,7 @@ export function LiveEventMonitor({
     });
   }, [events, filters]);
 
-  // Calculate event counts for filters
+  // Event counts for UI
   const eventCounts = useMemo(() => {
     const counts = {
       transactions: 0,
@@ -424,9 +402,8 @@ export function LiveEventMonitor({
     return counts;
   }, [filteredEvents]);
 
-  const fetchAnomalyStats = async () => {
+  const fetchAnomalyStats = useCallback(async () => {
     try {
-      // Only fetch stats - alerts come via SSE
       const statsResponse = await fetch('/api/anomaly?action=stats');
       if (statsResponse.ok) {
         const statsData = await statsResponse.json();
@@ -437,18 +414,9 @@ export function LiveEventMonitor({
     } catch (error) {
       console.error('Failed to fetch anomaly stats:', error);
     }
-  };
+  }, []);
 
-  const generateMockSignature = () => {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    let result = '';
-    for (let i = 0; i < 88; i++) {
-      result += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return result;
-  };
-
-  const getSeverityColor = (severity: string) => {
+  const getSeverityColor = useCallback((severity: string) => {
     switch (severity) {
       case 'critical': return 'bg-red-500 text-white';
       case 'high': return 'bg-orange-500 text-white';
@@ -456,67 +424,84 @@ export function LiveEventMonitor({
       case 'low': return 'bg-blue-500 text-white';
       default: return 'bg-gray-500 text-white';
     }
-  };
+  }, []);
 
-  const handleEventClick = (event: BlockchainEvent) => {
-    // Only handle transaction events that have signatures
+  const handleEventClick = useCallback((event: BlockchainEvent) => {
     if (event.type === 'transaction' && event.data?.signature) {
       const url = `/tx/${event.data.signature}`;
-      // Open in new tab in background
       window.open(url, '_blank', 'noopener,noreferrer');
     }
-  };
+  }, []);
 
-  const getEventTypeColor = (type: string, data?: any) => {
-    switch (type) {
-      case 'transaction': 
-        // Highlight known programs with special colors
-        if (data?.knownProgram) {
-          switch (data.knownProgram) {
-            case 'raydium': return 'bg-purple-100 text-purple-800 border-purple-300';
-            case 'meteora': return 'bg-blue-100 text-blue-800 border-blue-300';
-            case 'aldrin': return 'bg-orange-100 text-orange-800 border-orange-300';
-            case 'pumpswap': return 'bg-pink-100 text-pink-800 border-pink-300';
-            default: return 'bg-green-100 text-green-800';
-          }
-        }
-        // Different colors for transaction types
-        if (data?.transactionType === 'spl-transfer') {
-          return 'bg-emerald-100 text-emerald-800';
-        }
-        if (data?.transactionType === 'custom-program') {
-          return 'bg-green-100 text-green-800';
-        }
-        return 'bg-green-100 text-green-800';
-      case 'block': return 'bg-blue-100 text-blue-800';
-      case 'account_change': return 'bg-purple-100 text-purple-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
+  const toggleFullscreen = useCallback(() => {
+    setIsFullscreen(!isFullscreen);
+  }, [isFullscreen]);
+
+  const clearEvents = useCallback(() => {
+    eventQueue.clear();
+    setEvents([]);
+    eventCountRef.current = 0;
+  }, [eventQueue]);
+
+  if (isFullscreen) {
+    return (
+      <div className="fixed inset-0 bg-background z-50 flex flex-col">
+        {/* Fullscreen Header */}
+        <div className="flex items-center justify-between p-4 border-b bg-card">
+          <h1 className="text-2xl font-bold text-foreground">Real-Time Blockchain Monitoring</h1>
+          <button
+            onClick={toggleFullscreen}
+            className="px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary/90"
+          >
+            Exit Fullscreen
+          </button>
+        </div>
+        
+        {/* Fullscreen Content */}
+        <div className="flex-1 p-4 overflow-hidden">
+          <VirtualEventTable 
+            events={filteredEvents}
+            onEventClick={handleEventClick}
+            height={window.innerHeight - 150}
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
-      {/* Status Bar */}
-      <Card className="p-4">
+      {/* Compact Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Real-Time Blockchain Monitoring</h1>
+          <p className="text-sm text-muted-foreground">
+            Live Solana events with AI-driven anomaly detection
+          </p>
+        </div>
+        <button
+          onClick={toggleFullscreen}
+          className="px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary/90"
+        >
+          Fullscreen
+        </button>
+      </div>
+
+      {/* Compact Status Bar */}
+      <Card className="p-3">
         <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-6">
             <div className="flex items-center space-x-2">
-              <div className={`w-3 h-3 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
+              <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
               <span className="text-sm font-medium">
-                {isConnected ? 'Connected to Solana' : 'Disconnected'}
+                {isConnected ? 'Connected' : 'Disconnected'}
               </span>
-              {connectionError && (
-                <span className="text-xs text-yellow-600">({connectionError})</span>
-              )}
             </div>
             <div className="flex items-center space-x-2">
               <div className={`w-2 h-2 rounded-full ${sseConnected ? 'bg-blue-500' : 'bg-gray-500'}`} />
               <span className="text-xs text-muted-foreground">
-                SSE {sseConnected ? 'Connected' : 'Disconnected'}
+                SSE {sseConnected ? 'On' : 'Off'}
               </span>
-              {sseError && (
-                <span className="text-xs text-red-600">({sseError})</span>
-              )}
             </div>
             <div className="text-sm text-muted-foreground">
               Events: {eventCountRef.current}/{maxEvents}
@@ -548,36 +533,20 @@ export function LiveEventMonitor({
               Clear Alerts
             </button>
             <button
-              onClick={() => {
-                eventQueue.clear();
-                setEvents([]);
-                eventCountRef.current = 0;
-              }}
+              onClick={clearEvents}
               className="px-3 py-1 text-sm bg-gray-500 text-white rounded hover:bg-gray-600"
             >
               Clear Events
-            </button>
-            <button
-              onClick={isConnected ? disconnect : connectToSolana}
-              className={`px-3 py-1 text-sm rounded ${
-                isConnected 
-                  ? 'bg-red-500 text-white hover:bg-red-600' 
-                  : 'bg-green-500 text-white hover:bg-green-600'
-              }`}
-            >
-              {isConnected ? 'Disconnect' : 'Connect'}
             </button>
           </div>
         </div>
       </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-        {/* Left Sidebar - Statistics and Filters */}
-        <div className="lg:col-span-1 space-y-4">
-          {/* Pump Detection Statistics */}
+      {/* Main Grid Layout */}
+      <div className="grid grid-cols-1 xl:grid-cols-5 gap-4">
+        {/* Left Sidebar - Compact */}
+        <div className="xl:col-span-1 space-y-4">
           <PumpStatistics events={filteredEvents} />
-          
-          {/* Event Filters */}
           <EventFilterControls 
             filters={filters}
             onFiltersChange={setFilters}
@@ -585,33 +554,38 @@ export function LiveEventMonitor({
           />
         </div>
 
-        {/* Main Content - Virtual Table and Alerts */}
-        <div className="lg:col-span-3 space-y-4">
-          {/* Live Events with Virtual Table */}
+        {/* Main Content - Optimized */}
+        <div className="xl:col-span-4 space-y-4">
+          {/* Live Events Table */}
           <Card className="p-4">
-            <h3 className="text-lg font-semibold mb-4">Live Events (Virtual Table)</h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">Live Events</h3>
+              <div className="text-sm text-muted-foreground">
+                {filteredEvents.length} events • Virtual table
+              </div>
+            </div>
             <VirtualEventTable 
               events={filteredEvents}
               onEventClick={handleEventClick}
-              height={500}
+              height={600}
             />
-            {filteredEvents.length === 0 && (
-              <div className="text-center text-muted-foreground py-8">
-                {isConnected ? 'No events match current filters' : 'Not connected to Solana'}
-              </div>
-            )}
           </Card>
 
-          {/* Anomaly Alerts - Now powered by SSE */}
+          {/* Anomaly Alerts - Compact */}
           <Card className="p-4">
-            <h3 className="text-lg font-semibold mb-4">
-              Real-Time Anomaly Alerts 
-              {sseConnected && <span className="text-xs text-green-600 ml-2">(Live SSE)</span>}
-            </h3>
-            <div className="space-y-2 max-h-96 overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">
+                Anomaly Alerts
+                {sseConnected && <span className="text-xs text-green-600 ml-2">(Live)</span>}
+              </h3>
+              <div className="text-sm text-muted-foreground">
+                {alerts.length} alerts
+              </div>
+            </div>
+            <div className="space-y-2 max-h-64 overflow-y-auto">
               {alerts.map((alert) => (
-                <div key={alert.id} className="p-3 border rounded-lg">
-                  <div className="flex items-center justify-between mb-2">
+                <div key={alert.id} className="p-2 border rounded">
+                  <div className="flex items-center justify-between">
                     <span className={`px-2 py-1 text-xs rounded ${getSeverityColor(alert.severity)}`}>
                       {alert.severity.toUpperCase()}
                     </span>
@@ -619,16 +593,16 @@ export function LiveEventMonitor({
                       {new Date(alert.timestamp).toLocaleTimeString()}
                     </span>
                   </div>
-                  <div className="text-sm font-medium text-foreground">
+                  <div className="text-sm font-medium mt-1">
                     {alert.type.replace(/_/g, ' ').toUpperCase()}
                   </div>
-                  <div className="text-xs text-muted-foreground mt-1">
+                  <div className="text-xs text-muted-foreground">
                     {alert.description}
                   </div>
                 </div>
               ))}
               {alerts.length === 0 && (
-                <div className="text-center text-muted-foreground py-8">
+                <div className="text-center text-muted-foreground py-4">
                   No anomalies detected
                 </div>
               )}
@@ -636,24 +610,6 @@ export function LiveEventMonitor({
           </Card>
         </div>
       </div>
-
-      {/* Statistics */}
-      {stats && (
-        <Card className="p-4">
-          <h3 className="text-lg font-semibold mb-4">Anomaly Detection Statistics</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {stats.stats?.map((period: any) => (
-              <div key={period.period} className="bg-gray-50 p-3 rounded">
-                <div className="text-sm font-medium">{period.period}</div>
-                <div className="text-2xl font-bold">{period.total}</div>
-                <div className="text-xs text-muted-foreground">
-                  Critical: {period.critical} | High: {period.high} | Medium: {period.medium}
-                </div>
-              </div>
-            ))}
-          </div>
-        </Card>
-      )}
     </div>
   );
-}
+});
