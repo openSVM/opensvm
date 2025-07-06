@@ -464,6 +464,23 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
     };
   }, [disconnect]);
 
+  // Define fetchAnomalyStatsThrottled before using it in useEffect
+  const fetchAnomalyStatsThrottled = useAggressiveThrottle(useCallback(async () => {
+    try {
+      const statsResponse = await fetch('/api/anomaly?action=stats');
+      if (statsResponse.ok) {
+        const statsData = await statsResponse.json();
+        if (statsData.success) {
+          startTransition(() => {
+            setStats(statsData.data);
+          });
+        }
+      }
+    } catch (error) {
+      // Silently handle errors for better performance
+    }
+  }, []), 300000); // Increased from 60000ms to 300000ms (5 minutes)
+
   useEffect(() => {
     let interval: NodeJS.Timeout;
     
@@ -617,22 +634,6 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
     
     return counts;
   }, [filteredEvents]);
-
-  const fetchAnomalyStatsThrottled = useAggressiveThrottle(useCallback(async () => {
-    try {
-      const statsResponse = await fetch('/api/anomaly?action=stats');
-      if (statsResponse.ok) {
-        const statsData = await statsResponse.json();
-        if (statsData.success) {
-          startTransition(() => {
-            setStats(statsData.data);
-          });
-        }
-      }
-    } catch (error) {
-      // Silently handle errors for better performance
-    }
-  }, []), 300000); // Increased from 60000ms to 300000ms (5 minutes)
 
   const getSeverityColor = useCallback((severity: string) => {
     switch (severity) {
