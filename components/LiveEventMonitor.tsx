@@ -320,15 +320,7 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
   };
 
   // Consolidated SSE connection for both events and alerts
-  const {
-    alerts,
-    systemStatus,
-    isConnected: sseConnected,
-    error: sseError,
-    connect: connectSSE,
-    disconnect: disconnectSSE,
-    clearAlerts
-  } = useSSEAlerts({
+  const sseHookResult = useSSEAlerts({
     clientId: clientId.current,
     autoConnect: true,
     maxAlerts: 50,
@@ -347,6 +339,17 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
       setConnectionError(error.message);
     }
   });
+
+  // Safely destructure with fallbacks to prevent undefined references
+  const {
+    alerts = [],
+    systemStatus = null,
+    isConnected: sseConnected = false,
+    error: sseError = null,
+    connect: connectSSE = () => {},
+    disconnect: disconnectSSE = () => {},
+    clearAlerts = () => {}
+  } = sseHookResult || {};
 
   // Set connection state based on SSE connection (remove redundant WebSocket)
   useEffect(() => {
