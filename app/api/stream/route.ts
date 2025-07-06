@@ -646,122 +646,66 @@ export async function GET(request: NextRequest) {
     return Response.json(createSuccessResponse(manager.getStatus()));
   }
   
-    // Check if this is a WebSocket upgrade request
+  // Check for WebSocket upgrade request - provide clear error message
   const upgrade = request.headers.get('upgrade');
   const connection = request.headers.get('connection');
   
   if (upgrade?.toLowerCase() === 'websocket' && connection?.toLowerCase().includes('upgrade')) {
-    // This is a proper WebSocket upgrade request
-    
-    // Check rate limits for WebSocket connections
-    const rateLimitResult = checkRateLimit(clientId, 'websocket_connections', 1);
-    if (!rateLimitResult.allowed) {
-      const { response, status } = CommonErrors.rateLimit(rateLimitResult.retryAfter, rateLimitResult.remainingTokens);
-      return new Response(JSON.stringify(response), { 
-        status,
-        headers: {
-          'Content-Type': 'application/json',
-          'X-RateLimit-Remaining': rateLimitResult.remainingTokens.toString(),
-          'X-RateLimit-Reset': new Date(rateLimitResult.resetTime).toISOString(),
-          'Retry-After': rateLimitResult.retryAfter?.toString() || '60'
-        }
-      });
-    }
-
-    // Check if client is blocked
-    if (isClientBlocked(clientId)) {
-      const { response, status } = CommonErrors.clientBlocked('Authentication failures');
-      return new Response(JSON.stringify(response), { 
-        status,
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
-
-    // Feature flag: WebSocket upgrade support
-    // ENABLE_WEBSOCKET_UPGRADE - Controls whether WebSocket upgrades are supported
-    // When true: Attempts to upgrade connection to WebSocket protocol
-    // When false: Returns error with alternative polling instructions
-    // Infrastructure requirement: Requires proxy or custom server that can handle WebSocket upgrades
-    const webSocketSupported = process.env.ENABLE_WEBSOCKET_UPGRADE === 'true';
-    
-    if (!webSocketSupported) {
-      const { response, status } = createErrorResponse(
-        'WEBSOCKET_NOT_SUPPORTED',
-        'WebSocket upgrade not supported in current deployment',
-        {
-          message: 'Server does not support WebSocket upgrades. Use HTTP polling mode instead.',
-          clientId,
-          supportedEvents: ['transaction', 'block', 'account_change'],
-          alternatives: {
-            polling: '/api/stream (POST)',
-            documentation: '/docs/api/streaming',
-            sseAlternative: '/api/sse-alerts'
-          },
-          deploymentInfo: {
-            environment: process.env.NODE_ENV || 'development',
-            platform: process.env.VERCEL ? 'vercel' : 'custom',
-            webSocketSupport: false
-          }
-        },
-        426 // Upgrade Required
-      );
-      
-      return new Response(JSON.stringify(response), {
-        status,
-        headers: {
-          'Content-Type': 'application/json',
-          'Upgrade': 'websocket',
-          'Connection': 'Upgrade',
-          'Sec-WebSocket-Version': '13'
-        },
-      });
-    }
-    
-    // Future: Implement true WebSocket upgrade handling here
-    // Requirements for full WebSocket support:
-    // 1. Custom HTTP server (Express, Fastify, etc.) that can handle upgrades
-    // 2. WebSocket library (ws, socket.io, etc.)
-    // 3. Proxy configuration for production deployments
-    // 4. Connection lifecycle management
-    // 5. Authentication integration
-    
-    // For now, return a placeholder response indicating WebSocket support is coming
+    // WebSocket is not supported - be honest about it
     const { response, status } = createErrorResponse(
-      'WEBSOCKET_UPGRADE_NOT_IMPLEMENTED',
-      'WebSocket upgrade handler not yet implemented',
+      'WEBSOCKET_NOT_SUPPORTED',
+      'WebSocket connections are not supported by this endpoint',
       {
-        message: 'WebSocket upgrade is enabled but handler is not implemented. Use polling mode.',
+        message: 'This API uses Server-Sent Events (SSE), not WebSocket. WebSocket upgrade requests are not implemented.',
         clientId,
-        todoItems: [
-          'Implement WebSocket upgrade handler',
-          'Add connection lifecycle management',
-          'Integrate with authentication system',
-          'Configure proxy for production'
-        ]
+        alternatives: {
+          sseEndpoint: '/api/sse-alerts',
+          pollingEndpoint: '/api/stream (POST)',
+          documentation: '/docs/api/streaming'
+        },
+        supportedFeatures: [
+          'Server-Sent Events (SSE) for real-time streaming',
+          'HTTP polling for request-response patterns',
+          'Authentication and rate limiting'
+        ],
+        deploymentInfo: {
+          environment: process.env.NODE_ENV || 'development',
+          platform: process.env.VERCEL ? 'vercel' : 'custom',
+          webSocketSupport: false,
+          reason: 'Next.js API routes do not support WebSocket natively. Use SSE instead.'
+        }
       },
-      501 // Not Implemented
+      426 // Upgrade Required
     );
     
     return new Response(JSON.stringify(response), {
       status,
       headers: {
         'Content-Type': 'application/json',
-        'Upgrade': 'websocket',
-        'Connection': 'Upgrade'
-      }
+        'X-Streaming-Method': 'SSE',
+        'X-WebSocket-Support': 'false'
+      },
     });
   }
 
-  // If not a WebSocket request, return API information
+  // Return API information for regular GET requests
   return new Response(JSON.stringify(createSuccessResponse({
-    message: 'Streaming API endpoint',
+    message: 'Blockchain Event Streaming API',
     clientId,
-    supportedMethods: ['POST for polling', 'GET with WebSocket upgrade headers'],
+    streamingMethod: 'SSE',
+    supportedMethods: ['POST for polling', 'SSE for real-time streaming'],
     supportedEvents: ['transaction', 'block', 'account_change'],
-    documentation: '/docs/api/streaming'
+    endpoints: {
+      polling: '/api/stream (POST)',
+      realtime: '/api/sse-alerts',
+      documentation: '/docs/api/streaming'
+    },
+    note: 'This API uses Server-Sent Events (SSE), not WebSocket'
   })), {
     headers: {
       'Content-Type': 'application/json',
+      'X-Streaming-Method': 'SSE',
+      'X-WebSocket-Support': 'false'
     },
   });
 }

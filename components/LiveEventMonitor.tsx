@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo, startTransition } from 'react';
 import { Card } from '@/components/ui/card';
 import { useSSEAlerts } from '@/lib/hooks/useSSEAlerts';
-import { BlockchainEvent } from '@/lib/hooks/useWebSocketStream';
+import { BlockchainEvent } from '@/lib/hooks/useWebSocketStream'; // Note: This uses SSE, not WebSocket
 import { lamportsToSol } from '@/components/transaction-graph/utils';
 import { FIFOQueue } from '@/lib/utils/fifo-queue';
 import { TransactionTooltip } from './TransactionTooltip';

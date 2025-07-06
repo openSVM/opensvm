@@ -1,8 +1,10 @@
 /**
- * React Hook for WebSocket-based blockchain event streaming
+ * React Hook for SSE-based blockchain event streaming
  * 
- * Provides real-time blockchain events via WebSocket connection
- * Replaces polling with push-based event streaming
+ * Provides real-time blockchain events via Server-Sent Events (SSE)
+ * Uses EventSource for push-based event streaming from the server
+ * 
+ * Note: Despite the legacy name, this uses SSE, NOT WebSocket
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
@@ -14,7 +16,7 @@ export interface BlockchainEvent {
   metadata?: any;
 }
 
-interface UseWebSocketStreamOptions {
+interface UseSSEStreamOptions {
   clientId?: string;
   autoConnect?: boolean;
   maxEvents?: number;
@@ -25,7 +27,7 @@ interface UseWebSocketStreamOptions {
   onDisconnect?: () => void;
 }
 
-interface UseWebSocketStreamReturn {
+interface UseSSEStreamReturn {
   events: BlockchainEvent[];
   isConnected: boolean;
   error: string | null;
@@ -35,9 +37,9 @@ interface UseWebSocketStreamReturn {
   connectionStatus: string;
 }
 
-export function useWebSocketStream(options: UseWebSocketStreamOptions = {}): UseWebSocketStreamReturn {
+export function useSSEStream(options: UseSSEStreamOptions = {}): UseSSEStreamReturn {
   const {
-    clientId = `ws_client_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+    clientId = `sse_client_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
     autoConnect = true,
     maxEvents = 10000,
     eventTypes = ['transaction', 'block'],
@@ -52,7 +54,7 @@ export function useWebSocketStream(options: UseWebSocketStreamOptions = {}): Use
   const [error, setError] = useState<string | null>(null);
   const [connectionStatus, setConnectionStatus] = useState('disconnected');
 
-  const wsRef = useRef<WebSocket | null>(null);
+  const wsRef = useRef<EventSource | null>(null);
   const authTokenRef = useRef<string | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const reconnectAttempts = useRef(0);
@@ -85,7 +87,7 @@ export function useWebSocketStream(options: UseWebSocketStreamOptions = {}): Use
 
       throw new Error('Authentication failed: No token received');
     } catch (error) {
-      console.error('[WebSocket] Authentication error:', error);
+      console.error('[SSE] Authentication error:', error);
       setError(error instanceof Error ? error.message : 'Authentication failed');
       return null;
     }
@@ -114,7 +116,7 @@ export function useWebSocketStream(options: UseWebSocketStreamOptions = {}): Use
       const data = await response.json();
       return data.success;
     } catch (error) {
-      console.error('[WebSocket] Subscription error:', error);
+      console.error('[SSE] Subscription error:', error);
       return false;
     }
   }, [clientId, eventTypes]);
@@ -145,50 +147,24 @@ export function useWebSocketStream(options: UseWebSocketStreamOptions = {}): Use
 
       return false;
     } catch (error) {
-      console.error('[WebSocket] Start monitoring error:', error);
+      console.error('[SSE] Start monitoring error:', error);
       return false;
     }
   }, [clientId]);
 
-  // Create a mock WebSocket connection using Server-Sent Events
-  // This bridges the gap until full WebSocket support is implemented
-  const createMockWebSocket = useCallback(() => {
+  // Create SSE connection for real-time blockchain events
+  const createSSEConnection = useCallback(() => {
     if (!isMountedRef.current) return;
 
     try {
       setConnectionStatus('connecting');
-      console.log(`[WebSocket] Creating mock WebSocket connection for ${clientId}`);
+      console.log(`[SSE] Creating Server-Sent Events connection for ${clientId}`);
 
-      // Use EventSource for receiving events (one-way from server)
+      // Use EventSource for receiving events from server
       const eventSource = new EventSource(`/api/sse-alerts?clientId=${encodeURIComponent(clientId)}&action=connect`);
       
-      // Mock WebSocket interface
-      const mockWebSocket = {
-        readyState: WebSocket.CONNECTING,
-        url: `/api/stream?clientId=${clientId}`,
-        onopen: null as ((event: Event) => void) | null,
-        onmessage: null as ((event: MessageEvent) => void) | null,
-        onerror: null as ((event: Event) => void) | null,
-        onclose: null as ((event: CloseEvent) => void) | null,
-        close: () => {
-          try {
-            eventSource.close();
-            if (mockWebSocket.onclose) {
-              mockWebSocket.onclose(new CloseEvent('close'));
-            }
-          } catch (error) {
-            console.warn('[WebSocket] Error closing EventSource:', error);
-          }
-        },
-        send: (data: string) => {
-          // For now, just log what would be sent
-          console.log('[WebSocket] Mock send:', data);
-        }
-      };
-
       eventSource.onopen = () => {
-        console.log(`[WebSocket] Mock connection established for ${clientId}`);
-        mockWebSocket.readyState = WebSocket.OPEN;
+        console.log(`[SSE] Connection established for ${clientId}`);
         if (isMountedRef.current) {
           setIsConnected(true);
           setError(null);
@@ -199,13 +175,12 @@ export function useWebSocketStream(options: UseWebSocketStreamOptions = {}): Use
       };
 
       eventSource.onerror = (event) => {
-        console.error('[WebSocket] Mock connection error:', event);
-        mockWebSocket.readyState = WebSocket.CLOSED;
+        console.error('[SSE] Connection error:', event);
         if (isMountedRef.current) {
           setIsConnected(false);
           setConnectionStatus('error');
           
-          const errorMsg = 'WebSocket connection failed';
+          const errorMsg = 'SSE connection failed';
           setError(errorMsg);
           onError?.(new Error(errorMsg));
         }
@@ -213,7 +188,7 @@ export function useWebSocketStream(options: UseWebSocketStreamOptions = {}): Use
         // Attempt to reconnect
         if (reconnectAttempts.current < maxReconnectAttempts && isMountedRef.current) {
           const delay = Math.pow(2, reconnectAttempts.current) * 1000;
-          console.log(`[WebSocket] Reconnecting in ${delay}ms (attempt ${reconnectAttempts.current + 1}/${maxReconnectAttempts})`);
+          console.log(`[SSE] Reconnecting in ${delay}ms (attempt ${reconnectAttempts.current + 1}/${maxReconnectAttempts})`);
           
           reconnectTimeoutRef.current = setTimeout(() => {
             if (isMountedRef.current) {
@@ -228,7 +203,7 @@ export function useWebSocketStream(options: UseWebSocketStreamOptions = {}): Use
       eventSource.addEventListener('blockchain_event', (event) => {
         try {
           const blockchainEvent: BlockchainEvent = JSON.parse(event.data);
-          console.log('[WebSocket] Received blockchain event:', blockchainEvent);
+          console.log('[SSE] Received blockchain event:', blockchainEvent);
           
           if (isMountedRef.current) {
             setEvents(prev => {
@@ -239,7 +214,7 @@ export function useWebSocketStream(options: UseWebSocketStreamOptions = {}): Use
           
           onEvent?.(blockchainEvent);
         } catch (parseError) {
-          console.error('[WebSocket] Failed to parse blockchain event:', parseError);
+          console.error('[SSE] Failed to parse blockchain event:', parseError);
         }
       });
 
@@ -253,7 +228,7 @@ export function useWebSocketStream(options: UseWebSocketStreamOptions = {}): Use
             data: transactionData
           };
           
-          console.log('[WebSocket] Received transaction event:', blockchainEvent);
+          console.log('[SSE] Received transaction event:', blockchainEvent);
           
           if (isMountedRef.current) {
             setEvents(prev => {
@@ -264,7 +239,7 @@ export function useWebSocketStream(options: UseWebSocketStreamOptions = {}): Use
           
           onEvent?.(blockchainEvent);
         } catch (parseError) {
-          console.error('[WebSocket] Failed to parse transaction event:', parseError);
+          console.error('[SSE] Failed to parse transaction event:', parseError);
         }
       });
 
@@ -278,7 +253,7 @@ export function useWebSocketStream(options: UseWebSocketStreamOptions = {}): Use
             data: blockData
           };
           
-          console.log('[WebSocket] Received block event:', blockchainEvent);
+          console.log('[SSE] Received block event:', blockchainEvent);
           
           if (isMountedRef.current) {
             setEvents(prev => {
@@ -289,16 +264,16 @@ export function useWebSocketStream(options: UseWebSocketStreamOptions = {}): Use
           
           onEvent?.(blockchainEvent);
         } catch (parseError) {
-          console.error('[WebSocket] Failed to parse block event:', parseError);
+          console.error('[SSE] Failed to parse block event:', parseError);
         }
       });
 
-      // Store the mock WebSocket
-      wsRef.current = mockWebSocket as any;
+      // Store the EventSource connection
+      wsRef.current = eventSource;
 
     } catch (connectError) {
-      console.error('[WebSocket] Failed to create mock connection:', connectError);
-      setError('Failed to create WebSocket connection');
+      console.error('[SSE] Failed to create connection:', connectError);
+      setError('Failed to create SSE connection');
       setConnectionStatus('error');
       onError?.(connectError as Error);
     }
@@ -312,27 +287,27 @@ export function useWebSocketStream(options: UseWebSocketStreamOptions = {}): Use
       try {
         wsRef.current.close();
       } catch (error) {
-        console.warn('[WebSocket] Error closing existing connection:', error);
+        console.warn('[SSE] Error closing existing connection:', error);
       }
     }
 
     setConnectionStatus('authenticating');
     
     // First start monitoring to create the server-side client
-    console.log('[WebSocket] Starting monitoring...');
+    console.log('[SSE] Starting monitoring...');
     const monitoringStarted = await startMonitoring();
     
     if (monitoringStarted) {
-      // Create the mock WebSocket connection
-      createMockWebSocket();
+      // Create the SSE connection
+      createSSEConnection();
     } else {
       setError('Failed to start monitoring');
       setConnectionStatus('error');
     }
-  }, [startMonitoring, createMockWebSocket]);
+  }, [startMonitoring, createSSEConnection]);
 
   const disconnect = useCallback(() => {
-    console.log(`[WebSocket] Disconnecting client ${clientId}...`);
+    console.log(`[SSE] Disconnecting client ${clientId}...`);
     
     // Clear reconnection timeout
     if (reconnectTimeoutRef.current) {
@@ -340,12 +315,12 @@ export function useWebSocketStream(options: UseWebSocketStreamOptions = {}): Use
       reconnectTimeoutRef.current = null;
     }
 
-    // Close WebSocket connection
+    // Close SSE connection
     if (wsRef.current) {
       try {
         wsRef.current.close();
       } catch (error) {
-        console.warn('[WebSocket] Error closing WebSocket:', error);
+        console.warn('[SSE] Error closing SSE connection:', error);
       }
       wsRef.current = null;
     }
@@ -390,3 +365,6 @@ export function useWebSocketStream(options: UseWebSocketStreamOptions = {}): Use
     connectionStatus
   };
 }
+
+// Legacy export for backward compatibility
+export const useWebSocketStream = useSSEStream;
