@@ -183,9 +183,6 @@ function TransactionGraph({
   const pendingFetchesRef = useRef<Set<string>>(new Set());
   const isProcessingQueueRef = useRef<boolean>(false);
   
-  // Add fullscreen state
-  const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
-
   // Fullscreen functionality
   const toggleFullscreen = useCallback(() => {
     if (!containerRef.current) return;
@@ -1306,136 +1303,15 @@ function TransactionGraph({
                   fit: true,
                   padding: 50
                 }).run();
-          if (response.ok && !signal.aborted) {
-            const txData = await response.json();
-            console.log('✅ [FETCH] Transaction data fetched, progress: 60%');
-            setLoadingProgress(60);
-            
-            // Update transaction node with fetched data
-            if (cyRef.current && !signal.aborted) {
-              const txNode = cyRef.current.getElementById(initialSignature);
-              if (txNode.length) {
-                txNode.data('status', 'loaded');
-                txNode.data('timestamp', txData.timestamp || Date.now());
-                txNode.data('success', txData.success);
-                
-                console.log(`✅ [TX_UPDATE] Updated transaction node: ${initialSignature}`);
-                console.log(`✅ [TX_UPDATE] Success: ${txData.success}, Type: ${txData.type}, Timestamp: ${txData.timestamp}`);
               }
-            }
-            
-            if (txData.details?.accounts?.length > 0 && !signal.aborted) {
-              const firstAccount = txData.details.accounts[0].pubkey;
-              if (firstAccount) {
-                console.log(`🎯 [ACCOUNT] Starting graph build from account: ${firstAccount}`);
-                setLoadingProgress(80);
-                
-                // Initialize refs to ensure they exist
-                if (!loadedAccountsRef.current) {
-                  loadedAccountsRef.current = new Set();
-                }
-                
-                if (!signal.aborted) {
-                  try {
-                    // Queue the first account and provide immediate feedback
-                    console.log(`📝 [QUEUE] Queuing account: ${firstAccount}`);
-                    queueAccountFetch(firstAccount, 0, initialSignature);
-                    
-                    // Force queue processing immediately to ensure it starts
-                    console.log(`🔄 [QUEUE] Force processing queue immediately`);
-                    setTimeout(() => {
-                      if (!signal.aborted) {
-                        processAccountFetchQueue();
-                      }
-                    }, 100);
-                  
-                  // Set a more aggressive progress update with guaranteed completion
-                  setLoadingProgress(85);
-                  console.log('📈 [PROGRESS] Queued first account, progress: 85%');
-                  
-                  // Add multiple fallback mechanisms to ensure progress moves
-                  let progressCheckCount = 0;
-                  const maxChecks = 10;
-                  
-                  // Create a promise that resolves when progress is complete or times out
-                  const progressPromise = new Promise<void>((resolve) => {
-                    const checkProgress = () => {
-                      progressCheckCount++;
-                      const currentProgress = 85 + (progressCheckCount * 1.5);
-                      setLoadingProgress(Math.min(currentProgress, 99));
-                      console.log(`🔄 [PROGRESS CHECK ${progressCheckCount}] Progress: ${Math.min(currentProgress, 99)}%`);
-                      
-                      const elements = cyRef.current?.elements().length || 0;
-                      const accounts = loadedAccountsRef.current?.size || 0;
-                      console.log(`📊 [STATS] Elements: ${elements}, Loaded accounts: ${accounts}`);
-                      
-                      if (progressCheckCount >= maxChecks || elements > 2 || accounts > 0) {
-                        console.log('✅ [COMPLETE] Progress checks complete');
-                        resolve();
-                      } else {
-                        setTimeout(checkProgress, 500);
-                      }
-                    };
-                    checkProgress();
-                  });
-                  
-                  // Add a backup timeout to ensure loading always completes
-                  const backupTimeout = setTimeout(() => {
-                    console.log('⏰ [BACKUP] Backup timeout triggered - completing loading');
-                    setLoadingProgress(100);
-                    setLoading(false);
-                  }, 8000); // 8 seconds backup
-                  
-                  // Wait for processing with progress monitoring
-                  await Promise.race([progressPromise, new Promise(resolve => setTimeout(resolve, 7000))]);
-                  
-                  clearTimeout(backupTimeout);
-                  
-                  const elements = cyRef.current?.elements().length || 0;
-                  console.log(`🎭 [FINAL] Graph elements after processing: ${elements}`);
-                  
-                  if (elements > 1) {
-                    setLoadingProgress(100);
-                    console.log('🎉 [SUCCESS] Graph build successful, progress: 100%');
-                  } else {
-                    // Complete loading even with minimal data
-                    console.log('⚠️ [WARNING] Graph build completed with limited data, progress: 100%');
-                    setLoadingProgress(100);
-                  }
-                  } catch (error) {
-                    console.error('❌ [ERROR] Error during graph building:', error);
-                    setLoadingProgress(100);
-                  }
-                }
-              } else {
-                console.log('⚠️ [WARNING] No valid account found in transaction data');
+              
+              if (!signal.aborted) {
                 setLoadingProgress(100);
+                console.log('Restored cached state, progress: 100%');
               }
-            } else {
-              console.log('⚠️ [WARNING] No accounts found in transaction data');
-              setLoadingProgress(100);
+            } catch (err) {
+              console.warn('Error restoring cached state:', err);
             }
-          } else {
-            console.error(`Failed to fetch transaction data: ${response.status}`);
-            setError({
-              message: `Failed to load transaction data: ${response.statusText}`,
-              severity: 'error'
-            });
-            setLoadingProgress(100);
-          }
-          
-          // Set initial viewport for fresh data
-          if (cyRef.current) {
-            requestAnimationFrame(() => {
-              if (cyRef.current) {
-                runLayoutOptimized(true, false);
-                setTimeout(() => {
-                  if (cyRef.current) {
-                    cyRef.current.zoom(0.8);
-                  }
-                }, 100);
-              }
-            });
           }
         }
       } catch (err) {
@@ -1625,37 +1501,6 @@ function TransactionGraph({
       resizeGraph(cyRef, true);
     }
   }, []);
-
-  // Fullscreen functionality
-  const toggleFullscreen = useCallback(async () => {
-    if (!containerRef.current) return;
-    
-    try {
-      if (!isFullscreen) {
-        if (containerRef.current.requestFullscreen) {
-          await containerRef.current.requestFullscreen();
-        } else if ((containerRef.current as any).webkitRequestFullscreen) {
-          await (containerRef.current as any).webkitRequestFullscreen();
-        } else if ((containerRef.current as any).mozRequestFullScreen) {
-          await (containerRef.current as any).mozRequestFullScreen();
-        } else if ((containerRef.current as any).msRequestFullscreen) {
-          await (containerRef.current as any).msRequestFullscreen();
-        }
-      } else {
-        if (document.exitFullscreen) {
-          await document.exitFullscreen();
-        } else if ((document as any).webkitExitFullscreen) {
-          await (document as any).webkitExitFullscreen();
-        } else if ((document as any).mozCancelFullScreen) {
-          await (document as any).mozCancelFullScreen();
-        } else if ((document as any).msExitFullscreen) {
-          await (document as any).msExitFullscreen();
-        }
-      }
-    } catch (err) {
-      console.error('Error toggling fullscreen:', err);
-    }
-  }, [isFullscreen]);
 
   // Handle fullscreen change events
   useEffect(() => {
