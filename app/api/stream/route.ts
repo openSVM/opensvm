@@ -75,6 +75,70 @@ const AUTH_FAILURES = new Map<string, {
 }>();
 const rateLimiter = getRateLimiter();
 
+// Token cleanup worker - runs every 5 minutes
+let tokenCleanupInterval: NodeJS.Timeout | null = null;
+
+function startTokenCleanupWorker(): void {
+  if (tokenCleanupInterval) return;
+  
+  tokenCleanupInterval = setInterval(() => {
+    cleanupExpiredTokens();
+    cleanupOldAuthFailures();
+  }, 5 * 60 * 1000); // 5 minutes
+  
+  console.log('Token cleanup worker started');
+}
+
+function stopTokenCleanupWorker(): void {
+  if (tokenCleanupInterval) {
+    clearInterval(tokenCleanupInterval);
+    tokenCleanupInterval = null;
+    console.log('Token cleanup worker stopped');
+  }
+}
+
+function cleanupExpiredTokens(): void {
+  const now = Date.now();
+  const expiredTokens: string[] = [];
+  
+  for (const [clientId, authData] of CLIENT_AUTH_TOKENS.entries()) {
+    if (now - authData.createdAt > 3600000) { // 1 hour
+      expiredTokens.push(clientId);
+    }
+  }
+  
+  expiredTokens.forEach(clientId => {
+    CLIENT_AUTH_TOKENS.delete(clientId);
+  });
+  
+  if (expiredTokens.length > 0) {
+    console.log(`Cleaned up ${expiredTokens.length} expired tokens`);
+  }
+}
+
+function cleanupOldAuthFailures(): void {
+  const now = Date.now();
+  const staleFailures: string[] = [];
+  
+  for (const [clientId, failures] of AUTH_FAILURES.entries()) {
+    // Remove failure records older than 24 hours
+    if (now - failures.lastAttempt > 24 * 60 * 60 * 1000) {
+      staleFailures.push(clientId);
+    }
+  }
+  
+  staleFailures.forEach(clientId => {
+    AUTH_FAILURES.delete(clientId);
+  });
+  
+  if (staleFailures.length > 0) {
+    console.log(`Cleaned up ${staleFailures.length} stale auth failure records`);
+  }
+}
+
+// Start cleanup worker when module loads
+startTokenCleanupWorker();
+
 function generateAuthToken(): string {
   return Math.random().toString(36).substring(2) + Date.now().toString(36);
 }
@@ -115,9 +179,22 @@ function logAuthFailure(clientId: string, reason: string): void {
   // Block client after 5 failed attempts - use stricter timestamp-based blocking
   if (failures.attempts >= 5) {
     failures.blockUntil = now + (60 * 60 * 1000); // Block for 1 hour
-    console.warn(`[AUTH FAILURE] Client ${clientId} BLOCKED until ${new Date(failures.blockUntil).toISOString()}: ${reason}`);
+    
+    // Escalate repeated auth failures to console with higher severity
+    console.error(`[AUTH FAILURE - CRITICAL] Client ${clientId} BLOCKED until ${new Date(failures.blockUntil).toISOString()}: ${reason}`);
+    console.error(`[SECURITY ALERT] Client ${clientId} has made ${failures.attempts} failed authentication attempts`);
+    
+    // Could integrate with monitoring systems here:
+    // - Send alert to security team
+    // - Log to security monitoring dashboard
+    // - Trigger automated response if needed
+    
+  } else if (failures.attempts >= 3) {
+    // Warning level for 3+ attempts
+    console.warn(`[AUTH FAILURE - WARNING] Client ${clientId}: ${reason} (attempts: ${failures.attempts}/5)`);
   } else {
-    console.warn(`[AUTH FAILURE] Client ${clientId}: ${reason} (attempts: ${failures.attempts})`);
+    // Info level for initial attempts
+    console.log(`[AUTH FAILURE] Client ${clientId}: ${reason} (attempts: ${failures.attempts})`);
   }
   
   AUTH_FAILURES.set(clientId, failures);
@@ -168,7 +245,10 @@ class EventStreamManager {
   private clients: Map<string, StreamClient> = new Map();
   private connection: Connection | null = null;
   private subscriptionIds: Map<string, number> = new Map();
+  private subscriptionCallbacks: Map<string, (...args: any[]) => void> = new Map();
   private isMonitoring = false;
+  private subscriptionAttempts: Map<string, number> = new Map(); // Track subscription attempts
+  private subscriptionErrors: Map<string, { count: number; lastError: Date }> = new Map();
 
   public static getInstance(): EventStreamManager {
     if (!EventStreamManager.instance) {
@@ -231,30 +311,73 @@ class EventStreamManager {
         await anomalyDetector.start();
       }
       
-      // Subscribe to slot changes (new blocks)
-      const slotSubscriptionId = this.connection.onSlotChange((slotInfo) => {
-        const event = {
-          type: 'block' as const,
-          timestamp: Date.now(),
-          data: {
-            slot: slotInfo.slot,
-            parent: slotInfo.parent,
-            root: slotInfo.root
-          }
+      // Subscribe to slot changes (new blocks) with idempotency protection
+      await this.safeSubscribe('slots', () => {
+        const slotCallback = (slotInfo: any) => {
+          const event = {
+            type: 'block' as const,
+            timestamp: Date.now(),
+            data: {
+              slot: slotInfo.slot,
+              parent: slotInfo.parent,
+              root: slotInfo.root
+            }
+          };
+          this.broadcastEvent(event);
         };
-        this.broadcastEvent(event);
+        
+        this.subscriptionCallbacks.set('slots', slotCallback);
+        return this.connection!.onSlotChange(slotCallback);
       });
       
-      this.subscriptionIds.set('slots', slotSubscriptionId);
-      
-      // Subscribe to signature notifications for transaction monitoring
-      this.setupTransactionMonitoring();
+      // Setup transaction monitoring with error protection
+      await this.setupTransactionMonitoring();
       
       console.log('Started blockchain event monitoring with anomaly detection');
     } catch (error) {
       console.error('Failed to start monitoring:', error);
       this.isMonitoring = false;
+      this.recordSubscriptionError('monitoring', error);
     }
+  }
+
+  // Safe subscription wrapper with idempotency and error handling
+  private async safeSubscribe(
+    subscriptionKey: string, 
+    subscribeFunction: () => number
+  ): Promise<void> {
+    try {
+      // Check if already subscribed
+      if (this.subscriptionIds.has(subscriptionKey)) {
+        console.log(`Already subscribed to ${subscriptionKey}, skipping duplicate subscription`);
+        return;
+      }
+
+      // Track subscription attempts
+      const attempts = this.subscriptionAttempts.get(subscriptionKey) || 0;
+      this.subscriptionAttempts.set(subscriptionKey, attempts + 1);
+
+      // Perform subscription
+      const subscriptionId = subscribeFunction();
+      this.subscriptionIds.set(subscriptionKey, subscriptionId);
+      
+      console.log(`Successfully subscribed to ${subscriptionKey} (ID: ${subscriptionId})`);
+      
+    } catch (error) {
+      console.error(`Failed to subscribe to ${subscriptionKey}:`, error);
+      this.recordSubscriptionError(subscriptionKey, error);
+      throw error;
+    }
+  }
+
+  // Track subscription errors for monitoring and debugging
+  private recordSubscriptionError(subscriptionKey: string, error: any): void {
+    const errorInfo = this.subscriptionErrors.get(subscriptionKey) || { count: 0, lastError: new Date() };
+    errorInfo.count++;
+    errorInfo.lastError = new Date();
+    this.subscriptionErrors.set(subscriptionKey, errorInfo);
+    
+    console.error(`Subscription error for ${subscriptionKey} (${errorInfo.count} total errors):`, error);
   }
 
   private async setupTransactionMonitoring(): Promise<void> {
@@ -280,70 +403,75 @@ class EventStreamManager {
         bonkfun: ['BonkfunjxcXSo3Nvvv8YKxVy1jqhfNyVSKngkHa8EgD']
       };
 
-      // Monitor for new transactions by subscribing to logs
-      const logsSubscriptionId = this.connection.onLogs(
-        'all',
-        async (logs, context) => {
+      // Monitor for new transactions by subscribing to logs with safe subscription
+      await this.safeSubscribe('logs', () => {
+        const logsCallback = async (logs: any, context: any) => {
           if (logs.signature) {
-            // Skip obvious vote transactions early to reduce processing load
-            const isVoteTransaction = logs.logs?.some(log => log.includes('Vote111111111111111111111111111111111111111'));
-            if (isVoteTransaction) {
-              return;
-            }
-            
-            let txDetails = null;
             try {
-              // Try to fetch transaction details, but don't fail the whole event if this fails
-              txDetails = await this.connection!.getTransaction(logs.signature, {
-                commitment: 'confirmed',
-                maxSupportedTransactionVersion: 0
-              });
-            } catch (fetchError) {
-              // Log error but continue processing with just the logs data
-              console.warn(`Failed to fetch transaction details for ${logs.signature}:`, fetchError);
-            }
-
-            // Create event with available data (whether we got tx details or not)
-            const accountKeys = txDetails?.transaction?.message?.accountKeys?.map(key => key.toString()) || [];
-            
-            // Only filter out pure system transactions if we have account keys
-            if (accountKeys.length > 0) {
-              const isPureSystemTransaction = accountKeys.every(key => 
-                SYSTEM_PROGRAMS.has(key) && 
-                !key.includes('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA')
-              );
-              
-              // Skip pure system transactions
-              if (isPureSystemTransaction) {
+              // Skip obvious vote transactions early to reduce processing load
+              const isVoteTransaction = logs.logs?.some((log: string) => log.includes('Vote111111111111111111111111111111111111111'));
+              if (isVoteTransaction) {
                 return;
               }
-            }
-            
-            const event = {
-              type: 'transaction' as const,
-              timestamp: Date.now(),
-              data: {
-                signature: logs.signature,
-                slot: context.slot,
-                logs: logs.logs,
-                err: logs.err,
-                fee: txDetails?.meta?.fee || null,
-                preBalances: txDetails?.meta?.preBalances || [],
-                postBalances: txDetails?.meta?.postBalances || [],
-                accountKeys: accountKeys,
-                knownProgram: this.identifyKnownProgram(accountKeys),
-                transactionType: this.classifyTransaction(logs.logs || [], accountKeys)
+              
+              let txDetails = null;
+              try {
+                // Try to fetch transaction details, but don't fail the whole event if this fails
+                txDetails = await this.connection!.getTransaction(logs.signature, {
+                  commitment: 'confirmed',
+                  maxSupportedTransactionVersion: 0
+                });
+              } catch (fetchError) {
+                // Log error but continue processing with just the logs data
+                console.warn(`Failed to fetch transaction details for ${logs.signature}:`, fetchError);
               }
-            };
-            this.broadcastEvent(event);
+
+              // Create event with available data (whether we got tx details or not)
+              const accountKeys = txDetails?.transaction?.message?.accountKeys?.map(key => key.toString()) || [];
+              
+              // Only filter out pure system transactions if we have account keys
+              if (accountKeys.length > 0) {
+                const isPureSystemTransaction = accountKeys.every(key => 
+                  SYSTEM_PROGRAMS.has(key) && 
+                  !key.includes('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA')
+                );
+                
+                // Skip pure system transactions
+                if (isPureSystemTransaction) {
+                  return;
+                }
+              }
+              
+              const event = {
+                type: 'transaction' as const,
+                timestamp: Date.now(),
+                data: {
+                  signature: logs.signature,
+                  slot: context.slot,
+                  logs: logs.logs,
+                  err: logs.err,
+                  fee: txDetails?.meta?.fee || null,
+                  preBalances: txDetails?.meta?.preBalances || [],
+                  postBalances: txDetails?.meta?.postBalances || [],
+                  accountKeys: accountKeys,
+                  knownProgram: this.identifyKnownProgram(accountKeys),
+                  transactionType: this.classifyTransaction(logs.logs || [], accountKeys)
+                }
+              };
+              this.broadcastEvent(event);
+            } catch (eventError) {
+              console.error('Error processing transaction event:', eventError);
+            }
           }
-        },
-        'confirmed'
-      );
+        };
+        
+        this.subscriptionCallbacks.set('logs', logsCallback);
+        return this.connection!.onLogs('all', logsCallback, 'confirmed');
+      });
       
-      this.subscriptionIds.set('logs', logsSubscriptionId);
     } catch (error) {
       console.error('Failed to setup transaction monitoring:', error);
+      this.recordSubscriptionError('logs', error);
     }
   }
 
@@ -403,7 +531,7 @@ class EventStreamManager {
   private stopMonitoring(): void {
     if (!this.isMonitoring || !this.connection) return;
     
-    // Remove all subscriptions
+    // Remove all subscriptions with improved error handling
     for (const [type, subscriptionId] of this.subscriptionIds) {
       try {
         if (type === 'slots') {
@@ -411,12 +539,17 @@ class EventStreamManager {
         } else if (type === 'logs') {
           this.connection.removeOnLogsListener(subscriptionId);
         }
+        console.log(`Successfully removed ${type} subscription (ID: ${subscriptionId})`);
       } catch (error) {
-        console.error(`Failed to remove ${type} subscription:`, error);
+        console.error(`Failed to remove ${type} subscription (ID: ${subscriptionId}):`, error);
+        // Track failed removals for debugging
+        this.recordSubscriptionError(`${type}_removal`, error);
       }
     }
     
+    // Clear subscription tracking
     this.subscriptionIds.clear();
+    this.subscriptionCallbacks.clear();
     this.isMonitoring = false;
     this.connection = null;
     
@@ -487,6 +620,13 @@ class EventStreamManager {
       isMonitoring: this.isMonitoring,
       clientCount: this.clients.size,
       subscriptions: Array.from(this.subscriptionIds.keys()),
+      subscriptionAttempts: Object.fromEntries(this.subscriptionAttempts),
+      subscriptionErrors: Object.fromEntries(
+        Array.from(this.subscriptionErrors.entries()).map(([key, value]) => [
+          key,
+          { count: value.count, lastError: value.lastError.toISOString() }
+        ])
+      ),
       anomalyDetector: anomalyDetector.getStats()
     };
   }
@@ -503,7 +643,7 @@ export async function GET(request: NextRequest) {
     return Response.json(createSuccessResponse(manager.getStatus()));
   }
   
-  // Check if this is a WebSocket upgrade request
+    // Check if this is a WebSocket upgrade request
   const upgrade = request.headers.get('upgrade');
   const connection = request.headers.get('connection');
   
@@ -534,14 +674,11 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // In a real implementation, this would need to be handled by a WebSocket server
-    // For Next.js API routes, WebSocket upgrades require a custom server or serverless function
-    // that supports WebSocket protocols. 
-    // 
-    // LIMITATION: True WebSocket support requires infrastructure changes.
-    // Current implementation provides polling-based alternative.
-    // Feature flag: ENABLE_WEBSOCKET_UPGRADE can be set to enable when infrastructure supports it.
-    
+    // Feature flag: WebSocket upgrade support
+    // ENABLE_WEBSOCKET_UPGRADE - Controls whether WebSocket upgrades are supported
+    // When true: Attempts to upgrade connection to WebSocket protocol
+    // When false: Returns error with alternative polling instructions
+    // Infrastructure requirement: Requires proxy or custom server that can handle WebSocket upgrades
     const webSocketSupported = process.env.ENABLE_WEBSOCKET_UPGRADE === 'true';
     
     if (!webSocketSupported) {
@@ -554,7 +691,13 @@ export async function GET(request: NextRequest) {
           supportedEvents: ['transaction', 'block', 'account_change'],
           alternatives: {
             polling: '/api/stream (POST)',
-            documentation: '/docs/api/streaming'
+            documentation: '/docs/api/streaming',
+            sseAlternative: '/api/sse-alerts'
+          },
+          deploymentInfo: {
+            environment: process.env.NODE_ENV || 'development',
+            platform: process.env.VERCEL ? 'vercel' : 'custom',
+            webSocketSupport: false
           }
         },
         426 // Upgrade Required
@@ -565,13 +708,45 @@ export async function GET(request: NextRequest) {
         headers: {
           'Content-Type': 'application/json',
           'Upgrade': 'websocket',
-          'Connection': 'Upgrade'
+          'Connection': 'Upgrade',
+          'Sec-WebSocket-Version': '13'
         },
       });
     }
     
     // Future: Implement true WebSocket upgrade handling here
-    // when infrastructure supports it
+    // Requirements for full WebSocket support:
+    // 1. Custom HTTP server (Express, Fastify, etc.) that can handle upgrades
+    // 2. WebSocket library (ws, socket.io, etc.)
+    // 3. Proxy configuration for production deployments
+    // 4. Connection lifecycle management
+    // 5. Authentication integration
+    
+    // For now, return a placeholder response indicating WebSocket support is coming
+    const { response, status } = createErrorResponse(
+      'WEBSOCKET_UPGRADE_NOT_IMPLEMENTED',
+      'WebSocket upgrade handler not yet implemented',
+      {
+        message: 'WebSocket upgrade is enabled but handler is not implemented. Use polling mode.',
+        clientId,
+        todoItems: [
+          'Implement WebSocket upgrade handler',
+          'Add connection lifecycle management',
+          'Integrate with authentication system',
+          'Configure proxy for production'
+        ]
+      },
+      501 // Not Implemented
+    );
+    
+    return new Response(JSON.stringify(response), {
+      status,
+      headers: {
+        'Content-Type': 'application/json',
+        'Upgrade': 'websocket',
+        'Connection': 'Upgrade'
+      }
+    });
   }
 
   // If not a WebSocket request, return API information

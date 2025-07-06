@@ -31,62 +31,73 @@ interface AnomalyAlert {
 }
 
 // Ring buffer implementation for efficient memory management
+// Uses synchronous operations to eliminate async lock overhead
 class RingBuffer<T> {
   private buffer: T[];
   private head = 0;
   private tail = 0;
   private count = 0;
   private readonly capacity: number;
-  private readonly mutex = { locked: false };
 
   constructor(capacity: number) {
     this.capacity = capacity;
     this.buffer = new Array(capacity);
   }
 
-  async push(item: T): Promise<void> {
-    await this.lock();
-    try {
-      this.buffer[this.tail] = item;
-      this.tail = (this.tail + 1) % this.capacity;
-      
-      if (this.count < this.capacity) {
-        this.count++;
-      } else {
-        this.head = (this.head + 1) % this.capacity;
-      }
-    } finally {
-      this.unlock();
+  // Synchronous push operation - no async lock needed in single-threaded JS
+  push(item: T): void {
+    this.buffer[this.tail] = item;
+    this.tail = (this.tail + 1) % this.capacity;
+    
+    if (this.count < this.capacity) {
+      this.count++;
+    } else {
+      this.head = (this.head + 1) % this.capacity;
     }
   }
 
-  async toArray(): Promise<T[]> {
-    await this.lock();
-    try {
-      const result: T[] = [];
-      for (let i = 0; i < this.count; i++) {
-        const index = (this.head + i) % this.capacity;
-        result.push(this.buffer[index]);
-      }
-      return result;
-    } finally {
-      this.unlock();
+  // Synchronous toArray operation - no async lock needed
+  toArray(): T[] {
+    const result: T[] = [];
+    for (let i = 0; i < this.count; i++) {
+      const index = (this.head + i) % this.capacity;
+      result.push(this.buffer[index]);
     }
+    return result;
   }
 
-  private async lock(): Promise<void> {
-    while (this.mutex.locked) {
-      await new Promise(resolve => setTimeout(resolve, 1));
+  // Get a slice of recent items without copying the entire buffer
+  getRecent(maxItems: number): T[] {
+    const itemCount = Math.min(maxItems, this.count);
+    const result: T[] = [];
+    
+    for (let i = this.count - itemCount; i < this.count; i++) {
+      const index = (this.head + i) % this.capacity;
+      result.push(this.buffer[index]);
     }
-    this.mutex.locked = true;
+    
+    return result;
   }
 
-  private unlock(): void {
-    this.mutex.locked = false;
+  // Check if buffer is near capacity for memory management
+  isNearCapacity(threshold: number = 0.8): boolean {
+    return this.count >= this.capacity * threshold;
+  }
+
+  // Clear buffer for memory management
+  clear(): void {
+    this.head = 0;
+    this.tail = 0;
+    this.count = 0;
+    // Don't reallocate buffer, just reset pointers
   }
 
   get size(): number {
     return this.count;
+  }
+
+  get isFull(): boolean {
+    return this.count === this.capacity;
   }
 }
 
@@ -186,8 +197,8 @@ export class AnomalyDetectionCapability extends BaseCapability {
       return [];
     }
 
-    // Add event to ring buffer
-    await this.recentEvents.push(event);
+    // Add event to ring buffer (now synchronous)
+    this.recentEvents.push(event);
 
     // Create context for analysis
     const context = await this.createContext();
@@ -200,7 +211,7 @@ export class AnomalyDetectionCapability extends BaseCapability {
       if (isAnomaly) {
         const alert = this.createAlert(pattern, event, context);
         alerts.push(alert);
-        await this.alerts.push(alert);
+        this.alerts.push(alert); // Now synchronous
         
         // Push alert via SSE for real-time updates
         try {
@@ -218,7 +229,7 @@ export class AnomalyDetectionCapability extends BaseCapability {
   private async createContext(): Promise<AnomalyContext> {
     const now = Date.now();
     const recentWindow = 5 * 60 * 1000; // 5 minutes
-    const recentEvents = (await this.recentEvents.toArray()).filter(e => e.timestamp > now - recentWindow);
+    const recentEvents = this.recentEvents.toArray().filter(e => e.timestamp > now - recentWindow);
     
     const transactionEvents = recentEvents.filter(e => e.type === 'transaction');
     const failedTransactions = transactionEvents.filter(e => e.data.err !== null);
@@ -290,7 +301,7 @@ export class AnomalyDetectionCapability extends BaseCapability {
   }
 
   private async getAnomalyAlerts(params: ToolParams): Promise<any> {
-    const allAlerts = await this.alerts.toArray();
+    const allAlerts = this.alerts.toArray();
     const recentAlerts = allAlerts
       .filter(alert => alert.timestamp > Date.now() - (24 * 60 * 60 * 1000)) // Last 24 hours
       .sort((a, b) => b.timestamp - a.timestamp)
@@ -324,7 +335,7 @@ export class AnomalyDetectionCapability extends BaseCapability {
       { name: '24h', duration: 24 * 60 * 60 * 1000 }
     ];
 
-    const allAlerts = await this.alerts.toArray();
+    const allAlerts = this.alerts.toArray();
     const stats = periods.map(period => {
       const alerts = allAlerts.filter(alert => alert.timestamp > now - period.duration);
       return {
