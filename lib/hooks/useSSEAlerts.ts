@@ -69,6 +69,20 @@ export function useSSEAlerts(options: UseSSEAlertsOptions = {}): UseSSEAlertsRet
   const reconnectAttempts = useRef(0);
   const maxReconnectAttempts = 5;
   const isMountedRef = useRef(true);
+  
+  // Use refs for callbacks to prevent dependency changes causing reconnections
+  const onAlertRef = useRef(onAlert);
+  const onStatusUpdateRef = useRef(onStatusUpdate);
+  const onBlockchainEventRef = useRef(onBlockchainEvent);
+  const onErrorRef = useRef(onError);
+  
+  // Update refs when callbacks change
+  useEffect(() => {
+    onAlertRef.current = onAlert;
+    onStatusUpdateRef.current = onStatusUpdate;
+    onBlockchainEventRef.current = onBlockchainEvent;
+    onErrorRef.current = onError;
+  }, [onAlert, onStatusUpdate, onBlockchainEvent, onError]);
 
   const connect = useCallback(() => {
     // Safely close any existing connection first
@@ -103,7 +117,7 @@ export function useSSEAlerts(options: UseSSEAlertsOptions = {}): UseSSEAlertsRet
           
           const errorMsg = 'SSE connection failed';
           setError(errorMsg);
-          onError?.(new Error(errorMsg));
+          onErrorRef.current?.(new Error(errorMsg));
         }
 
         // Attempt to reconnect with exponential backoff
@@ -136,7 +150,7 @@ export function useSSEAlerts(options: UseSSEAlertsOptions = {}): UseSSEAlertsRet
             });
           }
           
-          onAlert?.(alert);
+          onAlertRef.current?.(alert);
         } catch (parseError) {
           console.error('[SSE] Failed to parse anomaly alert:', parseError);
         }
@@ -152,7 +166,7 @@ export function useSSEAlerts(options: UseSSEAlertsOptions = {}): UseSSEAlertsRet
             setSystemStatus(status);
           }
           
-          onStatusUpdate?.(status);
+          onStatusUpdateRef.current?.(status);
         } catch (parseError) {
           console.error('[SSE] Failed to parse system status:', parseError);
         }
@@ -163,7 +177,7 @@ export function useSSEAlerts(options: UseSSEAlertsOptions = {}): UseSSEAlertsRet
         try {
           const blockchainEvent: BlockchainEvent = JSON.parse(event.data);
           console.log('[SSE] Received blockchain event:', blockchainEvent);
-          onBlockchainEvent?.(blockchainEvent);
+          onBlockchainEventRef.current?.(blockchainEvent);
         } catch (parseError) {
           console.error('[SSE] Failed to parse blockchain event:', parseError);
         }
@@ -180,7 +194,7 @@ export function useSSEAlerts(options: UseSSEAlertsOptions = {}): UseSSEAlertsRet
           };
           
           console.log('[SSE] Received transaction event:', blockchainEvent);
-          onBlockchainEvent?.(blockchainEvent);
+          onBlockchainEventRef.current?.(blockchainEvent);
         } catch (parseError) {
           console.error('[SSE] Failed to parse transaction event:', parseError);
         }
@@ -197,7 +211,7 @@ export function useSSEAlerts(options: UseSSEAlertsOptions = {}): UseSSEAlertsRet
           };
           
           console.log('[SSE] Received block event:', blockchainEvent);
-          onBlockchainEvent?.(blockchainEvent);
+          onBlockchainEventRef.current?.(blockchainEvent);
         } catch (parseError) {
           console.error('[SSE] Failed to parse block event:', parseError);
         }
@@ -216,9 +230,9 @@ export function useSSEAlerts(options: UseSSEAlertsOptions = {}): UseSSEAlertsRet
     } catch (connectError) {
       console.error('[SSE] Failed to create EventSource:', connectError);
       setError('Failed to create SSE connection');
-      onError?.(connectError as Error);
+      onErrorRef.current?.(connectError as Error);
     }
-  }, [clientId, maxAlerts, onAlert, onStatusUpdate, onError]);
+  }, [clientId, maxAlerts]); // Remove callback dependencies to prevent reconnection loop
 
   const disconnect = useCallback(() => {
     console.log(`[SSE] Disconnecting client ${clientId}...`);
@@ -259,16 +273,17 @@ export function useSSEAlerts(options: UseSSEAlertsOptions = {}): UseSSEAlertsRet
     }
   }, []);
 
-  // Auto-connect on mount if enabled
+  // Auto-connect on mount if enabled - use stable dependencies to prevent reconnection loops
   useEffect(() => {
     if (autoConnect) {
       connect();
     }
 
     return () => {
+      isMountedRef.current = false;
       disconnect();
     };
-  }, [autoConnect, connect, disconnect]);
+  }, [autoConnect]); // Remove connect/disconnect from dependencies to prevent infinite loops
 
   return {
     alerts,

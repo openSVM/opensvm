@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo, startTransition } from 'react';
 import { Card } from '@/components/ui/card';
 import { useSSEAlerts } from '@/lib/hooks/useSSEAlerts';
-import { useWebSocketStream, BlockchainEvent } from '@/lib/hooks/useWebSocketStream';
+import { BlockchainEvent } from '@/lib/hooks/useWebSocketStream';
 import { lamportsToSol } from '@/components/transaction-graph/utils';
 import { FIFOQueue } from '@/lib/utils/fifo-queue';
 import { TransactionTooltip } from './TransactionTooltip';
@@ -319,25 +319,34 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
     bonkfun: ['BonkfunjxcXSo3Nvvv8YKxVy1jqhfNyVSKngkHa8EgD']
   };
 
+  // Stable callbacks for SSE hook to prevent reconnection loops
+  const handleAlert = useCallback((alert: any) => {
+    console.log('Received real-time anomaly alert:', alert);
+  }, []);
+
+  const handleStatusUpdate = useCallback((status: any) => {
+    console.log('System status update:', status);
+  }, []);
+
+  const handleBlockchainEvent = useCallback((event: BlockchainEvent) => {
+    // Process blockchain events through our existing pipeline
+    addEvent(event);
+  }, [addEvent]);
+
+  const handleError = useCallback((error: Error) => {
+    console.error('SSE error:', error);
+    setConnectionError(error.message);
+  }, []);
+
   // Consolidated SSE connection for both events and alerts
   const sseHookResult = useSSEAlerts({
     clientId: clientId.current,
     autoConnect: true,
     maxAlerts: 50,
-    onAlert: (alert) => {
-      console.log('Received real-time anomaly alert:', alert);
-    },
-    onStatusUpdate: (status) => {
-      console.log('System status update:', status);
-    },
-    onBlockchainEvent: (event) => {
-      // Process blockchain events through our existing pipeline
-      addEvent(event);
-    },
-    onError: (error) => {
-      console.error('SSE error:', error);
-      setConnectionError(error.message);
-    }
+    onAlert: handleAlert,
+    onStatusUpdate: handleStatusUpdate,
+    onBlockchainEvent: handleBlockchainEvent,
+    onError: handleError
   });
 
   // Safely destructure with fallbacks to prevent undefined references
