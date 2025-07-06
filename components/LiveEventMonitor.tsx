@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo, startTransition } from 'react';
 import { Card } from '@/components/ui/card';
 import { getConnection } from '@/lib/solana';
 import { useSSEAlerts } from '@/lib/hooks/useSSEAlerts';
@@ -10,6 +10,68 @@ import { TransactionTooltip } from './TransactionTooltip';
 import { PumpStatistics } from './PumpStatistics';
 import { EventFilterControls, EventFilters } from './EventFilterControls';
 import { VirtualEventTable } from './VirtualEventTable';
+
+// Performance monitoring utilities
+const performanceTracker = {
+  memoryUsage: () => {
+    if (typeof window !== 'undefined' && 'performance' in window && 'memory' in (window as any).performance) {
+      const memory = (window as any).performance.memory;
+      return {
+        used: Math.round(memory.usedJSHeapSize / 1048576), // MB
+        total: Math.round(memory.totalJSHeapSize / 1048576), // MB
+        limit: Math.round(memory.jsHeapSizeLimit / 1048576) // MB
+      };
+    }
+    return null;
+  },
+  
+  markStart: (label: string) => {
+    if (typeof window !== 'undefined' && 'performance' in window) {
+      performance.mark(`${label}-start`);
+    }
+  },
+  
+  markEnd: (label: string) => {
+    if (typeof window !== 'undefined' && 'performance' in window) {
+      performance.mark(`${label}-end`);
+      try {
+        performance.measure(label, `${label}-start`, `${label}-end`);
+        const measure = performance.getEntriesByName(label, 'measure')[0];
+        return measure?.duration || 0;
+      } catch (e) {
+        return 0;
+      }
+    }
+    return 0;
+  }
+};
+
+// Throttling utility for high-frequency operations
+const useThrottle = <T extends (...args: any[]) => any>(
+  callback: T,
+  delay: number
+): T => {
+  const lastCall = useRef(0);
+  const timeoutRef = useRef<NodeJS.Timeout>();
+  
+  return useCallback((...args: Parameters<T>) => {
+    const now = Date.now();
+    
+    if (now - lastCall.current >= delay) {
+      lastCall.current = now;
+      return callback(...args);
+    } else {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+      
+      timeoutRef.current = setTimeout(() => {
+        lastCall.current = Date.now();
+        callback(...args);
+      }, delay - (now - lastCall.current));
+    }
+  }, [callback, delay]) as T;
+};
 
 export interface BlockchainEvent {
   type: 'transaction' | 'block' | 'account_change';
@@ -38,6 +100,7 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
   autoRefresh = true, 
   refreshInterval = 5000
 }: LiveMonitorProps) {
+  // Performance-optimized state management
   const [eventQueue] = useState(() => new FIFOQueue<BlockchainEvent>(maxEvents));
   const [events, setEvents] = useState<BlockchainEvent[]>([]);
   const [isConnected, setIsConnected] = useState(false);
@@ -45,6 +108,18 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [lastSlot, setLastSlot] = useState<number | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [performanceMetrics, setPerformanceMetrics] = useState<{
+    memoryUsage: any;
+    renderTime: number;
+    eventProcessingTime: number;
+    totalEvents: number;
+  }>({
+    memoryUsage: null,
+    renderTime: 0,
+    eventProcessingTime: 0,
+    totalEvents: 0
+  });
+  
   const [filters, setFilters] = useState<EventFilters>({
     showTransactions: true,
     showBlocks: true,
@@ -68,6 +143,90 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
   const connectionRef = useRef<any>(null);
   const eventCountRef = useRef(0);
   const clientId = useRef(`client_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
+  const processingQueueRef = useRef<BlockchainEvent[]>([]);
+  const lastMemoryCheck = useRef(0);
+  const eventBatchRef = useRef<BlockchainEvent[]>([]);
+  const batchTimeoutRef = useRef<NodeJS.Timeout>();
+
+  // Memory monitoring
+  useEffect(() => {
+    const updateMemoryMetrics = () => {
+      const memory = performanceTracker.memoryUsage();
+      if (memory) {
+        setPerformanceMetrics(prev => ({
+          ...prev,
+          memoryUsage: memory,
+          totalEvents: eventCountRef.current
+        }));
+      }
+    };
+
+    const interval = setInterval(updateMemoryMetrics, 5000);
+    updateMemoryMetrics();
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // Throttled event processing
+  const processEventBatch = useThrottle(() => {
+    if (eventBatchRef.current.length === 0) return;
+    
+    performanceTracker.markStart('event-processing');
+    
+    startTransition(() => {
+      const batch = eventBatchRef.current.splice(0, 50); // Process max 50 events at a time
+      
+      batch.forEach(event => {
+        eventQueue.enqueue(event);
+      });
+      
+      setEvents(eventQueue.getAll());
+      eventCountRef.current = eventQueue.size();
+      
+      const processingTime = performanceTracker.markEnd('event-processing');
+      setPerformanceMetrics(prev => ({
+        ...prev,
+        eventProcessingTime: processingTime
+      }));
+    });
+  }, 200); // Process batches every 200ms
+
+  // Optimized event addition
+  const addEvent = useCallback((event: BlockchainEvent) => {
+    eventBatchRef.current.push(event);
+    
+    // Clear existing timeout
+    if (batchTimeoutRef.current) {
+      clearTimeout(batchTimeoutRef.current);
+    }
+    
+    // Set new timeout for batch processing
+    batchTimeoutRef.current = setTimeout(() => {
+      processEventBatch();
+    }, 100); // Batch events for 100ms
+  }, [processEventBatch]);
+
+  // Memory cleanup when approaching limits
+  useEffect(() => {
+    const checkMemoryPressure = () => {
+      const memory = performanceTracker.memoryUsage();
+      if (memory && memory.used > memory.limit * 0.8) {
+        console.warn('Memory pressure detected, cleaning up events');
+        
+        // Reduce event queue size
+        const reducedQueue = new FIFOQueue<BlockchainEvent>(Math.floor(maxEvents / 2));
+        const recentEvents = eventQueue.getAll().slice(-Math.floor(maxEvents / 2));
+        
+        recentEvents.forEach(event => reducedQueue.enqueue(event));
+        
+        setEvents(reducedQueue.getAll());
+        eventCountRef.current = reducedQueue.size();
+      }
+    };
+
+    const interval = setInterval(checkMemoryPressure, 10000);
+    return () => clearInterval(interval);
+  }, [maxEvents, eventQueue]);
 
   // Use SSE for anomaly alerts
   const {
@@ -129,20 +288,26 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
     }
   }, []);
 
-  // Fetch real blockchain events
-  const fetchRealtimeEvents = useCallback(async () => {
+  // Throttled blockchain event fetching
+  const fetchRealtimeEvents = useThrottle(useCallback(async () => {
     if (!connectionRef.current || !isConnected) return;
 
     try {
+      performanceTracker.markStart('fetch-events');
+      
       const currentSlot = await connectionRef.current.getSlot();
       
       if (lastSlot && currentSlot > lastSlot) {
+        // Limit slot processing to prevent overwhelming
+        const maxSlotsToProcess = 3;
         const newSlots = [];
-        for (let slot = lastSlot + 1; slot <= Math.min(lastSlot + 5, currentSlot); slot++) {
+        
+        for (let slot = lastSlot + 1; slot <= Math.min(lastSlot + maxSlotsToProcess, currentSlot); slot++) {
           newSlots.push(slot);
         }
         
-        const blockPromises = newSlots.map(async (slot) => {
+        // Process slots with concurrency limit
+        const processSlot = async (slot: number) => {
           try {
             const block = await connectionRef.current.getBlock(slot, {
               maxSupportedTransactionVersion: 0,
@@ -153,85 +318,102 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
           } catch (error) {
             return null;
           }
-        });
-        
-        const blockResults = await Promise.all(blockPromises);
-        
-        for (const result of blockResults) {
-          if (!result?.block) continue;
+        };
+
+        // Process max 2 slots concurrently
+        const slotBatches = [];
+        for (let i = 0; i < newSlots.length; i += 2) {
+          slotBatches.push(newSlots.slice(i, i + 2));
+        }
+
+        for (const batch of slotBatches) {
+          const blockResults = await Promise.all(batch.map(processSlot));
           
-          const { slot, block } = result;
-          
-          // Add block event
-          const blockEvent: BlockchainEvent = {
-            type: 'block',
-            timestamp: Date.now(),
-            data: {
-              slot,
-              blockhash: block.blockhash,
-              previousBlockhash: block.previousBlockhash,
-              parentSlot: block.parentSlot,
-              transactions: block.transactions?.length || 0
-            }
-          };
-          
-          addEvent(blockEvent);
-          
-          // Process transactions
-          if (block.transactions) {
-            for (const tx of block.transactions.slice(0, 10)) {
-              if (!tx.transaction || !tx.meta) continue;
+          for (const result of blockResults) {
+            if (!result?.block) continue;
+            
+            const { slot, block } = result;
+            
+            // Add block event
+            const blockEvent: BlockchainEvent = {
+              type: 'block',
+              timestamp: Date.now(),
+              data: {
+                slot,
+                blockhash: block.blockhash,
+                previousBlockhash: block.previousBlockhash,
+                parentSlot: block.parentSlot,
+                transactions: block.transactions?.length || 0
+              }
+            };
+            
+            addEvent(blockEvent);
+            
+            // Process transactions with limits
+            if (block.transactions) {
+              const maxTransactionsToProcess = 5; // Reduced from 10
+              const transactions = block.transactions.slice(0, maxTransactionsToProcess);
               
-              const signature = tx.transaction.signatures[0];
-              if (!signature) continue;
-              
-              const accountKeys = tx.transaction.message.accountKeys?.map(key => key.toString()) || [];
-              
-              const isVoteTransaction = accountKeys.some(key => key === 'Vote111111111111111111111111111111111111111');
-              const isSystemOnly = accountKeys.every(key => SYSTEM_PROGRAMS.has(key) || key.startsWith('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA'));
-              
-              if (isVoteTransaction || isSystemOnly) continue;
-              
-              const logs = tx.meta.logMessages || [];
-              const isSplTransfer = logs.some(log => 
-                log.includes('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA') ||
-                log.includes('Program log: Instruction: Transfer')
-              );
-              
-              const hasCustomProgram = accountKeys.some(key => 
-                !SYSTEM_PROGRAMS.has(key) && 
-                !key.startsWith('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA')
-              );
-              
-              if (!isSplTransfer && !hasCustomProgram) continue;
-              
-              const transactionEvent: BlockchainEvent = {
-                type: 'transaction',
-                timestamp: Date.now(),
-                data: {
-                  signature,
-                  slot,
-                  fee: tx.meta.fee,
-                  err: tx.meta.err,
-                  logs: logs,
-                  knownProgram: identifyKnownProgram(accountKeys),
-                  transactionType: classifyTransaction(logs, accountKeys),
-                  accountKeys: accountKeys.slice(0, 5)
+              for (const tx of transactions) {
+                if (!tx.transaction || !tx.meta) continue;
+                
+                const signature = tx.transaction.signatures[0];
+                if (!signature) continue;
+                
+                const accountKeys = tx.transaction.message.accountKeys?.map(key => key.toString()) || [];
+                
+                const isVoteTransaction = accountKeys.some(key => key === 'Vote111111111111111111111111111111111111111');
+                const isSystemOnly = accountKeys.every(key => SYSTEM_PROGRAMS.has(key) || key.startsWith('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA'));
+                
+                if (isVoteTransaction || isSystemOnly) continue;
+                
+                const logs = tx.meta.logMessages || [];
+                const isSplTransfer = logs.some(log => 
+                  log.includes('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA') ||
+                  log.includes('Program log: Instruction: Transfer')
+                );
+                
+                const hasCustomProgram = accountKeys.some(key => 
+                  !SYSTEM_PROGRAMS.has(key) && 
+                  !key.startsWith('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA')
+                );
+                
+                if (!isSplTransfer && !hasCustomProgram) continue;
+                
+                const transactionEvent: BlockchainEvent = {
+                  type: 'transaction',
+                  timestamp: Date.now(),
+                  data: {
+                    signature,
+                    slot,
+                    fee: tx.meta.fee,
+                    err: tx.meta.err,
+                    logs: logs.slice(0, 5), // Limit log entries
+                    knownProgram: identifyKnownProgram(accountKeys),
+                    transactionType: classifyTransaction(logs, accountKeys),
+                    accountKeys: accountKeys.slice(0, 3) // Reduced from 5
+                  }
+                };
+                
+                addEvent(transactionEvent);
+                
+                // Only process 1 in 20 events for anomalies (reduced from 1 in 10)
+                if (Math.random() < 0.05) {
+                  processEventForAnomaliesThrottled(transactionEvent);
                 }
-              };
-              
-              addEvent(transactionEvent);
-              processEventForAnomalies(transactionEvent);
+              }
             }
           }
         }
         
         setLastSlot(currentSlot);
       }
+      
+      performanceTracker.markEnd('fetch-events');
     } catch (error) {
       console.error('Failed to fetch realtime events:', error);
     }
-  }, [lastSlot, isConnected]);
+  }, [lastSlot, isConnected, addEvent]), 1000); // Throttle to max once per second
 
   const identifyKnownProgram = useCallback((accountKeys: string[]): string | null => {
     for (const [programName, programIds] of Object.entries(KNOWN_PROGRAMS)) {
@@ -257,16 +439,9 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
     return 'other';
   }, []);
 
-  const addEvent = useCallback((event: BlockchainEvent) => {
-    eventQueue.enqueue(event);
-    setEvents(eventQueue.getAll());
-    eventCountRef.current = eventQueue.size();
-  }, [eventQueue]);
-
-  const processEventForAnomalies = useCallback(async (event: BlockchainEvent) => {
+  // Throttled anomaly processing
+  const processEventForAnomaliesThrottled = useThrottle(useCallback(async (event: BlockchainEvent) => {
     try {
-      if (Math.random() > 0.1) return;
-      
       const response = await fetch('/api/anomaly', {
         method: 'POST',
         headers: {
@@ -285,7 +460,7 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
     } catch (error) {
       console.error('Failed to analyze event for anomalies:', error);
     }
-  }, []);
+  }, []), 2000); // Throttle anomaly processing to max every 2 seconds
 
   const disconnect = useCallback(() => {
     if (connectionRef.current) {
@@ -297,7 +472,7 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
     console.log('Disconnected from Solana monitoring');
   }, [disconnectSSE]);
 
-  // Effects
+  // Effects with performance optimization
   useEffect(() => {
     connectToSolana();
     return () => {
@@ -308,9 +483,10 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
   useEffect(() => {
     if (!isConnected || !autoRefresh) return;
     
+    // Increased interval for better performance
     const interval = setInterval(() => {
       fetchRealtimeEvents();
-    }, refreshInterval);
+    }, Math.max(refreshInterval, 2000)); // Minimum 2 second interval
     
     fetchRealtimeEvents();
     
@@ -323,20 +499,32 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
     let interval: NodeJS.Timeout;
     
     if (autoRefresh) {
+      // Reduced frequency for anomaly stats
       interval = setInterval(() => {
-        fetchAnomalyStats();
-      }, 60000);
+        fetchAnomalyStatsThrottled();
+      }, 120000); // Every 2 minutes instead of 1
     }
     
-    fetchAnomalyStats();
+    fetchAnomalyStatsThrottled();
     
     return () => {
       if (interval) clearInterval(interval);
     };
   }, [autoRefresh]);
 
-  // Apply filters with memoization
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (batchTimeoutRef.current) {
+        clearTimeout(batchTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Optimized filtering with better memoization
   const filteredEvents = useMemo(() => {
+    performanceTracker.markStart('filter-events');
+    
     const now = Date.now();
     let timeThreshold = 0;
     
@@ -347,7 +535,13 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
       default: timeThreshold = 0;
     }
     
-    return events.filter(event => {
+    // Limit the number of events to process for performance
+    const maxEventsToFilter = 1000;
+    const eventsToFilter = events.length > maxEventsToFilter 
+      ? events.slice(-maxEventsToFilter) 
+      : events;
+    
+    const filtered = eventsToFilter.filter(event => {
       if (timeThreshold > 0 && event.timestamp < timeThreshold) return false;
       
       if (!filters.showTransactions && event.type === 'transaction') return false;
@@ -380,9 +574,21 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
       
       return true;
     });
+
+    const filterTime = performanceTracker.markEnd('filter-events');
+    
+    // Update performance metrics
+    startTransition(() => {
+      setPerformanceMetrics(prev => ({
+        ...prev,
+        renderTime: filterTime
+      }));
+    });
+    
+    return filtered;
   }, [events, filters]);
 
-  // Event counts for UI
+  // Event counts for UI (memoized with shallow comparison)
   const eventCounts = useMemo(() => {
     const counts = {
       transactions: 0,
@@ -391,18 +597,37 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
       total: filteredEvents.length
     };
     
-    filteredEvents.forEach(event => {
-      switch (event.type) {
-        case 'transaction': counts.transactions++; break;
-        case 'block': counts.blocks++; break;
-        case 'account_change': counts.accountChanges++; break;
-      }
-    });
+    // Only count if we have a reasonable number of events
+    if (filteredEvents.length <= 1000) {
+      filteredEvents.forEach(event => {
+        switch (event.type) {
+          case 'transaction': counts.transactions++; break;
+          case 'block': counts.blocks++; break;
+          case 'account_change': counts.accountChanges++; break;
+        }
+      });
+    } else {
+      // Estimate for large datasets
+      const sample = filteredEvents.slice(0, 100);
+      const ratio = filteredEvents.length / 100;
+      
+      sample.forEach(event => {
+        switch (event.type) {
+          case 'transaction': counts.transactions += ratio; break;
+          case 'block': counts.blocks += ratio; break;
+          case 'account_change': counts.accountChanges += ratio; break;
+        }
+      });
+      
+      counts.transactions = Math.round(counts.transactions);
+      counts.blocks = Math.round(counts.blocks);
+      counts.accountChanges = Math.round(counts.accountChanges);
+    }
     
     return counts;
   }, [filteredEvents]);
 
-  const fetchAnomalyStats = useCallback(async () => {
+  const fetchAnomalyStatsThrottled = useThrottle(useCallback(async () => {
     try {
       const statsResponse = await fetch('/api/anomaly?action=stats');
       if (statsResponse.ok) {
@@ -414,7 +639,7 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
     } catch (error) {
       console.error('Failed to fetch anomaly stats:', error);
     }
-  }, []);
+  }, []), 30000); // Throttle to max every 30 seconds
 
   const getSeverityColor = useCallback((severity: string) => {
     switch (severity) {
@@ -487,7 +712,7 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
         </button>
       </div>
 
-      {/* Compact Status Bar */}
+      {/* Compact Status Bar with Performance Metrics */}
       <Card className="p-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-6">
@@ -517,6 +742,11 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
                 Slot: {lastSlot.toLocaleString()}
               </div>
             )}
+            {performanceMetrics.memoryUsage && (
+              <div className="text-xs text-muted-foreground">
+                RAM: {performanceMetrics.memoryUsage.used}MB
+              </div>
+            )}
           </div>
           <div className="flex space-x-2">
             <button
@@ -540,6 +770,20 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
             </button>
           </div>
         </div>
+        
+        {/* Performance Metrics Bar */}
+        {performanceMetrics.memoryUsage && (
+          <div className="mt-2 pt-2 border-t border-border">
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <div>Performance Metrics:</div>
+              <div className="flex space-x-4">
+                <span>Memory: {performanceMetrics.memoryUsage.used}/{performanceMetrics.memoryUsage.limit}MB</span>
+                <span>Filter: {performanceMetrics.renderTime.toFixed(1)}ms</span>
+                <span>Processing: {performanceMetrics.eventProcessingTime.toFixed(1)}ms</span>
+              </div>
+            </div>
+          </div>
+        )}
       </Card>
 
       {/* Main Grid Layout */}

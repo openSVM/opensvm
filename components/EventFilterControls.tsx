@@ -1,11 +1,12 @@
 /**
  * Event Filter Controls Component
  * Provides filtering options for blockchain events
+ * Optimized for performance with memoization
  */
 
 'use client';
 
-import React from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { Card } from '@/components/ui/card';
 
 export interface EventFilters {
@@ -39,15 +40,19 @@ interface EventFilterControlsProps {
   };
 }
 
-export function EventFilterControls({ filters, onFiltersChange, eventCounts }: EventFilterControlsProps) {
-  const updateFilter = (key: keyof EventFilters, value: any) => {
+export const EventFilterControls = React.memo(function EventFilterControls({ 
+  filters, 
+  onFiltersChange, 
+  eventCounts 
+}: EventFilterControlsProps) {
+  const updateFilter = useCallback((key: keyof EventFilters, value: any) => {
     onFiltersChange({
       ...filters,
       [key]: value
     });
-  };
+  }, [filters, onFiltersChange]);
 
-  const updateKnownProgram = (program: keyof EventFilters['showKnownPrograms'], value: boolean) => {
+  const updateKnownProgram = useCallback((program: keyof EventFilters['showKnownPrograms'], value: boolean) => {
     onFiltersChange({
       ...filters,
       showKnownPrograms: {
@@ -55,9 +60,17 @@ export function EventFilterControls({ filters, onFiltersChange, eventCounts }: E
         [program]: value
       }
     });
-  };
+  }, [filters, onFiltersChange]);
 
-  const resetFilters = () => {
+  // Memoize expensive calculations
+  const filterStats = useMemo(() => ({
+    activeFilters: Object.values(filters).filter(v => 
+      typeof v === 'boolean' ? v : true
+    ).length,
+    programFilters: Object.values(filters.showKnownPrograms).filter(Boolean).length
+  }), [filters]);
+
+  const resetFilters = useCallback(() => {
     onFiltersChange({
       showTransactions: true,
       showBlocks: true,
@@ -77,7 +90,7 @@ export function EventFilterControls({ filters, onFiltersChange, eventCounts }: E
       maxFee: 1000000000, // 1 SOL in lamports
       timeRange: 'all'
     });
-  };
+  }, [onFiltersChange]);
 
   return (
     <Card className="p-4 space-y-4">
@@ -308,4 +321,4 @@ export function EventFilterControls({ filters, onFiltersChange, eventCounts }: E
       </div>
     </Card>
   );
-}
+});
