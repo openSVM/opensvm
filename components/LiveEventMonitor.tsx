@@ -768,13 +768,11 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
               {isPaused ? 'Resume' : 'Pause'}
             </button>
             <button
-              onClick={wsConnected ? disconnectWebSocket : connectWebSocket}
+              onClick={sseConnected ? disconnectSSE : connectSSE}
               className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600"
-              disabled={connectionStatus === 'connecting' || connectionStatus === 'authenticating'}
+              disabled={!sseConnected && sseError}
             >
-              {connectionStatus === 'connecting' ? 'Connecting...' : 
-               connectionStatus === 'authenticating' ? 'Authenticating...' :
-               wsConnected ? 'Disconnect' : 'Connect'}
+              {sseError ? 'Error' : sseConnected ? 'Disconnect' : 'Connect'}
             </button>
             <button
               onClick={clearAlerts}
