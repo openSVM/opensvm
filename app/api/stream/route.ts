@@ -285,59 +285,57 @@ class EventStreamManager {
         'all',
         async (logs, context) => {
           if (logs.signature) {
+            // Skip obvious vote transactions early to reduce processing load
+            const isVoteTransaction = logs.logs?.some(log => log.includes('Vote111111111111111111111111111111111111111'));
+            if (isVoteTransaction) {
+              return;
+            }
+            
+            let txDetails = null;
             try {
-              // Fetch transaction details to get fee information and analyze programs
-              const txDetails = await this.connection!.getTransaction(logs.signature, {
+              // Try to fetch transaction details, but don't fail the whole event if this fails
+              txDetails = await this.connection!.getTransaction(logs.signature, {
                 commitment: 'confirmed',
                 maxSupportedTransactionVersion: 0
               });
-
-              // Filter out only obvious vote transactions, but be less aggressive
-              if (txDetails?.transaction?.message) {
-                const accountKeys = txDetails.transaction.message.accountKeys?.map(key => key.toString()) || [];
-                
-                // Only skip obvious vote transactions to reduce noise
-                const isVoteTransaction = logs.logs?.some(log => log.includes('Vote111111111111111111111111111111111111111'));
-                
-                // Skip vote transactions but allow most other transactions through
-                if (isVoteTransaction) {
-                  return;
-                }
-
-                // Allow more transaction types through - only filter out pure system program transactions
-                const isPureSystemTransaction = accountKeys.length > 0 && accountKeys.every(key => 
-                  SYSTEM_PROGRAMS.has(key) && 
-                  !key.includes('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA')
-                );
-
-                // Only skip pure system transactions (those with only system program accounts)
-                if (isPureSystemTransaction) {
-                  return;
-                }
-              }
-              
-              const event = {
-                type: 'transaction' as const,
-                timestamp: Date.now(),
-                data: {
-                  signature: logs.signature,
-                  slot: context.slot,
-                  logs: logs.logs,
-                  err: logs.err,
-                  fee: txDetails?.meta?.fee || null,
-                  preBalances: txDetails?.meta?.preBalances || [],
-                  postBalances: txDetails?.meta?.postBalances || [],
-                  accountKeys: txDetails?.transaction?.message?.accountKeys?.map(key => key.toString()) || [],
-                  knownProgram: this.identifyKnownProgram(txDetails?.transaction?.message?.accountKeys?.map(key => key.toString()) || []),
-                  transactionType: this.classifyTransaction(logs.logs || [], txDetails?.transaction?.message?.accountKeys?.map(key => key.toString()) || [])
-                }
-              };
-              this.broadcastEvent(event);
             } catch (fetchError) {
-              // If we can't fetch transaction details, skip this transaction
+              // Log error but continue processing with just the logs data
               console.warn(`Failed to fetch transaction details for ${logs.signature}:`, fetchError);
-              return;
             }
+
+            // Create event with available data (whether we got tx details or not)
+            const accountKeys = txDetails?.transaction?.message?.accountKeys?.map(key => key.toString()) || [];
+            
+            // Only filter out pure system transactions if we have account keys
+            if (accountKeys.length > 0) {
+              const isPureSystemTransaction = accountKeys.every(key => 
+                SYSTEM_PROGRAMS.has(key) && 
+                !key.includes('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA')
+              );
+              
+              // Skip pure system transactions
+              if (isPureSystemTransaction) {
+                return;
+              }
+            }
+            
+            const event = {
+              type: 'transaction' as const,
+              timestamp: Date.now(),
+              data: {
+                signature: logs.signature,
+                slot: context.slot,
+                logs: logs.logs,
+                err: logs.err,
+                fee: txDetails?.meta?.fee || null,
+                preBalances: txDetails?.meta?.preBalances || [],
+                postBalances: txDetails?.meta?.postBalances || [],
+                accountKeys: accountKeys,
+                knownProgram: this.identifyKnownProgram(accountKeys),
+                transactionType: this.classifyTransaction(logs.logs || [], accountKeys)
+              }
+            };
+            this.broadcastEvent(event);
           }
         },
         'confirmed'

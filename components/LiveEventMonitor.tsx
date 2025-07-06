@@ -11,6 +11,7 @@ import { PumpStatistics } from './PumpStatistics';
 import { EventFilterControls, EventFilters } from './EventFilterControls';
 import { SimpleEventTable } from './SimpleEventTable';
 import { VirtualTableErrorBoundary } from './VirtualTableErrorBoundary';
+import { AnomalyAlertsTable } from './AnomalyAlertsTable';
 
 // Performance monitoring utilities
 const performanceTracker = {
@@ -649,7 +650,7 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
       const url = `/tx/${event.data.signature}`;
       window.open(url, '_blank', 'noopener,noreferrer');
     } else if (event.type === 'block' && event.data?.slot) {
-      const url = `https://explorer.solana.com/block/${event.data.slot}`;
+      const url = `/block/${event.data.slot}`;
       window.open(url, '_blank', 'noopener,noreferrer');
     }
   }, []);
@@ -823,9 +824,9 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
       </Card>
 
       {/* Main Grid Layout */}
-      <div className="grid grid-cols-1 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 xl:grid-cols-4 gap-4 h-[calc(100vh-300px)]">
         {/* Left Sidebar - Compact */}
-        <div className="xl:col-span-1 space-y-4">
+        <div className="xl:col-span-1 space-y-4 overflow-y-auto">
           <PumpStatistics events={filteredEvents} />
           <EventFilterControls 
             filters={filters}
@@ -869,10 +870,10 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
           </Card>
         </div>
 
-        {/* Main Content - Optimized */}
-        <div className="xl:col-span-3 space-y-4">
-          {/* Live Events Table */}
-          <Card className="p-4">
+        {/* Main Content - Events and Anomalies */}
+        <div className="xl:col-span-3 flex flex-col h-full">
+          {/* Live Events Table - Fixed Height */}
+          <Card className="p-4 mb-4 flex-shrink-0">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold">Live Events</h3>
               <div className="text-sm text-muted-foreground">
@@ -884,14 +885,14 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
                 events={filteredEvents}
                 onEventClick={handleEventClick}
                 onAddressClick={handleAddressClick}
-                height={600}
+                height={400}
               />
             </VirtualTableErrorBoundary>
           </Card>
 
-          {/* Extended Anomaly Alerts - Under Main Table */}
-          <Card className="p-4">
-            <div className="flex items-center justify-between mb-4">
+          {/* All Anomaly Alerts - Takes Remaining Height */}
+          <Card className="p-4 flex-1 flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between mb-4 flex-shrink-0">
               <h3 className="text-lg font-semibold">
                 All Anomaly Alerts
                 {sseConnected && <span className="text-xs text-green-600 ml-2">(Live)</span>}
@@ -900,31 +901,7 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
                 {alerts.length} total alerts
               </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-64 overflow-y-auto">
-              {alerts.map((alert) => (
-                <div key={alert.id} className="p-3 border rounded transition-all duration-200 hover:shadow-md">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className={`px-2 py-1 text-xs rounded ${getSeverityColor(alert.severity)}`}>
-                      {alert.severity.toUpperCase()}
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      {new Date(alert.timestamp).toLocaleTimeString()}
-                    </span>
-                  </div>
-                  <div className="text-sm font-medium mb-1">
-                    {alert.type.replace(/_/g, ' ').toUpperCase()}
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    {alert.description}
-                  </div>
-                </div>
-              ))}
-              {alerts.length === 0 && (
-                <div className="col-span-full text-center text-muted-foreground py-8">
-                  No anomalies detected. System is monitoring for suspicious activity.
-                </div>
-              )}
-            </div>
+            <AnomalyAlertsTable alerts={alerts} />
           </Card>
         </div>
       </div>
