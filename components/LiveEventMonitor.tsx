@@ -9,7 +9,7 @@ import { FIFOQueue } from '@/lib/utils/fifo-queue';
 import { TransactionTooltip } from './TransactionTooltip';
 import { PumpStatistics } from './PumpStatistics';
 import { EventFilterControls, EventFilters } from './EventFilterControls';
-import { VirtualEventTable } from './VirtualEventTable';
+import { SimpleEventTable } from './SimpleEventTable';
 import { VirtualTableErrorBoundary } from './VirtualTableErrorBoundary';
 
 // Performance monitoring utilities
@@ -817,7 +817,7 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
         {/* Fullscreen Content */}
         <div className="flex-1 p-4 overflow-hidden">
           <VirtualTableErrorBoundary>
-            <VirtualEventTable 
+            <SimpleEventTable 
               events={filteredEvents}
               onEventClick={handleEventClick}
               onAddressClick={handleAddressClick}
@@ -995,11 +995,11 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold">Live Events</h3>
               <div className="text-sm text-muted-foreground">
-                {filteredEvents.length} events • Virtual table
+                {filteredEvents.length} events • Simple table
               </div>
             </div>
             <VirtualTableErrorBoundary>
-              <VirtualEventTable 
+              <SimpleEventTable 
                 events={filteredEvents}
                 onEventClick={handleEventClick}
                 onAddressClick={handleAddressClick}

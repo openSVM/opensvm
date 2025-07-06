@@ -6,7 +6,11 @@
 
 export class SSEManager {
   private static instance: SSEManager;
-  private clients = new Map<string, { response: Response; writer: WritableStreamDefaultWriter; lastActivity: number }>();
+  private clients = new Map<string, { 
+    response: Response; 
+    writer: ReadableStreamDefaultController<Uint8Array>; 
+    lastActivity: number 
+  }>();
   private alertBuffer = new Map<string, any[]>(); // Buffer alerts for each client
 
   static getInstance(): SSEManager {
@@ -23,7 +27,7 @@ export class SSEManager {
     let controller: ReadableStreamDefaultController<Uint8Array>;
     
     // Create SSE response stream
-    const stream = new ReadableStream({
+    const stream = new ReadableStream<Uint8Array>({
       start: (ctrl) => {
         controller = ctrl;
         
@@ -33,7 +37,7 @@ export class SSEManager {
         // Store client with writer
         this.clients.set(clientId, {
           response: null as any, // Will be set later
-          writer: controller as any,
+          writer: controller,
           lastActivity: Date.now()
         });
 
@@ -73,7 +77,7 @@ export class SSEManager {
     const client = this.clients.get(clientId);
     if (client) {
       try {
-        if (client.writer && typeof client.writer.close === 'function') {
+        if (client.writer) {
           client.writer.close();
         }
       } catch (error) {
