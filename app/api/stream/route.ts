@@ -11,8 +11,11 @@ import {
   CommonErrors, 
   ErrorCodes 
 } from '@/lib/api-response';
+import { generateSecureAuthToken, generateSecureClientId } from '@/lib/crypto-utils';
+import { createLogger } from '@/lib/debug-logger';
 
-// Input validation schemas
+// Enhanced logger for stream API
+const logger = createLogger('STREAM_API');
 interface StreamRequestBody {
   action: string;
   clientId?: string;
@@ -51,7 +54,7 @@ function parseAndValidateRequest(body: any): StreamRequestBody | null {
     
     return { action, clientId, eventTypes, authToken };
   } catch (error) {
-    console.error('Failed to parse request body:', error);
+    logger.error('Failed to parse request body:', error);
     return null;
   }
 }
@@ -86,14 +89,14 @@ function startTokenCleanupWorker(): void {
     cleanupOldAuthFailures();
   }, 5 * 60 * 1000); // 5 minutes
   
-  console.log('Token cleanup worker started');
+  logger.debug('Token cleanup worker started');
 }
 
 function stopTokenCleanupWorker(): void {
   if (tokenCleanupInterval) {
     clearInterval(tokenCleanupInterval);
     tokenCleanupInterval = null;
-    console.log('Token cleanup worker stopped');
+    logger.debug('Token cleanup worker stopped');
   }
 }
 
@@ -112,7 +115,7 @@ function cleanupExpiredTokens(): void {
   });
   
   if (expiredTokens.length > 0) {
-    console.log(`Cleaned up ${expiredTokens.length} expired tokens`);
+    logger.debug(`Cleaned up ${expiredTokens.length} expired tokens`);
   }
 }
 
@@ -132,7 +135,7 @@ function cleanupOldAuthFailures(): void {
   });
   
   if (staleFailures.length > 0) {
-    console.log(`Cleaned up ${staleFailures.length} stale auth failure records`);
+    logger.debug(`Cleaned up ${staleFailures.length} stale auth failure records`);
   }
 }
 
@@ -140,7 +143,7 @@ function cleanupOldAuthFailures(): void {
 startTokenCleanupWorker();
 
 function generateAuthToken(): string {
-  return Math.random().toString(36).substring(2) + Date.now().toString(36);
+  return generateSecureAuthToken();
 }
 
 function validateAuthToken(clientId: string, token: string): boolean {
@@ -181,8 +184,8 @@ function logAuthFailure(clientId: string, reason: string): void {
     failures.blockUntil = now + (60 * 60 * 1000); // Block for 1 hour
     
     // Escalate repeated auth failures to console with higher severity
-    console.error(`[AUTH FAILURE - CRITICAL] Client ${clientId} BLOCKED until ${new Date(failures.blockUntil).toISOString()}: ${reason}`);
-    console.error(`[SECURITY ALERT] Client ${clientId} has made ${failures.attempts} failed authentication attempts`);
+    logger.error(`[AUTH FAILURE - CRITICAL] Client ${clientId} BLOCKED until ${new Date(failures.blockUntil).toISOString()}: ${reason}`);
+    logger.error(`[SECURITY ALERT] Client ${clientId} has made ${failures.attempts} failed authentication attempts`);
     
     // Could integrate with monitoring systems here:
     // - Send alert to security team
@@ -191,10 +194,10 @@ function logAuthFailure(clientId: string, reason: string): void {
     
   } else if (failures.attempts >= 3) {
     // Warning level for 3+ attempts
-    console.warn(`[AUTH FAILURE - WARNING] Client ${clientId}: ${reason} (attempts: ${failures.attempts}/5)`);
+    logger.warn(`[AUTH FAILURE - WARNING] Client ${clientId}: ${reason} (attempts: ${failures.attempts}/5)`);
   } else {
     // Info level for initial attempts
-    console.log(`[AUTH FAILURE] Client ${clientId}: ${reason} (attempts: ${failures.attempts})`);
+    logger.debug(`[AUTH FAILURE] Client ${clientId}: ${reason} (attempts: ${failures.attempts})`);
   }
   
   AUTH_FAILURES.set(clientId, failures);
@@ -212,7 +215,7 @@ function isClientBlocked(clientId: string): boolean {
     failures.attempts = 0;
     failures.blockUntil = null;
     AUTH_FAILURES.set(clientId, failures);
-    console.log(`[AUTH] Client ${clientId} automatically unblocked after timeout`);
+    logger.debug(`[AUTH] Client ${clientId} automatically unblocked after timeout`);
     return false;
   }
   
@@ -259,7 +262,7 @@ class EventStreamManager {
 
   public async addClient(client: StreamClient): Promise<void> {
     this.clients.set(client.id, client);
-    console.log(`Client ${client.id} connected. Total clients: ${this.clients.size}`);
+    logger.debug(`Client ${client.id} connected. Total clients: ${this.clients.size}`);
     
     if (!this.isMonitoring) {
       await this.startMonitoring();
@@ -290,7 +293,7 @@ class EventStreamManager {
       this.clients.delete(clientId);
       CLIENT_AUTH_TOKENS.delete(clientId);
       AUTH_FAILURES.delete(clientId);
-      console.log(`Client ${clientId} disconnected. Total clients: ${this.clients.size}`);
+      logger.debug(`Client ${clientId} disconnected. Total clients: ${this.clients.size}`);
       
       if (this.clients.size === 0) {
         this.stopMonitoring();
@@ -333,9 +336,9 @@ class EventStreamManager {
       // Setup transaction monitoring with error protection
       await this.setupTransactionMonitoring();
       
-      console.log('Started blockchain event monitoring with anomaly detection');
+      logger.debug('Started blockchain event monitoring with anomaly detection');
     } catch (error) {
-      console.error('Failed to start monitoring:', error);
+      logger.error('Failed to start monitoring:', error);
       this.isMonitoring = false;
       this.recordSubscriptionError('monitoring', error);
     }
@@ -349,7 +352,7 @@ class EventStreamManager {
     try {
       // Check if already subscribed
       if (this.subscriptionIds.has(subscriptionKey)) {
-        console.log(`Already subscribed to ${subscriptionKey}, skipping duplicate subscription`);
+        logger.debug(`Already subscribed to ${subscriptionKey}, skipping duplicate subscription`);
         return;
       }
 
@@ -361,10 +364,10 @@ class EventStreamManager {
       const subscriptionId = subscribeFunction();
       this.subscriptionIds.set(subscriptionKey, subscriptionId);
       
-      console.log(`Successfully subscribed to ${subscriptionKey} (ID: ${subscriptionId})`);
+      logger.debug(`Successfully subscribed to ${subscriptionKey} (ID: ${subscriptionId})`);
       
     } catch (error) {
-      console.error(`Failed to subscribe to ${subscriptionKey}:`, error);
+      logger.error(`Failed to subscribe to ${subscriptionKey}:`, error);
       this.recordSubscriptionError(subscriptionKey, error);
       throw error;
     }
@@ -377,7 +380,7 @@ class EventStreamManager {
     errorInfo.lastError = new Date();
     this.subscriptionErrors.set(subscriptionKey, errorInfo);
     
-    console.error(`Subscription error for ${subscriptionKey} (${errorInfo.count} total errors):`, error);
+    logger.error(`Subscription error for ${subscriptionKey} (${errorInfo.count} total errors):`, error);
   }
 
   private async setupTransactionMonitoring(): Promise<void> {
@@ -423,7 +426,7 @@ class EventStreamManager {
                 });
               } catch (fetchError) {
                 // Log error but continue processing with just the logs data
-                console.warn(`Failed to fetch transaction details for ${logs.signature}:`, fetchError);
+                logger.warn(`Failed to fetch transaction details for ${logs.signature}:`, fetchError);
               }
 
               // Create event with available data (whether we got tx details or not)
@@ -460,7 +463,7 @@ class EventStreamManager {
               };
               this.broadcastEvent(event);
             } catch (eventError) {
-              console.error('Error processing transaction event:', eventError);
+              logger.error('Error processing transaction event:', eventError);
             }
           }
         };
@@ -470,7 +473,7 @@ class EventStreamManager {
       });
       
     } catch (error) {
-      console.error('Failed to setup transaction monitoring:', error);
+      logger.error('Failed to setup transaction monitoring:', error);
       this.recordSubscriptionError('logs', error);
     }
   }
@@ -539,9 +542,9 @@ class EventStreamManager {
         } else if (type === 'logs') {
           this.connection.removeOnLogsListener(subscriptionId);
         }
-        console.log(`Successfully removed ${type} subscription (ID: ${subscriptionId})`);
+        logger.debug(`Successfully removed ${type} subscription (ID: ${subscriptionId})`);
       } catch (error) {
-        console.error(`Failed to remove ${type} subscription (ID: ${subscriptionId}):`, error);
+        logger.error(`Failed to remove ${type} subscription (ID: ${subscriptionId}):`, error);
         // Track failed removals for debugging
         this.recordSubscriptionError(`${type}_removal`, error);
       }
@@ -553,7 +556,7 @@ class EventStreamManager {
     this.isMonitoring = false;
     this.connection = null;
     
-    console.log('Stopped blockchain event monitoring');
+    logger.debug('Stopped blockchain event monitoring');
   }
 
   private broadcastEvent(event: BlockchainEvent): void {
@@ -570,7 +573,7 @@ class EventStreamManager {
           successCount++;
         }
       } catch (error) {
-        console.error(`Failed to send event to client ${clientId}:`, error);
+        logger.error(`Failed to send event to client ${clientId}:`, error);
         failureCount++;
         // Remove failed clients
         this.removeClient(clientId);
@@ -582,11 +585,11 @@ class EventStreamManager {
       const sseManager = SSEManager.getInstance();
       sseManager.broadcastBlockchainEvent(event);
     } catch (error) {
-      console.error('Failed to broadcast to SSE clients:', error);
+      logger.error('Failed to broadcast to SSE clients:', error);
     }
     
     if (failureCount > 0) {
-      console.warn(`Event broadcast: ${successCount} successful, ${failureCount} failed`);
+      logger.warn(`Event broadcast: ${successCount} successful, ${failureCount} failed`);
     }
   }
 
@@ -598,14 +601,14 @@ class EventStreamManager {
     
     // Check authentication
     if (!client.authenticated || (authToken && !validateAuthToken(clientId, authToken))) {
-      console.warn(`Unauthorized subscription attempt from client ${clientId}`);
+      logger.warn(`Unauthorized subscription attempt from client ${clientId}`);
       return false;
     }
     
     // Check rate limit
     const rateLimitResult = checkRateLimit(clientId, 'api_requests', 1);
     if (!rateLimitResult.allowed) {
-      console.warn(`Rate limit exceeded for client ${clientId}`);
+      logger.warn(`Rate limit exceeded for client ${clientId}`);
       return false;
     }
     
@@ -635,7 +638,7 @@ class EventStreamManager {
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const action = searchParams.get('action');
-  const clientId = searchParams.get('clientId') || `client_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  const clientId = searchParams.get('clientId') || generateSecureClientId();
   
   // Handle status request
   if (action === 'status') {
@@ -771,7 +774,7 @@ export async function POST(request: NextRequest) {
     try {
       requestBody = await request.json();
     } catch (jsonError) {
-      console.error('Invalid JSON in request:', jsonError);
+      logger.error('Invalid JSON in request:', jsonError);
       const { response, status } = CommonErrors.invalidJson(jsonError);
       return Response.json(response, { status });
     }
@@ -851,7 +854,7 @@ export async function POST(request: NextRequest) {
           AUTH_FAILURES.set(clientId, failures);
         }
         
-        console.log(`[AUTH SUCCESS] Client ${clientId} authenticated successfully`);
+        logger.debug(`[AUTH SUCCESS] Client ${clientId} authenticated successfully`);
         
         return Response.json(createSuccessResponse({ 
           authToken: token,
@@ -898,8 +901,8 @@ export async function POST(request: NextRequest) {
         // Create authenticated mock client for testing
         const mockClient = {
           id: clientId!,
-          send: (data: any) => console.log('Mock send:', data),
-          close: () => console.log('Mock close'),
+          send: (data: any) => logger.debug('Mock send:', data),
+          close: () => logger.debug('Mock close'),
           subscriptions: new Set(['transaction', 'block']),
           authenticated: false,
           connectionTime: Date.now(),
@@ -926,7 +929,7 @@ export async function POST(request: NextRequest) {
         return Response.json(response, { status });
     }
   } catch (error) {
-    console.error('Stream API error:', error);
+    logger.error('Stream API error:', error);
     const { response, status } = CommonErrors.internalError(error);
     return Response.json(response, { status });
   }

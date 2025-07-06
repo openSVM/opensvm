@@ -12,6 +12,11 @@ import { EventFilterControls, EventFilters } from './EventFilterControls';
 import { SimpleEventTable } from './SimpleEventTable';
 import { VirtualTableErrorBoundary } from './VirtualTableErrorBoundary';
 import { AnomalyAlertsTable } from './AnomalyAlertsTable';
+import { generateSecureClientId } from '@/lib/crypto-utils';
+import { createLogger } from '@/lib/debug-logger';
+
+// Enhanced logger for live event monitoring
+const logger = createLogger('LIVE_EVENT_MONITOR');
 
 // Performance monitoring utilities
 const performanceTracker = {
@@ -166,7 +171,7 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
   
   const connectionRef = useRef<any>(null);
   const eventCountRef = useRef(0);
-  const clientId = useRef(`client_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
+  const clientId = useRef(generateSecureClientId());
   const processingQueueRef = useRef<BlockchainEvent[]>([]);
   const lastMemoryCheck = useRef(0);
   const eventBatchRef = useRef<BlockchainEvent[]>([]);
@@ -185,7 +190,7 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
         
         // More aggressive memory management
         if (memory.used > memory.limit * 0.7) {
-          console.warn('High memory usage detected, forcing cleanup');
+          logger.warn('High memory usage detected, forcing cleanup');
           
           // Force garbage collection if available
           if (typeof window !== 'undefined' && 'gc' in window) {
@@ -250,7 +255,7 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
     if (!isMountedRef.current) return;
     
     // Log to debug what events we're receiving
-    console.log(`Received ${event.type} event:`, event.type === 'transaction' ? event.data?.signature : event.data?.slot);
+    logger.debug(`Received ${event.type} event:`, event.type === 'transaction' ? event.data?.signature : event.data?.slot);
     
     eventBatchRef.current.push(event);
     
@@ -277,7 +282,7 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
     const checkMemoryPressure = () => {
       const memory = performanceTracker.memoryUsage();
       if (memory && memory.used > memory.limit * 0.6) {
-        console.warn('Memory pressure detected, aggressive cleanup');
+        logger.warn('Memory pressure detected, aggressive cleanup');
         
         // Much more aggressive cleanup
         const reducedQueue = new FIFOQueue<BlockchainEvent>(Math.floor(maxEvents / 4));
@@ -325,11 +330,11 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
 
   // Stable callbacks for SSE hook to prevent reconnection loops
   const handleAlert = useCallback((alert: any) => {
-    console.log('Received real-time anomaly alert:', alert);
+    logger.debug('Received real-time anomaly alert:', alert);
   }, []);
 
   const handleStatusUpdate = useCallback((status: any) => {
-    console.log('System status update:', status);
+    logger.debug('System status update:', status);
   }, []);
 
   const handleBlockchainEvent = useCallback((event: BlockchainEvent) => {
@@ -338,7 +343,7 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
   }, [addEvent]);
 
   const handleError = useCallback((error: Error) => {
-    console.error('SSE error:', error);
+    logger.error('SSE error:', error);
     setConnectionError(error.message);
   }, []);
 
@@ -369,9 +374,9 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
     setIsConnected(sseConnected);
     if (sseConnected) {
       setConnectionError(null);
-      console.log('Connected to Solana RPC for real-time monitoring');
+      logger.debug('Connected to Solana RPC for real-time monitoring');
     } else {
-      console.log('Disconnected from Solana monitoring');
+      logger.debug('Disconnected from Solana monitoring');
     }
   }, [sseConnected]);
 
@@ -416,7 +421,7 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
 
       if (response.ok) {
         const result = await response.json();
-        console.log('Event analyzed for anomalies:', result);
+        logger.debug('Event analyzed for anomalies:', result);
       }
     } catch (error) {
       // Silently handle errors to avoid console spam
@@ -454,7 +459,7 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
       // Silently handle SSE disconnection errors
     }
     
-    console.log('Disconnected from Solana monitoring');
+    logger.debug('Disconnected from Solana monitoring');
   }, [disconnectSSE]);
 
   // Connection cleanup on unmount

@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { generateSecureTestSignature } from '../../lib/crypto-utils';
 
 test.describe('Blockchain Event Streaming and Anomaly Detection E2E', () => {
   test.beforeEach(async ({ page }) => {
@@ -94,7 +95,7 @@ test.describe('Blockchain Event Streaming and Anomaly Detection E2E', () => {
       type: 'transaction',
       timestamp: Date.now(),
       data: {
-        signature: 'test-signature-' + Math.random().toString(36).substring(7),
+        signature: generateSecureTestSignature('test-signature'),
         slot: 250000000,
         logs: ['Program log: Token mint: pump123...', 'Program log: Transfer executed'],
         err: null,
@@ -125,7 +126,7 @@ test.describe('Blockchain Event Streaming and Anomaly Detection E2E', () => {
       type: 'transaction',
       timestamp: Date.now(),
       data: {
-        signature: 'pump-test-signature-' + Math.random().toString(36).substring(7),
+        signature: generateSecureTestSignature('pump-test-signature'),
         slot: 250000000,
         logs: [
           'Program log: Token mint: 7pumpABC123...',
@@ -166,7 +167,7 @@ test.describe('Blockchain Event Streaming and Anomaly Detection E2E', () => {
       type: 'transaction',
       timestamp: Date.now(),
       data: {
-        signature: 'chan-test-signature-' + Math.random().toString(36).substring(7),
+        signature: generateSecureTestSignature('chan-test-signature'),
         slot: 250000000,
         logs: [
           'Program log: Token mint: 9chanXYZ789...',
@@ -200,7 +201,7 @@ test.describe('Blockchain Event Streaming and Anomaly Detection E2E', () => {
         type: 'transaction',
         timestamp: Date.now() - 1000,
         data: {
-          signature: 'bulk-test-1-' + Math.random().toString(36).substring(7),
+          signature: generateSecureTestSignature('bulk-test-1'),
           slot: 250000001,
           logs: ['Program log: Normal transfer'],
           err: null,
@@ -211,7 +212,7 @@ test.describe('Blockchain Event Streaming and Anomaly Detection E2E', () => {
         type: 'transaction',
         timestamp: Date.now(),
         data: {
-          signature: 'bulk-test-2-' + Math.random().toString(36).substring(7),
+          signature: generateSecureTestSignature('bulk-test-2'),
           slot: 250000002,
           logs: ['Program log: pump token mint detected'],
           err: null,
@@ -271,7 +272,7 @@ test.describe('Blockchain Event Streaming and Anomaly Detection E2E', () => {
   });
 
   test('should handle stream API rate limiting', async ({ page }) => {
-    const clientId = 'rate-limit-test-' + Math.random().toString(36).substring(7);
+    const clientId = generateSecureTestSignature('rate-limit-test');
     
     // First authenticate
     const authResponse = await page.request.post('/api/stream', {
