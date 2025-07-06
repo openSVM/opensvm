@@ -4,6 +4,7 @@ import { Connection, PublicKey } from '@solana/web3.js';
 import { getStreamingAnomalyDetector } from '@/lib/streaming-anomaly-detector';
 import { validateStreamRequest } from '@/lib/validation/stream-schemas';
 import { getRateLimiter, type RateLimitResult } from '@/lib/rate-limiter';
+import { SSEManager } from '@/lib/sse-manager';
 import { 
   createSuccessResponse, 
   createErrorResponse, 
@@ -433,6 +434,7 @@ class EventStreamManager {
     let successCount = 0;
     let failureCount = 0;
     
+    // Broadcast to WebSocket clients
     for (const [clientId, client] of this.clients) {
       try {
         // Check if client is subscribed to this event type
@@ -446,6 +448,14 @@ class EventStreamManager {
         // Remove failed clients
         this.removeClient(clientId);
       }
+    }
+    
+    // Also broadcast to SSE clients
+    try {
+      const sseManager = SSEManager.getInstance();
+      sseManager.broadcastBlockchainEvent(event);
+    } catch (error) {
+      console.error('Failed to broadcast to SSE clients:', error);
     }
     
     if (failureCount > 0) {

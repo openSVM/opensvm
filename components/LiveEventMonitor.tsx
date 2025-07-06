@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo, startTransition } from 'react';
 import { Card } from '@/components/ui/card';
-import { getConnection } from '@/lib/solana';
 import { useSSEAlerts } from '@/lib/hooks/useSSEAlerts';
+import { useWebSocketStream, BlockchainEvent } from '@/lib/hooks/useWebSocketStream';
 import { lamportsToSol } from '@/components/transaction-graph/utils';
 import { FIFOQueue } from '@/lib/utils/fifo-queue';
 import { TransactionTooltip } from './TransactionTooltip';
@@ -341,143 +341,40 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
     pumpswap: ['6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P'],
   };
 
-  // Connect to Solana blockchain
-  const connectToSolana = useCallback(async () => {
-    try {
-      setConnectionError(null);
-      connectionRef.current = await getConnection();
+  // Use WebSocket for real-time blockchain events
+  const {
+    events: wsEvents,
+    isConnected: wsConnected,
+    error: wsError,
+    connect: connectWebSocket,
+    disconnect: disconnectWebSocket,
+    clearEvents: clearWebSocketEvents,
+    connectionStatus
+  } = useWebSocketStream({
+    clientId: clientId.current,
+    autoConnect: true,
+    maxEvents: maxEvents,
+    eventTypes: ['transaction', 'block'],
+    onEvent: (event) => {
+      // Process event through our existing pipeline
+      addEvent(event);
+    },
+    onError: (error) => {
+      console.error('WebSocket error:', error);
+      setConnectionError(error.message);
+    },
+    onConnect: () => {
+      console.log('WebSocket connected for real-time monitoring');
       setIsConnected(true);
-      console.log('Connected to Solana RPC for real-time monitoring');
-      
-      const currentSlot = await connectionRef.current.getSlot();
-      setLastSlot(currentSlot);
-      
-    } catch (error) {
-      console.error('Failed to connect to Solana:', error);
-      setConnectionError(error instanceof Error ? error.message : 'Connection failed');
+      setConnectionError(null);
+    },
+    onDisconnect: () => {
+      console.log('WebSocket disconnected');
       setIsConnected(false);
     }
-  }, []);
+  });
 
-  // Ultra-throttled blockchain event fetching - much more aggressive
-  const fetchRealtimeEvents = useAggressiveThrottle(useCallback(async () => {
-    if (!connectionRef.current || !isConnected || isPaused) return;
-
-    try {
-      performanceTracker.markStart('fetch-events');
-      
-      const currentSlot = await connectionRef.current.getSlot();
-      
-      if (lastSlot && currentSlot > lastSlot) {
-        // Much more limited slot processing
-        const maxSlotsToProcess = 1; // Reduced from 3
-        const newSlots = [];
-        
-        for (let slot = lastSlot + 1; slot <= Math.min(lastSlot + maxSlotsToProcess, currentSlot); slot++) {
-          newSlots.push(slot);
-        }
-        
-        // Process slots one at a time
-        for (const slot of newSlots) {
-          try {
-            const block = await connectionRef.current.getBlock(slot, {
-              maxSupportedTransactionVersion: 0,
-              transactionDetails: 'accounts', // Reduced detail level
-              rewards: false
-            });
-            
-            if (!block) continue;
-            
-            // Add block event only occasionally
-            if (Math.random() < 0.2) { // Reduced from 0.3 to 0.2
-              const blockEvent: BlockchainEvent = {
-                type: 'block',
-                timestamp: Date.now(),
-                data: {
-                  slot,
-                  blockhash: block.blockhash,
-                  previousBlockhash: block.previousBlockhash,
-                  parentSlot: block.parentSlot,
-                  transactions: block.transactions?.length || 0
-                }
-              };
-              
-              addEvent(blockEvent);
-            }
-            
-            // Process very limited transactions
-            if (block.transactions) {
-              const maxTransactionsToProcess = 1; // Reduced from 2
-              const transactions = block.transactions.slice(0, maxTransactionsToProcess);
-              
-              for (const tx of transactions) {
-                if (!tx.transaction || !tx.meta) continue;
-                
-                const signature = tx.transaction.signatures[0];
-                if (!signature) continue;
-                
-                const accountKeys = tx.transaction.message.accountKeys?.map(key => key.toString()) || [];
-                
-                // More aggressive filtering
-                const isVoteTransaction = accountKeys.some(key => key === 'Vote111111111111111111111111111111111111111');
-                const isSystemOnly = accountKeys.every(key => SYSTEM_PROGRAMS.has(key) || key.startsWith('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA'));
-                
-                if (isVoteTransaction || isSystemOnly) continue;
-                
-                // Only process 1 in 100 transactions for better performance
-                if (Math.random() > 0.01) continue; // Reduced from 0.02
-                
-                const logs = tx.meta.logMessages || [];
-                const isSplTransfer = logs.some(log => 
-                  log.includes('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA') ||
-                  log.includes('Program log: Instruction: Transfer')
-                );
-                
-                const hasCustomProgram = accountKeys.some(key => 
-                  !SYSTEM_PROGRAMS.has(key) && 
-                  !key.startsWith('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA')
-                );
-                
-                if (!isSplTransfer && !hasCustomProgram) continue;
-                
-                const transactionEvent: BlockchainEvent = {
-                  type: 'transaction',
-                  timestamp: Date.now(),
-                  data: {
-                    signature,
-                    slot,
-                    fee: tx.meta.fee,
-                    err: tx.meta.err,
-                    logs: logs.slice(0, 2), // Further reduced
-                    knownProgram: identifyKnownProgram(accountKeys),
-                    transactionType: classifyTransaction(logs, accountKeys),
-                    accountKeys: accountKeys.slice(0, 3) // Slightly increased for clickability
-                  }
-                };
-                
-                addEvent(transactionEvent);
-                
-                // Almost never process for anomalies
-                if (Math.random() < 0.005) { // Reduced from 0.01
-                  processEventForAnomaliesThrottled(transactionEvent);
-                }
-              }
-            }
-          } catch (error) {
-            // Silently continue on errors to maintain performance
-            continue;
-          }
-        }
-        
-        setLastSlot(currentSlot);
-      }
-      
-      performanceTracker.markEnd('fetch-events');
-    } catch (error) {
-      console.error('Failed to fetch realtime events:', error);
-    }
-  }, [lastSlot, isConnected, addEvent, isPaused]), 5000); // Increased from 2000ms to 5000ms for much better performance
-
+  // Utility functions for event classification
   const identifyKnownProgram = useCallback((accountKeys: string[]): string | null => {
     for (const [programName, programIds] of Object.entries(KNOWN_PROGRAMS)) {
       if (programIds.some(id => accountKeys.includes(id))) {
@@ -485,7 +382,7 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
       }
     }
     return null;
-  }, []);
+  }, [KNOWN_PROGRAMS]);
 
   const classifyTransaction = useCallback((logs: string[], accountKeys: string[]): string => {
     if (logs.some(log => 
@@ -500,7 +397,7 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
     }
 
     return 'other';
-  }, []);
+  }, [SYSTEM_PROGRAMS]);
 
   // Ultra-throttled anomaly processing
   const processEventForAnomaliesThrottled = useAggressiveThrottle(useCallback(async (event: BlockchainEvent) => {
@@ -559,32 +456,12 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
     console.log('Disconnected from Solana monitoring');
   }, [disconnectSSE]);
 
-  // Effects with performance optimization
+  // Connection cleanup on unmount
   useEffect(() => {
-    connectToSolana();
     return () => {
       disconnect();
     };
-  }, [connectToSolana, disconnect]);
-
-  useEffect(() => {
-    if (!isConnected || !autoRefresh) return;
-    
-    // Much longer interval for better performance
-    const interval = setInterval(() => {
-      if (!isPaused) {
-        fetchRealtimeEvents();
-      }
-    }, Math.max(refreshInterval, 10000)); // Minimum 10 second interval, increased from 5
-    
-    if (!isPaused) {
-      fetchRealtimeEvents();
-    }
-    
-    return () => {
-      clearInterval(interval);
-    };
-  }, [isConnected, autoRefresh, refreshInterval, fetchRealtimeEvents, isPaused]);
+  }, [disconnect]);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -601,7 +478,7 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [autoRefresh]);
+  }, [autoRefresh, fetchAnomalyStatsThrottled]);
 
   // Cleanup on unmount with proper race condition prevention
   useEffect(() => {
@@ -698,7 +575,7 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
     });
     
     return filtered;
-  }, [events, filters]);
+  }, [events, filters, SYSTEM_PROGRAMS]);
 
   // Ultra-optimized event counts with sampling for large datasets
   const eventCounts = useMemo(() => {
@@ -905,11 +782,13 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
               {isPaused ? 'Resume' : 'Pause'}
             </button>
             <button
-              onClick={fetchRealtimeEvents}
+              onClick={wsConnected ? disconnectWebSocket : connectWebSocket}
               className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600"
-              disabled={!isConnected || isPaused}
+              disabled={connectionStatus === 'connecting' || connectionStatus === 'authenticating'}
             >
-              Refresh
+              {connectionStatus === 'connecting' ? 'Connecting...' : 
+               connectionStatus === 'authenticating' ? 'Authenticating...' :
+               wsConnected ? 'Disconnect' : 'Connect'}
             </button>
             <button
               onClick={clearAlerts}

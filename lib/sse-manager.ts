@@ -127,6 +127,37 @@ export class SSEManager {
   }
 
   /**
+   * Broadcast blockchain event to all connected clients
+   */
+  broadcastBlockchainEvent(event: any): void {
+    const eventData = {
+      ...event,
+      timestamp: Date.now()
+    };
+
+    let successCount = 0;
+    let failureCount = 0;
+
+    for (const [clientId, client] of this.clients.entries()) {
+      try {
+        // Send as both generic blockchain_event and specific event type
+        this.sendEvent(client.writer, 'blockchain_event', eventData);
+        this.sendEvent(client.writer, event.type, eventData.data);
+        client.lastActivity = Date.now();
+        successCount++;
+      } catch (error) {
+        console.error(`Failed to send blockchain event to SSE client ${clientId}:`, error);
+        this.removeClient(clientId);
+        failureCount++;
+      }
+    }
+
+    if (failureCount > 0) {
+      console.warn(`Blockchain event broadcast: ${successCount} successful, ${failureCount} failed`);
+    }
+  }
+
+  /**
    * Send system status updates
    */
   broadcastSystemStatus(status: any): void {
