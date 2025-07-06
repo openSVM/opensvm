@@ -509,9 +509,21 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
   }, []), 10000); // Increased from 2000ms to 10000ms
 
   const disconnect = useCallback(() => {
+    // Clear timeouts first to prevent any new operations
+    if (batchTimeoutRef.current) {
+      clearTimeout(batchTimeoutRef.current);
+      batchTimeoutRef.current = null;
+    }
+
+    // Clear connection safely
     if (connectionRef.current) {
       connectionRef.current = null;
     }
+
+    // Clear processing queues
+    eventBatchRef.current = [];
+    processingQueueRef.current = [];
+
     setIsConnected(false);
     setConnectionError(null);
     disconnectSSE();
@@ -561,11 +573,20 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
   // Cleanup on unmount
   useEffect(() => {
     return () => {
+      // Clear all timeouts first
       if (batchTimeoutRef.current) {
         clearTimeout(batchTimeoutRef.current);
+        batchTimeoutRef.current = null;
       }
+      
+      // Clear processing queues
+      eventBatchRef.current = [];
+      processingQueueRef.current = [];
+      
+      // Disconnect properly
+      disconnect();
     };
-  }, []);
+  }, [disconnect]);
 
   // Ultra-optimized filtering with aggressive memoization and performance limits
   const filteredEvents = useMemo(() => {

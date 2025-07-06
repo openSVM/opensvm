@@ -197,14 +197,15 @@ export const VirtualEventTable = React.memo(function VirtualEventTable({
   const initializeTable = useCallback(() => {
     if (!containerRef.current) return;
 
-    // Clean up existing table
+    // Clean up existing table with proper error handling
     if (tableInstanceRef.current) {
       try {
-        tableInstanceRef.current.release();
-      } catch (e) {
-        // Silently handle cleanup errors
+        const existingTable = tableInstanceRef.current;
+        tableInstanceRef.current = null; // Clear reference first to prevent race conditions
+        existingTable.release();
+      } catch (error) {
+        console.warn('Error releasing existing table:', error);
       }
-      tableInstanceRef.current = null;
     }
 
     try {
@@ -279,16 +280,23 @@ export const VirtualEventTable = React.memo(function VirtualEventTable({
       themeCache.clear();
     }
     
-    initializeTable();
+    // Use requestAnimationFrame to ensure DOM is ready
+    const initTimer = requestAnimationFrame(() => {
+      initializeTable();
+    });
     
     return () => {
+      cancelAnimationFrame(initTimer);
+      
+      // Safe cleanup with error handling
       if (tableInstanceRef.current) {
         try {
-          tableInstanceRef.current.release();
-        } catch (e) {
-          console.warn('Error releasing table on cleanup:', e);
+          const table = tableInstanceRef.current;
+          tableInstanceRef.current = null; // Clear reference first to prevent race conditions
+          table.release();
+        } catch (error) {
+          console.warn('Error releasing table on cleanup:', error);
         }
-        tableInstanceRef.current = null;
       }
     };
   }, [initializeTable]);

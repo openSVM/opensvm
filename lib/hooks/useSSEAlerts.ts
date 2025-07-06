@@ -61,8 +61,15 @@ export function useSSEAlerts(options: UseSSEAlertsOptions = {}): UseSSEAlertsRet
   const maxReconnectAttempts = 5;
 
   const connect = useCallback(() => {
+    // Safely close any existing connection first
     if (eventSourceRef.current) {
-      eventSourceRef.current.close();
+      try {
+        const existingEventSource = eventSourceRef.current;
+        eventSourceRef.current = null; // Clear reference first
+        existingEventSource.close();
+      } catch (error) {
+        console.warn('[SSE] Error closing existing EventSource:', error);
+      }
     }
 
     try {
@@ -149,14 +156,21 @@ export function useSSEAlerts(options: UseSSEAlertsOptions = {}): UseSSEAlertsRet
   const disconnect = useCallback(() => {
     console.log(`[SSE] Disconnecting client ${clientId}...`);
     
+    // Clear reconnection timeout first
     if (reconnectTimeoutRef.current) {
       clearTimeout(reconnectTimeoutRef.current);
       reconnectTimeoutRef.current = null;
     }
 
+    // Safely close EventSource with proper error handling
     if (eventSourceRef.current) {
-      eventSourceRef.current.close();
-      eventSourceRef.current = null;
+      try {
+        const eventSource = eventSourceRef.current;
+        eventSourceRef.current = null; // Clear reference first to prevent race conditions
+        eventSource.close();
+      } catch (error) {
+        console.warn('[SSE] Error during EventSource cleanup:', error);
+      }
     }
 
     setIsConnected(false);
@@ -177,13 +191,6 @@ export function useSSEAlerts(options: UseSSEAlertsOptions = {}): UseSSEAlertsRet
       disconnect();
     };
   }, [autoConnect, connect, disconnect]);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      disconnect();
-    };
-  }, [disconnect]);
 
   return {
     alerts,
