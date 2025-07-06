@@ -62,33 +62,46 @@ export const VirtualEventTable = React.memo(function VirtualEventTable({
     return colors;
   }, []);
 
-  // Transform events to table data format with memoization and performance optimization
+  // Ultra-optimized data transformation with aggressive limits and caching
   const tableData = useMemo(() => {
-    // Limit data processing for performance
-    const maxEventsToShow = 5000;
+    // Much more aggressive performance limits
+    const maxEventsToShow = 1000; // Reduced from 5000
     const eventsToProcess = events.length > maxEventsToShow 
       ? events.slice(-maxEventsToShow)
       : events;
     
-    return eventsToProcess.map((event, index) => ({
-      id: index,
-      type: event.type,
-      timestamp: new Date(event.timestamp).toLocaleTimeString(),
-      signature: event.type === 'transaction' ? event.data?.signature?.substring(0, 12) + '...' : '-',
-      fee: event.type === 'transaction' && event.data?.fee 
-        ? lamportsToSol(event.data.fee).toFixed(6) + ' SOL'
-        : '-',
-      status: event.type === 'transaction' 
-        ? (event.data?.err ? '❌ Failed' : '✅ Success')
-        : event.type === 'block' ? '📦 Block' : '🔄 Change',
-      program: event.data?.knownProgram || (event.data?.transactionType === 'spl-transfer' ? 'SPL' : 'Custom'),
-      slot: event.data?.slot || '-',
-      logs: event.data?.logs?.length || 0,
-      rawEvent: event // Store raw event for click handling
-    }));
+    // Use lightweight data transformation
+    return eventsToProcess.map((event, index) => {
+      const isTransaction = event.type === 'transaction';
+      const data = event.data || {};
+      
+      return {
+        id: index,
+        type: event.type,
+        timestamp: new Date(event.timestamp).toLocaleTimeString('en-US', { 
+          hour12: false,
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit'
+        }),
+        signature: isTransaction && data.signature 
+          ? data.signature.substring(0, 8) + '...' // Further shortened
+          : '-',
+        fee: isTransaction && data.fee 
+          ? lamportsToSol(data.fee).toFixed(4) + ' SOL' // Reduced precision
+          : '-',
+        status: isTransaction 
+          ? (data.err ? '❌' : '✅') // Simplified icons
+          : event.type === 'block' ? '📦' : '🔄',
+        program: data.knownProgram || (data.transactionType === 'spl-transfer' ? 'SPL' : 'Custom'),
+        slot: data.slot?.toString() || '-',
+        logs: data.logs?.length || 0,
+        rawEvent: event // Store raw event for click handling
+      };
+    });
   }, [events]);
 
-  // Stable columns configuration with memoization
+  // Ultra-optimized columns with reduced styling complexity
   const columnsConfig = useMemo(() => {
     const theme = getThemeColors();
     
@@ -96,56 +109,51 @@ export const VirtualEventTable = React.memo(function VirtualEventTable({
       {
         field: 'type',
         title: 'Type',
-        width: 80,
+        width: 60, // Reduced width
         style: {
-          color: (args: any) => {
-            switch (args.value) {
-              case 'transaction': return theme.primary;
-              case 'block': return theme.accent;
-              case 'account_change': return theme.secondary;
-              default: return theme.foreground;
-            }
-          },
+          color: theme.foreground,
           fontWeight: 'bold',
-          fontFamily: 'Berkeley Mono, monospace'
+          fontSize: 11,
+          fontFamily: 'monospace'
         }
       },
       {
         field: 'timestamp',
         title: 'Time',
-        width: 90,
+        width: 80, // Reduced width
         style: {
-          fontSize: 12,
+          fontSize: 10,
           color: theme.mutedForeground,
-          fontFamily: 'Berkeley Mono, monospace'
+          fontFamily: 'monospace'
         }
       },
       {
         field: 'signature',
-        title: 'Signature',
-        width: 120,
+        title: 'Sig',
+        width: 80, // Reduced width
         style: {
-          fontFamily: 'Berkeley Mono, monospace',
-          fontSize: 11,
+          fontFamily: 'monospace',
+          fontSize: 10,
           color: theme.foreground
         }
       },
       {
         field: 'status',
         title: 'Status',
-        width: 90,
+        width: 60, // Reduced width
         style: {
-          fontSize: 12,
-          fontFamily: 'Berkeley Mono, monospace'
+          fontSize: 11,
+          fontFamily: 'monospace',
+          textAlign: 'center'
         }
       },
       {
         field: 'fee',
         title: 'Fee',
-        width: 100,
+        width: 90, // Reduced width
         style: {
-          fontFamily: 'Berkeley Mono, monospace',
-          fontSize: 11,
+          fontFamily: 'monospace',
+          fontSize: 10,
           textAlign: 'right',
           color: theme.foreground
         }
@@ -153,32 +161,20 @@ export const VirtualEventTable = React.memo(function VirtualEventTable({
       {
         field: 'program',
         title: 'Program',
-        width: 80,
+        width: 70, // Reduced width
         style: {
-          fontSize: 11,
-          fontFamily: 'Berkeley Mono, monospace',
-          color: (args: any) => {
-            switch (args.value) {
-              case 'raydium': return '#7c3aed';
-              case 'meteora': return '#2563eb';
-              case 'aldrin': return '#ea580c';
-              case 'pumpswap': return '#ec4899';
-              case 'SPL': return theme.primary;
-              default: return theme.foreground;
-            }
-          },
-          fontWeight: (args: any) => {
-            return ['raydium', 'meteora', 'aldrin', 'pumpswap'].includes(args.value) ? 'bold' : 'normal';
-          }
+          fontSize: 10,
+          fontFamily: 'monospace',
+          color: theme.foreground
         }
       },
       {
         field: 'slot',
         title: 'Slot',
-        width: 100,
+        width: 80, // Reduced width
         style: {
-          fontFamily: 'Berkeley Mono, monospace',
-          fontSize: 11,
+          fontFamily: 'monospace',
+          fontSize: 10,
           textAlign: 'right',
           color: theme.mutedForeground
         }
@@ -186,18 +182,18 @@ export const VirtualEventTable = React.memo(function VirtualEventTable({
       {
         field: 'logs',
         title: 'Logs',
-        width: 60,
+        width: 50, // Reduced width
         style: {
-          fontSize: 11,
+          fontSize: 10,
           textAlign: 'center',
           color: theme.mutedForeground,
-          fontFamily: 'Berkeley Mono, monospace'
+          fontFamily: 'monospace'
         }
       }
     ];
   }, [getThemeColors]);
 
-  // Initialize table with proper cleanup and error handling
+  // Ultra-optimized table initialization with minimal options
   const initializeTable = useCallback(() => {
     if (!containerRef.current) return;
 
@@ -206,7 +202,7 @@ export const VirtualEventTable = React.memo(function VirtualEventTable({
       try {
         tableInstanceRef.current.release();
       } catch (e) {
-        console.warn('Error releasing table:', e);
+        // Silently handle cleanup errors
       }
       tableInstanceRef.current = null;
     }
@@ -222,50 +218,47 @@ export const VirtualEventTable = React.memo(function VirtualEventTable({
           headerStyle: {
             bgColor: theme.card,
             color: theme.cardForeground,
-            fontSize: 12,
+            fontSize: 11,
             fontWeight: 'bold',
             borderColor: theme.border,
-            fontFamily: 'Berkeley Mono, monospace'
+            fontFamily: 'monospace'
           },
           bodyStyle: {
             bgColor: theme.background,
             hoverColor: theme.accent,
             borderColor: theme.border,
-            fontFamily: 'Berkeley Mono, monospace'
-          },
-          selectionStyle: {
-            cellBgColor: theme.primary,
-            cellBorderColor: theme.ring
+            fontFamily: 'monospace'
           }
         },
         hover: {
-          highlightMode: 'row'
-        },
-        select: {
           highlightMode: 'row'
         },
         scroll: {
           enable: true,
           mode: 'virtual'
         },
-        frozenColCount: 0,
-        allowFrozenColCount: 0,
         widthMode: 'standard',
         heightMode: 'autoHeight',
         autoFillHeight: true,
-        rowHeight: 28, // Fixed row height for better performance
-        defaultHeaderRowHeight: 32
+        rowHeight: 24, // Reduced from 28
+        defaultHeaderRowHeight: 28, // Reduced from 32
+        // Disable expensive features for better performance
+        allowFrozenColCount: 0,
+        frozenColCount: 0,
+        select: false, // Disable selection for better performance
+        animationAppear: false, // Disable animations
+        animationEnter: false
       });
 
-      // Handle click events
+      // Ultra-lightweight click handler
       table.on('click', (event: any) => {
         try {
           const { row } = event.target;
-          if (row >= 0 && tableData[row]?.rawEvent) {
+          if (row >= 0 && row < tableData.length && tableData[row]?.rawEvent) {
             onEventClick(tableData[row].rawEvent);
           }
         } catch (e) {
-          console.warn('Error handling table click:', e);
+          // Silently handle click errors
         }
       });
 
@@ -300,25 +293,42 @@ export const VirtualEventTable = React.memo(function VirtualEventTable({
     };
   }, [initializeTable]);
 
-  // Throttled table data updates for better performance
+  // Ultra-throttled table data updates for maximum performance
   const updateTableDataThrottled = useCallback(
     (() => {
       let timeoutId: NodeJS.Timeout | null = null;
+      let lastUpdateTime = 0;
       
       return () => {
-        if (timeoutId) {
-          clearTimeout(timeoutId);
+        const now = Date.now();
+        
+        // Prevent updates if too frequent
+        if (now - lastUpdateTime < 300) {
+          if (timeoutId) {
+            clearTimeout(timeoutId);
+          }
+          
+          timeoutId = setTimeout(() => {
+            if (tableInstanceRef.current && isTableReady) {
+              try {
+                tableInstanceRef.current.setRecords(tableData);
+                lastUpdateTime = Date.now();
+              } catch (error) {
+                // Silently handle update errors
+              }
+            }
+          }, 300 - (now - lastUpdateTime));
+          return;
         }
         
-        timeoutId = setTimeout(() => {
-          if (tableInstanceRef.current && isTableReady) {
-            try {
-              tableInstanceRef.current.setRecords(tableData);
-            } catch (error) {
-              console.error('Failed to update table data:', error);
-            }
+        if (tableInstanceRef.current && isTableReady) {
+          try {
+            tableInstanceRef.current.setRecords(tableData);
+            lastUpdateTime = now;
+          } catch (error) {
+            // Silently handle update errors
           }
-        }, 100); // Throttle updates to every 100ms
+        }
       };
     })(),
     [tableData, isTableReady]
@@ -346,10 +356,10 @@ export const VirtualEventTable = React.memo(function VirtualEventTable({
       </div>
       <div className="text-xs text-muted-foreground mt-2 px-2 font-mono flex justify-between">
         <span>
-          Showing {Math.min(tableData.length, 5000)} of {events.length} events
+          Showing {Math.min(tableData.length, 1000)} of {events.length} events
         </span>
         <span>
-          Click row to view details • Virtual scrolling • 
+          Click row • Virtual • 
           {isTableReady ? ' Ready' : ' Loading...'}
         </span>
       </div>
