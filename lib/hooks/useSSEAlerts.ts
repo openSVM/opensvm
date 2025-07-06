@@ -21,12 +21,20 @@ interface SystemStatus {
   timestamp: number;
 }
 
+interface BlockchainEvent {
+  type: 'transaction' | 'block' | 'account_change';
+  timestamp: number;
+  data: any;
+  metadata?: any;
+}
+
 interface UseSSEAlertsOptions {
   clientId?: string;
   autoConnect?: boolean;
   maxAlerts?: number;
   onAlert?: (alert: AnomalyAlert) => void;
   onStatusUpdate?: (status: SystemStatus) => void;
+  onBlockchainEvent?: (event: BlockchainEvent) => void;
   onError?: (error: Error) => void;
 }
 
@@ -47,6 +55,7 @@ export function useSSEAlerts(options: UseSSEAlertsOptions = {}): UseSSEAlertsRet
     maxAlerts = 100,
     onAlert,
     onStatusUpdate,
+    onBlockchainEvent,
     onError
   } = options;
 
@@ -146,6 +155,51 @@ export function useSSEAlerts(options: UseSSEAlertsOptions = {}): UseSSEAlertsRet
           onStatusUpdate?.(status);
         } catch (parseError) {
           console.error('[SSE] Failed to parse system status:', parseError);
+        }
+      });
+
+      // Listen for blockchain events
+      eventSource.addEventListener('blockchain_event', (event) => {
+        try {
+          const blockchainEvent: BlockchainEvent = JSON.parse(event.data);
+          console.log('[SSE] Received blockchain event:', blockchainEvent);
+          onBlockchainEvent?.(blockchainEvent);
+        } catch (parseError) {
+          console.error('[SSE] Failed to parse blockchain event:', parseError);
+        }
+      });
+
+      // Listen for transaction events specifically
+      eventSource.addEventListener('transaction', (event) => {
+        try {
+          const transactionData = JSON.parse(event.data);
+          const blockchainEvent: BlockchainEvent = {
+            type: 'transaction',
+            timestamp: Date.now(),
+            data: transactionData
+          };
+          
+          console.log('[SSE] Received transaction event:', blockchainEvent);
+          onBlockchainEvent?.(blockchainEvent);
+        } catch (parseError) {
+          console.error('[SSE] Failed to parse transaction event:', parseError);
+        }
+      });
+
+      // Listen for block events
+      eventSource.addEventListener('block', (event) => {
+        try {
+          const blockData = JSON.parse(event.data);
+          const blockchainEvent: BlockchainEvent = {
+            type: 'block',
+            timestamp: Date.now(),
+            data: blockData
+          };
+          
+          console.log('[SSE] Received block event:', blockchainEvent);
+          onBlockchainEvent?.(blockchainEvent);
+        } catch (parseError) {
+          console.error('[SSE] Failed to parse block event:', parseError);
         }
       });
 

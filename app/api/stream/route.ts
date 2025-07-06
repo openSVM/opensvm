@@ -765,3 +765,6 @@ export async function POST(request: NextRequest) {
     return Response.json(response, { status });
   }
 }
+
+// Export the EventStreamManager for use by other modules
+export { EventStreamManager };

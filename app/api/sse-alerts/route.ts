@@ -25,6 +25,37 @@ export async function GET(request: NextRequest) {
 
     switch (action) {
       case 'connect':
+        // Start monitoring when first client connects
+        try {
+          // Import EventStreamManager dynamically
+          const { EventStreamManager } = await import('@/app/api/stream/route');
+          const streamManager = EventStreamManager.getInstance();
+          
+          // Create a mock client for the stream manager to trigger monitoring
+          const mockClient = {
+            id: clientId,
+            send: (data: any) => {
+              // Send blockchain events to SSE clients
+              try {
+                const eventData = JSON.parse(data);
+                sseManager.broadcastBlockchainEvent(eventData);
+              } catch (error) {
+                console.error('Failed to parse blockchain event for SSE:', error);
+              }
+            },
+            close: () => {},
+            subscriptions: new Set(['transaction', 'block']),
+            authenticated: true,
+            connectionTime: Date.now(),
+            lastActivity: Date.now()
+          };
+
+          // This will start monitoring if not already started
+          await streamManager.addClient(mockClient);
+        } catch (error) {
+          console.warn('Failed to start blockchain monitoring:', error);
+        }
+        
         // Return SSE stream
         return sseManager.addClient(clientId);
 

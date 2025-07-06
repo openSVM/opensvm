@@ -300,7 +300,26 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
     return () => clearInterval(interval);
   }, [maxEvents, eventQueue]);
 
-  // Use SSE for anomaly alerts
+  // System programs to filter out
+  const SYSTEM_PROGRAMS = new Set([
+    'Vote111111111111111111111111111111111111111',
+    '11111111111111111111111111111111',
+    'ComputeBudget111111111111111111111111111111',
+    'AddressLookupTab1e1111111111111111111111111',
+    'Config1111111111111111111111111111111111111',
+    'Stake11111111111111111111111111111111111111',
+  ]);
+
+  // Known programs to highlight
+  const KNOWN_PROGRAMS = {
+    raydium: ['675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8', '27haf8L6oxUeXrHrgEgsexjSY5hbVUWEmvv9Nyxg8vQv'],
+    meteora: ['Eo7WjKq67rjJQSZxS6z3YkapzY3eMj6Xy8X5EQVn5UaB'],
+    aldrin: ['AMM55ShdkoGRB5jVYPjWziwk8m5MpwyDgsMWHaMSQWH6'],
+    pumpswap: ['6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P'],
+    bonkfun: ['BonkfunjxcXSo3Nvvv8YKxVy1jqhfNyVSKngkHa8EgD']
+  };
+
+  // Consolidated SSE connection for both events and alerts
   const {
     alerts,
     systemStatus,
@@ -319,61 +338,26 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
     onStatusUpdate: (status) => {
       console.log('System status update:', status);
     },
-    onError: (error) => {
-      console.error('SSE error:', error);
-    }
-  });
-
-  // System programs to filter out
-  const SYSTEM_PROGRAMS = new Set([
-    'Vote111111111111111111111111111111111111111',
-    '11111111111111111111111111111111',
-    'ComputeBudget111111111111111111111111111111',
-    'AddressLookupTab1e1111111111111111111111111',
-    'Config1111111111111111111111111111111111111',
-    'Stake11111111111111111111111111111111111111',
-  ]);
-
-  // Known programs to highlight
-  const KNOWN_PROGRAMS = {
-    raydium: ['675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8', '27haf8L6oxUeXrHrgEgsexjSY5hbVUWEmvv9Nyxg8vQv'],
-    meteora: ['Eo7WjKq67rjJQSZxS6z3YkapzY3eMj6Xy8X5EQVn5UaB'],
-    aldrin: ['AMM55ShdkoGRB5jVYPjWziwk8m5MpwyDgsMWHaMSQWH6'],
-    pumpswap: ['6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P'],
-  };
-
-  // Use WebSocket for real-time blockchain events
-  const {
-    events: wsEvents,
-    isConnected: wsConnected,
-    error: wsError,
-    connect: connectWebSocket,
-    disconnect: disconnectWebSocket,
-    clearEvents: clearWebSocketEvents,
-    connectionStatus
-  } = useWebSocketStream({
-    clientId: clientId.current,
-    autoConnect: true,
-    maxEvents: maxEvents,
-    eventTypes: ['transaction', 'block'],
-    onEvent: (event) => {
-      // Process event through our existing pipeline
+    onBlockchainEvent: (event) => {
+      // Process blockchain events through our existing pipeline
       addEvent(event);
     },
     onError: (error) => {
-      console.error('WebSocket error:', error);
+      console.error('SSE error:', error);
       setConnectionError(error.message);
-    },
-    onConnect: () => {
-      console.log('WebSocket connected for real-time monitoring');
-      setIsConnected(true);
-      setConnectionError(null);
-    },
-    onDisconnect: () => {
-      console.log('WebSocket disconnected');
-      setIsConnected(false);
     }
   });
+
+  // Set connection state based on SSE connection (remove redundant WebSocket)
+  useEffect(() => {
+    setIsConnected(sseConnected);
+    if (sseConnected) {
+      setConnectionError(null);
+      console.log('Connected to Solana RPC for real-time monitoring');
+    } else {
+      console.log('Disconnected from Solana monitoring');
+    }
+  }, [sseConnected]);
 
   // Utility functions for event classification
   const identifyKnownProgram = useCallback((accountKeys: string[]): string | null => {
