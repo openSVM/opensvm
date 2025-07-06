@@ -20,25 +20,20 @@ export class SSEManager {
    * Add a new SSE client
    */
   addClient(clientId: string): Response {
+    let controller: ReadableStreamDefaultController<Uint8Array>;
+    
     // Create SSE response stream
     const stream = new ReadableStream({
-      start: (controller) => {
+      start: (ctrl) => {
+        controller = ctrl;
+        
         // Send initial connection event
         this.sendEvent(controller, 'connected', { clientId, timestamp: Date.now() });
         
         // Store client with writer
-        const writer = controller;
         this.clients.set(clientId, {
-          response: new Response(stream, {
-            headers: {
-              'Content-Type': 'text/event-stream',
-              'Cache-Control': 'no-cache',
-              'Connection': 'keep-alive',
-              'Access-Control-Allow-Origin': '*',
-              'Access-Control-Allow-Headers': 'Cache-Control'
-            }
-          }),
-          writer: writer as any,
+          response: null as any, // Will be set later
+          writer: controller as any,
           lastActivity: Date.now()
         });
 
@@ -46,10 +41,13 @@ export class SSEManager {
         const buffered = this.alertBuffer.get(clientId) || [];
         buffered.forEach(alert => this.sendEvent(controller, 'anomaly_alert', alert));
         this.alertBuffer.delete(clientId);
+      },
+      cancel: () => {
+        this.removeClient(clientId);
       }
     });
 
-    return new Response(stream, {
+    const response = new Response(stream, {
       headers: {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
@@ -58,6 +56,14 @@ export class SSEManager {
         'Access-Control-Allow-Headers': 'Cache-Control'
       }
     });
+
+    // Update the stored client with the actual response
+    const client = this.clients.get(clientId);
+    if (client) {
+      client.response = response;
+    }
+
+    return response;
   }
 
   /**
@@ -67,7 +73,9 @@ export class SSEManager {
     const client = this.clients.get(clientId);
     if (client) {
       try {
-        client.writer.close();
+        if (client.writer && typeof client.writer.close === 'function') {
+          client.writer.close();
+        }
       } catch (error) {
         console.error('Failed to close SSE client %s:', clientId, error);
       }
@@ -137,9 +145,14 @@ export class SSEManager {
   /**
    * Send SSE event to client
    */
-  private sendEvent(writer: any, eventType: string, data: any): void {
-    const eventString = `event: ${eventType}\ndata: ${JSON.stringify(data)}\n\n`;
-    writer.enqueue(new TextEncoder().encode(eventString));
+  private sendEvent(controller: ReadableStreamDefaultController<Uint8Array>, eventType: string, data: any): void {
+    try {
+      const eventString = `event: ${eventType}\ndata: ${JSON.stringify(data)}\n\n`;
+      const encoded = new TextEncoder().encode(eventString);
+      controller.enqueue(encoded);
+    } catch (error) {
+      console.error('Failed to send SSE event:', error);
+    }
   }
 
   /**

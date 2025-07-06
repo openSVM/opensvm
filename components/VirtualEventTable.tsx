@@ -15,6 +15,7 @@ import { lamportsToSol } from '@/components/transaction-graph/utils';
 interface VirtualEventTableProps {
   events: BlockchainEvent[];
   onEventClick: (event: BlockchainEvent) => void;
+  onAddressClick: (address: string) => void;
   height?: number;
 }
 
@@ -24,12 +25,14 @@ const themeCache = new Map<string, any>();
 export const VirtualEventTable = React.memo(function VirtualEventTable({ 
   events, 
   onEventClick, 
+  onAddressClick,
   height = 400 
 }: VirtualEventTableProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const tableInstanceRef = useRef<ListTable | null>(null);
   const [isTableReady, setIsTableReady] = useState(false);
   const themeStateRef = useRef<string>('');
+  const [fadeIn, setFadeIn] = useState(false);
 
   // Get theme colors from CSS variables with caching
   const getThemeColors = useCallback(() => {
@@ -96,6 +99,10 @@ export const VirtualEventTable = React.memo(function VirtualEventTable({
         program: data.knownProgram || (data.transactionType === 'spl-transfer' ? 'SPL' : 'Custom'),
         slot: data.slot?.toString() || '-',
         logs: data.logs?.length || 0,
+        addresses: data.accountKeys && data.accountKeys.length > 0 
+          ? data.accountKeys[0].substring(0, 8) + '...' 
+          : '-',
+        rawAddresses: data.accountKeys || [], // Store full addresses for click handling
         rawEvent: event // Store raw event for click handling
       };
     });
@@ -189,6 +196,18 @@ export const VirtualEventTable = React.memo(function VirtualEventTable({
           color: theme.mutedForeground,
           fontFamily: 'monospace'
         }
+      },
+      {
+        field: 'addresses',
+        title: 'Address',
+        width: 100,
+        style: {
+          fontSize: 10,
+          fontFamily: 'monospace',
+          color: theme.primary,
+          cursor: 'pointer',
+          textDecoration: 'underline'
+        }
       }
     ];
   }, [getThemeColors]);
@@ -261,9 +280,18 @@ export const VirtualEventTable = React.memo(function VirtualEventTable({
       // Ultra-lightweight click handler
       table.on('click', (event: any) => {
         try {
-          const { row } = event.target;
-          if (row >= 0 && row < tableData.length && tableData[row]?.rawEvent) {
-            onEventClick(tableData[row].rawEvent);
+          const { row, col } = event.target;
+          if (row >= 0 && row < tableData.length) {
+            const rowData = tableData[row];
+            const columnField = columnsConfig[col]?.field;
+            
+            if (columnField === 'addresses' && rowData.rawAddresses?.length > 0) {
+              // Address click - open first address
+              onAddressClick(rowData.rawAddresses[0]);
+            } else if (rowData?.rawEvent) {
+              // Regular row click
+              onEventClick(rowData.rawEvent);
+            }
           }
         } catch (e) {
           // Silently handle click errors
@@ -272,11 +300,14 @@ export const VirtualEventTable = React.memo(function VirtualEventTable({
 
       tableInstanceRef.current = table;
       setIsTableReady(true);
+      
+      // Trigger fade-in animation
+      setTimeout(() => setFadeIn(true), 100);
     } catch (error) {
       console.error('Failed to initialize virtual table:', error);
       setIsTableReady(false);
     }
-  }, [tableData, columnsConfig, height, onEventClick, getThemeColors]);
+  }, [tableData, columnsConfig, height, onEventClick, onAddressClick, getThemeColors]);
 
   // Initialize table on mount and key changes
   useEffect(() => {
@@ -368,7 +399,9 @@ export const VirtualEventTable = React.memo(function VirtualEventTable({
       <div 
         ref={containerRef} 
         style={{ height: `${height}px` }}
-        className="border rounded-lg overflow-hidden bg-card relative"
+        className={`border rounded-lg overflow-hidden bg-card relative transition-opacity duration-500 ${
+          fadeIn ? 'opacity-100' : 'opacity-0'
+        }`}
       >
         {!isTableReady && (
           <div className="absolute inset-0 flex items-center justify-center bg-card/50 backdrop-blur-sm">
@@ -381,7 +414,7 @@ export const VirtualEventTable = React.memo(function VirtualEventTable({
           Showing {Math.min(tableData.length, 1000)} of {events.length} events
         </span>
         <span>
-          Click row • Virtual • 
+          Click row/address • Virtual • 
           {isTableReady ? ' Ready' : ' Loading...'}
         </span>
       </div>

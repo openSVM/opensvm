@@ -115,7 +115,7 @@ interface LiveMonitorProps {
 export const LiveEventMonitor = React.memo(function LiveEventMonitor({ 
   maxEvents = 2000, // Reduced from 10000 for better performance
   autoRefresh = true, 
-  refreshInterval = 8000 // Increased from 5000 for better performance
+  refreshInterval = 15000 // Increased from 8000 to reduce API load
 }: LiveMonitorProps) {
   // Ultra-performance optimized state management
   const [eventQueue] = useState(() => new FIFOQueue<BlockchainEvent>(maxEvents));
@@ -125,6 +125,8 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [lastSlot, setLastSlot] = useState<number | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+  const [pendingEventCount, setPendingEventCount] = useState(0);
   
   // Mounting flag to prevent race conditions
   const isMountedRef = useRef(true);
@@ -214,6 +216,12 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
     requestIdleCallbackPolyfill(() => {
       const batch = eventBatchRef.current.splice(0, 20); // Reduced from 50
       
+      if (isPaused) {
+        // If paused, just count pending events
+        setPendingEventCount(prev => prev + batch.length);
+        return;
+      }
+      
       batch.forEach(event => {
         eventQueue.enqueue(event);
       });
@@ -232,7 +240,7 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
         }));
       });
     });
-  }, 500); // Increased from 200ms to 500ms
+  }, 1000); // Increased from 500ms to 1000ms for better performance
 
   // Ultra-optimized event addition with larger batching
   const addEvent = useCallback((event: BlockchainEvent) => {
@@ -353,7 +361,7 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
 
   // Ultra-throttled blockchain event fetching - much more aggressive
   const fetchRealtimeEvents = useAggressiveThrottle(useCallback(async () => {
-    if (!connectionRef.current || !isConnected) return;
+    if (!connectionRef.current || !isConnected || isPaused) return;
 
     try {
       performanceTracker.markStart('fetch-events');
@@ -381,7 +389,7 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
             if (!block) continue;
             
             // Add block event only occasionally
-            if (Math.random() < 0.3) { // Only 30% chance
+            if (Math.random() < 0.2) { // Reduced from 0.3 to 0.2
               const blockEvent: BlockchainEvent = {
                 type: 'block',
                 timestamp: Date.now(),
@@ -399,7 +407,7 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
             
             // Process very limited transactions
             if (block.transactions) {
-              const maxTransactionsToProcess = 2; // Reduced from 5
+              const maxTransactionsToProcess = 1; // Reduced from 2
               const transactions = block.transactions.slice(0, maxTransactionsToProcess);
               
               for (const tx of transactions) {
@@ -416,8 +424,8 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
                 
                 if (isVoteTransaction || isSystemOnly) continue;
                 
-                // Only process 1 in 50 transactions for better performance
-                if (Math.random() > 0.02) continue;
+                // Only process 1 in 100 transactions for better performance
+                if (Math.random() > 0.01) continue; // Reduced from 0.02
                 
                 const logs = tx.meta.logMessages || [];
                 const isSplTransfer = logs.some(log => 
@@ -443,14 +451,14 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
                     logs: logs.slice(0, 2), // Further reduced
                     knownProgram: identifyKnownProgram(accountKeys),
                     transactionType: classifyTransaction(logs, accountKeys),
-                    accountKeys: accountKeys.slice(0, 2) // Further reduced
+                    accountKeys: accountKeys.slice(0, 3) // Slightly increased for clickability
                   }
                 };
                 
                 addEvent(transactionEvent);
                 
                 // Almost never process for anomalies
-                if (Math.random() < 0.01) { // Reduced from 0.05
+                if (Math.random() < 0.005) { // Reduced from 0.01
                   processEventForAnomaliesThrottled(transactionEvent);
                 }
               }
@@ -468,7 +476,7 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
     } catch (error) {
       console.error('Failed to fetch realtime events:', error);
     }
-  }, [lastSlot, isConnected, addEvent]), 2000); // Increased from 1000ms to 2000ms
+  }, [lastSlot, isConnected, addEvent, isPaused]), 5000); // Increased from 2000ms to 5000ms for much better performance
 
   const identifyKnownProgram = useCallback((accountKeys: string[]): string | null => {
     for (const [programName, programIds] of Object.entries(KNOWN_PROGRAMS)) {
@@ -564,15 +572,19 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
     
     // Much longer interval for better performance
     const interval = setInterval(() => {
-      fetchRealtimeEvents();
-    }, Math.max(refreshInterval, 5000)); // Minimum 5 second interval
+      if (!isPaused) {
+        fetchRealtimeEvents();
+      }
+    }, Math.max(refreshInterval, 10000)); // Minimum 10 second interval, increased from 5
     
-    fetchRealtimeEvents();
+    if (!isPaused) {
+      fetchRealtimeEvents();
+    }
     
     return () => {
       clearInterval(interval);
     };
-  }, [isConnected, autoRefresh, refreshInterval, fetchRealtimeEvents]);
+  }, [isConnected, autoRefresh, refreshInterval, fetchRealtimeEvents, isPaused]);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -581,7 +593,7 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
       // Much less frequent anomaly stats
       interval = setInterval(() => {
         fetchAnomalyStatsThrottled();
-      }, 300000); // Every 5 minutes instead of 2
+      }, 600000); // Every 10 minutes instead of 5
     }
     
     fetchAnomalyStatsThrottled();
@@ -742,7 +754,7 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
     } catch (error) {
       // Silently handle errors for better performance
     }
-  }, []), 60000); // Increased from 30000ms to 60000ms
+  }, []), 300000); // Increased from 60000ms to 300000ms (5 minutes)
 
   const getSeverityColor = useCallback((severity: string) => {
     switch (severity) {
@@ -760,6 +772,23 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
       window.open(url, '_blank', 'noopener,noreferrer');
     }
   }, []);
+
+  const handleAddressClick = useCallback((address: string) => {
+    const url = `/account/${address}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  }, []);
+
+  const togglePause = useCallback(() => {
+    setIsPaused(prev => {
+      const newPaused = !prev;
+      if (!newPaused && pendingEventCount > 0) {
+        // Resume and process pending events
+        setPendingEventCount(0);
+        processEventBatch();
+      }
+      return newPaused;
+    });
+  }, [pendingEventCount, processEventBatch]);
 
   const toggleFullscreen = useCallback(() => {
     setIsFullscreen(!isFullscreen);
@@ -791,6 +820,7 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
             <VirtualEventTable 
               events={filteredEvents}
               onEventClick={handleEventClick}
+              onAddressClick={handleAddressClick}
               height={window.innerHeight - 150}
             />
           </VirtualTableErrorBoundary>
@@ -826,6 +856,11 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
               <span className="text-sm font-medium">
                 {isConnected ? 'Connected' : 'Disconnected'}
               </span>
+              {isPaused && (
+                <span className="text-xs bg-yellow-500 text-white px-2 py-1 rounded">
+                  PAUSED
+                </span>
+              )}
             </div>
             <div className="flex items-center space-x-2">
               <div className={`w-2 h-2 rounded-full ${sseConnected ? 'bg-blue-500' : 'bg-gray-500'}`} />
@@ -839,6 +874,11 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
             <div className="text-sm text-muted-foreground">
               Filtered: {eventCounts.total}
             </div>
+            {pendingEventCount > 0 && (
+              <div className="text-sm text-orange-600 font-medium">
+                Pending: {pendingEventCount}
+              </div>
+            )}
             <div className="text-sm text-muted-foreground">
               Alerts: {alerts.length}
             </div>
@@ -855,9 +895,19 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
           </div>
           <div className="flex space-x-2">
             <button
+              onClick={togglePause}
+              className={`px-3 py-1 text-sm rounded hover:opacity-80 ${
+                isPaused 
+                  ? 'bg-green-500 text-white hover:bg-green-600' 
+                  : 'bg-yellow-500 text-white hover:bg-yellow-600'
+              }`}
+            >
+              {isPaused ? 'Resume' : 'Pause'}
+            </button>
+            <button
               onClick={fetchRealtimeEvents}
               className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600"
-              disabled={!isConnected}
+              disabled={!isConnected || isPaused}
             >
               Refresh
             </button>
@@ -892,7 +942,7 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
       </Card>
 
       {/* Main Grid Layout */}
-      <div className="grid grid-cols-1 xl:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 xl:grid-cols-4 gap-4">
         {/* Left Sidebar - Compact */}
         <div className="xl:col-span-1 space-y-4">
           <PumpStatistics events={filteredEvents} />
@@ -901,10 +951,45 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
             onFiltersChange={setFilters}
             eventCounts={eventCounts}
           />
+          
+          {/* Recent Anomaly Alerts - Compact */}
+          <Card className="p-3">
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="text-sm font-semibold">
+                Recent Alerts
+                {sseConnected && <span className="text-xs text-green-600 ml-1">(Live)</span>}
+              </h4>
+              <div className="text-xs text-muted-foreground">
+                {Math.min(alerts.length, 3)}
+              </div>
+            </div>
+            <div className="space-y-2 max-h-48 overflow-y-auto">
+              {alerts.slice(0, 3).map((alert) => (
+                <div key={alert.id} className="p-2 border rounded-sm">
+                  <div className="flex items-center justify-between">
+                    <span className={`px-1 py-0.5 text-xs rounded ${getSeverityColor(alert.severity)}`}>
+                      {alert.severity.toUpperCase()}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {new Date(alert.timestamp).toLocaleTimeString()}
+                    </span>
+                  </div>
+                  <div className="text-xs font-medium mt-1">
+                    {alert.type.replace(/_/g, ' ').toUpperCase()}
+                  </div>
+                </div>
+              ))}
+              {alerts.length === 0 && (
+                <div className="text-center text-muted-foreground py-2 text-xs">
+                  No recent alerts
+                </div>
+              )}
+            </div>
+          </Card>
         </div>
 
         {/* Main Content - Optimized */}
-        <div className="xl:col-span-4 space-y-4">
+        <div className="xl:col-span-3 space-y-4">
           {/* Live Events Table */}
           <Card className="p-4">
             <div className="flex items-center justify-between mb-4">
@@ -917,26 +1002,27 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
               <VirtualEventTable 
                 events={filteredEvents}
                 onEventClick={handleEventClick}
+                onAddressClick={handleAddressClick}
                 height={600}
               />
             </VirtualTableErrorBoundary>
           </Card>
 
-          {/* Anomaly Alerts - Compact */}
+          {/* Extended Anomaly Alerts - Under Main Table */}
           <Card className="p-4">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold">
-                Anomaly Alerts
+                All Anomaly Alerts
                 {sseConnected && <span className="text-xs text-green-600 ml-2">(Live)</span>}
               </h3>
               <div className="text-sm text-muted-foreground">
-                {alerts.length} alerts
+                {alerts.length} total alerts
               </div>
             </div>
-            <div className="space-y-2 max-h-64 overflow-y-auto">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-64 overflow-y-auto">
               {alerts.map((alert) => (
-                <div key={alert.id} className="p-2 border rounded">
-                  <div className="flex items-center justify-between">
+                <div key={alert.id} className="p-3 border rounded transition-all duration-200 hover:shadow-md">
+                  <div className="flex items-center justify-between mb-2">
                     <span className={`px-2 py-1 text-xs rounded ${getSeverityColor(alert.severity)}`}>
                       {alert.severity.toUpperCase()}
                     </span>
@@ -944,7 +1030,7 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
                       {new Date(alert.timestamp).toLocaleTimeString()}
                     </span>
                   </div>
-                  <div className="text-sm font-medium mt-1">
+                  <div className="text-sm font-medium mb-1">
                     {alert.type.replace(/_/g, ' ').toUpperCase()}
                   </div>
                   <div className="text-xs text-muted-foreground">
@@ -953,8 +1039,8 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
                 </div>
               ))}
               {alerts.length === 0 && (
-                <div className="text-center text-muted-foreground py-4">
-                  No anomalies detected
+                <div className="col-span-full text-center text-muted-foreground py-8">
+                  No anomalies detected. System is monitoring for suspicious activity.
                 </div>
               )}
             </div>
