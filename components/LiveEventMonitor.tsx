@@ -208,14 +208,14 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
     return () => clearInterval(interval);
   }, [maxEvents, eventQueue]);
 
-  // Ultra-optimized event processing with larger batches and longer delays
+  // Improved event processing with better responsiveness
   const processEventBatch = useAggressiveThrottle(() => {
     if (eventBatchRef.current.length === 0) return;
     
     performanceTracker.markStart('event-processing');
     
     requestIdleCallbackPolyfill(() => {
-      const batch = eventBatchRef.current.splice(0, 20); // Reduced from 50
+      const batch = eventBatchRef.current.splice(0, 30); // Increased from 20 for better throughput
       
       if (isPaused) {
         // If paused, just count pending events
@@ -241,17 +241,20 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
         }));
       });
     });
-  }, 1000); // Increased from 500ms to 1000ms for better performance
+  }, 500); // Reduced from 1000ms to 500ms for better responsiveness
 
-  // Ultra-optimized event addition with larger batching
+  // Improved event addition with faster processing for both transactions and blocks
   const addEvent = useCallback((event: BlockchainEvent) => {
     // Check if component is still mounted to prevent race conditions
     if (!isMountedRef.current) return;
     
+    // Log to debug what events we're receiving
+    console.log(`Received ${event.type} event:`, event.type === 'transaction' ? event.data?.signature : event.data?.slot);
+    
     eventBatchRef.current.push(event);
     
-    // Only process when batch gets large or after longer timeout
-    if (eventBatchRef.current.length >= 10) {
+    // Process smaller batches more frequently for better responsiveness
+    if (eventBatchRef.current.length >= 5) { // Reduced from 10
       processEventBatch();
     } else {
       // Clear existing timeout
@@ -259,12 +262,12 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
         clearTimeout(batchTimeoutRef.current);
       }
       
-      // Set longer timeout for batch processing
+      // Faster timeout for batch processing
       batchTimeoutRef.current = setTimeout(() => {
         if (isMountedRef.current) {
           processEventBatch();
         }
-      }, 300); // Increased from 100ms
+      }, 100); // Reduced from 300ms for faster processing
     }
   }, [processEventBatch]);
 
@@ -644,6 +647,9 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
   const handleEventClick = useCallback((event: BlockchainEvent) => {
     if (event.type === 'transaction' && event.data?.signature) {
       const url = `/tx/${event.data.signature}`;
+      window.open(url, '_blank', 'noopener,noreferrer');
+    } else if (event.type === 'block' && event.data?.slot) {
+      const url = `https://explorer.solana.com/block/${event.data.slot}`;
       window.open(url, '_blank', 'noopener,noreferrer');
     }
   }, []);

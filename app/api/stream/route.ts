@@ -292,33 +292,26 @@ class EventStreamManager {
                 maxSupportedTransactionVersion: 0
               });
 
-              // Filter out vote transactions and system program transactions
+              // Filter out only obvious vote transactions, but be less aggressive
               if (txDetails?.transaction?.message) {
                 const accountKeys = txDetails.transaction.message.accountKeys?.map(key => key.toString()) || [];
                 
-                // Check if this is a vote transaction or system program transaction
-                const isSystemTransaction = accountKeys.some(key => SYSTEM_PROGRAMS.has(key));
+                // Only skip obvious vote transactions to reduce noise
                 const isVoteTransaction = logs.logs?.some(log => log.includes('Vote111111111111111111111111111111111111111'));
                 
-                // Skip system transactions and vote transactions
-                if (isSystemTransaction || isVoteTransaction) {
+                // Skip vote transactions but allow most other transactions through
+                if (isVoteTransaction) {
                   return;
                 }
 
-                // Check for SPL token transfers (include these)
-                const isSplTransfer = logs.logs?.some(log => 
-                  log.includes('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA') ||
-                  log.includes('Program log: Instruction: Transfer')
+                // Allow more transaction types through - only filter out pure system program transactions
+                const isPureSystemTransaction = accountKeys.length > 0 && accountKeys.every(key => 
+                  SYSTEM_PROGRAMS.has(key) && 
+                  !key.includes('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA')
                 );
 
-                // Check for custom program calls (include these)
-                const hasCustomProgram = accountKeys.some(key => 
-                  !SYSTEM_PROGRAMS.has(key) && 
-                  !key.startsWith('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA')
-                );
-
-                // Only include transactions that are SPL transfers or custom program calls
-                if (!isSplTransfer && !hasCustomProgram) {
+                // Only skip pure system transactions (those with only system program accounts)
+                if (isPureSystemTransaction) {
                   return;
                 }
               }
