@@ -59,6 +59,7 @@ export function useSSEAlerts(options: UseSSEAlertsOptions = {}): UseSSEAlertsRet
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const reconnectAttempts = useRef(0);
   const maxReconnectAttempts = 5;
+  const isMountedRef = useRef(true);
 
   const connect = useCallback(() => {
     // Safely close any existing connection first
@@ -79,29 +80,35 @@ export function useSSEAlerts(options: UseSSEAlertsOptions = {}): UseSSEAlertsRet
 
       eventSource.onopen = () => {
         console.log(`[SSE] Connected client ${clientId}`);
-        setIsConnected(true);
-        setError(null);
+        if (isMountedRef.current) {
+          setIsConnected(true);
+          setError(null);
+        }
         reconnectAttempts.current = 0;
       };
 
       eventSource.onerror = (event) => {
         console.error('[SSE] Connection error:', event);
-        setIsConnected(false);
-        
-        const errorMsg = 'SSE connection failed';
-        setError(errorMsg);
-        onError?.(new Error(errorMsg));
+        if (isMountedRef.current) {
+          setIsConnected(false);
+          
+          const errorMsg = 'SSE connection failed';
+          setError(errorMsg);
+          onError?.(new Error(errorMsg));
+        }
 
         // Attempt to reconnect with exponential backoff
-        if (reconnectAttempts.current < maxReconnectAttempts) {
+        if (reconnectAttempts.current < maxReconnectAttempts && isMountedRef.current) {
           const delay = Math.pow(2, reconnectAttempts.current) * 1000; // 1s, 2s, 4s, 8s, 16s
           console.log(`[SSE] Reconnecting in ${delay}ms (attempt ${reconnectAttempts.current + 1}/${maxReconnectAttempts})`);
           
           reconnectTimeoutRef.current = setTimeout(() => {
-            reconnectAttempts.current++;
-            connect();
+            if (isMountedRef.current) {
+              reconnectAttempts.current++;
+              connect();
+            }
           }, delay);
-        } else {
+        } else if (isMountedRef.current) {
           console.error('[SSE] Max reconnection attempts reached');
           setError('Failed to establish SSE connection after multiple attempts');
         }
@@ -113,10 +120,12 @@ export function useSSEAlerts(options: UseSSEAlertsOptions = {}): UseSSEAlertsRet
           const alert: AnomalyAlert = JSON.parse(event.data);
           console.log('[SSE] Received anomaly alert:', alert);
           
-          setAlerts(prev => {
-            const newAlerts = [alert, ...prev].slice(0, maxAlerts);
-            return newAlerts;
-          });
+          if (isMountedRef.current) {
+            setAlerts(prev => {
+              const newAlerts = [alert, ...prev].slice(0, maxAlerts);
+              return newAlerts;
+            });
+          }
           
           onAlert?.(alert);
         } catch (parseError) {
@@ -129,7 +138,11 @@ export function useSSEAlerts(options: UseSSEAlertsOptions = {}): UseSSEAlertsRet
         try {
           const status: SystemStatus = JSON.parse(event.data);
           console.log('[SSE] Received system status:', status);
-          setSystemStatus(status);
+          
+          if (isMountedRef.current) {
+            setSystemStatus(status);
+          }
+          
           onStatusUpdate?.(status);
         } catch (parseError) {
           console.error('[SSE] Failed to parse system status:', parseError);
@@ -156,6 +169,9 @@ export function useSSEAlerts(options: UseSSEAlertsOptions = {}): UseSSEAlertsRet
   const disconnect = useCallback(() => {
     console.log(`[SSE] Disconnecting client ${clientId}...`);
     
+    // Mark as unmounted to prevent race conditions
+    isMountedRef.current = false;
+    
     // Clear reconnection timeout first
     if (reconnectTimeoutRef.current) {
       clearTimeout(reconnectTimeoutRef.current);
@@ -169,16 +185,24 @@ export function useSSEAlerts(options: UseSSEAlertsOptions = {}): UseSSEAlertsRet
         eventSourceRef.current = null; // Clear reference first to prevent race conditions
         eventSource.close();
       } catch (error) {
-        console.warn('[SSE] Error during EventSource cleanup:', error);
+        // Silently handle EventSource cleanup errors to prevent console spam
+        if (error instanceof Error && !error.message.includes('removeChild')) {
+          console.warn('[SSE] Error during EventSource cleanup:', error);
+        }
       }
     }
 
-    setIsConnected(false);
+    // Only update state if component is still mounted
+    if (isMountedRef.current) {
+      setIsConnected(false);
+    }
     reconnectAttempts.current = 0;
   }, [clientId]);
 
   const clearAlerts = useCallback(() => {
-    setAlerts([]);
+    if (isMountedRef.current) {
+      setAlerts([]);
+    }
   }, []);
 
   // Auto-connect on mount if enabled

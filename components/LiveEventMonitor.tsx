@@ -10,6 +10,7 @@ import { TransactionTooltip } from './TransactionTooltip';
 import { PumpStatistics } from './PumpStatistics';
 import { EventFilterControls, EventFilters } from './EventFilterControls';
 import { VirtualEventTable } from './VirtualEventTable';
+import { VirtualTableErrorBoundary } from './VirtualTableErrorBoundary';
 
 // Performance monitoring utilities
 const performanceTracker = {
@@ -124,6 +125,9 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [lastSlot, setLastSlot] = useState<number | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  
+  // Mounting flag to prevent race conditions
+  const isMountedRef = useRef(true);
   const [performanceMetrics, setPerformanceMetrics] = useState<{
     memoryUsage: any;
     renderTime: number;
@@ -232,6 +236,9 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
 
   // Ultra-optimized event addition with larger batching
   const addEvent = useCallback((event: BlockchainEvent) => {
+    // Check if component is still mounted to prevent race conditions
+    if (!isMountedRef.current) return;
+    
     eventBatchRef.current.push(event);
     
     // Only process when batch gets large or after longer timeout
@@ -245,7 +252,9 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
       
       // Set longer timeout for batch processing
       batchTimeoutRef.current = setTimeout(() => {
-        processEventBatch();
+        if (isMountedRef.current) {
+          processEventBatch();
+        }
       }, 300); // Increased from 100ms
     }
   }, [processEventBatch]);
@@ -509,6 +518,9 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
   }, []), 10000); // Increased from 2000ms to 10000ms
 
   const disconnect = useCallback(() => {
+    // Check if component is still mounted to prevent race conditions
+    if (!isMountedRef.current) return;
+    
     // Clear timeouts first to prevent any new operations
     if (batchTimeoutRef.current) {
       clearTimeout(batchTimeoutRef.current);
@@ -524,9 +536,18 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
     eventBatchRef.current = [];
     processingQueueRef.current = [];
 
-    setIsConnected(false);
-    setConnectionError(null);
-    disconnectSSE();
+    // Only update state if component is still mounted
+    if (isMountedRef.current) {
+      setIsConnected(false);
+      setConnectionError(null);
+    }
+    
+    try {
+      disconnectSSE();
+    } catch (error) {
+      // Silently handle SSE disconnection errors
+    }
+    
     console.log('Disconnected from Solana monitoring');
   }, [disconnectSSE]);
 
@@ -570,9 +591,12 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
     };
   }, [autoRefresh]);
 
-  // Cleanup on unmount
+  // Cleanup on unmount with proper race condition prevention
   useEffect(() => {
     return () => {
+      // Mark component as unmounted first
+      isMountedRef.current = false;
+      
       // Clear all timeouts first
       if (batchTimeoutRef.current) {
         clearTimeout(batchTimeoutRef.current);
@@ -763,11 +787,13 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
         
         {/* Fullscreen Content */}
         <div className="flex-1 p-4 overflow-hidden">
-          <VirtualEventTable 
-            events={filteredEvents}
-            onEventClick={handleEventClick}
-            height={window.innerHeight - 150}
-          />
+          <VirtualTableErrorBoundary>
+            <VirtualEventTable 
+              events={filteredEvents}
+              onEventClick={handleEventClick}
+              height={window.innerHeight - 150}
+            />
+          </VirtualTableErrorBoundary>
         </div>
       </div>
     );
@@ -887,11 +913,13 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
                 {filteredEvents.length} events • Virtual table
               </div>
             </div>
-            <VirtualEventTable 
-              events={filteredEvents}
-              onEventClick={handleEventClick}
-              height={600}
-            />
+            <VirtualTableErrorBoundary>
+              <VirtualEventTable 
+                events={filteredEvents}
+                onEventClick={handleEventClick}
+                height={600}
+              />
+            </VirtualTableErrorBoundary>
           </Card>
 
           {/* Anomaly Alerts - Compact */}

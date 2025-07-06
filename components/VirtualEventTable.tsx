@@ -197,14 +197,21 @@ export const VirtualEventTable = React.memo(function VirtualEventTable({
   const initializeTable = useCallback(() => {
     if (!containerRef.current) return;
 
-    // Clean up existing table with proper error handling
+    // Clean up existing table with proper error handling and DOM checks
     if (tableInstanceRef.current) {
       try {
         const existingTable = tableInstanceRef.current;
         tableInstanceRef.current = null; // Clear reference first to prevent race conditions
-        existingTable.release();
+        
+        // Check if the table container still exists in DOM before release
+        if (containerRef.current && containerRef.current.isConnected) {
+          existingTable.release();
+        }
       } catch (error) {
-        console.warn('Error releasing existing table:', error);
+        // Silently handle cleanup errors to prevent console spam
+        if (error instanceof Error && !error.message.includes('removeChild')) {
+          console.warn('Error releasing existing table:', error);
+        }
       }
     }
 
@@ -288,14 +295,21 @@ export const VirtualEventTable = React.memo(function VirtualEventTable({
     return () => {
       cancelAnimationFrame(initTimer);
       
-      // Safe cleanup with error handling
+      // Safe cleanup with error handling and DOM checks
       if (tableInstanceRef.current) {
         try {
           const table = tableInstanceRef.current;
           tableInstanceRef.current = null; // Clear reference first to prevent race conditions
-          table.release();
+          
+          // Only release if container still exists in DOM
+          if (containerRef.current && containerRef.current.isConnected) {
+            table.release();
+          }
         } catch (error) {
-          console.warn('Error releasing table on cleanup:', error);
+          // Silently handle DOM manipulation errors
+          if (error instanceof Error && !error.message.includes('removeChild')) {
+            console.warn('Error releasing table on cleanup:', error);
+          }
         }
       }
     };
