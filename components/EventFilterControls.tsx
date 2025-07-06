@@ -23,6 +23,7 @@ export interface EventFilters {
     meteora: boolean;
     aldrin: boolean;
     pumpswap: boolean;
+    bonkfun: boolean;
   };
   minFee: number; // in lamports
   maxFee: number; // in lamports
@@ -84,7 +85,8 @@ export const EventFilterControls = React.memo(function EventFilterControls({
         raydium: true,
         meteora: true,
         aldrin: true,
-        pumpswap: true
+        pumpswap: true,
+        bonkfun: true
       },
       minFee: 0,
       maxFee: 1000000000, // 1 SOL in lamports
@@ -260,7 +262,20 @@ export const EventFilterControls = React.memo(function EventFilterControls({
             />
             <span className="text-sm">
               <span className="inline-block w-2 h-2 bg-pink-500 rounded mr-1"></span>
-              Pumpswap
+              Pump.fun
+            </span>
+          </label>
+          
+          <label className="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              checked={filters.showKnownPrograms.bonkfun}
+              onChange={(e) => updateKnownProgram('bonkfun', e.target.checked)}
+              className="rounded"
+            />
+            <span className="text-sm">
+              <span className="inline-block w-2 h-2 bg-yellow-500 rounded mr-1"></span>
+              Bonkfun
             </span>
           </label>
         </div>

@@ -155,7 +155,8 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
       raydium: true,
       meteora: true,
       aldrin: true,
-      pumpswap: true
+      pumpswap: true,
+      bonkfun: true
     },
     minFee: 0,
     maxFee: 1000000000,

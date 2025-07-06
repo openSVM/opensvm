@@ -326,6 +326,23 @@ const DEX_CONFIGS: Record<string, Partial<DexProfileData>> = {
       timelock: true,
     },
   },
+  'bonkfun': {
+    name: 'bonkfun',
+    description: 'Bonk-themed launchpad and trading platform for meme tokens and community-driven projects.',
+    website: 'https://bonkfun.com',
+    twitter: 'https://twitter.com/bonkfun',
+    github: 'https://github.com/bonkfun',
+    programId: 'BonkfunjxcXSo3Nvvv8YKxVy1jqhfNyVSKngkHa8EgD',
+    status: 'active',
+    security: {
+      audited: false,
+      auditors: [],
+      lastAudit: '',
+      bugBounty: false,
+      multisig: true,
+      timelock: false,
+    },
+  },
 };
 
 // Generate historical data

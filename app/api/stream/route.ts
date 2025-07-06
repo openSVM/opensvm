@@ -277,6 +277,7 @@ class EventStreamManager {
         meteora: ['Eo7WjKq67rjJQSZxS6z3YkapzY3eMj6Xy8X5EQVn5UaB'],
         aldrin: ['AMM55ShdkoGRB5jVYPjWziwk8m5MpwyDgsMWHaMSQWH6'],
         pumpswap: ['6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P'],
+        bonkfun: ['BonkfunjxcXSo3Nvvv8YKxVy1jqhfNyVSKngkHa8EgD']
       };
 
       // Monitor for new transactions by subscribing to logs
@@ -361,6 +362,7 @@ class EventStreamManager {
       meteora: ['Eo7WjKq67rjJQSZxS6z3YkapzY3eMj6Xy8X5EQVn5UaB'],
       aldrin: ['AMM55ShdkoGRB5jVYPjWziwk8m5MpwyDgsMWHaMSQWH6'],
       pumpswap: ['6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P'],
+      bonkfun: ['BonkfunjxcXSo3Nvvv8YKxVy1jqhfNyVSKngkHa8EgD']
     };
 
     for (const [programName, programIds] of Object.entries(KNOWN_PROGRAMS)) {
@@ -375,6 +377,7 @@ class EventStreamManager {
       if (key.toLowerCase().includes('meteora')) return 'meteora';
       if (key.toLowerCase().includes('aldrin')) return 'aldrin';
       if (key.toLowerCase().includes('pump')) return 'pumpswap';
+      if (key.toLowerCase().includes('bonk') && key.toLowerCase().includes('fun')) return 'bonkfun';
     }
 
     return null;
