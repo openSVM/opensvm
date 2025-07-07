@@ -68,7 +68,7 @@ export const AnomalyAlertsTable = React.memo(function AnomalyAlertsTable({
     } finally {
       setLoadingDetails(false);
     }
-  }, []);
+  }, [getAccountsFromAlert]);
 
   const getAccountsFromAlert = useCallback((alert: AnomalyAlert): string[] => {
     if (!alert.event?.data?.accountKeys) return [];

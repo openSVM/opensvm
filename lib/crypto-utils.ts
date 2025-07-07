@@ -1,6 +1,7 @@
 /**
  * Crypto-secure utilities for UUID generation and other security-sensitive operations
  */
+import { randomUUID, randomBytes } from 'crypto';
 
 // Check if we're in a browser environment
 const isNode = typeof window === 'undefined';
@@ -13,8 +14,7 @@ const isNode = typeof window === 'undefined';
 export function generateSecureUUID(): string {
   if (isNode) {
     // Node.js environment
-    const crypto = require('crypto');
-    return crypto.randomUUID();
+    return randomUUID();
   } else {
     // Browser environment with enhanced fallback support
     if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -56,8 +56,7 @@ export function generateSecureActionId(): string {
 export function generateSecureRandomString(length: number = 9): string {
   if (isNode) {
     // Node.js environment
-    const crypto = require('crypto');
-    const bytes = crypto.randomBytes(Math.ceil(length * 0.75)); // Adjust for base36 encoding
+    const bytes = randomBytes(Math.ceil(length * 0.75)); // Adjust for base36 encoding
     return bytes.toString('hex').substring(0, length);
   } else {
     // Browser environment
