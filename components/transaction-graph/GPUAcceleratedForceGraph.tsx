@@ -231,7 +231,11 @@ export const GPUAcceleratedForceGraph: React.FC<GPUAcceleratedForceGraphProps> =
         if (graphRef.current) {
           console.log(`🔄 [GPU_GRAPH] Restarting force simulation`);
           try {
-            (graphRef.current as any).d3ReheatSimulation?.();
+            // Type-safe way to access d3ReheatSimulation if it exists
+            const graph = graphRef.current as { d3ReheatSimulation?: () => void };
+            if (graph.d3ReheatSimulation && typeof graph.d3ReheatSimulation === 'function') {
+              graph.d3ReheatSimulation();
+            }
           } catch (error) {
             console.warn(`⚠️ [GPU_GRAPH] Could not restart simulation:`, error);
           }

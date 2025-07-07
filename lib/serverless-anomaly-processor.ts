@@ -323,12 +323,101 @@ export class OffThreadAnomalyProcessor {
   }
 
   /**
-   * Get an available worker
+   * Get an available worker with improved scheduling
    */
   private getAvailableWorker(): Worker | null {
-    // Simple round-robin selection
-    // In a real implementation, we'd track worker availability
-    return this.workers.length > 0 ? this.workers[0] : null;
+    if (this.workers.length === 0) {
+      return null;
+    }
+
+    // Track worker busy states and task queues
+    const workerStats = this.workers.map((worker, index) => ({
+      worker,
+      index,
+      busyTasks: Array.from(this.activeTasks.values()).filter(task => 
+        task.id.endsWith(`_worker_${index}`)
+      ).length,
+      isAvailable: true // In a real implementation, track this properly
+    }));
+
+    // Find the least busy worker
+    const availableWorkers = workerStats.filter(w => w.isAvailable);
+    if (availableWorkers.length === 0) {
+      logger.warn('No available workers, tasks will be queued');
+      return null;
+    }
+
+    // Sort by least busy first
+    availableWorkers.sort((a, b) => a.busyTasks - b.busyTasks);
+    
+    const selectedWorker = availableWorkers[0];
+    logger.debug(`Selected worker ${selectedWorker.index} with ${selectedWorker.busyTasks} busy tasks`);
+    
+    return selectedWorker.worker;
+  }
+
+  /**
+   * Enhanced worker management with health checks
+   */
+  private async performWorkerHealthCheck(): Promise<void> {
+    const healthPromises = this.workers.map(async (worker, index) => {
+      try {
+        // Send ping to worker
+        const pingId = generateSecureActionId();
+        const pingPromise = new Promise<boolean>((resolve) => {
+          const timeout = setTimeout(() => resolve(false), 5000);
+          
+          const handler = (event: MessageEvent) => {
+            if (event.data.type === 'pong' && event.data.pingId === pingId) {
+              clearTimeout(timeout);
+              worker.removeEventListener('message', handler);
+              resolve(true);
+            }
+          };
+          
+          worker.addEventListener('message', handler);
+        });
+
+        worker.postMessage({ type: 'ping', pingId });
+        const isHealthy = await pingPromise;
+        
+        if (!isHealthy) {
+          logger.warn(`Worker ${index} failed health check, restarting`);
+          await this.restartWorker(index);
+        }
+      } catch (error) {
+        logger.error(`Health check failed for worker ${index}:`, error);
+        await this.restartWorker(index);
+      }
+    });
+
+    await Promise.allSettled(healthPromises);
+  }
+
+  /**
+   * Intelligent task scheduling with backpressure handling
+   */
+  private async scheduleTask(task: AnomalyTask): Promise<void> {
+    // Check queue capacity
+    if (this.taskQueue.length >= this.config.queueMaxSize) {
+      // Drop lowest priority tasks if queue is full
+      const lowPriorityIndex = this.taskQueue.findIndex(t => t.priority === 'low');
+      if (lowPriorityIndex !== -1) {
+        const droppedTask = this.taskQueue.splice(lowPriorityIndex, 1)[0];
+        logger.warn(`Dropped low priority task ${droppedTask.id} due to queue overflow`);
+      } else {
+        throw new Error('Task queue is full and no low priority tasks to drop');
+      }
+    }
+
+    // Insert task by priority
+    this.insertTaskByPriority(task);
+    
+    // Update stats
+    this.processingStats.queueSize = this.taskQueue.length;
+    
+    // Try to process immediately if workers are available
+    this.processQueue();
   }
 
   /**

@@ -2,7 +2,7 @@
 
 ## Overview
 
-The OpenSVM Streaming API provides real-time blockchain event monitoring with AI-driven anomaly detection. The API supports both WebSocket connections and HTTP polling with comprehensive rate limiting and authentication.
+The OpenSVM Streaming API provides real-time blockchain event monitoring with AI-driven anomaly detection. The API uses Server-Sent Events (SSE) for real-time data streaming with comprehensive rate limiting and authentication.
 
 ## Authentication
 
@@ -28,7 +28,7 @@ The OpenSVM Streaming API provides real-time blockchain event monitoring with AI
      "expiresIn": 3600,
      "rateLimits": {
        "api_requests": { "tokens": 100, "capacity": 100 },
-       "websocket_connections": { "tokens": 10, "capacity": 10 }
+       "sse_connections": { "tokens": 10, "capacity": 10 }
      }
    }
    ```
@@ -59,7 +59,7 @@ The API uses Token Bucket rate limiting with different limits for different oper
 | Type | Capacity | Refill Rate | Window |
 |------|----------|-------------|--------|
 | API Requests | 100 requests | 10/second | 1 minute |
-| WebSocket Connections | 10 connections | 1/second | 1 minute |
+| SSE Connections | 10 connections | 1/second | 1 minute |
 | Authentication | 5 attempts | 1/10 seconds | 5 minutes |
 | Anomaly Analysis | 50 requests | 5/second | 1 minute |
 
@@ -86,28 +86,28 @@ When rate limits are exceeded:
 }
 ```
 
-## WebSocket Connections
+## Server-Sent Events (SSE) Connections
 
-### Connection Upgrade
+### Connection Setup
 
 ```javascript
-const ws = new WebSocket('ws://localhost:3000/api/stream?clientId=my-client');
+const eventSource = new EventSource('/api/sse-alerts?clientId=my-client');
 
-ws.onopen = () => {
-  console.log('WebSocket connected');
+eventSource.onopen = () => {
+  console.log('SSE connected');
 };
 
-ws.onmessage = (event) => {
+eventSource.onmessage = (event) => {
   const data = JSON.parse(event.data);
   console.log('Received event:', data);
 };
 ```
 
-### WebSocket Limitations
+### Connection Management
 
-- **Environment Support**: WebSocket upgrades require a WebSocket-capable server
-- **Next.js Limitation**: API routes don't support WebSocket upgrades directly
-- **Alternative**: Use HTTP polling or deploy with custom WebSocket server
+- **Automatic Reconnection**: Client handles connection drops automatically
+- **Connection Limits**: Maximum 10 concurrent SSE connections per client
+- **Keep-Alive**: Heartbeat messages sent every 30 seconds
 
 ## HTTP Polling API
 
@@ -206,7 +206,7 @@ Content-Type: application/json
 | 400 | Bad Request | Check request format and required fields |
 | 401 | Unauthorized | Authenticate or refresh token |
 | 403 | Forbidden | Client blocked, contact support |
-| 426 | Upgrade Required | WebSocket upgrade needed but not supported |
+| 406 | Not Acceptable | SSE not supported by client |
 | 429 | Rate Limit Exceeded | Wait for rate limit reset |
 | 500 | Internal Server Error | Server issue, try again later |
 

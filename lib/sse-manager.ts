@@ -191,37 +191,135 @@ export class SSEManager {
   }
 
   /**
-   * Clean up inactive clients
+   * Enhanced cleanup with better memory management
    */
   cleanup(): void {
     const now = Date.now();
-    const timeout = 30 * 60 * 1000; // 30 minutes
+    const clientTimeout = 30 * 60 * 1000; // 30 minutes
+    const bufferTimeout = 10 * 60 * 1000; // 10 minutes for buffer
+    const maxBufferSize = 50; // Reduced from 100
+    
+    let removedClients = 0;
+    let cleanedBuffers = 0;
 
+    // Clean up inactive clients
     for (const [clientId, client] of this.clients.entries()) {
-      if (now - client.lastActivity > timeout) {
+      if (now - client.lastActivity > clientTimeout) {
         console.log(`Removing inactive SSE client ${clientId}`);
         this.removeClient(clientId);
+        removedClients++;
       }
     }
 
-    // Clean up old buffered alerts
+    // Enhanced buffer cleanup with memory pressure detection
+    const memoryPressure = this.detectMemoryPressure();
+    const bufferSizeLimit = memoryPressure ? 25 : maxBufferSize;
+
     for (const [clientId, alerts] of this.alertBuffer.entries()) {
-      if (alerts.length > 100) { // Keep only latest 100 alerts
-        this.alertBuffer.set(clientId, alerts.slice(-100));
+      const bufferAge = now - (alerts[0]?.timestamp || now);
+      
+      // Remove old buffers entirely
+      if (bufferAge > bufferTimeout) {
+        this.alertBuffer.delete(clientId);
+        cleanedBuffers++;
+        continue;
+      }
+      
+      // Trim oversized buffers
+      if (alerts.length > bufferSizeLimit) {
+        this.alertBuffer.set(clientId, alerts.slice(-bufferSizeLimit));
+        cleanedBuffers++;
+      }
+      
+      // Remove buffers for clients that no longer exist
+      if (!this.clients.has(clientId)) {
+        this.alertBuffer.delete(clientId);
+        cleanedBuffers++;
+      }
+    }
+
+    // Log cleanup stats
+    if (removedClients > 0 || cleanedBuffers > 0) {
+      console.log(`SSE cleanup completed: ${removedClients} clients removed, ${cleanedBuffers} buffers cleaned`);
+    }
+    
+    // Emergency cleanup if memory usage is still high
+    if (memoryPressure && this.getTotalMemoryUsage() > 10 * 1024 * 1024) { // 10MB threshold
+      this.emergencyCleanup();
+    }
+  }
+
+  /**
+   * Detect memory pressure from buffer sizes
+   */
+  private detectMemoryPressure(): boolean {
+    const totalAlerts = Array.from(this.alertBuffer.values())
+      .reduce((sum, alerts) => sum + alerts.length, 0);
+    
+    const avgAlertsPerClient = this.alertBuffer.size > 0 ? totalAlerts / this.alertBuffer.size : 0;
+    
+    // Memory pressure if we have too many alerts or large buffers
+    return totalAlerts > 1000 || avgAlertsPerClient > 50 || this.alertBuffer.size > 20;
+  }
+
+  /**
+   * Emergency cleanup when memory usage is high
+   */
+  private emergencyCleanup(): void {
+    console.warn('Performing emergency SSE cleanup due to memory pressure');
+    
+    // Keep only the most recent alerts for each client
+    for (const [clientId, alerts] of this.alertBuffer.entries()) {
+      if (alerts.length > 10) {
+        this.alertBuffer.set(clientId, alerts.slice(-10));
+      }
+    }
+    
+    // Remove clients that haven't been active in 10 minutes (instead of 30)
+    const now = Date.now();
+    const emergencyTimeout = 10 * 60 * 1000;
+    
+    for (const [clientId, client] of this.clients.entries()) {
+      if (now - client.lastActivity > emergencyTimeout) {
+        this.removeClient(clientId);
       }
     }
   }
 
   /**
-   * Get SSE statistics
+   * Estimate total memory usage
+   */
+  private getTotalMemoryUsage(): number {
+    let totalSize = 0;
+    
+    // Estimate buffer memory usage
+    for (const alerts of this.alertBuffer.values()) {
+      totalSize += alerts.length * 1024; // Rough estimate: 1KB per alert
+    }
+    
+    // Estimate client connection memory
+    totalSize += this.clients.size * 512; // Rough estimate: 512 bytes per client
+    
+    return totalSize;
+  }
+
+  /**
+   * Get enhanced SSE statistics with memory info
    */
   getStats(): any {
+    const memoryUsage = this.getTotalMemoryUsage();
+    const memoryPressure = this.detectMemoryPressure();
+    
     return {
       connectedClients: this.clients.size,
       bufferedAlerts: Object.fromEntries(
         Array.from(this.alertBuffer.entries()).map(([clientId, alerts]) => [clientId, alerts.length])
       ),
-      lastActivity: Math.max(...Array.from(this.clients.values()).map(c => c.lastActivity))
+      totalBufferedAlerts: Array.from(this.alertBuffer.values()).reduce((sum, alerts) => sum + alerts.length, 0),
+      estimatedMemoryUsage: Math.round(memoryUsage / 1024) + ' KB',
+      memoryPressure,
+      lastActivity: this.clients.size > 0 ? Math.max(...Array.from(this.clients.values()).map(c => c.lastActivity)) : 0,
+      oldestBuffer: this.alertBuffer.size > 0 ? Math.min(...Array.from(this.alertBuffer.values()).map(alerts => alerts[0]?.timestamp || Date.now())) : null
     };
   }
 }

@@ -17,18 +17,22 @@ import { createLogger } from '@/lib/debug-logger';
 import { KNOWN_PROGRAM_IDS, getProtocolFromProgramId, getProtocolDisplayName } from '@/lib/constants/program-ids';
 
 // Enhanced logger for live event monitoring
+import { safeGetMemoryInfo, safeCallGarbageCollector } from './transaction-graph/type-safe-utils';
+
 const logger = createLogger('LIVE_EVENT_MONITOR');
 
 // Performance monitoring utilities
 const performanceTracker = {
   memoryUsage: () => {
-    if (typeof window !== 'undefined' && 'performance' in window && 'memory' in (window as any).performance) {
-      const memory = (window as any).performance.memory;
-      return {
-        used: Math.round(memory.usedJSHeapSize / 1048576), // MB
-        total: Math.round(memory.totalJSHeapSize / 1048576), // MB
-        limit: Math.round(memory.jsHeapSizeLimit / 1048576) // MB
-      };
+    if (typeof window !== 'undefined') {
+      const memory = safeGetMemoryInfo(window);
+      if (memory) {
+        return {
+          used: Math.round(memory.usedJSHeapSize / 1048576), // MB
+          total: Math.round(memory.totalJSHeapSize / 1048576), // MB
+          limit: Math.round(memory.jsHeapSizeLimit / 1048576) // MB
+        };
+      }
     }
     return null;
   },
@@ -194,8 +198,8 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
           logger.warn('High memory usage detected, forcing cleanup');
           
           // Force garbage collection if available
-          if (typeof window !== 'undefined' && 'gc' in window) {
-            (window as any).gc();
+          if (typeof window !== 'undefined') {
+            safeCallGarbageCollector(window);
           }
           
           // Reduce event queue size more aggressively
@@ -300,8 +304,8 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
         });
         
         // Force browser cleanup
-        if (typeof window !== 'undefined' && 'gc' in window) {
-          (window as any).gc();
+        if (typeof window !== 'undefined') {
+          safeCallGarbageCollector(window);
         }
       }
     };
