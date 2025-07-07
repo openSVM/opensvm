@@ -13,6 +13,7 @@ import {
 } from '@/lib/api-response';
 import { generateSecureAuthToken, generateSecureClientId } from '@/lib/crypto-utils';
 import { createLogger } from '@/lib/debug-logger';
+import { KNOWN_PROGRAM_IDS, getProtocolFromProgramId, getProtocolDisplayName } from '@/lib/constants/program-ids';
 
 // Enhanced logger for stream API
 const logger = createLogger('STREAM_API');
@@ -397,15 +398,6 @@ class EventStreamManager {
         'Stake11111111111111111111111111111111111111', // Stake program
       ]);
 
-      // Known programs to highlight
-      const KNOWN_PROGRAMS = {
-        raydium: ['675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8', '27haf8L6oxUeXrHrgEgsexjSY5hbVUWEmvv9Nyxg8vQv'],
-        meteora: ['Eo7WjKq67rjJQSZxS6z3YkapzY3eMj6Xy8X5EQVn5UaB'],
-        aldrin: ['AMM55ShdkoGRB5jVYPjWziwk8m5MpwyDgsMWHaMSQWH6'],
-        pumpswap: ['6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P'],
-        bonkfun: ['BonkfunjxcXSo3Nvvv8YKxVy1jqhfNyVSKngkHa8EgD']
-      };
-
       // Monitor for new transactions by subscribing to logs with safe subscription
       await this.safeSubscribe('logs', () => {
         const logsCallback = async (logs: any, context: any) => {
@@ -479,17 +471,11 @@ class EventStreamManager {
   }
 
   private identifyKnownProgram(accountKeys: string[]): string | null {
-    const KNOWN_PROGRAMS = {
-      raydium: ['675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8', '27haf8L6oxUeXrHrgEgsexjSY5hbVUWEmvv9Nyxg8vQv'],
-      meteora: ['Eo7WjKq67rjJQSZxS6z3YkapzY3eMj6Xy8X5EQVn5UaB'],
-      aldrin: ['AMM55ShdkoGRB5jVYPjWziwk8m5MpwyDgsMWHaMSQWH6'],
-      pumpswap: ['6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P'],
-      bonkfun: ['BonkfunjxcXSo3Nvvv8YKxVy1jqhfNyVSKngkHa8EgD']
-    };
-
-    for (const [programName, programIds] of Object.entries(KNOWN_PROGRAMS)) {
-      if (programIds.some(id => accountKeys.includes(id))) {
-        return programName;
+    // Use centralized program ID mappings
+    for (const accountKey of accountKeys) {
+      const protocol = getProtocolFromProgramId(accountKey);
+      if (protocol) {
+        return getProtocolDisplayName(protocol);
       }
     }
 

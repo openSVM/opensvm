@@ -3,9 +3,9 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo, startTransition } from 'react';
 import { Card } from '@/components/ui/card';
 import { useSSEAlerts } from '@/lib/hooks/useSSEAlerts';
-import { BlockchainEvent } from '@/lib/hooks/useWebSocketStream'; // Note: This uses SSE, not WebSocket
+import { BlockchainEvent } from '@/lib/hooks/useWebSocketStream'; // Note: Legacy import for SSE-based streaming
 import { lamportsToSol } from '@/components/transaction-graph/utils';
-import { FIFOQueue } from '@/lib/utils/fifo-queue';
+import { RingBuffer } from '@/lib/utils/ring-buffer';
 import { TransactionTooltip } from './TransactionTooltip';
 import { PumpStatistics } from './PumpStatistics';
 import { EventFilterControls, EventFilters } from './EventFilterControls';
@@ -14,6 +14,7 @@ import { VirtualTableErrorBoundary } from './VirtualTableErrorBoundary';
 import { AnomalyAlertsTable } from './AnomalyAlertsTable';
 import { generateSecureClientId } from '@/lib/crypto-utils';
 import { createLogger } from '@/lib/debug-logger';
+import { KNOWN_PROGRAM_IDS, getProtocolFromProgramId, getProtocolDisplayName } from '@/lib/constants/program-ids';
 
 // Enhanced logger for live event monitoring
 const logger = createLogger('LIVE_EVENT_MONITOR');
@@ -124,7 +125,7 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
   refreshInterval = 15000 // Increased from 8000 to reduce API load
 }: LiveMonitorProps) {
   // Ultra-performance optimized state management
-  const [eventQueue] = useState(() => new FIFOQueue<BlockchainEvent>(maxEvents));
+  const [eventQueue] = useState(() => new RingBuffer<BlockchainEvent>(maxEvents));
   const [events, setEvents] = useState<BlockchainEvent[]>([]);
   const [isConnected, setIsConnected] = useState(false);
   const [stats, setStats] = useState<any>(null);
@@ -198,7 +199,7 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
           }
           
           // Reduce event queue size more aggressively
-          const reducedQueue = new FIFOQueue<BlockchainEvent>(Math.floor(maxEvents / 3));
+          const reducedQueue = new RingBuffer<BlockchainEvent>(Math.floor(maxEvents / 3));
           const recentEvents = eventQueue.getAll().slice(-Math.floor(maxEvents / 3));
           
           recentEvents.forEach(event => reducedQueue.enqueue(event));
@@ -285,7 +286,7 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
         logger.warn('Memory pressure detected, aggressive cleanup');
         
         // Much more aggressive cleanup
-        const reducedQueue = new FIFOQueue<BlockchainEvent>(Math.floor(maxEvents / 4));
+        const reducedQueue = new RingBuffer<BlockchainEvent>(Math.floor(maxEvents / 4));
         const recentEvents = eventQueue.getAll().slice(-Math.floor(maxEvents / 4));
         
         // Clear processing queue
@@ -318,15 +319,6 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
     'Config1111111111111111111111111111111111111',
     'Stake11111111111111111111111111111111111111',
   ]);
-
-  // Known programs to highlight
-  const KNOWN_PROGRAMS = {
-    raydium: ['675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8', '27haf8L6oxUeXrHrgEgsexjSY5hbVUWEmvv9Nyxg8vQv'],
-    meteora: ['Eo7WjKq67rjJQSZxS6z3YkapzY3eMj6Xy8X5EQVn5UaB'],
-    aldrin: ['AMM55ShdkoGRB5jVYPjWziwk8m5MpwyDgsMWHaMSQWH6'],
-    pumpswap: ['6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P'],
-    bonkfun: ['BonkfunjxcXSo3Nvvv8YKxVy1jqhfNyVSKngkHa8EgD']
-  };
 
   // Stable callbacks for SSE hook to prevent reconnection loops
   const handleAlert = useCallback((alert: any) => {
@@ -382,13 +374,14 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
 
   // Utility functions for event classification
   const identifyKnownProgram = useCallback((accountKeys: string[]): string | null => {
-    for (const [programName, programIds] of Object.entries(KNOWN_PROGRAMS)) {
-      if (programIds.some(id => accountKeys.includes(id))) {
-        return programName;
+    for (const accountKey of accountKeys) {
+      const protocol = getProtocolFromProgramId(accountKey);
+      if (protocol) {
+        return getProtocolDisplayName(protocol);
       }
     }
     return null;
-  }, [KNOWN_PROGRAMS]);
+  }, []);
 
   const classifyTransaction = useCallback((logs: string[], accountKeys: string[]): string => {
     if (logs.some(log => 

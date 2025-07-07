@@ -8,15 +8,8 @@ import {
   type AnomalyContext 
 } from '@/lib/anomaly-patterns';
 import { SSEManager } from '@/lib/sse-manager';
-
-// UUID v4 generation function
-function generateUUID(): string {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-    const r = Math.random() * 16 | 0;
-    const v = c === 'x' ? r : (r & 0x3 | 0x8);
-    return v.toString(16);
-  });
-}
+import { generateSecureUUID } from '@/lib/crypto-utils';
+import { RingBuffer } from '@/lib/utils/ring-buffer';
 
 interface AnomalyAlert {
   id: string;
@@ -28,77 +21,6 @@ interface AnomalyAlert {
   timestamp: number;
   confidence?: number;
   category?: string;
-}
-
-// Ring buffer implementation for efficient memory management
-// Uses synchronous operations to eliminate async lock overhead
-class RingBuffer<T> {
-  private buffer: T[];
-  private head = 0;
-  private tail = 0;
-  private count = 0;
-  private readonly capacity: number;
-
-  constructor(capacity: number) {
-    this.capacity = capacity;
-    this.buffer = new Array(capacity);
-  }
-
-  // Synchronous push operation - no async lock needed in single-threaded JS
-  push(item: T): void {
-    this.buffer[this.tail] = item;
-    this.tail = (this.tail + 1) % this.capacity;
-    
-    if (this.count < this.capacity) {
-      this.count++;
-    } else {
-      this.head = (this.head + 1) % this.capacity;
-    }
-  }
-
-  // Synchronous toArray operation - no async lock needed
-  toArray(): T[] {
-    const result: T[] = [];
-    for (let i = 0; i < this.count; i++) {
-      const index = (this.head + i) % this.capacity;
-      result.push(this.buffer[index]);
-    }
-    return result;
-  }
-
-  // Get a slice of recent items without copying the entire buffer
-  getRecent(maxItems: number): T[] {
-    const itemCount = Math.min(maxItems, this.count);
-    const result: T[] = [];
-    
-    for (let i = this.count - itemCount; i < this.count; i++) {
-      const index = (this.head + i) % this.capacity;
-      result.push(this.buffer[index]);
-    }
-    
-    return result;
-  }
-
-  // Check if buffer is near capacity for memory management
-  isNearCapacity(threshold: number = 0.8): boolean {
-    return this.count >= this.capacity * threshold;
-  }
-
-  // Clear buffer for memory management
-  clear(): void {
-    this.head = 0;
-    this.tail = 0;
-    this.count = 0;
-    // Don't reallocate buffer, just reset pointers
-  }
-
-  get size(): number {
-    return this.count;
-  }
-
-  get isFull(): boolean {
-    return this.count === this.capacity;
-  }
 }
 
 export class AnomalyDetectionCapability extends BaseCapability {
@@ -262,7 +184,7 @@ export class AnomalyDetectionCapability extends BaseCapability {
     const severity = calculateSeverity(pattern, event, context, confidence);
     
     return {
-      id: generateUUID(),
+      id: generateSecureUUID(),
       type: pattern.type,
       severity,
       description: pattern.description,

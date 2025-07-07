@@ -120,10 +120,14 @@ export function useSSEAlerts(options: UseSSEAlertsOptions = {}): UseSSEAlertsRet
           onErrorRef.current?.(new Error(errorMsg));
         }
 
-        // Attempt to reconnect with exponential backoff
+        // Attempt to reconnect with exponential backoff, jitter, and cap
         if (reconnectAttempts.current < maxReconnectAttempts && isMountedRef.current) {
-          const delay = Math.pow(2, reconnectAttempts.current) * 1000; // 1s, 2s, 4s, 8s, 16s
-          console.log(`[SSE] Reconnecting in ${delay}ms (attempt ${reconnectAttempts.current + 1}/${maxReconnectAttempts})`);
+          // Exponential backoff with 30-second cap and jitter
+          const baseDelay = Math.min(Math.pow(2, reconnectAttempts.current) * 1000, 30000);
+          const jitter = Math.random() * 1000; // 0-1s jitter
+          const delay = baseDelay + jitter;
+          
+          console.log(`[SSE] Reconnecting in ${Math.round(delay)}ms (attempt ${reconnectAttempts.current + 1}/${maxReconnectAttempts})`);
           
           reconnectTimeoutRef.current = setTimeout(() => {
             if (isMountedRef.current) {
@@ -132,8 +136,16 @@ export function useSSEAlerts(options: UseSSEAlertsOptions = {}): UseSSEAlertsRet
             }
           }, delay);
         } else if (isMountedRef.current) {
-          console.error('[SSE] Max reconnection attempts reached');
-          setError('Failed to establish SSE connection after multiple attempts');
+          // After max attempts, wait longer before giving up completely
+          console.error('[SSE] Max reconnection attempts reached. Waiting 5 minutes before final retry...');
+          setError('Connection lost. Retrying in 5 minutes...');
+          
+          reconnectTimeoutRef.current = setTimeout(() => {
+            if (isMountedRef.current) {
+              reconnectAttempts.current = 0; // Reset for final attempt
+              connect();
+            }
+          }, 5 * 60 * 1000); // 5 minutes
         }
       };
 

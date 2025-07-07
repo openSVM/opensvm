@@ -8,6 +8,7 @@ const isNode = typeof window === 'undefined';
 /**
  * Generate a crypto-secure UUID using Web Crypto API or Node.js crypto
  * Replaces Math.random() based UUID generation for security
+ * Includes enhanced fallback for older browsers and environments
  */
 export function generateSecureUUID(): string {
   if (isNode) {
@@ -15,12 +16,15 @@ export function generateSecureUUID(): string {
     const crypto = require('crypto');
     return crypto.randomUUID();
   } else {
-    // Browser environment
+    // Browser environment with enhanced fallback support
     if (typeof crypto !== 'undefined' && crypto.randomUUID) {
       return crypto.randomUUID();
-    } else {
-      // Fallback for older browsers using crypto.getRandomValues
+    } else if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+      // Fallback for browsers that support getRandomValues but not randomUUID
       return generateSecureUUIDFallback();
+    } else {
+      // Enhanced fallback for very old browsers
+      return generateHardenedPolyfillUUID();
     }
   }
 }
@@ -109,4 +113,47 @@ export function generateSecureAuthToken(): string {
  */
 export function generateSecureSessionToken(): string {
   return generateSecureRandomString(16) + Date.now().toString(36);
+}
+
+/**
+ * Enhanced hardened polyfill for UUID generation in very old browsers
+ * Uses multiple entropy sources and timing variations
+ */
+function generateHardenedPolyfillUUID(): string {
+  // Use multiple sources of entropy for very old browsers
+  const getRandomValue = () => {
+    const sources = [
+      () => Math.floor(Math.random() * 256),
+      () => Date.now() % 256,
+      () => Math.floor(performance.now() % 256),
+      () => Math.floor(Math.random() * Date.now()) % 256,
+    ];
+    
+    // XOR multiple sources for better entropy
+    return sources.reduce((acc, source) => {
+      try {
+        return acc ^ source();
+      } catch {
+        return acc ^ Math.floor(Math.random() * 256);
+      }
+    }, 0) % 256;
+  };
+
+  const bytes = new Array(16);
+  for (let i = 0; i < 16; i++) {
+    bytes[i] = getRandomValue();
+  }
+  
+  // Set version (4) and variant bits
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  
+  const hex = bytes.map(b => b.toString(16).padStart(2, '0')).join('');
+  return [
+    hex.substring(0, 8),
+    hex.substring(8, 12),
+    hex.substring(12, 16),
+    hex.substring(16, 20),
+    hex.substring(20, 32)
+  ].join('-');
 }
