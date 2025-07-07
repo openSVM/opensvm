@@ -10,6 +10,7 @@ import {
 import { SSEManager } from '@/lib/sse-manager';
 import { generateSecureUUID } from '@/lib/crypto-utils';
 import { RingBuffer } from '@/lib/utils/ring-buffer';
+import { getAnomalyPatternManager, loadAnomalyPatterns } from '@/lib/configurable-anomaly-patterns';
 
 interface AnomalyAlert {
   id: string;
@@ -35,7 +36,7 @@ export class AnomalyDetectionCapability extends BaseCapability {
     super(connection);
     this.recentEvents = new RingBuffer<any>(this.maxEventHistory);
     this.alerts = new RingBuffer<AnomalyAlert>(this.maxAlertHistory);
-    this.initializePatterns();
+    this.initializePatterns(); // Now async but fire-and-forget
     this.tools = this.createTools();
   }
 
@@ -50,10 +51,18 @@ export class AnomalyDetectionCapability extends BaseCapability {
            content.includes('monitor');
   }
 
-  private initializePatterns(): void {
-    // Load externalized patterns
-    this.patterns = getAllPatterns();
-    console.log(`Loaded ${this.patterns.length} anomaly detection patterns`);
+  private async initializePatterns(): Promise<void> {
+    try {
+      // Try to load configurable patterns first
+      const remoteConfigUrl = process.env.ANOMALY_PATTERNS_CONFIG_URL;
+      this.patterns = await loadAnomalyPatterns(remoteConfigUrl);
+      console.log(`Loaded ${this.patterns.length} configurable anomaly detection patterns`);
+    } catch (error) {
+      console.warn('Failed to load configurable patterns, falling back to static patterns:', error);
+      // Fallback to static patterns
+      this.patterns = getAllPatterns();
+      console.log(`Loaded ${this.patterns.length} static anomaly detection patterns`);
+    }
   }
 
   private createTools(): Tool[] {
@@ -77,6 +86,11 @@ export class AnomalyDetectionCapability extends BaseCapability {
         'configureDetection',
         'Configure anomaly detection parameters',
         this.configureDetection.bind(this)
+      ),
+      this.createToolExecutor(
+        'getPatternConfiguration',
+        'Get current anomaly pattern configuration',
+        this.getPatternConfiguration.bind(this)
       )
     ];
   }
@@ -286,13 +300,34 @@ export class AnomalyDetectionCapability extends BaseCapability {
   }
 
   private async configureDetection(params: ToolParams): Promise<any> {
-    // This would allow configuration of detection parameters
-    // For now, return current configuration
+    // Enhanced configuration with pattern manager support
+    const manager = getAnomalyPatternManager();
+    const configInfo = manager.getConfigurationInfo();
+    
     return {
       message: 'Anomaly detection configuration',
       patterns: this.patterns.length,
       maxEventHistory: this.maxEventHistory,
-      maxAlertHistory: this.maxAlertHistory
+      maxAlertHistory: this.maxAlertHistory,
+      patternConfiguration: configInfo
+    };
+  }
+
+  private async getPatternConfiguration(params: ToolParams): Promise<any> {
+    const manager = getAnomalyPatternManager();
+    const configInfo = manager.getConfigurationInfo();
+    const enabledPatterns = manager.getEnabledPatterns();
+    
+    return {
+      message: 'Current anomaly pattern configuration',
+      configuration: configInfo,
+      enabledPatterns: enabledPatterns.map(p => ({
+        type: p.type,
+        description: p.description,
+        severity: p.severity,
+        category: p.category,
+        threshold: p.threshold
+      }))
     };
   }
 
