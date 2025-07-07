@@ -43,6 +43,11 @@ export const AnomalyAlertsTable = React.memo(function AnomalyAlertsTable({
     }
   }, []);
 
+  const getAccountsFromAlert = useCallback((alert: AnomalyAlert): string[] => {
+    if (!alert.event?.data?.accountKeys) return [];
+    return alert.event.data.accountKeys.filter((key: string) => key && key.length > 0);
+  }, []);
+
   const handleAlertClick = useCallback(async (alert: AnomalyAlert) => {
     setSelectedAlert(alert);
     setLoadingDetails(true);
@@ -69,11 +74,6 @@ export const AnomalyAlertsTable = React.memo(function AnomalyAlertsTable({
       setLoadingDetails(false);
     }
   }, [getAccountsFromAlert]);
-
-  const getAccountsFromAlert = useCallback((alert: AnomalyAlert): string[] => {
-    if (!alert.event?.data?.accountKeys) return [];
-    return alert.event.data.accountKeys.filter((key: string) => key && key.length > 0);
-  }, []);
 
   const openFullAnomalyProfile = useCallback((alert: AnomalyAlert) => {
     const url = `/anomaly/${alert.id}`;

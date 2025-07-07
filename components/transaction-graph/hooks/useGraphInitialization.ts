@@ -2,7 +2,9 @@
 
 import { useRef, useCallback, useState, useEffect } from 'react';
 import cytoscape from 'cytoscape';
-import { initializeCytoscape, setupGraphInteractions, debugLog, errorLog } from '../utils';
+import { initializeCytoscape } from '../layout';
+import { setupGraphInteractions } from '../interaction-handlers';
+import { debugLog, errorLog } from '../utils';
 
 export function useGraphInitialization() {
   const cyRef = useRef<cytoscape.Core | null>(null);
