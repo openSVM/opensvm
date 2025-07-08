@@ -1,25 +1,33 @@
 /**
  * User Profile API Endpoints
- * Handles user profile operations
+ * Handles user profile operations with Qdrant storage and authentication
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { UserProfile, UserHistoryEntry } from '@/types/user-history';
-import { calculateStats, validateWalletAddress } from '@/lib/user-history-utils';
+import { UserProfile } from '@/types/user-history';
+import { calculateStats, validateWalletAddress, sanitizeInput } from '@/lib/user-history-utils';
+import { getSessionFromCookie } from '@/lib/auth-server';
+import { 
+  getUserProfile,
+  storeUserProfile,
+  getUserHistory,
+  checkQdrantHealth
+} from '@/lib/qdrant';
 
-// In a real implementation, this would be stored in a database
-// TODO: Replace with proper database storage for production
-// TODO: Implement data persistence across server restarts
-// TODO: Add proper indexing for wallet addresses and timestamps
-// TODO: Consider using Redis for caching frequently accessed profiles
-const serverProfileStore = new Map<string, UserProfile>();
-const serverHistoryStore = new Map<string, UserHistoryEntry[]>();
-
-// Basic authentication check
+// Authentication check using session validation
 function isValidRequest(request: NextRequest): boolean {
-  // TODO: Implement proper authentication (JWT, API key, etc.)
-  // For now, basic rate limiting could be added here
-  return true;
+  try {
+    const session = getSessionFromCookie();
+    if (!session) return false;
+    
+    // Check if session is expired
+    if (Date.now() > session.expiresAt) return false;
+    
+    return true;
+  } catch (error) {
+    console.error('Session validation error:', error);
+    return false;
+  }
 }
 
 export async function GET(
@@ -27,7 +35,13 @@ export async function GET(
   { params }: { params: { walletAddress: string } }
 ) {
   try {
-    // Basic authentication check
+    // Check Qdrant health first
+    const isHealthy = await checkQdrantHealth();
+    if (!isHealthy) {
+      return NextResponse.json({ error: 'Database unavailable' }, { status: 503 });
+    }
+
+    // Authentication check
     if (!isValidRequest(request)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -40,8 +54,8 @@ export async function GET(
       return NextResponse.json({ error: 'Invalid wallet address format' }, { status: 400 });
     }
 
-    // Get profile from store
-    let profile = serverProfileStore.get(validatedAddress);
+    // Get profile from Qdrant
+    let profile = await getUserProfile(validatedAddress);
     
     // If profile doesn't exist, create a basic one
     if (!profile) {
@@ -56,9 +70,9 @@ export async function GET(
     }
 
     // Get user history and update stats using centralized function
-    const history = serverHistoryStore.get(validatedAddress) || [];
-    profile.stats = calculateStats(history);
-    profile.history = history;
+    const historyResult = await getUserHistory(validatedAddress, { limit: 10000 });
+    profile.stats = calculateStats(historyResult.history);
+    profile.history = historyResult.history;
 
     return NextResponse.json({ profile });
   } catch (error) {
@@ -72,7 +86,13 @@ export async function PUT(
   { params }: { params: { walletAddress: string } }
 ) {
   try {
-    // Basic authentication check
+    // Check Qdrant health first
+    const isHealthy = await checkQdrantHealth();
+    if (!isHealthy) {
+      return NextResponse.json({ error: 'Database unavailable' }, { status: 503 });
+    }
+
+    // Authentication check
     if (!isValidRequest(request)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -88,7 +108,7 @@ export async function PUT(
     const body = await request.json();
     
     // Get existing profile or create new one
-    let profile = serverProfileStore.get(validatedAddress);
+    let profile = await getUserProfile(validatedAddress);
     
     if (!profile) {
       profile = {
@@ -101,12 +121,15 @@ export async function PUT(
       };
     }
 
-    // Update profile fields with basic sanitization
+    // Update profile fields with proper sanitization
     if (body.displayName !== undefined) {
-      profile.displayName = String(body.displayName).trim().slice(0, 100); // Limit length
+      profile.displayName = sanitizeInput(String(body.displayName)).slice(0, 100); // Limit length
     }
     if (body.avatar !== undefined) {
-      profile.avatar = String(body.avatar).trim().slice(0, 500); // Limit length
+      profile.avatar = sanitizeInput(String(body.avatar)).slice(0, 500); // Limit length
+    }
+    if (body.bio !== undefined) {
+      profile.bio = sanitizeInput(String(body.bio)).slice(0, 500); // Limit length
     }
     if (body.isPublic !== undefined) {
       profile.isPublic = Boolean(body.isPublic);
@@ -114,8 +137,8 @@ export async function PUT(
     
     profile.lastActive = Date.now();
 
-    // Store updated profile
-    serverProfileStore.set(validatedAddress, profile);
+    // Store updated profile in Qdrant
+    await storeUserProfile(profile);
 
     return NextResponse.json({ profile });
   } catch (error) {

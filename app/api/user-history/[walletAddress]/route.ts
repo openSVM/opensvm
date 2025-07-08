@@ -1,24 +1,33 @@
 /**
  * User History API Endpoints
- * Handles server-side user history operations
+ * Handles server-side user history operations with Qdrant storage and authentication
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { UserHistoryEntry } from '@/types/user-history';
 import { validateWalletAddress, sanitizeInput } from '@/lib/user-history-utils';
+import { getSessionFromCookie } from '@/lib/auth-server';
+import { 
+  storeHistoryEntry, 
+  getUserHistory, 
+  deleteUserHistory,
+  checkQdrantHealth 
+} from '@/lib/qdrant';
 
-// In a real implementation, this would be stored in a database
-// TODO: Replace with proper database storage for production
-// TODO: Implement data persistence across server restarts
-// TODO: Add proper indexing for wallet addresses and timestamps
-// TODO: Consider using Redis for caching frequently accessed data
-const serverHistoryStore = new Map<string, UserHistoryEntry[]>();
-
-// Basic authentication check
+// Authentication check using session validation
 function isValidRequest(request: NextRequest): boolean {
-  // TODO: Implement proper authentication (JWT, API key, etc.)
-  // For now, basic rate limiting could be added here
-  return true;
+  try {
+    const session = getSessionFromCookie();
+    if (!session) return false;
+    
+    // Check if session is expired
+    if (Date.now() > session.expiresAt) return false;
+    
+    return true;
+  } catch (error) {
+    console.error('Session validation error:', error);
+    return false;
+  }
 }
 
 export async function GET(
@@ -26,7 +35,13 @@ export async function GET(
   { params }: { params: { walletAddress: string } }
 ) {
   try {
-    // Basic authentication check
+    // Check Qdrant health first
+    const isHealthy = await checkQdrantHealth();
+    if (!isHealthy) {
+      return NextResponse.json({ error: 'Database unavailable' }, { status: 503 });
+    }
+
+    // Authentication check
     if (!isValidRequest(request)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -45,23 +60,19 @@ export async function GET(
     const offset = Math.max(parseInt(url.searchParams.get('offset') || '0'), 0);
     const pageType = sanitizeInput(url.searchParams.get('pageType') || '');
 
-    // Get user history from store
-    let history = serverHistoryStore.get(validatedAddress) || [];
-    
-    // Filter by page type if specified
-    if (pageType) {
-      history = history.filter(entry => entry.pageType === pageType);
-    }
-
-    // Apply pagination
-    const paginatedHistory = history.slice(offset, offset + limit);
-
-    return NextResponse.json({
-      history: paginatedHistory,
-      total: history.length,
+    // Get user history from Qdrant
+    const result = await getUserHistory(validatedAddress, {
       limit,
       offset,
-      hasMore: offset + limit < history.length
+      pageType: pageType || undefined
+    });
+
+    return NextResponse.json({
+      history: result.history,
+      total: result.total,
+      limit,
+      offset,
+      hasMore: offset + limit < result.total
     });
   } catch (error) {
     console.error('Error fetching user history:', error);
@@ -74,7 +85,13 @@ export async function POST(
   { params }: { params: { walletAddress: string } }
 ) {
   try {
-    // Basic authentication check
+    // Check Qdrant health first
+    const isHealthy = await checkQdrantHealth();
+    if (!isHealthy) {
+      return NextResponse.json({ error: 'Database unavailable' }, { status: 503 });
+    }
+
+    // Authentication check
     if (!isValidRequest(request)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -114,19 +131,16 @@ export async function POST(
       return NextResponse.json({ error: 'Invalid pageType' }, { status: 400 });
     }
 
-    // Get existing history or create new array
-    const existingHistory = serverHistoryStore.get(validatedAddress) || [];
-    
-    // Add new entry and keep only last 10,000 entries
-    const updatedHistory = [entry, ...existingHistory].slice(0, 10000);
-    
-    // Store updated history
-    serverHistoryStore.set(validatedAddress, updatedHistory);
+    // Store in Qdrant
+    await storeHistoryEntry(entry);
+
+    // Get updated total count
+    const result = await getUserHistory(validatedAddress, { limit: 1 });
 
     return NextResponse.json({ 
       success: true, 
       entry,
-      total: updatedHistory.length 
+      total: result.total
     });
   } catch (error) {
     console.error('Error adding history entry:', error);
@@ -139,7 +153,13 @@ export async function DELETE(
   { params }: { params: { walletAddress: string } }
 ) {
   try {
-    // Basic authentication check
+    // Check Qdrant health first
+    const isHealthy = await checkQdrantHealth();
+    if (!isHealthy) {
+      return NextResponse.json({ error: 'Database unavailable' }, { status: 503 });
+    }
+
+    // Authentication check
     if (!isValidRequest(request)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -152,8 +172,8 @@ export async function DELETE(
       return NextResponse.json({ error: 'Invalid wallet address format' }, { status: 400 });
     }
 
-    // Clear user history
-    serverHistoryStore.delete(validatedAddress);
+    // Delete user history from Qdrant
+    await deleteUserHistory(validatedAddress);
 
     return NextResponse.json({ success: true });
   } catch (error) {

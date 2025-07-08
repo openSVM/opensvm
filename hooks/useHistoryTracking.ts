@@ -1,6 +1,6 @@
 /**
  * History Tracking Hook
- * Tracks user page visits for logged-in users with improved error handling
+ * Tracks user page visits for authenticated users with improved error handling
  */
 
 'use client';
@@ -10,6 +10,7 @@ import { usePathname, useSearchParams } from 'next/navigation';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { UserHistoryEntry } from '@/types/user-history';
 import { validateWalletAddress } from '@/lib/user-history-utils';
+import { useAuth } from './useAuth';
 
 // Retry function with exponential backoff
 async function retryWithBackoff<T>(
@@ -137,10 +138,22 @@ export function useHistoryTracking() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { publicKey, connected } = useWallet();
-  const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'success' | 'error'>('idle');
+  const { isAuthenticated, authenticate } = useAuth();
+  const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'success' | 'error' | 'auth_required'>('idle');
 
   const trackPageVisit = useCallback(async (path: string, searchQuery?: string) => {
     if (!connected || !publicKey) return;
+
+    // Check if user is authenticated, if not try to authenticate
+    if (!isAuthenticated) {
+      setSyncStatus('auth_required');
+      const authSuccess = await authenticate();
+      if (!authSuccess) {
+        setSyncStatus('error');
+        setTimeout(() => setSyncStatus('idle'), 5000);
+        return;
+      }
+    }
 
     const walletAddress = publicKey.toBase58();
     
@@ -184,7 +197,7 @@ export function useHistoryTracking() {
       const updatedHistory = [newEntry, ...existingHistory].slice(0, 10000);
       localStorage.setItem(`opensvm_user_history_${validatedAddress}`, JSON.stringify(updatedHistory));
 
-      // Sync to server with retry logic
+      // Sync to server with retry logic (now with authentication)
       setSyncStatus('syncing');
       
       try {
@@ -194,10 +207,14 @@ export function useHistoryTracking() {
             headers: {
               'Content-Type': 'application/json',
             },
+            credentials: 'include', // Include cookies for authentication
             body: JSON.stringify(historyEntry)
           });
           
           if (!response.ok) {
+            if (response.status === 401) {
+              throw new Error('Authentication required');
+            }
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
           }
           
@@ -222,7 +239,7 @@ export function useHistoryTracking() {
       setSyncStatus('error');
       setTimeout(() => setSyncStatus('idle'), 5000);
     }
-  }, [connected, publicKey]);
+  }, [connected, publicKey, isAuthenticated, authenticate]);
 
   // Track page visits
   useEffect(() => {
