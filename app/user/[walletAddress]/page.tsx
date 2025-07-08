@@ -94,7 +94,7 @@ export default function UserProfilePage() {
       
       // Only apply token gating when viewing OTHER people's profiles
       try {
-        const response = await fetch(`/api/token-gating/check?wallet=${myWallet}`);
+        const response = await fetch(`/api/token-gating/check`);
         if (response.ok) {
           const data = await response.json();
           setTokenGating({
@@ -102,6 +102,14 @@ export default function UserProfilePage() {
             balance: data.data.balance,
             loading: false,
             error: data.data.error
+          });
+        } else if (response.status === 401) {
+          // User is not authenticated
+          setTokenGating({
+            hasAccess: false,
+            balance: 0,
+            loading: false,
+            error: 'Please connect your wallet to view restricted content'
           });
         } else {
           setTokenGating(prev => ({ 

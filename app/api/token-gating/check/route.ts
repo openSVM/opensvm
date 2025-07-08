@@ -1,18 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { checkSVMAIAccess } from '@/lib/token-gating';
+import { getSessionFromCookie } from '@/lib/auth-server';
 
 export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
-  const walletAddress = searchParams.get('wallet');
+  console.log(`[Token Gating] Checking access...`);
 
-  console.log(`[Token Gating] Checking access for wallet: ${walletAddress}`);
-
-  if (!walletAddress) {
+  // Get the authenticated session
+  const session = getSessionFromCookie();
+  
+  if (!session || Date.now() > session.expiresAt) {
+    console.log(`[Token Gating] No authenticated session found`);
     return NextResponse.json(
-      { error: 'Wallet address is required' },
-      { status: 400 }
+      { 
+        error: 'Not authenticated',
+        data: {
+          hasAccess: false,
+          balance: 0,
+          error: 'Authentication required to check token balance'
+        }
+      },
+      { status: 401 }
     );
   }
+
+  const walletAddress = session.walletAddress;
+  console.log(`[Token Gating] Checking access for authenticated wallet: ${walletAddress}`);
 
   try {
     const result = await checkSVMAIAccess(walletAddress);
