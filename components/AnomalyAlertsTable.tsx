@@ -278,6 +278,26 @@ function getAnomalyExplanation(alert: AnomalyAlert): string {
       return 'Multiple transactions from the same address in a very short time period, which could indicate bot activity or spam attacks.';
     case 'unusual_program_activity':
       return 'A program is being called with unusual frequency or patterns, which could indicate exploitation or abnormal usage.';
+    case 'account_drain_detection':
+      return 'Rapid depletion of account balance detected, which could indicate account compromise, theft, or unauthorized access.';
+    case 'flash_loan_attack_pattern':
+      return 'Pattern consistent with flash loan attacks detected, involving rapid borrowing and repaying with potential exploitation.';
+    case 'sandwich_attack_detection':
+      return 'MEV sandwich attack pattern identified, where transactions are placed before and after target transactions to extract value.';
+    case 'wash_trading_detection':
+      return 'Potential wash trading activity detected, involving circular trading patterns to artificially inflate volume.';
+    case 'token_spam_detection':
+      return 'Spam token creation or distribution detected, which could indicate airdrop farming or token flooding attacks.';
+    case 'arbitrage_bot_detection':
+      return 'High-frequency arbitrage bot activity detected, which may impact market dynamics and transaction costs.';
+    case 'price_manipulation':
+      return 'Artificial price manipulation patterns detected, involving coordinated trading to influence token prices.';
+    case 'phishing_signature':
+      return 'Potential phishing contract interactions detected, which could indicate users being tricked into malicious transactions.';
+    case 'liquidity_drain':
+      return 'Liquidity pool drainage patterns detected, which could indicate rug pulls or protocol exploitation.';
+    case 'governance_attack':
+      return 'Potential governance manipulation detected, involving unusual voting patterns or proposal activities.';
     default:
       return 'This pattern deviates from normal blockchain behavior and requires investigation.';
   }

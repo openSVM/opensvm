@@ -14,7 +14,7 @@ interface AnomalyPatternConfig {
   enabled: boolean;
   threshold: number;
   conditions: {
-    type: 'fee_spike' | 'failure_rate' | 'transaction_burst' | 'unusual_program' | 'large_transfer' | 'rapid_trades';
+    type: 'fee_spike' | 'failure_rate' | 'transaction_burst' | 'unusual_program' | 'large_transfer' | 'rapid_trades' | 'account_drain' | 'flash_loan_attack' | 'sandwich_attack' | 'wash_trading' | 'price_manipulation' | 'token_spam' | 'phishing_signature' | 'liquidity_drain' | 'arbitrage_bot' | 'governance_attack';
     operator: 'gt' | 'lt' | 'eq' | 'gte' | 'lte' | 'contains' | 'regex';
     value: any;
     field?: string;
@@ -130,6 +130,144 @@ const DEFAULT_PATTERNS: AnomalyPatternConfiguration = {
         mlWeight: 1.1,
         confidence: 0.85,
         timeWindowMs: 3600000 // 1 hour
+      }
+    },
+    {
+      id: 'account_drain_detection',
+      name: 'Account Drain Detection',
+      description: 'Rapid depletion of account balance detected',
+      severity: 'critical',
+      category: 'security',
+      enabled: true,
+      threshold: 0.8,
+      conditions: [
+        {
+          type: 'account_drain',
+          operator: 'gte',
+          value: 0.8,
+          field: 'balanceChangePercent'
+        }
+      ],
+      metadata: {
+        tags: ['drain', 'security', 'theft'],
+        mlWeight: 1.8,
+        confidence: 0.9,
+        timeWindowMs: 300000 // 5 minutes
+      }
+    },
+    {
+      id: 'flash_loan_attack_pattern',
+      name: 'Flash Loan Attack',
+      description: 'Potential flash loan attack pattern detected',
+      severity: 'critical',
+      category: 'security',
+      enabled: true,
+      threshold: 1,
+      conditions: [
+        {
+          type: 'flash_loan_attack',
+          operator: 'gte',
+          value: 1,
+          field: 'borrowRepayPattern'
+        }
+      ],
+      metadata: {
+        tags: ['flash_loan', 'attack', 'defi'],
+        mlWeight: 2.0,
+        confidence: 0.95,
+        timeWindowMs: 30000 // 30 seconds
+      }
+    },
+    {
+      id: 'sandwich_attack_detection',
+      name: 'Sandwich Attack',
+      description: 'MEV sandwich attack pattern detected',
+      severity: 'high',
+      category: 'behavior',
+      enabled: true,
+      threshold: 2,
+      conditions: [
+        {
+          type: 'sandwich_attack',
+          operator: 'gte',
+          value: 2,
+          field: 'frontRunBackRunPattern'
+        }
+      ],
+      metadata: {
+        tags: ['mev', 'sandwich', 'frontrun'],
+        mlWeight: 1.6,
+        confidence: 0.8,
+        timeWindowMs: 60000 // 1 minute
+      }
+    },
+    {
+      id: 'wash_trading_detection',
+      name: 'Wash Trading',
+      description: 'Potential wash trading activity detected',
+      severity: 'medium',
+      category: 'token_manipulation',
+      enabled: true,
+      threshold: 5,
+      conditions: [
+        {
+          type: 'wash_trading',
+          operator: 'gte',
+          value: 5,
+          field: 'circularTradingPattern'
+        }
+      ],
+      metadata: {
+        tags: ['wash_trading', 'manipulation', 'volume'],
+        mlWeight: 1.4,
+        confidence: 0.75,
+        timeWindowMs: 900000 // 15 minutes
+      }
+    },
+    {
+      id: 'token_spam_detection',
+      name: 'Token Spam',
+      description: 'Spam token creation or distribution detected',
+      severity: 'medium',
+      category: 'behavior',
+      enabled: true,
+      threshold: 10,
+      conditions: [
+        {
+          type: 'token_spam',
+          operator: 'gte',
+          value: 10,
+          field: 'tokenCreationBurst'
+        }
+      ],
+      metadata: {
+        tags: ['spam', 'tokens', 'creation'],
+        mlWeight: 1.2,
+        confidence: 0.7,
+        timeWindowMs: 600000 // 10 minutes
+      }
+    },
+    {
+      id: 'arbitrage_bot_detection',
+      name: 'Arbitrage Bot Activity',
+      description: 'High-frequency arbitrage bot activity detected',
+      severity: 'low',
+      category: 'behavior',
+      enabled: true,
+      threshold: 20,
+      conditions: [
+        {
+          type: 'arbitrage_bot',
+          operator: 'gte',
+          value: 20,
+          field: 'highFrequencyTrades'
+        }
+      ],
+      metadata: {
+        tags: ['arbitrage', 'bot', 'trading'],
+        mlWeight: 1.0,
+        confidence: 0.6,
+        timeWindowMs: 180000 // 3 minutes
       }
     }
   ]
@@ -308,7 +446,7 @@ export class AnomalyPatternManager {
           errors.push(`Condition ${index}: type is required`);
         }
 
-        const validTypes = ['fee_spike', 'failure_rate', 'transaction_burst', 'unusual_program', 'large_transfer', 'rapid_trades'];
+        const validTypes = ['fee_spike', 'failure_rate', 'transaction_burst', 'unusual_program', 'large_transfer', 'rapid_trades', 'account_drain', 'flash_loan_attack', 'sandwich_attack', 'wash_trading', 'price_manipulation', 'token_spam', 'phishing_signature', 'liquidity_drain', 'arbitrage_bot', 'governance_attack'];
         if (!validTypes.includes(condition.type)) {
           errors.push(`Condition ${index}: type must be one of: ${validTypes.join(', ')}`);
         }
@@ -434,7 +572,25 @@ export class AnomalyPatternManager {
       case 'failure_rate':
         return context.errorRate;
       case 'transaction_burst':
+      case 'rapid_trades':
+      case 'arbitrage_bot':
         return context.recentEvents.length;
+      case 'large_transfer':
+      case 'account_drain':
+      case 'liquidity_drain':
+        return context.transactionVolume;
+      case 'flash_loan_attack':
+      case 'sandwich_attack':
+      case 'wash_trading':
+      case 'price_manipulation':
+        return context.recentEvents.filter(e => e.type === 'transaction').length;
+      case 'token_spam':
+      case 'phishing_signature':
+        return context.recentEvents.filter(e => e.type === 'transaction' && e.data?.logs?.length > 0).length;
+      case 'governance_attack':
+        return context.recentEvents.filter(e => e.type === 'transaction' && e.data?.accountKeys?.length > 5).length;
+      case 'unusual_program':
+        return context.recentEvents.filter(e => e.type === 'transaction' && e.data?.err !== null).length;
       default:
         return 0;
     }
