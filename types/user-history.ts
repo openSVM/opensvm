@@ -42,15 +42,47 @@ export interface UserHistoryStats {
   }>;
 }
 
+export interface UserSocialStats {
+  visitsByUsers: number; // Total page views by other users
+  followers: number;
+  following: number;
+  likes: number;
+  profileViews: number;
+}
+
 export interface UserProfile {
   walletAddress: string;
   displayName?: string;
   avatar?: string;
+  bio?: string;
   isPublic: boolean;
   createdAt: number;
   lastActive: number;
   stats: UserHistoryStats;
+  socialStats: UserSocialStats;
   history: UserHistoryEntry[];
+}
+
+export interface UserFollowEntry {
+  id: string;
+  followerAddress: string;
+  followingAddress: string;
+  timestamp: number;
+}
+
+export interface UserLikeEntry {
+  id: string;
+  likerAddress: string;
+  targetAddress: string;
+  timestamp: number;
+}
+
+export interface UserPageView {
+  id: string;
+  viewerAddress: string;
+  targetAddress: string;
+  timestamp: number;
+  userAgent?: string;
 }
 
 export interface HistoryExportData {

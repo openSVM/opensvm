@@ -3,7 +3,14 @@
  * Centralized functions for user history statistics and validation
  */
 
-import { UserHistoryEntry, UserHistoryStats } from '@/types/user-history';
+import { 
+  UserHistoryEntry, 
+  UserHistoryStats, 
+  UserSocialStats, 
+  UserFollowEntry, 
+  UserLikeEntry, 
+  UserPageView 
+} from '@/types/user-history';
 
 /**
  * Calculate user statistics from history entries
@@ -91,6 +98,31 @@ export function validateWalletAddress(address: string): string | null {
   }
 
   return sanitized;
+}
+
+/**
+ * Calculate social statistics for a user
+ */
+export function calculateSocialStats(
+  followers: UserFollowEntry[],
+  following: UserFollowEntry[],
+  likes: UserLikeEntry[],
+  pageViews: UserPageView[]
+): UserSocialStats {
+  return {
+    visitsByUsers: pageViews.length,
+    followers: followers.length,
+    following: following.length,
+    likes: likes.length,
+    profileViews: pageViews.length
+  };
+}
+
+/**
+ * Generate unique ID for database entries
+ */
+export function generateId(): string {
+  return Date.now().toString(36) + Math.random().toString(36).substr(2);
 }
 
 /**
