@@ -144,8 +144,11 @@ export function useHistoryTracking() {
   const trackPageVisit = useCallback(async (path: string, searchQuery?: string) => {
     if (!connected || !publicKey) return;
 
-    // Check if user is authenticated, if not try to authenticate
-    if (!isAuthenticated) {
+    // Only require authentication for user profile pages
+    const isUserProfilePage = path.includes('/user/');
+    
+    // Check if user is authenticated, if not try to authenticate (only for user pages)
+    if (!isAuthenticated && isUserProfilePage) {
       setSyncStatus('auth_required');
       const authSuccess = await authenticate();
       if (!authSuccess) {
@@ -197,41 +200,48 @@ export function useHistoryTracking() {
       const updatedHistory = [newEntry, ...existingHistory].slice(0, 10000);
       localStorage.setItem(`opensvm_user_history_${validatedAddress}`, JSON.stringify(updatedHistory));
 
-      // Sync to server with retry logic (now with authentication)
-      setSyncStatus('syncing');
-      
-      try {
-        await retryWithBackoff(async () => {
-          const response = await fetch(`/api/user-history/${validatedAddress}`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            credentials: 'include', // Include cookies for authentication
-            body: JSON.stringify(historyEntry)
+      // Sync to server with retry logic (only if authenticated or for non-user pages)
+      if (isAuthenticated || !isUserProfilePage) {
+        setSyncStatus('syncing');
+        
+        try {
+          await retryWithBackoff(async () => {
+            const response = await fetch(`/api/user-history/${validatedAddress}`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              credentials: 'include', // Include cookies for authentication
+              body: JSON.stringify(historyEntry)
+            });
+            
+            if (!response.ok) {
+              // For non-user pages, don't require authentication
+              if (response.status === 401 && !isUserProfilePage) {
+                console.log('Skipping server sync for non-authenticated user on public page');
+                return { success: true, skipped: true };
+              }
+              if (response.status === 401) {
+                throw new Error('Authentication required');
+              }
+              throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            return response.json();
           });
           
-          if (!response.ok) {
-            if (response.status === 401) {
-              throw new Error('Authentication required');
-            }
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-          }
+          setSyncStatus('success');
           
-          return response.json();
-        });
-        
-        setSyncStatus('success');
-        
-        // Clear success status after a short delay
-        setTimeout(() => setSyncStatus('idle'), 2000);
-        
-      } catch (syncError) {
-        console.warn('Failed to sync history to server after retries:', syncError);
-        setSyncStatus('error');
-        
-        // Clear error status after a delay
-        setTimeout(() => setSyncStatus('idle'), 5000);
+          // Clear success status after a short delay
+          setTimeout(() => setSyncStatus('idle'), 2000);
+          
+        } catch (syncError) {
+          console.warn('Failed to sync history to server after retries:', syncError);
+          setSyncStatus('error');
+          
+          // Clear error status after a delay
+          setTimeout(() => setSyncStatus('idle'), 5000);
+        }
       }
 
     } catch (error) {

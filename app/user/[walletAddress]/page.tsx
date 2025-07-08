@@ -76,11 +76,23 @@ export default function UserProfilePage() {
   // Check token gating access
   useEffect(() => {
     const checkTokenAccess = async () => {
+      // If no wallet is connected, this is a public view - no access to restricted content
       if (!myWallet) {
         setTokenGating(prev => ({ ...prev, loading: false, hasAccess: false }));
         return;
       }
+
+      // If viewing your own profile, always grant access (no token gating for own profile)
+      if (validatedWalletAddress && myWallet === validatedWalletAddress) {
+        setTokenGating({
+          hasAccess: true,
+          balance: 0, // Balance irrelevant for own profile
+          loading: false
+        });
+        return;
+      }
       
+      // Only apply token gating when viewing OTHER people's profiles
       try {
         const response = await fetch(`/api/token-gating/check?wallet=${myWallet}`);
         if (response.ok) {
@@ -111,7 +123,7 @@ export default function UserProfilePage() {
     };
 
     checkTokenAccess();
-  }, [myWallet]);
+  }, [myWallet, validatedWalletAddress]);
 
   const handleFollowToggle = async () => {
     if (!validatedWalletAddress || socialLoading || (myWallet && validatedWalletAddress === myWallet)) return;
@@ -435,14 +447,14 @@ export default function UserProfilePage() {
           </Card>
         </div>
 
-        {/* Token Gating Notice */}
-        {!tokenGating.loading && !tokenGating.hasAccess && (
+        {/* Token Gating Notice - Only show for other people's profiles */}
+        {!tokenGating.loading && !tokenGating.hasAccess && !isMyProfile && (
           <Card className="border-destructive/50 bg-destructive/5 dark:border-destructive/30 dark:bg-destructive/10">
             <CardContent className="p-4">
               <div className="flex items-center gap-2 text-destructive">
                 <Coins className="h-4 w-4" />
                 <span className="text-sm font-medium">
-                  Token Gating Active: 100,000+ $SVMAI required to view profile history and statistics
+                  Token Gating Active: 100,000+ $SVMAI required to view other users' profile history and statistics
                 </span>
               </div>
             </CardContent>
@@ -480,7 +492,7 @@ export default function UserProfilePage() {
                   </div>
                 </CardContent>
               </Card>
-            ) : !tokenGating.hasAccess ? (
+            ) : !tokenGating.hasAccess && !isMyProfile ? (
               <Card className="border-destructive/50 bg-destructive/5 dark:border-destructive/30 dark:bg-destructive/10">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-destructive">
@@ -493,7 +505,7 @@ export default function UserProfilePage() {
                     <Coins className="h-5 w-5 text-destructive mt-1" />
                     <div className="space-y-2">
                       <p className="text-foreground">
-                        You need to hold at least <strong>100,000 $SVMAI tokens</strong> to view profile history.
+                        You need to hold at least <strong>100,000 $SVMAI tokens</strong> to view other users' profile history.
                       </p>
                       <p className="text-sm text-muted-foreground">
                         Current balance: <strong>{tokenGating.balance.toLocaleString()}</strong> $SVMAI
@@ -507,8 +519,8 @@ export default function UserProfilePage() {
                   </div>
                   <div className="pt-2 border-t border-border">
                     <p className="text-sm text-muted-foreground">
-                      This restriction applies to all users, including viewing your own profile history.
-                      Please acquire the required $SVMAI tokens to access this feature.
+                      This restriction only applies when viewing other users' profiles.
+                      Your own profile is always accessible to you.
                     </p>
                   </div>
                 </CardContent>
@@ -528,7 +540,7 @@ export default function UserProfilePage() {
                   </div>
                 </CardContent>
               </Card>
-            ) : !tokenGating.hasAccess ? (
+            ) : !tokenGating.hasAccess && !isMyProfile ? (
               <Card className="border-destructive/50 bg-destructive/5 dark:border-destructive/30 dark:bg-destructive/10">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-destructive">
@@ -538,7 +550,7 @@ export default function UserProfilePage() {
                 </CardHeader>
                 <CardContent>
                   <p className="text-foreground">
-                    Statistics and activity data require <strong>100,000+ $SVMAI tokens</strong> to view.
+                    Statistics and activity data require <strong>100,000+ $SVMAI tokens</strong> to view for other users.
                   </p>
                   <p className="text-sm text-muted-foreground mt-2">
                     Current balance: <strong>{tokenGating.balance.toLocaleString()}</strong> $SVMAI
@@ -595,7 +607,7 @@ export default function UserProfilePage() {
                   </div>
                 </CardContent>
               </Card>
-            ) : !tokenGating.hasAccess ? (
+            ) : !tokenGating.hasAccess && !isMyProfile ? (
               <Card className="border-destructive/50 bg-destructive/5 dark:border-destructive/30 dark:bg-destructive/10">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-destructive">
@@ -605,7 +617,7 @@ export default function UserProfilePage() {
                 </CardHeader>
                 <CardContent>
                   <p className="text-foreground">
-                    Activity feed requires <strong>100,000+ $SVMAI tokens</strong> to view.
+                    Activity feed requires <strong>100,000+ $SVMAI tokens</strong> to view for other users.
                   </p>
                   <p className="text-sm text-muted-foreground mt-2">
                     Current balance: <strong>{tokenGating.balance.toLocaleString()}</strong> $SVMAI
