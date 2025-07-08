@@ -1,19 +1,33 @@
 'use client';
 
 import { useWallet } from '@solana/wallet-adapter-react';
-import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { Button } from '@/components/ui/button';
 import { useEffect, useState } from 'react';
 
 interface WalletButtonProps {}
 
 export const WalletButton: React.FC<WalletButtonProps> = () => {
-  const { connected, connecting, disconnect } = useWallet();
+  const { connected, connecting, disconnect, select, wallets, publicKey } = useWallet();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  const handleConnect = async () => {
+    // Find Phantom wallet from available wallets
+    const phantomWallet = wallets.find(wallet => wallet.adapter.name === 'Phantom');
+    
+    if (phantomWallet) {
+      try {
+        // Select and connect to Phantom wallet
+        select(phantomWallet.adapter.name);
+        await phantomWallet.adapter.connect();
+      } catch (error) {
+        console.error('Failed to connect to Phantom wallet:', error);
+      }
+    }
+  };
 
   if (!mounted) {
     return (
@@ -32,7 +46,7 @@ export const WalletButton: React.FC<WalletButtonProps> = () => {
     );
   }
 
-  if (connected) {
+  if (connected && publicKey) {
     return (
       <Button 
         variant="outline" 
@@ -45,8 +59,12 @@ export const WalletButton: React.FC<WalletButtonProps> = () => {
   }
 
   return (
-    <WalletMultiButton
-      className="min-w-[180px] h-9 px-4 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 inline-flex items-center justify-center font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
-    />
+    <Button
+      variant="outline"
+      className="min-w-[180px] h-9 bg-primary text-primary-foreground hover:bg-primary/90"
+      onClick={handleConnect}
+    >
+      Connect Wallet
+    </Button>
   );
 };
