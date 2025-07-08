@@ -8,6 +8,7 @@
 
 import React, { useState, useCallback, useMemo } from 'react';
 import { Card } from '@/components/ui/card';
+import { CopyButton } from '@/components/CopyButton';
 
 interface AnomalyAlert {
   id: string;
@@ -46,6 +47,72 @@ export const AnomalyAlertsTable = React.memo(function AnomalyAlertsTable({
   const getAccountsFromAlert = useCallback((alert: AnomalyAlert): string[] => {
     if (!alert.event?.data?.accountKeys) return [];
     return alert.event.data.accountKeys.filter((key: string) => key && key.length > 0);
+  }, []);
+
+  const getTransactionIdFromAlert = useCallback((alert: AnomalyAlert): string | null => {
+    if (!alert.event?.data?.signature) return null;
+    return alert.event.data.signature;
+  }, []);
+
+  const getTokenMintFromAlert = useCallback((alert: AnomalyAlert): string[] => {
+    const mints: string[] = [];
+    
+    // Check tokenChanges for mint addresses
+    if (alert.event?.data?.tokenChanges) {
+      alert.event.data.tokenChanges.forEach((change: any) => {
+        if (change.mint) {
+          mints.push(change.mint);
+        }
+      });
+    }
+    
+    // Check preTokenBalances for mint addresses
+    if (alert.event?.data?.preTokenBalances) {
+      alert.event.data.preTokenBalances.forEach((balance: any) => {
+        if (balance.mint) {
+          mints.push(balance.mint);
+        }
+      });
+    }
+    
+    // Check postTokenBalances for mint addresses
+    if (alert.event?.data?.postTokenBalances) {
+      alert.event.data.postTokenBalances.forEach((balance: any) => {
+        if (balance.mint) {
+          mints.push(balance.mint);
+        }
+      });
+    }
+    
+    // Remove duplicates
+    return [...new Set(mints)];
+  }, []);
+
+  const isTokenRelatedAnomaly = useCallback((alert: AnomalyAlert): boolean => {
+    const tokenTypes = [
+      'token_spam',
+      'token_spam_detection',
+      'pump_token_spam',
+      'pump_rapid_minting',
+      'pump_liquidity_manipulation',
+      'large_transfer',
+      'rapid_trades',
+      'wash_trading',
+      'wash_trading_detection',
+      'price_manipulation',
+      'liquidity_drain',
+      'arbitrage_bot',
+      'arbitrage_bot_detection'
+    ];
+    return tokenTypes.includes(alert.type);
+  }, []);
+
+  const isFeeRelatedAnomaly = useCallback((alert: AnomalyAlert): boolean => {
+    const feeTypes = [
+      'suspicious_fee_spike',
+      'fee_spike'
+    ];
+    return feeTypes.includes(alert.type);
   }, []);
 
   const handleAlertClick = useCallback(async (alert: AnomalyAlert) => {
@@ -194,6 +261,42 @@ export const AnomalyAlertsTable = React.memo(function AnomalyAlertsTable({
                   {getAnomalyExplanation(selectedAlert)}
                 </div>
               </div>
+
+              {/* Transaction ID for Fee Spikes */}
+              {isFeeRelatedAnomaly(selectedAlert) && getTransactionIdFromAlert(selectedAlert) && (
+                <div>
+                  <h5 className="text-xs font-semibold mb-2">Transaction ID</h5>
+                  <div className="flex items-center">
+                    <button
+                      onClick={() => window.open(`/tx/${getTransactionIdFromAlert(selectedAlert)}`, '_blank', 'noopener,noreferrer')}
+                      className="text-xs text-primary hover:underline font-mono"
+                    >
+                      {getTransactionIdFromAlert(selectedAlert)?.substring(0, 8)}...{getTransactionIdFromAlert(selectedAlert)?.substring(getTransactionIdFromAlert(selectedAlert)?.length - 8)}
+                    </button>
+                    <CopyButton text={getTransactionIdFromAlert(selectedAlert)!} />
+                  </div>
+                </div>
+              )}
+
+              {/* Token Mint Addresses for Token-Related Anomalies */}
+              {isTokenRelatedAnomaly(selectedAlert) && getTokenMintFromAlert(selectedAlert).length > 0 && (
+                <div>
+                  <h5 className="text-xs font-semibold mb-2">Token Mint Addresses</h5>
+                  <div className="space-y-1">
+                    {getTokenMintFromAlert(selectedAlert).map((mint, index) => (
+                      <div key={index} className="flex items-center">
+                        <button
+                          onClick={() => window.open(`/token/${mint}`, '_blank', 'noopener,noreferrer')}
+                          className="text-xs text-primary hover:underline font-mono"
+                        >
+                          {mint.substring(0, 8)}...{mint.substring(mint.length - 8)}
+                        </button>
+                        <CopyButton text={mint} />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Involved Accounts */}
               <div>
