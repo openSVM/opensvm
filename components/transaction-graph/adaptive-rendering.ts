@@ -1,9 +1,13 @@
 'use client';
 
+import { createLogger } from '@/lib/debug-logger';
+
 /**
  * VR and WebGPU capability detection and fallback utilities
  * Future-proofing for next-generation visualization technologies
  */
+
+const logger = createLogger('ADAPTIVE_RENDERING');
 
 interface VRCapabilities {
   hasVRSupport: boolean;
@@ -237,14 +241,14 @@ export async function initializeAdaptiveRendering(
 ): Promise<AdaptiveRenderingContext> {
   const result = await selectOptimalRenderingMode(options);
   
-  console.log(`🎨 [RENDERING] ${result.recommended}`);
+  logger.info(`${result.recommended}`);
   
   if (result.capabilities.vr.hasVRSupport) {
-    console.log(`🥽 [VR] VR support detected - ${result.capabilities.vr.supportedSessionModes.join(', ')} modes available`);
+    logger.debug(`VR support detected - ${result.capabilities.vr.supportedSessionModes.join(', ')} modes available`);
   }
   
   if (result.capabilities.webgpu.hasWebGPUSupport) {
-    console.log(`🚀 [WebGPU] WebGPU support detected - high-performance compute available`);
+    logger.debug(`WebGPU support detected - high-performance compute available`);
   }
 
   return new AdaptiveRenderingContext(result.mode, result.capabilities);

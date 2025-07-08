@@ -6,6 +6,7 @@ import dagre from 'cytoscape-dagre';
 import { useRouter } from 'next/navigation';
 import { GraphStateCache, ViewportState } from '@/lib/graph-state-cache';
 import { debounce } from '@/lib/utils';
+import { createLogger } from '@/lib/debug-logger';
 import { TrackingStatsPanel } from './TrackingStatsPanel';
 import { TransactionGraphClouds } from '../TransactionGraphClouds';
 import { GPUAcceleratedForceGraph } from './GPUAcceleratedForceGraph';
@@ -81,6 +82,9 @@ function TransactionGraph({
   height = '100%',
   maxDepth = 2 // Reduced from 3 to 2 for better performance
 }: TransactionGraphProps) {
+  // Logger instance
+  const logger = createLogger('TRANSACTION_GRAPH');
+  
   // Component refs 
   const containerRef = useRef<HTMLDivElement>(null);
   const isInitialized = useRef<boolean>(false);
@@ -182,6 +186,74 @@ function TransactionGraph({
   const transactionCache = useRef<Map<string, any>>(new Map());
   const pendingFetchesRef = useRef<Set<string>>(new Set());
   const isProcessingQueueRef = useRef<boolean>(false);
+  
+  // Fullscreen functionality
+  const toggleFullscreen = useCallback(() => {
+    if (!containerRef.current) return;
+
+    if (!isFullscreen) {
+      // Enter fullscreen
+      if (containerRef.current.requestFullscreen) {
+        containerRef.current.requestFullscreen();
+      } else if ((containerRef.current as any).mozRequestFullScreen) {
+        (containerRef.current as any).mozRequestFullScreen();
+      } else if ((containerRef.current as any).webkitRequestFullscreen) {
+        (containerRef.current as any).webkitRequestFullscreen();
+      } else if ((containerRef.current as any).msRequestFullscreen) {
+        (containerRef.current as any).msRequestFullscreen();
+      }
+    } else {
+      // Exit fullscreen
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      } else if ((document as any).mozCancelFullScreen) {
+        (document as any).mozCancelFullScreen();
+      } else if ((document as any).webkitExitFullscreen) {
+        (document as any).webkitExitFullscreen();
+      } else if ((document as any).msExitFullscreen) {
+        (document as any).msExitFullscreen();
+      }
+    }
+  }, [isFullscreen]);
+
+  // Resize graph callback for fullscreen changes
+  const resizeGraphCallback = useCallback(() => {
+    if (cyRef.current && containerRef.current) {
+      resizeGraph(cyRef, true);
+    }
+  }, []);
+
+  // Listen for fullscreen changes
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      const isCurrentlyFullscreen = !!(
+        document.fullscreenElement ||
+        (document as any).mozFullScreenElement ||
+        (document as any).webkitFullscreenElement ||
+        (document as any).msFullscreenElement
+      );
+      setIsFullscreen(isCurrentlyFullscreen);
+      
+      // Resize graph when entering/exiting fullscreen
+      setTimeout(() => {
+        resizeGraphCallback();
+      }, 100);
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    document.addEventListener('msfullscreenchange', handleFullscreenChange);
+
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('msfullscreenchange', handleFullscreenChange);
+    };
+  }, [resizeGraphCallback]);
+  
+  // Router for navigation
   const fetchQueueRef = useRef<Array<{address: string; depth: number; parentSignature: string | null}>>([]);
   const queueAccountFetchRef = useRef<any>(null);
   const focusSignatureRef = useRef<string>(initialSignature);
@@ -371,14 +443,14 @@ function TransactionGraph({
   // Convert Cytoscape data to GPU graph format
   const convertToGPUGraphData = useCallback(() => {
     if (!cyRef.current) {
-      console.log('🔄 [GPU_CONVERT] No Cytoscape instance, returning empty data');
+      logger.debug('No Cytoscape instance, returning empty data');
       return { nodes: [], links: [] };
     }
 
     const cytoscapeNodes = cyRef.current.nodes();
     const cytoscapeEdges = cyRef.current.edges();
     
-    console.log(`🔄 [GPU_CONVERT] Converting Cytoscape data: ${cytoscapeNodes.length} nodes, ${cytoscapeEdges.length} edges`);
+    logger.debug(`Converting Cytoscape data: ${cytoscapeNodes.length} nodes, ${cytoscapeEdges.length} edges`);
 
     const nodes = cytoscapeNodes.map((node) => {
       const data = node.data();
@@ -416,7 +488,7 @@ function TransactionGraph({
         accountCount: data.accountCount || 0,
         color: color
       };
-      console.log(`🔄 [GPU_CONVERT] Converted node: ${data.id} (${data.type}/${data.subType || 'none'})`);
+      logger.debug(`Converted node: ${data.id} (${data.type}/${data.subType || 'none'})`);
       return convertedNode;
     });
 
@@ -444,11 +516,11 @@ function TransactionGraph({
         label: data.label,
         color: color
       };
-      console.log(`🔄 [GPU_CONVERT] Converted edge: ${data.source} -> ${data.target} (${data.type})`);
+      logger.debug(`Converted edge: ${data.source} -> ${data.target} (${data.type})`);
       return convertedLink;
     });
 
-    console.log(`✅ [GPU_CONVERT] Conversion complete: ${nodes.length} nodes, ${links.length} links`);
+    logger.debug(`Conversion complete: ${nodes.length} nodes, ${links.length} links`);
     
     // Log summary statistics
     const nodeStats = nodes.reduce((stats: Record<string, number>, node) => {
@@ -456,13 +528,13 @@ function TransactionGraph({
       stats[key] = (stats[key] || 0) + 1;
       return stats;
     }, {});
-    console.log(`✅ [GPU_CONVERT] Node statistics:`, nodeStats);
+    logger.debug(`Node statistics:`, nodeStats);
     
     const linkStats = links.reduce((stats: Record<string, number>, link) => {
       stats[link.type] = (stats[link.type] || 0) + 1;
       return stats;
     }, {});
-    console.log(`✅ [GPU_CONVERT] Link statistics:`, linkStats);
+    logger.debug(`Link statistics:`, linkStats);
     
     return { nodes, links };
   }, []);
@@ -470,39 +542,39 @@ function TransactionGraph({
   // Update GPU graph data when Cytoscape changes
   const updateGPUGraphData = useCallback(() => {
     if (useGPUGraph) {
-      console.log('🔄 [GPU_UPDATE] Updating GPU graph data...');
+      logger.debug('Updating GPU graph data...');
       const newData = convertToGPUGraphData();
-      console.log(`🔄 [GPU_UPDATE] Setting GPU graph data: ${newData.nodes.length} nodes, ${newData.links.length} links`);
+      logger.debug(`Setting GPU graph data: ${newData.nodes.length} nodes, ${newData.links.length} links`);
       
       // Log what types of nodes we have
       const nodeTypes = newData.nodes.reduce((types: Record<string, number>, node) => {
         types[node.type] = (types[node.type] || 0) + 1;
         return types;
       }, {});
-      console.log(`🔄 [GPU_UPDATE] Node types:`, nodeTypes);
+      logger.debug(`Node types:`, nodeTypes);
       
       // Log what types of links we have
       const linkTypes = newData.links.reduce((types: Record<string, number>, link) => {
         types[link.type] = (types[link.type] || 0) + 1;
         return types;
       }, {});
-      console.log(`🔄 [GPU_UPDATE] Link types:`, linkTypes);
+      logger.debug(`Link types:`, linkTypes);
       
       // Log sample data for debugging
       if (newData.nodes.length > 0) {
-        console.log(`🔄 [GPU_UPDATE] Sample node:`, newData.nodes[0]);
+        logger.debug(`Sample node:`, newData.nodes[0]);
       }
       if (newData.links.length > 0) {
-        console.log(`🔄 [GPU_UPDATE] Sample link:`, newData.links[0]);
+        logger.debug(`Sample link:`, newData.links[0]);
       }
       
       setGpuGraphData(newData);
-      console.log('✅ [GPU_UPDATE] GPU graph data updated successfully');
+      logger.debug('GPU graph data updated successfully');
       
       // Enhanced feedback for empty graphs
       if (newData.nodes.length === 0) {
-        console.log('🚨 [GPU_UPDATE] CRITICAL: GPU graph is empty after update');
-        console.log('🚨 [GPU_UPDATE] Cytoscape elements count:', cyRef.current?.elements().length || 0);
+        logger.warn('CRITICAL: GPU graph is empty after update');
+        logger.debug('Cytoscape elements count:', cyRef.current?.elements().length || 0);
         
         // Force an error message to show user why graph is empty
         setError({
@@ -515,7 +587,7 @@ function TransactionGraph({
           setError(null);
         }, 8000);
       } else if (newData.nodes.length === 1 && newData.links.length === 0) {
-        console.log('⚠️ [GPU_UPDATE] WARNING: GPU graph has only isolated node');
+        logger.warn('GPU graph has only isolated node');
         
         // Show informative message about limited data
         setError({
@@ -528,7 +600,7 @@ function TransactionGraph({
           setError(null);
         }, 6000);
       } else {
-        console.log(`✅ [GPU_UPDATE] Good data: ${newData.nodes.length} nodes and ${newData.links.length} links`);
+        logger.debug(`Good data: ${newData.nodes.length} nodes and ${newData.links.length} links`);
         
         // Clear any previous error messages
         setError(null);
@@ -537,13 +609,13 @@ function TransactionGraph({
       // Force a UI re-render to ensure the graph component updates
       setTimeout(() => {
         if (containerRef.current) {
-          console.log('🔄 [GPU_UPDATE] Forcing container resize to trigger re-render');
+          logger.debug('Forcing container resize to trigger re-render');
           const resizeEvent = new Event('resize');
           window.dispatchEvent(resizeEvent);
         }
       }, 100);
     } else {
-      console.log('🔄 [GPU_UPDATE] GPU graph disabled, skipping update');
+      logger.debug('GPU graph disabled, skipping update');
     }
   }, [useGPUGraph, convertToGPUGraphData]);
 
@@ -655,7 +727,7 @@ function TransactionGraph({
         }
         
         // Update GPU graph after adding data
-        console.log(`🔄 [GPU_TRIGGER] Triggering GPU graph update after adding account ${address}`);
+        logger.debug(`Triggering GPU graph update after adding account ${address}`);
         updateGPUGraphData();
       }
 
@@ -1038,11 +1110,11 @@ function TransactionGraph({
   // Update GPU graph data when Cytoscape graph changes
   useEffect(() => {
     if (cyRef.current && useGPUGraph) {
-      console.log('🔄 [GPU_LISTENER] Setting up GPU graph update listeners');
+      logger.debug('Setting up GPU graph update listeners');
       
       // Set up listener for graph changes
       const updateHandler = () => {
-        console.log('🔄 [GPU_LISTENER] Cytoscape graph changed, updating GPU graph');
+        logger.debug('Cytoscape graph changed, updating GPU graph');
         updateGPUGraphData();
       };
       
@@ -1050,12 +1122,12 @@ function TransactionGraph({
       cyRef.current.on('add remove data position', updateHandler);
       
       // Initial update
-      console.log('🔄 [GPU_LISTENER] Performing initial GPU graph update');
+      logger.debug('Performing initial GPU graph update');
       updateGPUGraphData();
       
       return () => {
         if (cyRef.current) {
-          console.log('🔄 [GPU_LISTENER] Removing GPU graph update listeners');
+          logger.debug('Removing GPU graph update listeners');
           cyRef.current.off('add remove data position', updateHandler);
         }
       };
@@ -1151,7 +1223,7 @@ function TransactionGraph({
             console.log('🚀 [PROGRESS] Added initial transaction node, progress: 20%');
             
             // Update GPU graph immediately after adding initial node
-            console.log('🔄 [GPU_INITIAL] Updating GPU graph after adding initial transaction node');
+            logger.debug('Updating GPU graph after adding initial transaction node');
             updateGPUGraphData();
           }
         }
@@ -1165,6 +1237,7 @@ function TransactionGraph({
             typedState.nodes.forEach(node => {
               if (node.data && !cyRef.current?.getElementById(node.data.id).length && !signal.aborted) {
                 cyRef.current?.add(node);
+
               }
             });
             
@@ -1191,136 +1264,65 @@ function TransactionGraph({
           
           const response = await fetch(`/api/transaction/${initialSignature}`, { signal });
           
-          if (response.ok && !signal.aborted) {
-            const txData = await response.json();
-            console.log('✅ [FETCH] Transaction data fetched, progress: 60%');
-            setLoadingProgress(60);
-            
-            // Update transaction node with fetched data
-            if (cyRef.current && !signal.aborted) {
-              const txNode = cyRef.current.getElementById(initialSignature);
-              if (txNode.length) {
-                txNode.data('status', 'loaded');
-                txNode.data('timestamp', txData.timestamp || Date.now());
-                txNode.data('success', txData.success);
-                
-                console.log(`✅ [TX_UPDATE] Updated transaction node: ${initialSignature}`);
-                console.log(`✅ [TX_UPDATE] Success: ${txData.success}, Type: ${txData.type}, Timestamp: ${txData.timestamp}`);
-              }
-            }
-            
-            if (txData.details?.accounts?.length > 0 && !signal.aborted) {
-              const firstAccount = txData.details.accounts[0].pubkey;
-              if (firstAccount) {
-                console.log(`🎯 [ACCOUNT] Starting graph build from account: ${firstAccount}`);
-                setLoadingProgress(80);
-                
-                // Initialize refs to ensure they exist
-                if (!loadedAccountsRef.current) {
-                  loadedAccountsRef.current = new Set();
-                }
-                
-                if (!signal.aborted) {
-                  try {
-                    // Queue the first account and provide immediate feedback
-                    console.log(`📝 [QUEUE] Queuing account: ${firstAccount}`);
-                    queueAccountFetch(firstAccount, 0, initialSignature);
-                    
-                    // Force queue processing immediately to ensure it starts
-                    console.log(`🔄 [QUEUE] Force processing queue immediately`);
-                    setTimeout(() => {
-                      if (!signal.aborted) {
-                        processAccountFetchQueue();
-                      }
-                    }, 100);
-                  
-                  // Set a more aggressive progress update with guaranteed completion
-                  setLoadingProgress(85);
-                  console.log('📈 [PROGRESS] Queued first account, progress: 85%');
-                  
-                  // Add multiple fallback mechanisms to ensure progress moves
-                  let progressCheckCount = 0;
-                  const maxChecks = 10;
-                  
-                  // Create a promise that resolves when progress is complete or times out
-                  const progressPromise = new Promise<void>((resolve) => {
-                    const checkProgress = () => {
-                      progressCheckCount++;
-                      const currentProgress = 85 + (progressCheckCount * 1.5);
-                      setLoadingProgress(Math.min(currentProgress, 99));
-                      console.log(`🔄 [PROGRESS CHECK ${progressCheckCount}] Progress: ${Math.min(currentProgress, 99)}%`);
-                      
-                      const elements = cyRef.current?.elements().length || 0;
-                      const accounts = loadedAccountsRef.current?.size || 0;
-                      console.log(`📊 [STATS] Elements: ${elements}, Loaded accounts: ${accounts}`);
-                      
-                      if (progressCheckCount >= maxChecks || elements > 2 || accounts > 0) {
-                        console.log('✅ [COMPLETE] Progress checks complete');
-                        resolve();
-                      } else {
-                        setTimeout(checkProgress, 500);
-                      }
-                    };
-                    checkProgress();
-                  });
-                  
-                  // Add a backup timeout to ensure loading always completes
-                  const backupTimeout = setTimeout(() => {
-                    console.log('⏰ [BACKUP] Backup timeout triggered - completing loading');
-                    setLoadingProgress(100);
-                    setLoading(false);
-                  }, 8000); // 8 seconds backup
-                  
-                  // Wait for processing with progress monitoring
-                  await Promise.race([progressPromise, new Promise(resolve => setTimeout(resolve, 7000))]);
-                  
-                  clearTimeout(backupTimeout);
-                  
-                  const elements = cyRef.current?.elements().length || 0;
-                  console.log(`🎭 [FINAL] Graph elements after processing: ${elements}`);
-                  
-                  if (elements > 1) {
-                    setLoadingProgress(100);
-                    console.log('🎉 [SUCCESS] Graph build successful, progress: 100%');
-                  } else {
-                    // Complete loading even with minimal data
-                    console.log('⚠️ [WARNING] Graph build completed with limited data, progress: 100%');
-                    setLoadingProgress(100);
-                  }
-                  } catch (error) {
-                    console.error('❌ [ERROR] Error during graph building:', error);
-                    setLoadingProgress(100);
-                  }
-                }
-              } else {
-                console.log('⚠️ [WARNING] No valid account found in transaction data');
-                setLoadingProgress(100);
-              }
-            } else {
-              console.log('⚠️ [WARNING] No accounts found in transaction data');
-              setLoadingProgress(100);
-            }
-          } else {
-            console.error(`Failed to fetch transaction data: ${response.status}`);
-            setError({
-              message: `Failed to load transaction data: ${response.statusText}`,
-              severity: 'error'
-            });
-            setLoadingProgress(100);
+          // Check for cached state first
+          const cachedState = GraphStateCache.loadState(initialSignature);
+          const hasExistingElements = cyRef.current?.elements().length > 0;
+          
+          // Skip initialization if we already have elements and signature matches
+          if (hasExistingElements && initialSignature === currentSignature) {
+            setLoading(false);
+            return;
           }
           
-          // Set initial viewport for fresh data
-          if (cyRef.current) {
-            requestAnimationFrame(() => {
-              if (cyRef.current) {
-                runLayoutOptimized(true, false);
-                setTimeout(() => {
-                  if (cyRef.current) {
-                    cyRef.current.zoom(0.8);
-                  }
-                }, 100);
-              }
+          // Create initial transaction node regardless of cache state
+          if (cyRef.current && !cyRef.current.getElementById(initialSignature).length) {
+            cyRef.current.add({ 
+              data: { 
+                id: initialSignature, 
+                label: initialSignature.slice(0, 8) + '...', 
+                type: 'transaction' 
+              }, 
+              classes: 'transaction highlight-transaction' 
             });
+          }
+
+          // If we have cached state, restore it first
+          if (cachedState && Array.isArray(cachedState.nodes) && cachedState.nodes.length > 0) {
+            try {
+              // Restore cached nodes and edges
+              const typedState = cachedState as unknown as CachedState;
+              typedState.nodes.forEach(node => {
+                if (node.data && !cyRef.current?.getElementById(node.data.id).length) {
+                  cyRef.current?.add(node);
+                }
+              });
+              
+              if (typedState.edges) {
+                typedState.edges.forEach(edge => {
+                  if (edge.data && !cyRef.current?.getElementById(edge.data.id).length) {
+                    cyRef.current?.add(edge);
+                  }
+                });
+              }
+              
+              // Run layout with proper typing
+              if (cyRef.current) {
+                cyRef.current.layout({
+                  name: 'dagre',
+                  // @ts-ignore - dagre layout options are not fully typed
+                  rankDir: 'TB', // Changed from 'LR' to 'TB' to rotate 90 degrees to the right
+                  fit: true,
+                  padding: 50
+                }).run();
+              }
+              
+              if (!signal.aborted) {
+                setLoadingProgress(100);
+                console.log('Restored cached state, progress: 100%');
+              }
+            } catch (err) {
+              console.warn('Error restoring cached state:', err);
+            }
           }
         }
       } catch (err) {
@@ -1504,44 +1506,6 @@ function TransactionGraph({
     };
   }, []);
 
-  // Resize graph callback for fullscreen changes
-  const resizeGraphCallback = useCallback(() => {
-    if (cyRef.current && containerRef.current) {
-      resizeGraph(cyRef, true);
-    }
-  }, []);
-
-  // Fullscreen functionality
-  const toggleFullscreen = useCallback(async () => {
-    if (!containerRef.current) return;
-    
-    try {
-      if (!isFullscreen) {
-        if (containerRef.current.requestFullscreen) {
-          await containerRef.current.requestFullscreen();
-        } else if ((containerRef.current as any).webkitRequestFullscreen) {
-          await (containerRef.current as any).webkitRequestFullscreen();
-        } else if ((containerRef.current as any).mozRequestFullScreen) {
-          await (containerRef.current as any).mozRequestFullScreen();
-        } else if ((containerRef.current as any).msRequestFullscreen) {
-          await (containerRef.current as any).msRequestFullscreen();
-        }
-      } else {
-        if (document.exitFullscreen) {
-          await document.exitFullscreen();
-        } else if ((document as any).webkitExitFullscreen) {
-          await (document as any).webkitExitFullscreen();
-        } else if ((document as any).mozCancelFullScreen) {
-          await (document as any).mozCancelFullScreen();
-        } else if ((document as any).msExitFullscreen) {
-          await (document as any).msExitFullscreen();
-        }
-      }
-    } catch (err) {
-      console.error('Error toggling fullscreen:', err);
-    }
-  }, [isFullscreen]);
-
   // Handle fullscreen change events
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -1722,6 +1686,7 @@ function TransactionGraph({
 
       <div 
         ref={containerRef}
+
         className={`graph-container w-full bg-muted/50 rounded-lg border border-border overflow-hidden ${isFullscreen ? 'rounded-none border-none bg-background' : ''}`}
         style={{ 
           width: '100%', 
@@ -1815,6 +1780,40 @@ function TransactionGraph({
             <path d="M5 12h14"></path>
             <path d="M12 5l7 7-7 7"></path>
           </svg>
+        </button>
+        
+        {/* Fullscreen button */}
+        <button 
+          className="p-1.5 hover:bg-primary/10 rounded-md transition-colors"
+          onClick={toggleFullscreen}
+          title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+          aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+        >
+          {isFullscreen ? (
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M8 3v3a2 2 0 0 1-2 2H3"></path>
+              <path d="M21 8h-3a2 2 0 0 1-2-2V3"></path>
+              <path d="M3 16h3a2 2 0 0 1 2 2v3"></path>
+              <path d="M16 21v-3a2 2 0 0 1 2-2h3"></path>
+            </svg>
+          ) : (
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 7V3h4"></path>
+              <path d="M17 3h4v4"></path>
+              <path d="M21 17v4h-4"></path>
+              <path d="M7 21H3v-4"></path>
+            </svg>
+          )}
+        </button>
+        
+        {/* Cloud view button */}
+        <button 
+          className="p-1.5 hover:bg-primary/10 rounded-md transition-colors"
+          onClick={showCloudView}
+          title="Show cloud view"
+          aria-label="Show cloud view"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg>
         </button>
 
         <button 

@@ -5,6 +5,7 @@
 [build.environment]
   NODE_VERSION = "22"
   NEXT_TELEMETRY_DISABLED = "1"
+  PUPPETEER_SKIP_DOWNLOAD = "true"
   NETLIFY_NEXT_PLUGIN_SKIP = "false"
   NPM_FLAGS = "--legacy-peer-deps"
 
