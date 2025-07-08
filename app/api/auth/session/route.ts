@@ -4,8 +4,9 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { generateSessionKey, createSignMessage, setSessionCookie } from '@/lib/auth';
-import { validateWalletAddress, sanitizeInput } from '@/lib/user-history-utils';
+import { generateSessionKey, createSignMessage } from '@/lib/auth';
+import { validateWalletAddress } from '@/lib/user-history-utils';
+import { getSessionFromCookie } from '@/lib/auth-server';
 
 export async function POST(request: NextRequest) {
   try {
@@ -32,5 +33,23 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Error creating session:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+export async function GET() {
+  try {
+    const session = getSessionFromCookie();
+    
+    if (!session || Date.now() > session.expiresAt) {
+      return NextResponse.json({ authenticated: false });
+    }
+    
+    return NextResponse.json({ 
+      authenticated: true,
+      walletAddress: session.walletAddress,
+      expiresAt: session.expiresAt
+    });
+  } catch (error) {
+    return NextResponse.json({ authenticated: false });
   }
 }

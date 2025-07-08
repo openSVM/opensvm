@@ -75,11 +75,11 @@ export function UserHistoryDisplay({ history }: UserHistoryDisplayProps) {
       <Card>
         <CardContent className="p-6">
           <div className="text-center">
-            <Activity className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
+            <Activity className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-foreground mb-2">
               No browsing history
             </h3>
-            <p className="text-gray-600 dark:text-gray-400">
+            <p className="text-muted-foreground">
               Start exploring the blockchain to see your activity here!
             </p>
           </div>

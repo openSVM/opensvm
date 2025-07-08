@@ -63,6 +63,7 @@ export function UserHistoryStats({ stats }: UserHistoryStatsProps) {
   };
 
   const getDaysActive = () => {
+    if (!stats.firstVisit) return 0;
     const today = new Date();
     const firstVisit = new Date(stats.firstVisit);
     const timeDiff = today.getTime() - firstVisit.getTime();
@@ -91,16 +92,16 @@ export function UserHistoryStats({ stats }: UserHistoryStatsProps) {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                <p className="text-sm font-medium text-muted-foreground">
                   Days Active
                 </p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                <p className="text-2xl font-bold text-foreground">
                   {getDaysActive()}
                 </p>
               </div>
               <Calendar className="h-8 w-8 text-blue-600" />
             </div>
-            <div className="mt-4 text-xs text-gray-500 dark:text-gray-500">
+            <div className="mt-4 text-xs text-muted-foreground">
               Since {formatDate(stats.firstVisit)}
             </div>
           </CardContent>
@@ -110,16 +111,16 @@ export function UserHistoryStats({ stats }: UserHistoryStatsProps) {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                <p className="text-sm font-medium text-muted-foreground">
                   Avg. Daily Visits
                 </p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                <p className="text-2xl font-bold text-foreground">
                   {getAverageVisitsPerDay()}
                 </p>
               </div>
               <TrendingUp className="h-8 w-8 text-green-600" />
             </div>
-            <div className="mt-4 text-xs text-gray-500 dark:text-gray-500">
+            <div className="mt-4 text-xs text-muted-foreground">
               Based on {stats.totalVisits} total visits
             </div>
           </CardContent>
@@ -129,16 +130,16 @@ export function UserHistoryStats({ stats }: UserHistoryStatsProps) {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                <p className="text-sm font-medium text-muted-foreground">
                   Peak Daily Visits
                 </p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                <p className="text-2xl font-bold text-foreground">
                   {getMaxDailyVisits()}
                 </p>
               </div>
               <Activity className="h-8 w-8 text-purple-600" />
             </div>
-            <div className="mt-4 text-xs text-gray-500 dark:text-gray-500">
+            <div className="mt-4 text-xs text-muted-foreground">
               Highest single day activity
             </div>
           </CardContent>
@@ -148,16 +149,16 @@ export function UserHistoryStats({ stats }: UserHistoryStatsProps) {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                <p className="text-sm font-medium text-muted-foreground">
                   Recent Activity
                 </p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                <p className="text-2xl font-bold text-foreground">
                   {getRecentActivity()}
                 </p>
               </div>
               <Clock className="h-8 w-8 text-orange-600" />
             </div>
-            <div className="mt-4 text-xs text-gray-500 dark:text-gray-500">
+            <div className="mt-4 text-xs text-muted-foreground">
               Last 7 days
             </div>
           </CardContent>

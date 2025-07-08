@@ -7,7 +7,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
-import { UserProfile, UserHistoryEntry } from '@/types/user-history';
+import { UserProfile } from '@/types/user-history';
 import { validateWalletAddress } from '@/lib/user-history-utils';
 import { UserHistoryDisplay } from '@/components/user-history/UserHistoryDisplay';
 import { UserHistoryStats } from '@/components/user-history/UserHistoryStats';
@@ -19,12 +19,11 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useTheme } from '@/lib/theme';
+import { useCurrentUser } from '@/contexts/AuthContext';
 import { 
   User, 
   Activity, 
   BarChart3, 
-  Download, 
   Calendar, 
   Eye, 
   Globe,
@@ -33,22 +32,33 @@ import {
   UserPlus,
   UserMinus,
   Heart,
-  Users
+  Users,
+  Lock,
+  Coins
 } from 'lucide-react';
 
 export default function UserProfilePage() {
   const params = useParams();
   const rawWalletAddress = params?.walletAddress as string;
-  
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState('history');
+  const [activeTab] = useState('history');
   const [validatedWalletAddress, setValidatedWalletAddress] = useState<string | null>(null);
   const [isFollowing, setIsFollowing] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
   const [socialLoading, setSocialLoading] = useState(false);
-  const { theme } = useTheme();
+  const { walletAddress: myWallet } = useCurrentUser(); // Use auth context instead of direct API call
+  const [tokenGating, setTokenGating] = useState<{
+    hasAccess: boolean;
+    balance: number;
+    loading: boolean;
+    error?: string;
+  }>({
+    hasAccess: false,
+    balance: 0,
+    loading: true
+  });
 
   // Validate wallet address on mount
   useEffect(() => {
@@ -63,22 +73,59 @@ export default function UserProfilePage() {
     }
   }, [rawWalletAddress]);
 
+  // Check token gating access
+  useEffect(() => {
+    const checkTokenAccess = async () => {
+      if (!myWallet) {
+        setTokenGating(prev => ({ ...prev, loading: false, hasAccess: false }));
+        return;
+      }
+      
+      try {
+        const response = await fetch(`/api/token-gating/check?wallet=${myWallet}`);
+        if (response.ok) {
+          const data = await response.json();
+          setTokenGating({
+            hasAccess: data.data.hasAccess,
+            balance: data.data.balance,
+            loading: false,
+            error: data.data.error
+          });
+        } else {
+          setTokenGating(prev => ({ 
+            ...prev, 
+            loading: false, 
+            hasAccess: false,
+            error: 'Failed to check token balance'
+          }));
+        }
+      } catch (error) {
+        console.error('Error checking token access:', error);
+        setTokenGating(prev => ({ 
+          ...prev, 
+          loading: false, 
+          hasAccess: false,
+          error: 'Network error checking token balance'
+        }));
+      }
+    };
+
+    checkTokenAccess();
+  }, [myWallet]);
+
   const handleFollowToggle = async () => {
-    if (!validatedWalletAddress || socialLoading) return;
-    
+    if (!validatedWalletAddress || socialLoading || (myWallet && validatedWalletAddress === myWallet)) return;
     try {
       setSocialLoading(true);
       const action = isFollowing ? 'unfollow' : 'follow';
-      
       const response = await fetch(`/api/user-social/${action}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ targetAddress: validatedWalletAddress })
       });
-      
       if (response.ok) {
         setIsFollowing(!isFollowing);
-        // Update follower count in profile
         if (profile) {
           setProfile({
             ...profile,
@@ -97,21 +144,18 @@ export default function UserProfilePage() {
   };
 
   const handleLikeToggle = async () => {
-    if (!validatedWalletAddress || socialLoading) return;
-    
+    if (!validatedWalletAddress || socialLoading || (myWallet && validatedWalletAddress === myWallet)) return;
     try {
       setSocialLoading(true);
       const action = isLiked ? 'unlike' : 'like';
-      
       const response = await fetch(`/api/user-social/${action}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ targetAddress: validatedWalletAddress })
       });
-      
       if (response.ok) {
         setIsLiked(!isLiked);
-        // Update likes count in profile
         if (profile) {
           setProfile({
             ...profile,
@@ -131,48 +175,34 @@ export default function UserProfilePage() {
 
   const fetchUserProfile = useCallback(async () => {
     if (!validatedWalletAddress) return;
-    
     try {
       setLoading(true);
       setError(null);
-      
-      console.log('Fetching profile for:', validatedWalletAddress);
       const response = await fetch(`/api/user-profile/${validatedWalletAddress}`);
-      
-      console.log('Response status:', response.status);
-      console.log('Response ok:', response.ok);
-      
       if (!response.ok) {
         const errorData = await response.text();
-        console.error('API error response:', errorData);
         throw new Error(`Failed to fetch user profile: ${response.status} ${errorData}`);
       }
-      
       const data = await response.json();
-      console.log('Profile data received:', data);
-      
       if (!data.profile) {
         throw new Error('No profile data in response');
       }
-      
       setProfile(data.profile);
-
-      // Track profile view (increment view count)
-      await fetch(`/api/user-social/view`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ targetAddress: validatedWalletAddress })
-      }).catch(error => {
-        console.log('Profile view tracking failed:', error);
-        // Don't fail the whole page load if view tracking fails
-      });
+      // Track profile view (increment view count) if not my own profile
+      if (!myWallet || validatedWalletAddress !== myWallet) {
+        await fetch(`/api/user-social/view`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ targetAddress: validatedWalletAddress })
+        }).catch(() => {});
+      }
     } catch (error) {
-      console.error('Error fetching user profile:', error);
       setError(error instanceof Error ? error.message : 'Failed to load user profile');
     } finally {
       setLoading(false);
     }
-  }, [validatedWalletAddress]);
+  }, [validatedWalletAddress, myWallet]);
 
   useEffect(() => {
     fetchUserProfile();
@@ -243,6 +273,7 @@ export default function UserProfilePage() {
     });
   };
 
+  const isMyProfile = myWallet && validatedWalletAddress === myWallet;
   return (
     <div className="min-h-screen bg-background p-4">
       <div className="max-w-7xl mx-auto space-y-6">
@@ -263,6 +294,12 @@ export default function UserProfilePage() {
                     <h1 className="text-2xl font-bold text-foreground">
                       {profile.displayName || formatWalletAddress(profile.walletAddress)}
                     </h1>
+                    {isMyProfile && (
+                      <Badge variant="default" className="bg-primary text-primary-foreground">
+                        <User className="h-3 w-3 mr-1" />
+                        My Profile
+                      </Badge>
+                    )}
                     {profile.isPublic && (
                       <Badge variant="secondary" className="bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300">
                         <Globe className="h-3 w-3 mr-1" />
@@ -270,7 +307,11 @@ export default function UserProfilePage() {
                       </Badge>
                     )}
                   </div>
-                  <p className="text-sm text-muted-foreground font-mono">
+                  <p 
+                    className="text-sm text-muted-foreground font-mono cursor-pointer hover:text-primary transition-colors underline-offset-4 hover:underline"
+                    onClick={() => window.open(`/account/${profile.walletAddress}`, '_blank')}
+                    title="Click to view account details in new tab"
+                  >
                     {profile.walletAddress}
                   </p>
                   <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
@@ -286,27 +327,31 @@ export default function UserProfilePage() {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                {/* Social interaction buttons */}
-                <Button
-                  variant={isFollowing ? "default" : "outline"}
-                  size="sm"
-                  onClick={handleFollowToggle}
-                  disabled={socialLoading}
-                  className="gap-1"
-                >
-                  {isFollowing ? <UserMinus className="h-4 w-4" /> : <UserPlus className="h-4 w-4" />}
-                  {isFollowing ? 'Unfollow' : 'Follow'}
-                </Button>
-                <Button
-                  variant={isLiked ? "default" : "outline"}
-                  size="sm"
-                  onClick={handleLikeToggle}
-                  disabled={socialLoading}
-                  className="gap-1"
-                >
-                  <Heart className={`h-4 w-4 ${isLiked ? 'fill-current' : ''}`} />
-                  {isLiked ? 'Liked' : 'Like'}
-                </Button>
+                {/* Social interaction buttons - hide for own profile */}
+                {!isMyProfile && (
+                  <>
+                    <Button
+                      variant={isFollowing ? "default" : "outline"}
+                      size="sm"
+                      onClick={handleFollowToggle}
+                      disabled={socialLoading}
+                      className="gap-1"
+                    >
+                      {isFollowing ? <UserMinus className="h-4 w-4" /> : <UserPlus className="h-4 w-4" />}
+                      {isFollowing ? 'Unfollow' : 'Follow'}
+                    </Button>
+                    <Button
+                      variant={isLiked ? "default" : "outline"}
+                      size="sm"
+                      onClick={handleLikeToggle}
+                      disabled={socialLoading}
+                      className="gap-1"
+                    >
+                      <Heart className={`h-4 w-4 ${isLiked ? 'fill-current' : ''}`} />
+                      {isLiked ? 'Liked' : 'Like'}
+                    </Button>
+                  </>
+                )}
                 <UserHistoryExport profile={profile} />
                 <Badge variant="outline" className="flex items-center gap-1">
                   <Eye className="h-3 w-3" />
@@ -390,8 +435,22 @@ export default function UserProfilePage() {
           </Card>
         </div>
 
+        {/* Token Gating Notice */}
+        {!tokenGating.loading && !tokenGating.hasAccess && (
+          <Card className="border-destructive/50 bg-destructive/5 dark:border-destructive/30 dark:bg-destructive/10">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 text-destructive">
+                <Coins className="h-4 w-4" />
+                <span className="text-sm font-medium">
+                  Token Gating Active: 100,000+ $SVMAI required to view profile history and statistics
+                </span>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Main Content Tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <Tabs defaultValue={activeTab} className="w-full">
           <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="history" className="flex items-center gap-2">
               <Activity className="h-4 w-4" />
@@ -412,18 +471,96 @@ export default function UserProfilePage() {
           </TabsList>
           
           <TabsContent value="history" className="space-y-4">
-            <UserHistoryDisplay history={profile.history} />
+            {tokenGating.loading ? (
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-center">
+                    <Loader2 className="h-6 w-6 animate-spin mr-2" />
+                    <span>Checking access permissions...</span>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : !tokenGating.hasAccess ? (
+              <Card className="border-destructive/50 bg-destructive/5 dark:border-destructive/30 dark:bg-destructive/10">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-destructive">
+                    <Lock className="h-5 w-5" />
+                    Access Restricted - Token Gating Active
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-start gap-3">
+                    <Coins className="h-5 w-5 text-destructive mt-1" />
+                    <div className="space-y-2">
+                      <p className="text-foreground">
+                        You need to hold at least <strong>100,000 $SVMAI tokens</strong> to view profile history.
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        Current balance: <strong>{tokenGating.balance.toLocaleString()}</strong> $SVMAI
+                      </p>
+                      {tokenGating.error && (
+                        <p className="text-sm text-destructive">
+                          Error: {tokenGating.error}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="pt-2 border-t border-border">
+                    <p className="text-sm text-muted-foreground">
+                      This restriction applies to all users, including viewing your own profile history.
+                      Please acquire the required $SVMAI tokens to access this feature.
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <UserHistoryDisplay history={profile.history} />
+            )}
           </TabsContent>
           
           <TabsContent value="stats" className="space-y-4">
-            <UserHistoryStats stats={profile.stats} />
-            <UserActivityCalendar history={profile.history} />
+            {tokenGating.loading ? (
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-center">
+                    <Loader2 className="h-6 w-6 animate-spin mr-2" />
+                    <span>Checking access permissions...</span>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : !tokenGating.hasAccess ? (
+              <Card className="border-destructive/50 bg-destructive/5 dark:border-destructive/30 dark:bg-destructive/10">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-destructive">
+                    <Lock className="h-5 w-5" />
+                    Statistics Access Restricted
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-foreground">
+                    Statistics and activity data require <strong>100,000+ $SVMAI tokens</strong> to view.
+                  </p>
+                  <p className="text-sm text-muted-foreground mt-2">
+                    Current balance: <strong>{tokenGating.balance.toLocaleString()}</strong> $SVMAI
+                  </p>
+                </CardContent>
+              </Card>
+            ) : (
+              <>
+                <UserHistoryStats stats={profile.stats} />
+                <UserActivityCalendar history={profile.history} />
+              </>
+            )}
           </TabsContent>
           
           <TabsContent value="social" className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <UserFollowersList walletAddress={validatedWalletAddress} type="followers" />
-              <UserFollowersList walletAddress={validatedWalletAddress} type="following" />
+              {validatedWalletAddress && (
+                <>
+                  <UserFollowersList walletAddress={validatedWalletAddress} type="followers" />
+                  <UserFollowersList walletAddress={validatedWalletAddress} type="following" />
+                </>
+              )}
             </div>
             
             <Card>
@@ -449,29 +586,57 @@ export default function UserProfilePage() {
           </TabsContent>
           
           <TabsContent value="activity" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Activity className="h-5 w-5" />
-                  Recent Activity Timeline
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {profile.history.slice(0, 10).map((entry, index) => (
-                    <div key={entry.id} className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
-                      <div className="w-2 h-2 rounded-full bg-primary"></div>
-                      <div className="flex-1">
-                        <p className="text-sm font-medium">{entry.pageTitle}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {new Date(entry.timestamp).toLocaleString()} • {entry.pageType}
-                        </p>
+            {tokenGating.loading ? (
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-center">
+                    <Loader2 className="h-6 w-6 animate-spin mr-2" />
+                    <span>Checking access permissions...</span>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : !tokenGating.hasAccess ? (
+              <Card className="border-destructive/50 bg-destructive/5 dark:border-destructive/30 dark:bg-destructive/10">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-destructive">
+                    <Lock className="h-5 w-5" />
+                    Activity Feed Access Restricted
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-foreground">
+                    Activity feed requires <strong>100,000+ $SVMAI tokens</strong> to view.
+                  </p>
+                  <p className="text-sm text-muted-foreground mt-2">
+                    Current balance: <strong>{tokenGating.balance.toLocaleString()}</strong> $SVMAI
+                  </p>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Activity className="h-5 w-5" />
+                    Recent Activity Timeline
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {profile.history.slice(0, 10).map((entry) => (
+                      <div key={entry.id} className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
+                        <div className="w-2 h-2 rounded-full bg-primary"></div>
+                        <div className="flex-1">
+                          <p className="text-sm font-medium">{entry.pageTitle}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {new Date(entry.timestamp).toLocaleString()} • {entry.pageType}
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
         </Tabs>
       </div>

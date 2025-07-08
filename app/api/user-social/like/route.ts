@@ -5,13 +5,13 @@
 import { NextResponse } from 'next/server';
 import { qdrantClient } from '@/lib/qdrant';
 import { v4 as uuidv4 } from 'uuid';
-import { getAuthenticatedSession } from '@/lib/auth-server';
+import { getSessionFromCookie } from '@/lib/auth-server';
 
 export async function POST(request: Request) {
   try {
     // Authenticate the user
-    const session = await getAuthenticatedSession(request);
-    if (!session) {
+    const session = getSessionFromCookie();
+    if (!session || Date.now() > session.expiresAt) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -26,16 +26,22 @@ export async function POST(request: Request) {
     }
 
     // Check if already liked
-    const existingLikeResult = await qdrantClient.search('user_likes', {
-      vector: Array(384).fill(0),
-      filter: {
-        must: [
-          { key: 'likerAddress', match: { value: session.walletAddress } },
-          { key: 'targetAddress', match: { value: targetAddress } }
-        ]
-      },
-      limit: 1
-    });
+    let existingLikeResult = [];
+    try {
+      existingLikeResult = await qdrantClient.search('user_likes', {
+        vector: Array(384).fill(0),
+        filter: {
+          must: [
+            { key: 'likerAddress', match: { value: session.walletAddress } },
+            { key: 'targetAddress', match: { value: targetAddress } }
+          ]
+        },
+        limit: 1
+      });
+    } catch (error) {
+      // Collection doesn't exist yet, will be created below
+      console.log('user_likes collection does not exist, will create it');
+    }
 
     if (existingLikeResult.length > 0) {
       return NextResponse.json({ error: 'Already liked this user' }, { status: 400 });
@@ -49,15 +55,38 @@ export async function POST(request: Request) {
       timestamp: Date.now()
     };
 
-    await qdrantClient.upsert('user_likes', {
-      points: [
-        {
-          id: likeEntry.id,
-          vector: Array(384).fill(0),
-          payload: likeEntry
-        }
-      ]
-    });
+    try {
+      await qdrantClient.upsert('user_likes', {
+        points: [
+          {
+            id: likeEntry.id,
+            vector: Array(384).fill(0),
+            payload: likeEntry
+          }
+        ]
+      });
+    } catch (error) {
+      // Create collection if it doesn't exist
+      try {
+        await qdrantClient.createCollection('user_likes', {
+          vectors: { size: 384, distance: 'Cosine' }
+        });
+        
+        // Retry upserting the like
+        await qdrantClient.upsert('user_likes', {
+          points: [
+            {
+              id: likeEntry.id,
+              vector: Array(384).fill(0),
+              payload: likeEntry
+            }
+          ]
+        });
+      } catch (createError) {
+        console.error('Error creating user_likes collection:', createError);
+        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+      }
+    }
 
     // Update likes count for target user
     const targetProfileResult = await qdrantClient.search('user_profiles', {
@@ -69,19 +98,26 @@ export async function POST(request: Request) {
     });
 
     if (targetProfileResult.length > 0) {
-      const targetProfile = targetProfileResult[0].payload;
+      const targetProfile = targetProfileResult[0].payload as any;
+      const currentSocialStats = targetProfile.socialStats || {
+        visitsByUsers: 0,
+        followers: 0,
+        following: 0,
+        likes: 0,
+        profileViews: 0
+      };
       const updatedProfile = {
         ...targetProfile,
         socialStats: {
-          ...targetProfile.socialStats,
-          likes: (targetProfile.socialStats?.likes || 0) + 1
+          ...currentSocialStats,
+          likes: (currentSocialStats.likes || 0) + 1
         }
       };
 
       await qdrantClient.upsert('user_profiles', {
         points: [
           {
-            id: targetProfile.walletAddress,
+            id: String(targetProfile.walletAddress),
             vector: Array(384).fill(0),
             payload: updatedProfile
           }

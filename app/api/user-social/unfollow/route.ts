@@ -4,13 +4,13 @@
 
 import { NextResponse } from 'next/server';
 import { qdrantClient } from '@/lib/qdrant';
-import { getAuthenticatedSession } from '@/lib/auth-server';
+import { getSessionFromCookie } from '@/lib/auth-server';
 
 export async function POST(request: Request) {
   try {
     // Authenticate the user
-    const session = await getAuthenticatedSession(request);
-    if (!session) {
+    const session = getSessionFromCookie();
+    if (!session || Date.now() > session.expiresAt) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -51,19 +51,26 @@ export async function POST(request: Request) {
     });
 
     if (targetProfileResult.length > 0) {
-      const targetProfile = targetProfileResult[0].payload;
+      const targetProfile = targetProfileResult[0].payload as any;
+      const currentSocialStats = targetProfile.socialStats || {
+        visitsByUsers: 0,
+        followers: 0,
+        following: 0,
+        likes: 0,
+        profileViews: 0
+      };
       const updatedProfile = {
         ...targetProfile,
         socialStats: {
-          ...targetProfile.socialStats,
-          followers: Math.max(0, (targetProfile.socialStats?.followers || 0) - 1)
+          ...currentSocialStats,
+          followers: Math.max(0, (currentSocialStats.followers || 0) - 1)
         }
       };
 
       await qdrantClient.upsert('user_profiles', {
         points: [
           {
-            id: targetProfile.walletAddress,
+            id: String(targetProfile.walletAddress),
             vector: Array(384).fill(0),
             payload: updatedProfile
           }
@@ -81,19 +88,26 @@ export async function POST(request: Request) {
     });
 
     if (currentProfileResult.length > 0) {
-      const currentProfile = currentProfileResult[0].payload;
+      const currentProfile = currentProfileResult[0].payload as any;
+      const currentSocialStats = currentProfile.socialStats || {
+        visitsByUsers: 0,
+        followers: 0,
+        following: 0,
+        likes: 0,
+        profileViews: 0
+      };
       const updatedProfile = {
         ...currentProfile,
         socialStats: {
-          ...currentProfile.socialStats,
-          following: Math.max(0, (currentProfile.socialStats?.following || 0) - 1)
+          ...currentSocialStats,
+          following: Math.max(0, (currentSocialStats.following || 0) - 1)
         }
       };
 
       await qdrantClient.upsert('user_profiles', {
         points: [
           {
-            id: currentProfile.walletAddress,
+            id: String(currentProfile.walletAddress),
             vector: Array(384).fill(0),
             payload: updatedProfile
           }
