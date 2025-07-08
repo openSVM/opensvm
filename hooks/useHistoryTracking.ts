@@ -10,7 +10,7 @@ import { usePathname, useSearchParams } from 'next/navigation';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { UserHistoryEntry } from '@/types/user-history';
 import { validateWalletAddress } from '@/lib/user-history-utils';
-import { useAuth } from './useAuth';
+import { useAuthContext } from '@/contexts/AuthContext';
 
 // Retry function with exponential backoff
 async function retryWithBackoff<T>(
@@ -138,7 +138,7 @@ export function useHistoryTracking() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { publicKey, connected } = useWallet();
-  const { isAuthenticated, authenticate } = useAuth();
+  const { isAuthenticated } = useAuthContext();
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'success' | 'error' | 'auth_required'>('idle');
 
   const trackPageVisit = useCallback(async (path: string, searchQuery?: string) => {
@@ -245,7 +245,7 @@ export function useHistoryTracking() {
       setSyncStatus('error');
       setTimeout(() => setSyncStatus('idle'), 5000);
     }
-  }, [connected, publicKey, isAuthenticated, authenticate]);
+  }, [connected, publicKey, isAuthenticated]);
 
   // Track page visits
   useEffect(() => {
