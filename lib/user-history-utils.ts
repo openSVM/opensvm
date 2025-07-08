@@ -101,9 +101,20 @@ export function sanitizeInput(input: string): string {
     return '';
   }
   
-  return input
-    .replace(/[<>]/g, '') // Remove < and > characters
-    .replace(/javascript:/gi, '') // Remove javascript: protocol
-    .replace(/on\w+=/gi, '') // Remove event handlers
-    .trim();
+  let sanitized = input.trim();
+  
+  // Remove < and > characters
+  sanitized = sanitized.replace(/[<>]/g, '');
+  
+  // Remove javascript: protocol
+  sanitized = sanitized.replace(/javascript:/gi, '');
+  
+  // Remove event handlers (apply repeatedly until no matches are found)
+  let previous;
+  do {
+    previous = sanitized;
+    sanitized = sanitized.replace(/on\w+=/gi, '');
+  } while (sanitized !== previous);
+  
+  return sanitized;
 }
