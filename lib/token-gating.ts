@@ -11,6 +11,9 @@ export const MIN_SVMAI_BALANCE = 100000;
 const DEV_MODE = process.env.NODE_ENV === 'development';
 const BYPASS_TOKEN_GATING = process.env.NEXT_PUBLIC_BYPASS_TOKEN_GATING === 'true';
 
+// For development/testing when NODE_ENV is not set
+const IS_DEVELOPMENT = DEV_MODE || !process.env.NODE_ENV || process.env.NODE_ENV !== 'production';
+
 /**
  * Check if a wallet has sufficient SVMAI tokens to access gated features
  * @param walletAddress The wallet address to check
@@ -26,8 +29,8 @@ export async function checkSVMAIAccess(walletAddress: string): Promise<{
     console.log(`[Token Gating] Target mint: ${SVMAI_MINT_ADDRESS}`);
     
     // Allow bypass in development or when explicitly enabled
-    if (DEV_MODE || BYPASS_TOKEN_GATING) {
-      console.log(`[Token Gating] Bypassing token check (dev mode: ${DEV_MODE}, bypass: ${BYPASS_TOKEN_GATING})`);
+    if (IS_DEVELOPMENT || BYPASS_TOKEN_GATING) {
+      console.log(`[Token Gating] Bypassing token check (dev mode: ${DEV_MODE}, is_dev: ${IS_DEVELOPMENT}, bypass: ${BYPASS_TOKEN_GATING})`);
       return {
         hasAccess: true,
         balance: MIN_SVMAI_BALANCE + 1000 // Simulate having enough tokens
@@ -39,10 +42,12 @@ export async function checkSVMAIAccess(walletAddress: string): Promise<{
     const svmaiMint = new PublicKey(SVMAI_MINT_ADDRESS);
     
     console.log(`[Token Gating] Getting token accounts for wallet: ${walletPubkey.toString()}`);
+    console.log(`[Token Gating] Connection endpoint: ${connection.rpcEndpoint || 'unknown'}`);
     
     // Method 1: Try getParsedTokenAccountsByOwner
     let totalBalance = 0;
     try {
+      console.log(`[Token Gating] Attempting getParsedTokenAccountsByOwner...`);
       const tokenAccounts = await connection.getParsedTokenAccountsByOwner(
         walletPubkey,
         { mint: svmaiMint }
@@ -102,7 +107,12 @@ export async function checkSVMAIAccess(walletAddress: string): Promise<{
         }
       } catch (fallbackError) {
         console.error(`[Token Gating] Both methods failed:`, fallbackError);
-        throw fallbackError;
+        // Instead of throwing, continue with balance 0 and provide detailed error
+        return {
+          hasAccess: false,
+          balance: 0,
+          error: `Failed to fetch token balance: ${fallbackError.message}`
+        };
       }
     }
     
@@ -118,7 +128,7 @@ export async function checkSVMAIAccess(walletAddress: string): Promise<{
     console.error('Error checking SVMAI balance:', error);
     
     // In development, allow access even if there's an error
-    if (DEV_MODE || BYPASS_TOKEN_GATING) {
+    if (IS_DEVELOPMENT || BYPASS_TOKEN_GATING) {
       return {
         hasAccess: true,
         balance: MIN_SVMAI_BALANCE + 1000,
