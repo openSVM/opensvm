@@ -12,9 +12,20 @@ import { EventFilterControls, EventFilters } from './EventFilterControls';
 import { SimpleEventTable } from './SimpleEventTable';
 import { VirtualTableErrorBoundary } from './VirtualTableErrorBoundary';
 import { AnomalyAlertsTable } from './AnomalyAlertsTable';
+import { StackedAnomalyAlerts } from './StackedAnomalyAlerts';
+import { DeduplicatedEventTable } from './DeduplicatedEventTable';
 import { generateSecureClientId } from '@/lib/crypto-utils';
 import { createLogger } from '@/lib/debug-logger';
 import { KNOWN_PROGRAM_IDS, getProtocolFromProgramId, getProtocolDisplayName } from '@/lib/constants/program-ids';
+import { 
+  deduplicateEvents, 
+  deduplicateAnomalies, 
+  stackAnomaliesByType, 
+  cleanupOldData,
+  DeduplicatedEvent,
+  DeduplicatedAnomaly,
+  AnomalyStack
+} from '@/lib/utils/deduplication';
 
 // Enhanced logger for live event monitoring
 import { safeGetMemoryInfo, safeCallGarbageCollector } from './transaction-graph/type-safe-utils';
@@ -314,15 +325,15 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
     return () => clearInterval(interval);
   }, [maxEvents, eventQueue]);
 
-  // System programs to filter out
-  const SYSTEM_PROGRAMS = new Set([
+  // System programs to filter out (memoized to prevent dependency changes)
+  const SYSTEM_PROGRAMS = useMemo(() => new Set([
     'Vote111111111111111111111111111111111111111',
     '11111111111111111111111111111111',
     'ComputeBudget111111111111111111111111111111',
     'AddressLookupTab1e1111111111111111111111111',
     'Config1111111111111111111111111111111111111',
     'Stake11111111111111111111111111111111111111',
-  ]);
+  ]), []);
 
   // Stable callbacks for SSE hook to prevent reconnection loops
   const handleAlert = useCallback((alert: any) => {
@@ -364,6 +375,45 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
     disconnect: disconnectSSE = () => {},
     clearAlerts = () => {}
   } = sseHookResult || {};
+
+  // Enhanced state management with deduplication
+  const [deduplicatedEvents, setDeduplicatedEvents] = useState<DeduplicatedEvent[]>([]);
+  const [deduplicatedAnomalies, setDeduplicatedAnomalies] = useState<DeduplicatedAnomaly[]>([]);
+  const [anomalyStacks, setAnomalyStacks] = useState<AnomalyStack[]>([]);
+  const [selectedAnomalyStack, setSelectedAnomalyStack] = useState<AnomalyStack | null>(null);
+  const [showStackedView, setShowStackedView] = useState(true);
+
+  // Process deduplication when events or alerts change
+  useEffect(() => {
+    const processDeduplication = () => {
+      // Deduplicate events
+      const dedupedEvents = deduplicateEvents(events);
+      setDeduplicatedEvents(dedupedEvents);
+
+      // Deduplicate anomalies
+      const dedupedAnomalies = deduplicateAnomalies(alerts);
+      setDeduplicatedAnomalies(dedupedAnomalies);
+
+      // Create anomaly stacks
+      const stacks = stackAnomaliesByType(dedupedAnomalies);
+      setAnomalyStacks(stacks);
+
+      // Cleanup old data
+      const cleanedEvents = cleanupOldData(dedupedEvents, 24 * 60 * 60 * 1000, 500);
+      const cleanedAnomalies = cleanupOldData(dedupedAnomalies, 24 * 60 * 60 * 1000, 100);
+      
+      if (cleanedEvents.length !== dedupedEvents.length || cleanedAnomalies.length !== dedupedAnomalies.length) {
+        setDeduplicatedEvents(cleanedEvents);
+        setDeduplicatedAnomalies(cleanedAnomalies);
+        setAnomalyStacks(stackAnomaliesByType(cleanedAnomalies));
+      }
+    };
+
+    // Use requestIdleCallback for better performance
+    requestIdleCallbackPolyfill(() => {
+      processDeduplication();
+    });
+  }, [events, alerts]);
 
   // Set connection state based on SSE connection (remove redundant WebSocket)
   useEffect(() => {
@@ -535,11 +585,11 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
       default: timeThreshold = 0;
     }
     
-    // Much more aggressive performance limits
-    const maxEventsToFilter = 500; // Reduced from 1000
-    const eventsToFilter = events.length > maxEventsToFilter 
-      ? events.slice(-maxEventsToFilter) 
-      : events;
+    // Use deduplicated events for better performance
+    const maxEventsToFilter = 500;
+    const eventsToFilter = deduplicatedEvents.length > maxEventsToFilter 
+      ? deduplicatedEvents.slice(0, maxEventsToFilter) 
+      : deduplicatedEvents;
     
     const filtered = eventsToFilter.filter(event => {
       // Basic time filtering
@@ -595,7 +645,7 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
     });
     
     return filtered;
-  }, [events, filters, SYSTEM_PROGRAMS]);
+  }, [deduplicatedEvents, filters, SYSTEM_PROGRAMS]);
 
   // Ultra-optimized event counts with sampling for large datasets
   const eventCounts = useMemo(() => {
@@ -662,6 +712,34 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
     window.open(url, '_blank', 'noopener,noreferrer');
   }, []);
 
+  // New handlers for deduplicated components
+  const handleDeduplicatedEventClick = useCallback((event: DeduplicatedEvent) => {
+    if (event.type === 'transaction' && event.signature) {
+      const url = `/tx/${event.signature}`;
+      window.open(url, '_blank', 'noopener,noreferrer');
+    } else if (event.type === 'block' && event.data?.slot) {
+      const url = `/block/${event.data.slot}`;
+      window.open(url, '_blank', 'noopener,noreferrer');
+    }
+  }, []);
+
+  const handleAnomalyClick = useCallback((anomaly: DeduplicatedAnomaly) => {
+    setSelectedAnomalyStack(null);
+    // Open anomaly profile in new tab
+    const url = `/anomaly/${anomaly.id}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  }, []);
+
+  const handleStackToggle = useCallback((type: string, expanded: boolean) => {
+    setAnomalyStacks(prev => prev.map(stack => 
+      stack.type === type ? { ...stack, expanded } : stack
+    ));
+  }, []);
+
+  const toggleStackedView = useCallback(() => {
+    setShowStackedView(prev => !prev);
+  }, []);
+
   const togglePause = useCallback(() => {
     setIsPaused(prev => {
       const newPaused = !prev;
@@ -701,9 +779,9 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
         {/* Fullscreen Content */}
         <div className="flex-1 p-4 overflow-hidden">
           <VirtualTableErrorBoundary>
-            <SimpleEventTable 
+            <DeduplicatedEventTable 
               events={filteredEvents}
-              onEventClick={handleEventClick}
+              onEventClick={handleDeduplicatedEventClick}
               onAddressClick={handleAddressClick}
               height={window.innerHeight - 150}
             />
@@ -756,6 +834,9 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
               Events: {eventCountRef.current}/{maxEvents}
             </div>
             <div className="text-sm text-muted-foreground">
+              Deduped: {deduplicatedEvents.length}
+            </div>
+            <div className="text-sm text-muted-foreground">
               Filtered: {eventCounts.total}
             </div>
             {pendingEventCount > 0 && (
@@ -765,6 +846,9 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
             )}
             <div className="text-sm text-muted-foreground">
               Alerts: {alerts.length}
+            </div>
+            <div className="text-sm text-muted-foreground">
+              Stacks: {anomalyStacks.length}
             </div>
             {lastSlot && (
               <div className="text-sm text-muted-foreground">
@@ -877,15 +961,15 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
           {/* Live Events Table - Fixed Height */}
           <Card className="p-4 mb-4 flex-shrink-0">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold">Live Events</h3>
+              <h3 className="text-lg font-semibold">Live Events (Deduplicated)</h3>
               <div className="text-sm text-muted-foreground">
-                {filteredEvents.length} events • Simple table
+                {filteredEvents.length} events • Duplicates removed
               </div>
             </div>
             <VirtualTableErrorBoundary>
-              <SimpleEventTable 
+              <DeduplicatedEventTable 
                 events={filteredEvents}
-                onEventClick={handleEventClick}
+                onEventClick={handleDeduplicatedEventClick}
                 onAddressClick={handleAddressClick}
                 height={400}
               />
@@ -896,14 +980,34 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
           <Card className="p-4 flex-1 flex flex-col overflow-hidden">
             <div className="flex items-center justify-between mb-4 flex-shrink-0">
               <h3 className="text-lg font-semibold">
-                All Anomaly Alerts
+                {showStackedView ? 'Anomaly Stacks' : 'All Anomaly Alerts'}
                 {sseConnected && <span className="text-xs text-green-600 ml-2">(Live)</span>}
               </h3>
-              <div className="text-sm text-muted-foreground">
-                {alerts.length} total alerts
+              <div className="flex items-center space-x-4">
+                <button
+                  onClick={toggleStackedView}
+                  className="px-3 py-1 text-sm bg-secondary text-secondary-foreground rounded hover:bg-secondary/80"
+                >
+                  {showStackedView ? 'Show All' : 'Stack by Type'}
+                </button>
+                <div className="text-sm text-muted-foreground">
+                  {showStackedView ? 
+                    `${anomalyStacks.length} stacks • ${deduplicatedAnomalies.length} total` : 
+                    `${alerts.length} alerts`
+                  }
+                </div>
               </div>
             </div>
-            <AnomalyAlertsTable alerts={alerts} />
+            
+            {showStackedView ? (
+              <StackedAnomalyAlerts
+                stacks={anomalyStacks}
+                onAnomalyClick={handleAnomalyClick}
+                onStackToggle={handleStackToggle}
+              />
+            ) : (
+              <AnomalyAlertsTable alerts={alerts} />
+            )}
           </Card>
         </div>
       </div>
