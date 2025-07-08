@@ -271,6 +271,9 @@ export const NavbarInteractive: React.FC<NavbarInteractiveProps> = () => {
                 <DropdownMenuItem onClick={(e) => { e.stopPropagation(); router.push('/analytics/trends'); }}>
                   Trends
                 </DropdownMenuItem>
+                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); router.push('/monitoring'); }}>
+                  Live Monitoring
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
   
