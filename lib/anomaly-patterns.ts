@@ -26,10 +26,114 @@ export interface AnomalyContext {
   errorRate: number;
   timestamp: number;
   timeWindowMs?: number;
+  // Enhanced statistical context
+  feeStatistics: {
+    mean: number;
+    median: number;
+    stdDev: number;
+    percentiles: { p95: number; p99: number };
+    movingAverage: number;
+  };
+  transactionStatistics: {
+    volumeMovingAverage: number;
+    volumeStdDev: number;
+    intervalStatistics: {
+      mean: number;
+      stdDev: number;
+      outlierThreshold: number;
+    };
+  };
+  baselineData: {
+    historicalAverageFees: number;
+    historicalVolumeAverage: number;
+    historicalErrorRate: number;
+    dataPoints: number;
+    lastUpdated: number;
+  };
 }
 
 /**
- * Unified severity logic based on multiple factors
+ * Statistical utility functions for anomaly detection
+ */
+export class AnomalyStatistics {
+  static calculateMean(values: number[]): number {
+    if (values.length === 0) return 0;
+    return values.reduce((sum, val) => sum + val, 0) / values.length;
+  }
+
+  static calculateMedian(values: number[]): number {
+    if (values.length === 0) return 0;
+    const sorted = [...values].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    return sorted.length % 2 === 0 
+      ? (sorted[mid - 1] + sorted[mid]) / 2 
+      : sorted[mid];
+  }
+
+  static calculateStdDev(values: number[], mean?: number): number {
+    if (values.length <= 1) return 0;
+    const actualMean = mean ?? this.calculateMean(values);
+    const variance = values.reduce((sum, val) => sum + Math.pow(val - actualMean, 2), 0) / (values.length - 1);
+    return Math.sqrt(variance);
+  }
+
+  static calculatePercentile(values: number[], percentile: number): number {
+    if (values.length === 0) return 0;
+    const sorted = [...values].sort((a, b) => a - b);
+    const index = Math.ceil((percentile / 100) * sorted.length) - 1;
+    return sorted[Math.max(0, index)];
+  }
+
+  static calculateMovingAverage(values: number[], windowSize: number = 20): number {
+    if (values.length === 0) return 0;
+    const window = values.slice(-windowSize);
+    return this.calculateMean(window);
+  }
+
+  static isStatisticalOutlier(value: number, mean: number, stdDev: number, threshold: number = 3): boolean {
+    if (stdDev === 0) return false;
+    const zScore = Math.abs(value - mean) / stdDev;
+    return zScore > threshold;
+  }
+
+  static detectTrendAnomaly(values: number[], windowSize: number = 10): { isAnomaly: boolean; trendStrength: number } {
+    if (values.length < windowSize) return { isAnomaly: false, trendStrength: 0 };
+    
+    const recent = values.slice(-windowSize);
+    const correlationCoeff = this.calculateTrendCorrelation(recent);
+    
+    // Strong trend (positive or negative) with sudden change indicates anomaly
+    const isAnomaly = Math.abs(correlationCoeff) > 0.7 && recent.length > 5;
+    return { isAnomaly, trendStrength: Math.abs(correlationCoeff) };
+  }
+
+  private static calculateTrendCorrelation(values: number[]): number {
+    const n = values.length;
+    const x = Array.from({ length: n }, (_, i) => i);
+    const y = values;
+    
+    const meanX = this.calculateMean(x);
+    const meanY = this.calculateMean(y);
+    
+    let numerator = 0;
+    let denomX = 0;
+    let denomY = 0;
+    
+    for (let i = 0; i < n; i++) {
+      const diffX = x[i] - meanX;
+      const diffY = y[i] - meanY;
+      numerator += diffX * diffY;
+      denomX += diffX * diffX;
+      denomY += diffY * diffY;
+    }
+    
+    if (denomX === 0 || denomY === 0) return 0;
+    return numerator / Math.sqrt(denomX * denomY);
+  }
+}
+
+/**
+ * Enhanced severity logic with statistical analysis
  */
 export function calculateSeverity(
   pattern: AnomalyPattern, 
@@ -39,9 +143,8 @@ export function calculateSeverity(
 ): 'low' | 'medium' | 'high' | 'critical' {
   const baseSeverity = pattern.severity;
   const mlWeight = pattern.metadata?.mlWeight || 1.0;
-  const eventFrequency = context.recentEvents.length / (context.timeWindowMs || 60000) * 1000; // events per second
+  const eventFrequency = context.recentEvents.length / (context.timeWindowMs || 60000) * 1000;
   
-  // Adjust severity based on frequency and confidence
   let adjustedScore = 0;
   
   switch (baseSeverity) {
@@ -51,12 +154,43 @@ export function calculateSeverity(
     case 'critical': adjustedScore = 4; break;
   }
   
-  // Apply ML confidence and frequency adjustments
+  // Enhanced statistical adjustments
   adjustedScore *= confidenceScore * mlWeight;
   
-  if (eventFrequency > 10) adjustedScore += 1; // High frequency events are more severe
-  if (pattern.category === 'security') adjustedScore += 0.5; // Security patterns get priority
-  if (pattern.category === 'financial') adjustedScore += 0.3; // Financial patterns get slight priority
+  // Statistical deviation adjustments
+  if (pattern.type === 'suspicious_fee_spike' && context.feeStatistics) {
+    const feeValue = event.data?.fee || 0;
+    if (AnomalyStatistics.isStatisticalOutlier(feeValue, context.feeStatistics.mean, context.feeStatistics.stdDev, 2)) {
+      adjustedScore += 0.5; // Statistical outlier adds severity
+    }
+  }
+  
+  // Trend analysis adjustments
+  if (context.transactionStatistics && eventFrequency > 1) {
+    const volumeValues = context.recentEvents
+      .filter(e => e.type === 'transaction')
+      .map(e => e.timestamp)
+      .slice(-20);
+    
+    const trendAnalysis = AnomalyStatistics.detectTrendAnomaly(volumeValues);
+    if (trendAnalysis.isAnomaly) {
+      adjustedScore += trendAnalysis.trendStrength * 0.5;
+    }
+  }
+  
+  // Baseline deviation adjustments
+  if (context.baselineData && context.baselineData.dataPoints > 50) {
+    const currentErrorRate = context.errorRate;
+    const baselineErrorRate = context.baselineData.historicalErrorRate;
+    
+    if (currentErrorRate > baselineErrorRate * 2) {
+      adjustedScore += 0.3; // Significant deviation from baseline
+    }
+  }
+  
+  if (eventFrequency > 10) adjustedScore += 1;
+  if (pattern.category === 'security') adjustedScore += 0.5;
+  if (pattern.category === 'financial') adjustedScore += 0.3;
   
   // Convert back to severity levels
   if (adjustedScore >= 4.5) return 'critical';
@@ -66,33 +200,77 @@ export function calculateSeverity(
 }
 
 /**
- * Core anomaly detection patterns
+ * Enhanced core anomaly detection patterns with statistical analysis
  */
 export const CORE_PATTERNS: AnomalyPattern[] = [
   {
     type: 'high_failure_rate',
-    description: 'Unusually high transaction failure rate',
+    description: 'Statistically significant spike in transaction failure rate',
     severity: 'high',
     threshold: 0.3,
     category: 'performance',
-    check: (event, context) => context.errorRate > 0.3,
-    metadata: { tags: ['performance', 'errors'], mlWeight: 1.2 }
+    check: (event, context) => {
+      // Enhanced statistical analysis for failure rate
+      if (!context.baselineData || context.baselineData.dataPoints < 30) {
+        return context.errorRate > 0.3; // Fallback to simple threshold
+      }
+      
+      const currentErrorRate = context.errorRate;
+      const historicalMean = context.baselineData.historicalErrorRate;
+      
+      // Calculate recent error rates for standard deviation
+      const recentTxs = context.recentEvents.filter(e => e.type === 'transaction');
+      const recentWindowSize = Math.min(50, recentTxs.length);
+      const recentFailures = recentTxs.slice(-recentWindowSize).filter(e => e.data.err !== null);
+      const recentErrorRates = [];
+      
+      // Calculate rolling error rates
+      for (let i = 10; i <= recentWindowSize; i += 5) {
+        const window = recentTxs.slice(-i);
+        const failures = window.filter(e => e.data.err !== null).length;
+        recentErrorRates.push(failures / window.length);
+      }
+      
+      if (recentErrorRates.length > 3) {
+        const stdDev = AnomalyStatistics.calculateStdDev(recentErrorRates);
+        return AnomalyStatistics.isStatisticalOutlier(currentErrorRate, historicalMean, stdDev, 2.5);
+      }
+      
+      return currentErrorRate > historicalMean * 3; // 3x historical average
+    },
+    metadata: { tags: ['performance', 'errors', 'statistical'], mlWeight: 1.3 }
   },
   {
     type: 'suspicious_fee_spike',
-    description: 'Sudden spike in transaction fees',
+    description: 'Statistically anomalous transaction fee spike detected',
     severity: 'medium',
     threshold: 5.0,
     category: 'financial',
     check: (event, context) => {
       if (event.type !== 'transaction' || !event.data.fee) return false;
-      return event.data.fee > (context.averageFees * 5);
+      
+      const currentFee = event.data.fee;
+      
+      // Enhanced statistical fee analysis
+      if (context.feeStatistics) {
+        const { mean, stdDev, percentiles } = context.feeStatistics;
+        
+        // Multiple criteria for fee anomaly
+        const isStatOutlier = AnomalyStatistics.isStatisticalOutlier(currentFee, mean, stdDev, 3);
+        const exceedsP99 = currentFee > percentiles.p99 * 1.5;
+        const exceedsMovingAvg = currentFee > context.feeStatistics.movingAverage * 5;
+        
+        return isStatOutlier || exceedsP99 || exceedsMovingAvg;
+      }
+      
+      // Fallback to simple threshold
+      return currentFee > (context.averageFees * 5);
     },
-    metadata: { tags: ['fees', 'financial'], mlWeight: 1.1 }
+    metadata: { tags: ['fees', 'financial', 'statistical'], mlWeight: 1.2 }
   },
   {
     type: 'rapid_transaction_burst',
-    description: 'Rapid burst of transactions from same address',
+    description: 'Statistically anomalous burst of transactions from address',
     severity: 'high',
     threshold: 10,
     category: 'behavior',
@@ -102,29 +280,86 @@ export const CORE_PATTERNS: AnomalyPattern[] = [
       const currentSender = event.data.accountKeys?.[0] || event.data.signer || null;
       if (!currentSender) return false;
       
-      const recentFromSameAddress = context.recentEvents
+      // Enhanced burst detection with time intervals
+      const senderTxs = context.recentEvents
         .filter(e => e.type === 'transaction' && 
-                    e.timestamp > Date.now() - 60000 &&
+                    e.timestamp > Date.now() - 300000 && // 5 minute window
                     (e.data.accountKeys?.[0] === currentSender || e.data.signer === currentSender))
-        .length;
-      return recentFromSameAddress > 10;
+        .sort((a, b) => a.timestamp - b.timestamp);
+      
+      if (senderTxs.length < 5) return false;
+      
+      // Calculate time intervals between transactions
+      const intervals = [];
+      for (let i = 1; i < senderTxs.length; i++) {
+        intervals.push(senderTxs[i].timestamp - senderTxs[i-1].timestamp);
+      }
+      
+      // Statistical analysis of intervals
+      const meanInterval = AnomalyStatistics.calculateMean(intervals);
+      const medianInterval = AnomalyStatistics.calculateMedian(intervals);
+      
+      // Burst detected if intervals are consistently very short
+      const shortIntervals = intervals.filter(interval => interval < 5000).length; // < 5 seconds
+      const burstRatio = shortIntervals / intervals.length;
+      
+      // Transaction frequency analysis
+      const avgTxPerMinute = senderTxs.length / 5; // 5 minute window
+      
+      return (burstRatio > 0.7 && senderTxs.length > 10) || 
+             (avgTxPerMinute > 15) || 
+             (meanInterval < 3000 && senderTxs.length > 8);
     },
-    metadata: { tags: ['burst', 'behavior'], mlWeight: 1.3 }
+    metadata: { tags: ['burst', 'behavior', 'statistical'], mlWeight: 1.4 }
   },
   {
     type: 'unusual_program_activity',
-    description: 'Unusual activity in lesser-known programs',
+    description: 'Statistical anomaly in program interaction patterns',
     severity: 'medium',
     threshold: 100,
     category: 'behavior',
     check: (event, context) => {
-      if (event.type !== 'transaction' || !event.data.logs) return false;
-      const suspiciousPatterns = ['error', 'failed', 'insufficient', 'unauthorized'];
-      return event.data.logs.some((log: string) => 
-        suspiciousPatterns.some(pattern => log.toLowerCase().includes(pattern))
-      );
+      if (event.type !== 'transaction') return false;
+      
+      // Enhanced program activity analysis
+      const currentPrograms = event.data.accountKeys?.slice(1) || [];
+      if (currentPrograms.length === 0) return false;
+      
+      // Analyze historical program usage patterns
+      const allPrograms = context.recentEvents
+        .filter(e => e.type === 'transaction' && e.data.accountKeys)
+        .flatMap(e => e.data.accountKeys.slice(1));
+      
+      const programFreq = new Map<string, number>();
+      allPrograms.forEach(program => {
+        programFreq.set(program, (programFreq.get(program) || 0) + 1);
+      });
+      
+      const totalUsage = allPrograms.length;
+      
+      // Check for interactions with rarely used programs
+      const rarePrograms = currentPrograms.filter(program => {
+        const usage = programFreq.get(program) || 0;
+        const frequency = totalUsage > 0 ? usage / totalUsage : 0;
+        return frequency < 0.01 && usage < 3; // < 1% frequency and < 3 total uses
+      });
+      
+      // Error pattern analysis
+      if (event.data.logs) {
+        const suspiciousPatterns = ['error', 'failed', 'insufficient', 'unauthorized', 'revert', 'panic'];
+        const errorCount = event.data.logs.filter((log: string) => 
+          suspiciousPatterns.some(pattern => log.toLowerCase().includes(pattern))
+        ).length;
+        
+        const hasSignificantErrors = errorCount > 2 || 
+          (errorCount > 0 && event.data.logs.length > 0 && errorCount / event.data.logs.length > 0.5);
+        
+        return rarePrograms.length > 0 && hasSignificantErrors;
+      }
+      
+      return rarePrograms.length > 1; // Multiple rare programs in single transaction
     },
-    metadata: { tags: ['programs', 'errors'], mlWeight: 1.0 }
+    metadata: { tags: ['programs', 'errors', 'statistical'], mlWeight: 1.1 }
   }
 ];
 
@@ -232,25 +467,24 @@ export const PUMP_CHAN_PATTERNS: AnomalyPattern[] = [
 ];
 
 /**
- * ML-Enhanced Patterns using simple pattern recognition
+ * Enhanced ML patterns using advanced statistical analysis and pattern recognition
  */
 export const ML_ENHANCED_PATTERNS: AnomalyPattern[] = [
   {
     type: 'ml_anomalous_transaction_timing',
-    description: 'ML-detected anomalous transaction timing patterns',
+    description: 'ML-detected anomalous transaction timing patterns using statistical analysis',
     severity: 'medium',
     threshold: 0.7,
     category: 'behavior',
     check: (event, context) => {
       if (event.type !== 'transaction') return false;
       
-      // Simple ML-like analysis: detect transactions that occur at unusual intervals
       const recentTxTimes = context.recentEvents
         .filter(e => e.type === 'transaction')
         .map(e => e.timestamp)
         .sort((a, b) => a - b);
       
-      if (recentTxTimes.length < 5) return false;
+      if (recentTxTimes.length < 10) return false;
       
       // Calculate intervals between transactions
       const intervals = [];
@@ -258,52 +492,304 @@ export const ML_ENHANCED_PATTERNS: AnomalyPattern[] = [
         intervals.push(recentTxTimes[i] - recentTxTimes[i-1]);
       }
       
-      // Simple outlier detection: if current interval is much different from average
-      const avgInterval = intervals.reduce((sum, int) => sum + int, 0) / intervals.length;
+      // Advanced statistical analysis
+      const mean = AnomalyStatistics.calculateMean(intervals);
+      const stdDev = AnomalyStatistics.calculateStdDev(intervals, mean);
+      const median = AnomalyStatistics.calculateMedian(intervals);
+      
+      // Current interval analysis
       const currentInterval = event.timestamp - recentTxTimes[recentTxTimes.length - 1];
       
-      // Flag if current interval is more than 3 standard deviations from mean
-      const variance = intervals.reduce((sum, int) => sum + Math.pow(int - avgInterval, 2), 0) / intervals.length;
-      const stdDev = Math.sqrt(variance);
+      // Multiple anomaly detection criteria
+      const isOutlier = AnomalyStatistics.isStatisticalOutlier(currentInterval, mean, stdDev, 2.5);
+      const isExtremeDeviation = Math.abs(currentInterval - median) > median * 3;
       
-      return Math.abs(currentInterval - avgInterval) > (3 * stdDev);
+      // Trend analysis for timing patterns
+      const recentIntervals = intervals.slice(-10);
+      const trendAnalysis = AnomalyStatistics.detectTrendAnomaly(recentIntervals);
+      
+      // Detect periodic patterns (potential automated behavior)
+      const periodicPattern = this.detectPeriodicPattern(intervals);
+      
+      return isOutlier || isExtremeDeviation || trendAnalysis.isAnomaly || periodicPattern.isDetected;
     },
-    metadata: { tags: ['ml', 'timing', 'pattern'], mlWeight: 1.4, confidence: 0.8 }
+    metadata: { tags: ['ml', 'timing', 'pattern', 'statistical'], mlWeight: 1.5, confidence: 0.85 }
   },
   {
     type: 'ml_program_interaction_anomaly',
-    description: 'ML-detected unusual program interaction patterns',
+    description: 'ML-detected unusual program interaction patterns using graph analysis',
     severity: 'high',
     threshold: 0.8,
     category: 'behavior',
     check: (event, context) => {
       if (event.type !== 'transaction' || !event.data.accountKeys) return false;
       
-      // Analyze program interaction patterns
-      const programInteractions = context.recentEvents
+      // Build program interaction graph
+      const interactionGraph = new Map<string, Set<string>>();
+      const programUsageFreq = new Map<string, number>();
+      
+      context.recentEvents
         .filter(e => e.type === 'transaction' && e.data.accountKeys)
-        .map(e => e.data.accountKeys.slice(1)) // Skip the sender
-        .flat();
+        .forEach(e => {
+          const programs = e.data.accountKeys.slice(1);
+          programs.forEach(program => {
+            programUsageFreq.set(program, (programUsageFreq.get(program) || 0) + 1);
+            
+            // Build co-occurrence graph
+            programs.forEach(otherProgram => {
+              if (program !== otherProgram) {
+                if (!interactionGraph.has(program)) {
+                  interactionGraph.set(program, new Set());
+                }
+                interactionGraph.get(program)!.add(otherProgram);
+              }
+            });
+          });
+        });
       
-      // Count frequency of each program
-      const programFreq = new Map<string, number>();
-      programInteractions.forEach(program => {
-        programFreq.set(program, (programFreq.get(program) || 0) + 1);
-      });
-      
-      // Check if current transaction interacts with rarely used programs
       const currentPrograms = event.data.accountKeys.slice(1);
-      const rareProgramInteraction = currentPrograms.some(program => {
-        const freq = programFreq.get(program) || 0;
-        const totalInteractions = programInteractions.length;
-        return totalInteractions > 10 && freq / totalInteractions < 0.05; // Less than 5% frequency
+      const totalTransactions = context.recentEvents.filter(e => e.type === 'transaction').length;
+      
+      // Analyze current transaction for anomalies
+      let anomalyScore = 0;
+      
+      for (const program of currentPrograms) {
+        const usage = programUsageFreq.get(program) || 0;
+        const frequency = usage / totalTransactions;
+        
+        // Rare program usage
+        if (frequency < 0.05 && usage < 5) {
+          anomalyScore += 0.3;
+        }
+        
+        // Unusual co-occurrence patterns
+        const expectedCoOccurrences = interactionGraph.get(program) || new Set();
+        const actualCoOccurrences = currentPrograms.filter(p => p !== program);
+        
+        const unexpectedCoOccurrences = actualCoOccurrences.filter(p => 
+          !expectedCoOccurrences.has(p) && (programUsageFreq.get(p) || 0) > 0);
+        
+        if (unexpectedCoOccurrences.length > 0) {
+          anomalyScore += unexpectedCoOccurrences.length * 0.2;
+        }
+      }
+      
+      // Program chain complexity analysis
+      const complexity = this.calculateProgramComplexity(currentPrograms, interactionGraph);
+      if (complexity.isUnusual) {
+        anomalyScore += 0.4;
+      }
+      
+      return anomalyScore > 0.6;
+    },
+    metadata: { tags: ['ml', 'programs', 'graph', 'rare'], mlWeight: 1.7, confidence: 0.8 }
+  },
+  {
+    type: 'ml_volume_pattern_anomaly',
+    description: 'ML-detected anomalous transaction volume patterns',
+    severity: 'medium',
+    threshold: 0.75,
+    category: 'behavior',
+    check: (event, context) => {
+      if (!context.transactionStatistics) return false;
+      
+      const currentVolume = context.transactionVolume;
+      const { volumeMovingAverage, volumeStdDev } = context.transactionStatistics;
+      
+      // Multi-timeframe analysis
+      const timeframes = [60000, 300000, 900000]; // 1min, 5min, 15min
+      let anomalyCount = 0;
+      
+      timeframes.forEach(timeframe => {
+        const windowEvents = context.recentEvents.filter(e => 
+          e.type === 'transaction' && e.timestamp > Date.now() - timeframe
+        );
+        
+        const windowVolume = windowEvents.length;
+        const expectedVolume = volumeMovingAverage * (timeframe / (context.timeWindowMs || 300000));
+        
+        // Statistical anomaly detection for each timeframe
+        if (volumeStdDev > 0) {
+          const zScore = Math.abs(windowVolume - expectedVolume) / volumeStdDev;
+          if (zScore > 2.5) {
+            anomalyCount++;
+          }
+        }
       });
       
-      return rareProgramInteraction;
+      // Pattern analysis - detect if this is part of a larger pattern
+      const volumeHistory = this.getVolumeHistory(context.recentEvents, 20);
+      const patternAnalysis = AnomalyStatistics.detectTrendAnomaly(volumeHistory, 10);
+      
+      return anomalyCount >= 2 || patternAnalysis.trendStrength > 0.8;
     },
-    metadata: { tags: ['ml', 'programs', 'rare'], mlWeight: 1.6, confidence: 0.75 }
+    metadata: { tags: ['ml', 'volume', 'pattern', 'multi-timeframe'], mlWeight: 1.3, confidence: 0.75 }
+  },
+  {
+    type: 'ml_behavioral_fingerprint_anomaly',
+    description: 'ML-detected deviation from established behavioral fingerprints',
+    severity: 'high',
+    threshold: 0.8,
+    category: 'behavior',
+    check: (event, context) => {
+      if (event.type !== 'transaction') return false;
+      
+      const sender = event.data.accountKeys?.[0] || event.data.signer;
+      if (!sender) return false;
+      
+      // Build behavioral fingerprint for this address
+      const senderHistory = context.recentEvents
+        .filter(e => e.type === 'transaction' && 
+                    (e.data.accountKeys?.[0] === sender || e.data.signer === sender));
+      
+      if (senderHistory.length < 5) return false; // Need history to establish pattern
+      
+      // Analyze behavioral patterns
+      const fingerprint = this.buildBehavioralFingerprint(senderHistory);
+      const currentBehavior = this.analyzeBehavior(event);
+      
+      // Compare current behavior against established fingerprint
+      const deviation = this.calculateBehavioralDeviation(fingerprint, currentBehavior);
+      
+      return deviation > 0.7; // Significant deviation from established pattern
+    },
+    metadata: { tags: ['ml', 'behavioral', 'fingerprint', 'deviation'], mlWeight: 1.8, confidence: 0.9 }
   }
 ];
+
+// Helper methods for ML analysis (would be implemented as static methods)
+const MLHelpers = {
+  detectPeriodicPattern(intervals: number[]): { isDetected: boolean; period?: number } {
+    if (intervals.length < 6) return { isDetected: false };
+    
+    // Simple autocorrelation for periodic detection
+    const maxLag = Math.min(intervals.length / 2, 10);
+    let maxCorrelation = 0;
+    let detectedPeriod = 0;
+    
+    for (let lag = 1; lag <= maxLag; lag++) {
+      let correlation = 0;
+      let count = 0;
+      
+      for (let i = 0; i < intervals.length - lag; i++) {
+        correlation += intervals[i] * intervals[i + lag];
+        count++;
+      }
+      
+      correlation /= count;
+      
+      if (correlation > maxCorrelation) {
+        maxCorrelation = correlation;
+        detectedPeriod = lag;
+      }
+    }
+    
+    // Threshold for periodic behavior detection
+    return {
+      isDetected: maxCorrelation > 0.8,
+      period: detectedPeriod
+    };
+  },
+
+  calculateProgramComplexity(programs: string[], graph: Map<string, Set<string>>): { isUnusual: boolean; complexity: number } {
+    const connections = programs.reduce((total, program) => {
+      const connections = graph.get(program)?.size || 0;
+      return total + connections;
+    }, 0);
+    
+    const avgConnections = programs.length > 0 ? connections / programs.length : 0;
+    const complexity = programs.length * avgConnections;
+    
+    return {
+      isUnusual: complexity > 50 || (programs.length > 5 && avgConnections < 1),
+      complexity
+    };
+  },
+
+  getVolumeHistory(events: any[], buckets: number): number[] {
+    const now = Date.now();
+    const bucketSize = 60000; // 1 minute buckets
+    const history: number[] = [];
+    
+    for (let i = 0; i < buckets; i++) {
+      const bucketStart = now - (i + 1) * bucketSize;
+      const bucketEnd = now - i * bucketSize;
+      
+      const bucketCount = events.filter(e => 
+        e.type === 'transaction' && 
+        e.timestamp >= bucketStart && 
+        e.timestamp < bucketEnd
+      ).length;
+      
+      history.unshift(bucketCount);
+    }
+    
+    return history;
+  },
+
+  buildBehavioralFingerprint(history: any[]): any {
+    // Extract behavioral features
+    const features = {
+      avgTimeBetweenTxs: 0,
+      programUsagePattern: new Map<string, number>(),
+      feePattern: { mean: 0, stdDev: 0 },
+      timeOfDayPattern: new Map<number, number>(),
+      txSizePattern: { mean: 0, stdDev: 0 }
+    };
+    
+    // Calculate timing patterns
+    const timestamps = history.map(h => h.timestamp).sort((a, b) => a - b);
+    const intervals = [];
+    for (let i = 1; i < timestamps.length; i++) {
+      intervals.push(timestamps[i] - timestamps[i-1]);
+    }
+    features.avgTimeBetweenTxs = AnomalyStatistics.calculateMean(intervals);
+    
+    // Program usage patterns
+    history.forEach(tx => {
+      if (tx.data.accountKeys) {
+        tx.data.accountKeys.slice(1).forEach((program: string) => {
+          features.programUsagePattern.set(program, 
+            (features.programUsagePattern.get(program) || 0) + 1);
+        });
+      }
+    });
+    
+    return features;
+  },
+
+  analyzeBehavior(event: any): any {
+    return {
+      programs: event.data.accountKeys?.slice(1) || [],
+      fee: event.data.fee || 0,
+      timeOfDay: new Date(event.timestamp).getHours(),
+      size: JSON.stringify(event.data).length
+    };
+  },
+
+  calculateBehavioralDeviation(fingerprint: any, current: any): number {
+    let deviation = 0;
+    
+    // Program usage deviation
+    const usedPrograms = current.programs;
+    const knownPrograms = Array.from(fingerprint.programUsagePattern.keys());
+    const unknownPrograms = usedPrograms.filter((p: string) => !knownPrograms.includes(p));
+    
+    if (unknownPrograms.length > 0) {
+      deviation += unknownPrograms.length * 0.3;
+    }
+    
+    // Fee deviation (simplified)
+    if (fingerprint.feePattern.stdDev > 0) {
+      const feeZScore = Math.abs(current.fee - fingerprint.feePattern.mean) / fingerprint.feePattern.stdDev;
+      if (feeZScore > 2) {
+        deviation += 0.2;
+      }
+    }
+    
+    return Math.min(deviation, 1.0);
+  }
+};
 
 /**
  * Get all patterns combined

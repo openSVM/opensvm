@@ -4,6 +4,7 @@ import type { Message, Tool, ToolParams } from '../types';
 import { 
   getAllPatterns, 
   calculateSeverity, 
+  AnomalyStatistics,
   type AnomalyPattern, 
   type AnomalyContext 
 } from '@/lib/anomaly-patterns';
@@ -170,13 +171,130 @@ export class AnomalyDetectionCapability extends BaseCapability {
     const transactionEvents = recentEvents.filter(e => e.type === 'transaction');
     const failedTransactions = transactionEvents.filter(e => e.data.err !== null);
     
+    // Enhanced statistical calculations
+    const fees = transactionEvents
+      .map(t => t.data.fee)
+      .filter(fee => typeof fee === 'number' && fee > 0);
+    
+    const feeStatistics = this.calculateFeeStatistics(fees);
+    const transactionStatistics = this.calculateTransactionStatistics(transactionEvents);
+    const baselineData = await this.getBaselineData();
+    
     return {
       recentEvents,
       transactionVolume: transactionEvents.length,
       averageFees: this.calculateAverageFees(transactionEvents),
       errorRate: transactionEvents.length > 0 ? failedTransactions.length / transactionEvents.length : 0,
       timestamp: now,
-      timeWindowMs: recentWindow
+      timeWindowMs: recentWindow,
+      feeStatistics,
+      transactionStatistics,
+      baselineData
+    };
+  }
+
+  private calculateFeeStatistics(fees: number[]) {
+    if (fees.length === 0) {
+      return {
+        mean: 0,
+        median: 0,
+        stdDev: 0,
+        percentiles: { p95: 0, p99: 0 },
+        movingAverage: 0
+      };
+    }
+
+    const mean = AnomalyStatistics.calculateMean(fees);
+    const median = AnomalyStatistics.calculateMedian(fees);
+    const stdDev = AnomalyStatistics.calculateStdDev(fees, mean);
+    const p95 = AnomalyStatistics.calculatePercentile(fees, 95);
+    const p99 = AnomalyStatistics.calculatePercentile(fees, 99);
+    const movingAverage = AnomalyStatistics.calculateMovingAverage(fees, 20);
+
+    return {
+      mean,
+      median,
+      stdDev,
+      percentiles: { p95, p99 },
+      movingAverage
+    };
+  }
+
+  private calculateTransactionStatistics(transactions: any[]) {
+    const volumes = this.getVolumeTimeSeries(transactions);
+    const volumeMovingAverage = AnomalyStatistics.calculateMovingAverage(volumes, 10);
+    const volumeStdDev = AnomalyStatistics.calculateStdDev(volumes);
+    
+    // Calculate transaction intervals for timing analysis
+    const timestamps = transactions.map(t => t.timestamp).sort((a, b) => a - b);
+    const intervals = [];
+    for (let i = 1; i < timestamps.length; i++) {
+      intervals.push(timestamps[i] - timestamps[i-1]);
+    }
+    
+    const intervalMean = AnomalyStatistics.calculateMean(intervals);
+    const intervalStdDev = AnomalyStatistics.calculateStdDev(intervals, intervalMean);
+    
+    return {
+      volumeMovingAverage,
+      volumeStdDev,
+      intervalStatistics: {
+        mean: intervalMean,
+        stdDev: intervalStdDev,
+        outlierThreshold: intervalMean + (3 * intervalStdDev)
+      }
+    };
+  }
+
+  private getVolumeTimeSeries(transactions: any[], bucketSizeMs: number = 30000): number[] {
+    if (transactions.length === 0) return [];
+    
+    const now = Date.now();
+    const buckets: number[] = [];
+    const numBuckets = 20; // 20 buckets for time series
+    
+    for (let i = 0; i < numBuckets; i++) {
+      const bucketEnd = now - (i * bucketSizeMs);
+      const bucketStart = bucketEnd - bucketSizeMs;
+      
+      const bucketCount = transactions.filter(t => 
+        t.timestamp >= bucketStart && t.timestamp < bucketEnd
+      ).length;
+      
+      buckets.unshift(bucketCount);
+    }
+    
+    return buckets;
+  }
+
+  private async getBaselineData() {
+    // Simple baseline calculation from recent history
+    // In production, this would come from a database or cache
+    const allEvents = this.recentEvents.toArray();
+    const historicalTxs = allEvents.filter(e => e.type === 'transaction');
+    
+    if (historicalTxs.length < 50) {
+      return {
+        historicalAverageFees: 0,
+        historicalVolumeAverage: 0,
+        historicalErrorRate: 0,
+        dataPoints: 0,
+        lastUpdated: Date.now()
+      };
+    }
+    
+    const historicalFees = historicalTxs
+      .map(t => t.data.fee)
+      .filter(fee => typeof fee === 'number' && fee > 0);
+    
+    const historicalFailures = historicalTxs.filter(t => t.data.err !== null);
+    
+    return {
+      historicalAverageFees: AnomalyStatistics.calculateMean(historicalFees),
+      historicalVolumeAverage: historicalTxs.length / 20, // Average per time bucket
+      historicalErrorRate: historicalFailures.length / historicalTxs.length,
+      dataPoints: historicalTxs.length,
+      lastUpdated: Date.now()
     };
   }
 
