@@ -8,6 +8,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { UserProfile, UserHistoryEntry } from '@/types/user-history';
+import { validateWalletAddress } from '@/lib/user-history-utils';
 import { UserHistoryDisplay } from '@/components/user-history/UserHistoryDisplay';
 import { UserHistoryStats } from '@/components/user-history/UserHistoryStats';
 import { UserHistoryGraph } from '@/components/user-history/UserHistoryGraph';
@@ -31,21 +32,35 @@ import {
 
 export default function UserProfilePage() {
   const params = useParams();
-  const walletAddress = params?.walletAddress as string;
+  const rawWalletAddress = params?.walletAddress as string;
   
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('history');
+  const [validatedWalletAddress, setValidatedWalletAddress] = useState<string | null>(null);
+
+  // Validate wallet address on mount
+  useEffect(() => {
+    if (rawWalletAddress) {
+      const validated = validateWalletAddress(rawWalletAddress);
+      if (!validated) {
+        setError('Invalid wallet address format');
+        setLoading(false);
+        return;
+      }
+      setValidatedWalletAddress(validated);
+    }
+  }, [rawWalletAddress]);
 
   const fetchUserProfile = useCallback(async () => {
-    if (!walletAddress) return;
+    if (!validatedWalletAddress) return;
     
     try {
       setLoading(true);
       setError(null);
       
-      const response = await fetch(`/api/user-profile/${walletAddress}`);
+      const response = await fetch(`/api/user-profile/${validatedWalletAddress}`);
       
       if (!response.ok) {
         throw new Error('Failed to fetch user profile');
@@ -59,7 +74,7 @@ export default function UserProfilePage() {
     } finally {
       setLoading(false);
     }
-  }, [walletAddress]);
+  }, [validatedWalletAddress]);
 
   useEffect(() => {
     fetchUserProfile();

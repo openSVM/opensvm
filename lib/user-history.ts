@@ -4,6 +4,7 @@
  */
 
 import { UserHistoryEntry, UserProfile, UserHistoryStats } from '@/types/user-history';
+import { calculateStats, validateWalletAddress } from '@/lib/user-history-utils';
 
 const STORAGE_KEY = 'opensvm_user_history';
 const PROFILE_KEY = 'opensvm_user_profiles';
@@ -14,16 +15,23 @@ export class UserHistoryService {
    */
   static addHistoryEntry(entry: UserHistoryEntry): void {
     try {
-      const existingHistory = this.getUserHistory(entry.walletAddress);
+      // Validate wallet address
+      const validatedAddress = validateWalletAddress(entry.walletAddress);
+      if (!validatedAddress) {
+        console.error('Invalid wallet address provided');
+        return;
+      }
+
+      const existingHistory = this.getUserHistory(validatedAddress);
       const updatedHistory = [entry, ...existingHistory].slice(0, 10000); // Keep last 10k entries
       
       localStorage.setItem(
-        `${STORAGE_KEY}_${entry.walletAddress}`,
+        `${STORAGE_KEY}_${validatedAddress}`,
         JSON.stringify(updatedHistory)
       );
       
-      // Update user profile
-      this.updateUserProfile(entry.walletAddress, entry);
+      // Update user profile with recalculated stats
+      this.updateUserProfile(validatedAddress, updatedHistory);
     } catch (error) {
       console.error('Error adding history entry:', error);
     }
@@ -34,7 +42,14 @@ export class UserHistoryService {
    */
   static getUserHistory(walletAddress: string): UserHistoryEntry[] {
     try {
-      const stored = localStorage.getItem(`${STORAGE_KEY}_${walletAddress}`);
+      // Validate wallet address
+      const validatedAddress = validateWalletAddress(walletAddress);
+      if (!validatedAddress) {
+        console.error('Invalid wallet address provided');
+        return [];
+      }
+
+      const stored = localStorage.getItem(`${STORAGE_KEY}_${validatedAddress}`);
       return stored ? JSON.parse(stored) : [];
     } catch (error) {
       console.error('Error getting user history:', error);
@@ -47,14 +62,21 @@ export class UserHistoryService {
    */
   static getUserProfile(walletAddress: string): UserProfile | null {
     try {
-      const stored = localStorage.getItem(`${PROFILE_KEY}_${walletAddress}`);
+      // Validate wallet address
+      const validatedAddress = validateWalletAddress(walletAddress);
+      if (!validatedAddress) {
+        console.error('Invalid wallet address provided');
+        return null;
+      }
+
+      const stored = localStorage.getItem(`${PROFILE_KEY}_${validatedAddress}`);
       if (!stored) return null;
       
       const profile: UserProfile = JSON.parse(stored);
-      const history = this.getUserHistory(walletAddress);
+      const history = this.getUserHistory(validatedAddress);
       
-      // Update stats
-      profile.stats = this.calculateStats(history);
+      // Update stats using centralized function
+      profile.stats = calculateStats(history);
       profile.history = history;
       
       return profile;
@@ -65,15 +87,22 @@ export class UserHistoryService {
   }
 
   /**
-   * Update user profile
+   * Update user profile with recalculated stats
    */
-  private static updateUserProfile(walletAddress: string, entry: UserHistoryEntry): void {
+  private static updateUserProfile(walletAddress: string, history: UserHistoryEntry[]): void {
     try {
-      let profile = this.getUserProfile(walletAddress);
+      // Validate wallet address
+      const validatedAddress = validateWalletAddress(walletAddress);
+      if (!validatedAddress) {
+        console.error('Invalid wallet address provided');
+        return;
+      }
+
+      let profile = this.getUserProfile(validatedAddress);
       
       if (!profile) {
         profile = {
-          walletAddress,
+          walletAddress: validatedAddress,
           isPublic: true,
           createdAt: Date.now(),
           lastActive: Date.now(),
@@ -83,70 +112,13 @@ export class UserHistoryService {
       }
       
       profile.lastActive = Date.now();
+      // Recalculate stats with updated history
+      profile.stats = calculateStats(history);
       
-      localStorage.setItem(`${PROFILE_KEY}_${walletAddress}`, JSON.stringify(profile));
+      localStorage.setItem(`${PROFILE_KEY}_${validatedAddress}`, JSON.stringify(profile));
     } catch (error) {
       console.error('Error updating user profile:', error);
     }
-  }
-
-  /**
-   * Calculate user statistics
-   */
-  private static calculateStats(history: UserHistoryEntry[]): UserHistoryStats {
-    if (history.length === 0) {
-      return {
-        totalVisits: 0,
-        uniquePages: 0,
-        mostVisitedPageType: 'other',
-        averageSessionDuration: 0,
-        lastVisit: 0,
-        firstVisit: 0,
-        dailyActivity: [],
-        pageTypeDistribution: []
-      };
-    }
-
-    const uniquePaths = new Set(history.map(h => h.path));
-    const pageTypes = history.reduce((acc, h) => {
-      acc[h.pageType] = (acc[h.pageType] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
-
-    const mostVisitedType = Object.entries(pageTypes).reduce((a, b) => 
-      pageTypes[a[0]] > pageTypes[b[0]] ? a : b
-    )[0];
-
-    // Calculate daily activity
-    const dailyActivity = history.reduce((acc, h) => {
-      const date = new Date(h.timestamp).toISOString().split('T')[0];
-      acc[date] = (acc[date] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
-
-    const dailyActivityArray = Object.entries(dailyActivity).map(([date, visits]) => ({
-      date,
-      visits
-    })).sort((a, b) => a.date.localeCompare(b.date));
-
-    // Calculate page type distribution
-    const totalVisits = history.length;
-    const pageTypeDistribution = Object.entries(pageTypes).map(([type, count]) => ({
-      type,
-      count,
-      percentage: (count / totalVisits) * 100
-    })).sort((a, b) => b.count - a.count);
-
-    return {
-      totalVisits: history.length,
-      uniquePages: uniquePaths.size,
-      mostVisitedPageType: mostVisitedType,
-      averageSessionDuration: 0, // TODO: Calculate based on session data
-      lastVisit: Math.max(...history.map(h => h.timestamp)),
-      firstVisit: Math.min(...history.map(h => h.timestamp)),
-      dailyActivity: dailyActivityArray,
-      pageTypeDistribution
-    };
   }
 
   /**
@@ -228,8 +200,15 @@ export class UserHistoryService {
    */
   static clearUserHistory(walletAddress: string): void {
     try {
-      localStorage.removeItem(`${STORAGE_KEY}_${walletAddress}`);
-      localStorage.removeItem(`${PROFILE_KEY}_${walletAddress}`);
+      // Validate wallet address
+      const validatedAddress = validateWalletAddress(walletAddress);
+      if (!validatedAddress) {
+        console.error('Invalid wallet address provided');
+        return;
+      }
+
+      localStorage.removeItem(`${STORAGE_KEY}_${validatedAddress}`);
+      localStorage.removeItem(`${PROFILE_KEY}_${validatedAddress}`);
     } catch (error) {
       console.error('Error clearing user history:', error);
     }

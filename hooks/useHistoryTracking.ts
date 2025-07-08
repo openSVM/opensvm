@@ -1,14 +1,42 @@
 /**
  * History Tracking Hook
- * Tracks user page visits for logged-in users
+ * Tracks user page visits for logged-in users with improved error handling
  */
 
 'use client';
 
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useState } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { UserHistoryEntry } from '@/types/user-history';
+import { validateWalletAddress } from '@/lib/user-history-utils';
+
+// Retry function with exponential backoff
+async function retryWithBackoff<T>(
+  fn: () => Promise<T>,
+  maxRetries: number = 3,
+  baseDelay: number = 1000
+): Promise<T> {
+  let lastError: Error;
+  
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error as Error;
+      
+      if (attempt === maxRetries) {
+        throw lastError;
+      }
+      
+      // Exponential backoff: wait 1s, 2s, 4s
+      const delay = baseDelay * Math.pow(2, attempt);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+  
+  throw lastError!;
+}
 
 // Helper function to determine page type from path
 function getPageType(path: string): UserHistoryEntry['pageType'] {
@@ -109,11 +137,20 @@ export function useHistoryTracking() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { publicKey, connected } = useWallet();
+  const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'success' | 'error'>('idle');
 
   const trackPageVisit = useCallback(async (path: string, searchQuery?: string) => {
     if (!connected || !publicKey) return;
 
     const walletAddress = publicKey.toBase58();
+    
+    // Validate wallet address
+    const validatedAddress = validateWalletAddress(walletAddress);
+    if (!validatedAddress) {
+      console.error('Invalid wallet address');
+      return;
+    }
+
     const pageType = getPageType(path);
     const metadata = extractMetadata(path, pageType);
     
@@ -123,7 +160,7 @@ export function useHistoryTracking() {
     }
 
     const historyEntry: Omit<UserHistoryEntry, 'id' | 'timestamp'> = {
-      walletAddress,
+      walletAddress: validatedAddress,
       path,
       pageType,
       pageTitle: getPageTitle(path, pageType),
@@ -133,33 +170,57 @@ export function useHistoryTracking() {
     };
 
     try {
-      // Store locally first
+      // Store locally first (immediate feedback)
       const existingHistory = JSON.parse(
-        localStorage.getItem(`opensvm_user_history_${walletAddress}`) || '[]'
+        localStorage.getItem(`opensvm_user_history_${validatedAddress}`) || '[]'
       );
       
       const newEntry = {
         ...historyEntry,
-        id: `${walletAddress}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        id: `${validatedAddress}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         timestamp: Date.now()
       };
       
       const updatedHistory = [newEntry, ...existingHistory].slice(0, 10000);
-      localStorage.setItem(`opensvm_user_history_${walletAddress}`, JSON.stringify(updatedHistory));
+      localStorage.setItem(`opensvm_user_history_${validatedAddress}`, JSON.stringify(updatedHistory));
 
-      // Also send to server API (fire and forget)
-      fetch(`/api/user-history/${walletAddress}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(historyEntry)
-      }).catch(error => {
-        console.warn('Failed to sync history to server:', error);
-      });
+      // Sync to server with retry logic
+      setSyncStatus('syncing');
+      
+      try {
+        await retryWithBackoff(async () => {
+          const response = await fetch(`/api/user-history/${validatedAddress}`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(historyEntry)
+          });
+          
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+          
+          return response.json();
+        });
+        
+        setSyncStatus('success');
+        
+        // Clear success status after a short delay
+        setTimeout(() => setSyncStatus('idle'), 2000);
+        
+      } catch (syncError) {
+        console.warn('Failed to sync history to server after retries:', syncError);
+        setSyncStatus('error');
+        
+        // Clear error status after a delay
+        setTimeout(() => setSyncStatus('idle'), 5000);
+      }
 
     } catch (error) {
       console.error('Error tracking page visit:', error);
+      setSyncStatus('error');
+      setTimeout(() => setSyncStatus('idle'), 5000);
     }
   }, [connected, publicKey]);
 
@@ -178,5 +239,5 @@ export function useHistoryTracking() {
     return () => clearTimeout(timer);
   }, [pathname, searchParams, trackPageVisit, connected, publicKey]);
 
-  return { trackPageVisit };
+  return { trackPageVisit, syncStatus };
 }
