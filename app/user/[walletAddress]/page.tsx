@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useTheme } from '@/lib/theme';
 import { 
   User, 
   Activity, 
@@ -27,7 +28,11 @@ import {
   Eye, 
   Globe,
   Loader2,
-  AlertCircle
+  AlertCircle,
+  UserPlus,
+  UserMinus,
+  Heart,
+  Users
 } from 'lucide-react';
 
 export default function UserProfilePage() {
@@ -39,6 +44,10 @@ export default function UserProfilePage() {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('history');
   const [validatedWalletAddress, setValidatedWalletAddress] = useState<string | null>(null);
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [isLiked, setIsLiked] = useState(false);
+  const [socialLoading, setSocialLoading] = useState(false);
+  const { theme } = useTheme();
 
   // Validate wallet address on mount
   useEffect(() => {
@@ -52,6 +61,138 @@ export default function UserProfilePage() {
       setValidatedWalletAddress(validated);
     }
   }, [rawWalletAddress]);
+
+  const handleFollowToggle = async () => {
+    if (!validatedWalletAddress || socialLoading) return;
+    
+    try {
+      setSocialLoading(true);
+      const action = isFollowing ? 'unfollow' : 'follow';
+      
+      const response = await fetch(`/api/user-social/${action}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetAddress: validatedWalletAddress })
+      });
+      
+      if (response.ok) {
+        setIsFollowing(!isFollowing);
+        // Update follower count in profile
+        if (profile) {
+          setProfile({
+            ...profile,
+            socialStats: {
+              ...profile.socialStats,
+              followers: profile.socialStats.followers + (isFollowing ? -1 : 1)
+            }
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error toggling follow:', error);
+    } finally {
+      setSocialLoading(false);
+    }
+  };
+
+  const handleLikeToggle = async () => {
+    if (!validatedWalletAddress || socialLoading) return;
+    
+    try {
+      setSocialLoading(true);
+      const action = isLiked ? 'unlike' : 'like';
+      
+      const response = await fetch(`/api/user-social/${action}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetAddress: validatedWalletAddress })
+      });
+      
+      if (response.ok) {
+        setIsLiked(!isLiked);
+        // Update likes count in profile
+        if (profile) {
+          setProfile({
+            ...profile,
+            socialStats: {
+              ...profile.socialStats,
+              likes: profile.socialStats.likes + (isLiked ? -1 : 1)
+            }
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error toggling like:', error);
+    } finally {
+      setSocialLoading(false);
+    }
+  };
+
+  const handleFollowToggle = async () => {
+    if (!validatedWalletAddress || socialLoading) return;
+    
+    try {
+      setSocialLoading(true);
+      const action = isFollowing ? 'unfollow' : 'follow';
+      
+      const response = await fetch(`/api/user-social/${action}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetAddress: validatedWalletAddress })
+      });
+      
+      if (response.ok) {
+        setIsFollowing(!isFollowing);
+        // Update follower count in profile
+        if (profile) {
+          setProfile({
+            ...profile,
+            socialStats: {
+              ...profile.socialStats,
+              followers: profile.socialStats.followers + (isFollowing ? -1 : 1)
+            }
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error toggling follow:', error);
+    } finally {
+      setSocialLoading(false);
+    }
+  };
+
+  const handleLikeToggle = async () => {
+    if (!validatedWalletAddress || socialLoading) return;
+    
+    try {
+      setSocialLoading(true);
+      const action = isLiked ? 'unlike' : 'like';
+      
+      const response = await fetch(`/api/user-social/${action}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetAddress: validatedWalletAddress })
+      });
+      
+      if (response.ok) {
+        setIsLiked(!isLiked);
+        // Update likes count in profile
+        if (profile) {
+          setProfile({
+            ...profile,
+            socialStats: {
+              ...profile.socialStats,
+              likes: profile.socialStats.likes + (isLiked ? -1 : 1)
+            }
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error toggling like:', error);
+    } finally {
+      setSocialLoading(false);
+    }
+  };
 
   const fetchUserProfile = useCallback(async () => {
     if (!validatedWalletAddress) return;
@@ -68,6 +209,16 @@ export default function UserProfilePage() {
       
       const data = await response.json();
       setProfile(data.profile);
+
+      // Track profile view (increment view count)
+      await fetch(`/api/user-social/view`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetAddress: validatedWalletAddress })
+      }).catch(error => {
+        console.log('Profile view tracking failed:', error);
+        // Don't fail the whole page load if view tracking fails
+      });
     } catch (error) {
       console.error('Error fetching user profile:', error);
       setError('Failed to load user profile');
@@ -82,12 +233,12 @@ export default function UserProfilePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 p-4">
+      <div className="min-h-screen bg-background p-4">
         <div className="max-w-7xl mx-auto">
           <div className="flex items-center justify-center h-64">
             <div className="text-center">
-              <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-600" />
-              <p className="text-gray-600 dark:text-gray-400">Loading user profile...</p>
+              <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
+              <p className="text-muted-foreground">Loading user profile...</p>
             </div>
           </div>
         </div>
@@ -97,13 +248,13 @@ export default function UserProfilePage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 p-4">
+      <div className="min-h-screen bg-background p-4">
         <div className="max-w-7xl mx-auto">
           <div className="flex items-center justify-center h-64">
             <div className="text-center">
-              <AlertCircle className="h-8 w-8 mx-auto mb-4 text-red-600" />
-              <p className="text-red-600 dark:text-red-400 mb-2">Error loading profile</p>
-              <p className="text-gray-600 dark:text-gray-400 text-sm">{error}</p>
+              <AlertCircle className="h-8 w-8 mx-auto mb-4 text-destructive" />
+              <p className="text-destructive mb-2">Error loading profile</p>
+              <p className="text-muted-foreground text-sm">{error}</p>
               <Button 
                 onClick={fetchUserProfile} 
                 variant="outline" 
@@ -120,12 +271,12 @@ export default function UserProfilePage() {
 
   if (!profile) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 p-4">
+      <div className="min-h-screen bg-background p-4">
         <div className="max-w-7xl mx-auto">
           <div className="flex items-center justify-center h-64">
             <div className="text-center">
-              <User className="h-8 w-8 mx-auto mb-4 text-gray-400" />
-              <p className="text-gray-600 dark:text-gray-400">No profile found</p>
+              <User className="h-8 w-8 mx-auto mb-4 text-muted-foreground" />
+              <p className="text-muted-foreground">No profile found</p>
             </div>
           </div>
         </div>
@@ -146,23 +297,23 @@ export default function UserProfilePage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 p-4">
+    <div className="min-h-screen bg-background p-4">
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Profile Header */}
         <Card className="relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-purple-600 opacity-10" />
+          <div className="absolute inset-0 bg-gradient-to-r from-primary/20 to-secondary/20" />
           <CardHeader className="relative">
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-4">
-                <Avatar className="h-16 w-16 border-4 border-white dark:border-gray-800 shadow-lg">
+                <Avatar className="h-16 w-16 border-4 border-background shadow-lg">
                   <AvatarImage src={profile.avatar} alt={profile.displayName || 'User avatar'} />
-                  <AvatarFallback className="text-lg font-bold bg-gradient-to-r from-blue-500 to-purple-500 text-white">
+                  <AvatarFallback className="text-lg font-bold bg-gradient-to-r from-primary to-secondary text-primary-foreground">
                     {profile.displayName?.[0] || formatWalletAddress(profile.walletAddress)[0]}
                   </AvatarFallback>
                 </Avatar>
                 <div>
                   <div className="flex items-center gap-2">
-                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+                    <h1 className="text-2xl font-bold text-foreground">
                       {profile.displayName || formatWalletAddress(profile.walletAddress)}
                     </h1>
                     {profile.isPublic && (
@@ -172,10 +323,10 @@ export default function UserProfilePage() {
                       </Badge>
                     )}
                   </div>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 font-mono">
+                  <p className="text-sm text-muted-foreground font-mono">
                     {profile.walletAddress}
                   </p>
-                  <div className="flex items-center gap-4 mt-2 text-sm text-gray-600 dark:text-gray-400">
+                  <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
                     <div className="flex items-center gap-1">
                       <Calendar className="h-4 w-4" />
                       <span>Joined {formatDate(profile.createdAt)}</span>
@@ -188,10 +339,31 @@ export default function UserProfilePage() {
                 </div>
               </div>
               <div className="flex items-center gap-2">
+                {/* Social interaction buttons */}
+                <Button
+                  variant={isFollowing ? "default" : "outline"}
+                  size="sm"
+                  onClick={handleFollowToggle}
+                  disabled={socialLoading}
+                  className="gap-1"
+                >
+                  {isFollowing ? <UserMinus className="h-4 w-4" /> : <UserPlus className="h-4 w-4" />}
+                  {isFollowing ? 'Unfollow' : 'Follow'}
+                </Button>
+                <Button
+                  variant={isLiked ? "default" : "outline"}
+                  size="sm"
+                  onClick={handleLikeToggle}
+                  disabled={socialLoading}
+                  className="gap-1"
+                >
+                  <Heart className={`h-4 w-4 ${isLiked ? 'fill-current' : ''}`} />
+                  {isLiked ? 'Liked' : 'Like'}
+                </Button>
                 <UserHistoryExport profile={profile} />
                 <Badge variant="outline" className="flex items-center gap-1">
                   <Eye className="h-3 w-3" />
-                  {profile.stats.totalVisits} visits
+                  {profile.socialStats.profileViews} views
                 </Badge>
               </div>
             </div>
@@ -199,17 +371,17 @@ export default function UserProfilePage() {
         </Card>
 
         {/* Quick Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
           <Card>
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Visits</p>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                  <p className="text-sm font-medium text-muted-foreground">Total Visits</p>
+                  <p className="text-2xl font-bold text-foreground">
                     {profile.stats.totalVisits.toLocaleString()}
                   </p>
                 </div>
-                <Activity className="h-8 w-8 text-blue-600" />
+                <Activity className="h-8 w-8 text-primary" />
               </div>
             </CardContent>
           </Card>
@@ -218,12 +390,12 @@ export default function UserProfilePage() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Unique Pages</p>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                    {profile.stats.uniquePages}
+                  <p className="text-sm font-medium text-muted-foreground">Profile Views</p>
+                  <p className="text-2xl font-bold text-foreground">
+                    {profile.socialStats.profileViews.toLocaleString()}
                   </p>
                 </div>
-                <Eye className="h-8 w-8 text-green-600" />
+                <Eye className="h-8 w-8 text-blue-600" />
               </div>
             </CardContent>
           </Card>
@@ -232,12 +404,12 @@ export default function UserProfilePage() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Most Visited</p>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white capitalize">
-                    {profile.stats.mostVisitedPageType}
+                  <p className="text-sm font-medium text-muted-foreground">Followers</p>
+                  <p className="text-2xl font-bold text-foreground">
+                    {profile.socialStats.followers}
                   </p>
                 </div>
-                <BarChart3 className="h-8 w-8 text-purple-600" />
+                <Users className="h-8 w-8 text-green-600" />
               </div>
             </CardContent>
           </Card>
@@ -246,8 +418,22 @@ export default function UserProfilePage() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Days Active</p>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                  <p className="text-sm font-medium text-muted-foreground">Likes</p>
+                  <p className="text-2xl font-bold text-foreground">
+                    {profile.socialStats.likes}
+                  </p>
+                </div>
+                <Heart className="h-8 w-8 text-red-600" />
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Days Active</p>
+                  <p className="text-2xl font-bold text-foreground">
                     {profile.stats.dailyActivity.length}
                   </p>
                 </div>
@@ -259,7 +445,7 @@ export default function UserProfilePage() {
 
         {/* Main Content Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="history" className="flex items-center gap-2">
               <Activity className="h-4 w-4" />
               History
@@ -268,9 +454,13 @@ export default function UserProfilePage() {
               <BarChart3 className="h-4 w-4" />
               Statistics
             </TabsTrigger>
-            <TabsTrigger value="graph" className="flex items-center gap-2">
+            <TabsTrigger value="social" className="flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              Social
+            </TabsTrigger>
+            <TabsTrigger value="activity" className="flex items-center gap-2">
               <Activity className="h-4 w-4" />
-              Live Graph
+              Activity Feed
             </TabsTrigger>
           </TabsList>
           
@@ -282,12 +472,69 @@ export default function UserProfilePage() {
             <UserHistoryStats stats={profile.stats} />
           </TabsContent>
           
-          <TabsContent value="graph" className="space-y-4">
-            <UserHistoryGraph 
-              history={profile.history}
-              stats={profile.stats}
-              walletAddress={profile.walletAddress}
-            />
+          <TabsContent value="social" className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Users className="h-5 w-5" />
+                    Followers ({profile.socialStats.followers})
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-muted-foreground">Follower list will be displayed here</p>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Heart className="h-5 w-5" />
+                    Social Activity
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">Total Likes</span>
+                    <span className="font-semibold">{profile.socialStats.likes}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">Following</span>
+                    <span className="font-semibold">{profile.socialStats.following}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">Profile Views</span>
+                    <span className="font-semibold">{profile.socialStats.profileViews}</span>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+          
+          <TabsContent value="activity" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Activity className="h-5 w-5" />
+                  Recent Activity Timeline
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {profile.history.slice(0, 10).map((entry, index) => (
+                    <div key={entry.id} className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
+                      <div className="w-2 h-2 rounded-full bg-primary"></div>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium">{entry.pageTitle}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {new Date(entry.timestamp).toLocaleString()} • {entry.pageType}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
       </div>

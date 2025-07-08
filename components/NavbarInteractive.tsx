@@ -12,9 +12,10 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { SettingsMenu } from './SettingsMenu';
 import { WalletButton } from './WalletButton';
-import { X } from 'lucide-react';
+import { X, User } from 'lucide-react';
 import { AIChatSidebar } from './ai/AIChatSidebar';
 import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
+import { useWallet } from '@solana/wallet-adapter-react';
 
 interface NavbarInteractiveProps {}
 
@@ -28,6 +29,7 @@ export const NavbarInteractive: React.FC<NavbarInteractiveProps> = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [contentPadding, setContentPadding] = useState<string>('0px');
   const menuRef = useRef<HTMLDivElement>(null);
+  const { connected, publicKey } = useWallet();
 
   // Close mobile menu when clicking outside
   useEffect(() => {
@@ -273,6 +275,18 @@ export const NavbarInteractive: React.FC<NavbarInteractiveProps> = () => {
             </DropdownMenu>
   
             <SettingsMenu />
+            {connected && publicKey && (
+              <Button 
+                variant="outline"
+                size="sm"
+                onClick={() => router.push(`/user/${publicKey.toString()}`)}
+                className="gap-1 px-3 h-9 text-sm font-medium"
+                aria-label="View Profile"
+              >
+                <User className="h-4 w-4" />
+                Profile
+              </Button>
+            )}
             <WalletButton />
             <Button 
               size="sm" 
@@ -474,6 +488,19 @@ export const NavbarInteractive: React.FC<NavbarInteractiveProps> = () => {
             </div>
             
             <div className="flex gap-2 mt-4 border-t pt-4 border-border/40">
+              {connected && publicKey && (
+                <Button 
+                  variant="outline"
+                  className="gap-1"
+                  onClick={() => {
+                    router.push(`/user/${publicKey.toString()}`);
+                    setIsMobileMenuOpen(false);
+                  }}
+                >
+                  <User className="h-4 w-4" />
+                  Profile
+                </Button>
+              )}
               <WalletButton />
               <SettingsMenu />
               <Button 

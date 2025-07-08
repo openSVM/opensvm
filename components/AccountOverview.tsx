@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
-import { Loader2 } from 'lucide-react';
+import { Loader2, ExternalLink } from 'lucide-react';
 import { type TokenAccount } from '@/lib/solana';
 import AccountExplorerLinks from './AccountExplorerLinks';
 import { useTheme } from '@/lib/theme';
+import { Button } from '@/components/ui/button';
+import { useRouter } from 'next/navigation';
 import { 
   PieChart,
   Pie,
@@ -35,6 +37,7 @@ export default function AccountOverview({
   }>({ totalTransactions: null, tokenTransfers: null });
   const [statsLoading, setStatsLoading] = useState(true);
   const { theme } = useTheme();
+  const router = useRouter();
 
   useEffect(() => {
     async function fetchAccountStats() {
@@ -312,6 +315,18 @@ export default function AccountOverview({
           )}
 
           <AccountExplorerLinks address={address} />
+
+          {/* User Page Redirect Button */}
+          <div className="mt-4">
+            <Button 
+              variant="outline" 
+              className="w-full gap-2"
+              onClick={() => router.push(`/user/${address}`)}
+            >
+              <ExternalLink className="h-4 w-4" />
+              View User Profile & History
+            </Button>
+          </div>
         </div>
       </div>
     </div>

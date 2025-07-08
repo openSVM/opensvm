@@ -65,7 +65,25 @@ export async function GET(
         createdAt: Date.now(),
         lastActive: Date.now(),
         stats: calculateStats([]),
+        socialStats: {
+          visitsByUsers: 0,
+          followers: 0,
+          following: 0,
+          likes: 0,
+          profileViews: 0
+        },
         history: []
+      };
+    }
+
+    // Ensure socialStats exists
+    if (!profile.socialStats) {
+      profile.socialStats = {
+        visitsByUsers: 0,
+        followers: 0,
+        following: 0,
+        likes: 0,
+        profileViews: 0
       };
     }
 
@@ -117,7 +135,25 @@ export async function PUT(
         createdAt: Date.now(),
         lastActive: Date.now(),
         stats: calculateStats([]),
+        socialStats: {
+          visitsByUsers: 0,
+          followers: 0,
+          following: 0,
+          likes: 0,
+          profileViews: 0
+        },
         history: []
+      };
+    }
+
+    // Ensure socialStats exists
+    if (!profile.socialStats) {
+      profile.socialStats = {
+        visitsByUsers: 0,
+        followers: 0,
+        following: 0,
+        likes: 0,
+        profileViews: 0
       };
     }
 
