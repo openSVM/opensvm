@@ -11,7 +11,8 @@ import { UserProfile, UserHistoryEntry } from '@/types/user-history';
 import { validateWalletAddress } from '@/lib/user-history-utils';
 import { UserHistoryDisplay } from '@/components/user-history/UserHistoryDisplay';
 import { UserHistoryStats } from '@/components/user-history/UserHistoryStats';
-import { UserHistoryGraph } from '@/components/user-history/UserHistoryGraph';
+import { UserActivityCalendar } from '@/components/user-history/UserActivityCalendar';
+import { UserFollowersList } from '@/components/user-history/UserFollowersList';
 import { UserHistoryExport } from '@/components/user-history/UserHistoryExport';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -128,72 +129,6 @@ export default function UserProfilePage() {
     }
   };
 
-  const handleFollowToggle = async () => {
-    if (!validatedWalletAddress || socialLoading) return;
-    
-    try {
-      setSocialLoading(true);
-      const action = isFollowing ? 'unfollow' : 'follow';
-      
-      const response = await fetch(`/api/user-social/${action}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ targetAddress: validatedWalletAddress })
-      });
-      
-      if (response.ok) {
-        setIsFollowing(!isFollowing);
-        // Update follower count in profile
-        if (profile) {
-          setProfile({
-            ...profile,
-            socialStats: {
-              ...profile.socialStats,
-              followers: profile.socialStats.followers + (isFollowing ? -1 : 1)
-            }
-          });
-        }
-      }
-    } catch (error) {
-      console.error('Error toggling follow:', error);
-    } finally {
-      setSocialLoading(false);
-    }
-  };
-
-  const handleLikeToggle = async () => {
-    if (!validatedWalletAddress || socialLoading) return;
-    
-    try {
-      setSocialLoading(true);
-      const action = isLiked ? 'unlike' : 'like';
-      
-      const response = await fetch(`/api/user-social/${action}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ targetAddress: validatedWalletAddress })
-      });
-      
-      if (response.ok) {
-        setIsLiked(!isLiked);
-        // Update likes count in profile
-        if (profile) {
-          setProfile({
-            ...profile,
-            socialStats: {
-              ...profile.socialStats,
-              likes: profile.socialStats.likes + (isLiked ? -1 : 1)
-            }
-          });
-        }
-      }
-    } catch (error) {
-      console.error('Error toggling like:', error);
-    } finally {
-      setSocialLoading(false);
-    }
-  };
-
   const fetchUserProfile = useCallback(async () => {
     if (!validatedWalletAddress) return;
     
@@ -201,13 +136,25 @@ export default function UserProfilePage() {
       setLoading(true);
       setError(null);
       
+      console.log('Fetching profile for:', validatedWalletAddress);
       const response = await fetch(`/api/user-profile/${validatedWalletAddress}`);
       
+      console.log('Response status:', response.status);
+      console.log('Response ok:', response.ok);
+      
       if (!response.ok) {
-        throw new Error('Failed to fetch user profile');
+        const errorData = await response.text();
+        console.error('API error response:', errorData);
+        throw new Error(`Failed to fetch user profile: ${response.status} ${errorData}`);
       }
       
       const data = await response.json();
+      console.log('Profile data received:', data);
+      
+      if (!data.profile) {
+        throw new Error('No profile data in response');
+      }
+      
       setProfile(data.profile);
 
       // Track profile view (increment view count)
@@ -221,7 +168,7 @@ export default function UserProfilePage() {
       });
     } catch (error) {
       console.error('Error fetching user profile:', error);
-      setError('Failed to load user profile');
+      setError(error instanceof Error ? error.message : 'Failed to load user profile');
     } finally {
       setLoading(false);
     }
@@ -470,45 +417,35 @@ export default function UserProfilePage() {
           
           <TabsContent value="stats" className="space-y-4">
             <UserHistoryStats stats={profile.stats} />
+            <UserActivityCalendar history={profile.history} />
           </TabsContent>
           
           <TabsContent value="social" className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Users className="h-5 w-5" />
-                    Followers ({profile.socialStats.followers})
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-muted-foreground">Follower list will be displayed here</p>
-                </CardContent>
-              </Card>
-              
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Heart className="h-5 w-5" />
-                    Social Activity
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Total Likes</span>
-                    <span className="font-semibold">{profile.socialStats.likes}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Following</span>
-                    <span className="font-semibold">{profile.socialStats.following}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Profile Views</span>
-                    <span className="font-semibold">{profile.socialStats.profileViews}</span>
-                  </div>
-                </CardContent>
-              </Card>
+              <UserFollowersList walletAddress={validatedWalletAddress} type="followers" />
+              <UserFollowersList walletAddress={validatedWalletAddress} type="following" />
             </div>
+            
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Heart className="h-5 w-5" />
+                  Social Stats Summary
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="text-center p-4 bg-muted rounded-lg">
+                    <p className="text-2xl font-bold">{profile.socialStats.likes}</p>
+                    <p className="text-sm text-muted-foreground">Total Likes</p>
+                  </div>
+                  <div className="text-center p-4 bg-muted rounded-lg">
+                    <p className="text-2xl font-bold">{profile.socialStats.profileViews}</p>
+                    <p className="text-sm text-muted-foreground">Profile Views</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
           
           <TabsContent value="activity" className="space-y-4">

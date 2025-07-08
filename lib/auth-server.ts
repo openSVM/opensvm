@@ -54,3 +54,10 @@ export function clearSessionCookie() {
   const cookieStore = cookies();
   cookieStore.delete('opensvm_session');
 }
+
+/**
+ * Get authenticated session and validate it
+ */
+export function getAuthenticatedSession(): SessionData | null {
+  return getSessionFromCookie();
+}

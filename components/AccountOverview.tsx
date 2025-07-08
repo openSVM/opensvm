@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
-import { Loader2, ExternalLink } from 'lucide-react';
+import { Loader2, User } from 'lucide-react';
 import { type TokenAccount } from '@/lib/solana';
 import AccountExplorerLinks from './AccountExplorerLinks';
 import { useTheme } from '@/lib/theme';
@@ -323,7 +323,7 @@ export default function AccountOverview({
               className="w-full gap-2"
               onClick={() => router.push(`/user/${address}`)}
             >
-              <ExternalLink className="h-4 w-4" />
+              <User className="h-4 w-4" />
               View User Profile & History
             </Button>
           </div>

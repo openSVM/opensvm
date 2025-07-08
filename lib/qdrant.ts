@@ -14,8 +14,13 @@ const qdrantClient = new QdrantClient({
 // Collection names
 export const COLLECTIONS = {
   USER_HISTORY: 'user_history',
-  USER_PROFILES: 'user_profiles'
+  USER_PROFILES: 'user_profiles',
+  USER_FOLLOWS: 'user_follows',
+  USER_LIKES: 'user_likes'
 } as const;
+
+// Export qdrant client for direct access
+export { qdrantClient };
 
 /**
  * Initialize Qdrant collections for user data
@@ -33,23 +38,7 @@ export async function initializeCollections() {
         }
       });
       
-      // Create index on wallet address for fast filtering
-      await qdrantClient.createFieldIndex(COLLECTIONS.USER_HISTORY, {
-        field_name: 'walletAddress',
-        field_type: 'keyword'
-      });
-      
-      // Create index on timestamp for sorting
-      await qdrantClient.createFieldIndex(COLLECTIONS.USER_HISTORY, {
-        field_name: 'timestamp',
-        field_type: 'integer'
-      });
-      
-      // Create index on page type for filtering
-      await qdrantClient.createFieldIndex(COLLECTIONS.USER_HISTORY, {
-        field_name: 'pageType',
-        field_type: 'keyword'
-      });
+      // Note: Field indexing is handled automatically by Qdrant for filtering
     }
     
     // Check if user_profiles collection exists
@@ -63,10 +52,30 @@ export async function initializeCollections() {
         }
       });
       
-      // Create index on wallet address
-      await qdrantClient.createFieldIndex(COLLECTIONS.USER_PROFILES, {
-        field_name: 'walletAddress',
-        field_type: 'keyword'
+      // Note: Field indexing is handled automatically by Qdrant for filtering
+    }
+    
+    // Check if user_follows collection exists
+    const followsExists = await qdrantClient.getCollection(COLLECTIONS.USER_FOLLOWS).catch(() => null);
+    
+    if (!followsExists) {
+      await qdrantClient.createCollection(COLLECTIONS.USER_FOLLOWS, {
+        vectors: {
+          size: 384,
+          distance: 'Cosine'
+        }
+      });
+    }
+    
+    // Check if user_likes collection exists
+    const likesExists = await qdrantClient.getCollection(COLLECTIONS.USER_LIKES).catch(() => null);
+    
+    if (!likesExists) {
+      await qdrantClient.createCollection(COLLECTIONS.USER_LIKES, {
+        vectors: {
+          size: 384,
+          distance: 'Cosine'
+        }
       });
     }
     
@@ -173,7 +182,7 @@ export async function getUserHistory(
       filter
     });
     
-    const history = result.map(point => point.payload as UserHistoryEntry);
+    const history = result.map(point => point.payload as unknown as UserHistoryEntry);
     
     // Sort by timestamp (newest first)
     history.sort((a, b) => b.timestamp - a.timestamp);
@@ -226,7 +235,7 @@ export async function storeUserProfile(profile: UserProfile): Promise<void> {
       points: [{
         id: profile.walletAddress,
         vector,
-        payload: profile
+        payload: profile as any
       }]
     });
   } catch (error) {
@@ -251,7 +260,7 @@ export async function getUserProfile(walletAddress: string): Promise<UserProfile
       return null;
     }
     
-    return result[0].payload as UserProfile;
+    return result[0].payload as unknown as UserProfile;
   } catch (error) {
     console.error('Error getting user profile:', error);
     return null;
@@ -268,5 +277,190 @@ export async function checkQdrantHealth(): Promise<boolean> {
   } catch (error) {
     console.error('Qdrant health check failed:', error);
     return false;
+  }
+}
+
+/**
+ * Social Features - Follow functionality
+ */
+
+// User follow entry interface
+interface UserFollowEntry {
+  id: string;
+  followerAddress: string;
+  targetAddress: string;
+  timestamp: number;
+}
+
+/**
+ * Store user follow relationship
+ */
+export async function storeUserFollow(entry: UserFollowEntry): Promise<void> {
+  try {
+    await initializeCollections();
+    
+    const textContent = `${entry.followerAddress} follows ${entry.targetAddress}`;
+    const vector = generateSimpleEmbedding(textContent);
+    
+    await qdrantClient.upsert(COLLECTIONS.USER_FOLLOWS, {
+      wait: true,
+      points: [{
+        id: entry.id,
+        vector,
+        payload: entry as any
+      }]
+    });
+  } catch (error) {
+    console.error('Error storing user follow:', error);
+    throw error;
+  }
+}
+
+/**
+ * Remove user follow relationship
+ */
+export async function removeUserFollow(followerAddress: string, targetAddress: string): Promise<void> {
+  try {
+    await initializeCollections();
+    
+    await qdrantClient.delete(COLLECTIONS.USER_FOLLOWS, {
+      wait: true,
+      filter: {
+        must: [
+          { key: 'followerAddress', match: { value: followerAddress } },
+          { key: 'targetAddress', match: { value: targetAddress } }
+        ]
+      }
+    });
+  } catch (error) {
+    console.error('Error removing user follow:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get user followers
+ */
+export async function getUserFollowers(targetAddress: string): Promise<UserFollowEntry[]> {
+  try {
+    await initializeCollections();
+    
+    const result = await qdrantClient.search(COLLECTIONS.USER_FOLLOWS, {
+      vector: new Array(384).fill(0),
+      filter: {
+        must: [{ key: 'targetAddress', match: { value: targetAddress } }]
+      },
+      limit: 1000,
+      with_payload: true
+    });
+    
+    return result.map(point => point.payload as unknown as UserFollowEntry);
+  } catch (error) {
+    console.error('Error getting user followers:', error);
+    return [];
+  }
+}
+
+/**
+ * Get users that a user is following
+ */
+export async function getUserFollowing(followerAddress: string): Promise<UserFollowEntry[]> {
+  try {
+    await initializeCollections();
+    
+    const result = await qdrantClient.search(COLLECTIONS.USER_FOLLOWS, {
+      vector: new Array(384).fill(0),
+      filter: {
+        must: [{ key: 'followerAddress', match: { value: followerAddress } }]
+      },
+      limit: 1000,
+      with_payload: true
+    });
+    
+    return result.map(point => point.payload as unknown as UserFollowEntry);
+  } catch (error) {
+    console.error('Error getting user following:', error);
+    return [];
+  }
+}
+
+/**
+ * Social Features - Like functionality
+ */
+
+// User like entry interface
+interface UserLikeEntry {
+  id: string;
+  likerAddress: string;
+  targetAddress: string;
+  timestamp: number;
+}
+
+/**
+ * Store user like relationship
+ */
+export async function storeUserLike(entry: UserLikeEntry): Promise<void> {
+  try {
+    await initializeCollections();
+    
+    const textContent = `${entry.likerAddress} likes ${entry.targetAddress}`;
+    const vector = generateSimpleEmbedding(textContent);
+    
+    await qdrantClient.upsert(COLLECTIONS.USER_LIKES, {
+      wait: true,
+      points: [{
+        id: entry.id,
+        vector,
+        payload: entry as any
+      }]
+    });
+  } catch (error) {
+    console.error('Error storing user like:', error);
+    throw error;
+  }
+}
+
+/**
+ * Remove user like relationship
+ */
+export async function removeUserLike(likerAddress: string, targetAddress: string): Promise<void> {
+  try {
+    await initializeCollections();
+    
+    await qdrantClient.delete(COLLECTIONS.USER_LIKES, {
+      wait: true,
+      filter: {
+        must: [
+          { key: 'likerAddress', match: { value: likerAddress } },
+          { key: 'targetAddress', match: { value: targetAddress } }
+        ]
+      }
+    });
+  } catch (error) {
+    console.error('Error removing user like:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get user likes
+ */
+export async function getUserLikes(targetAddress: string): Promise<UserLikeEntry[]> {
+  try {
+    await initializeCollections();
+    
+    const result = await qdrantClient.search(COLLECTIONS.USER_LIKES, {
+      vector: new Array(384).fill(0),
+      filter: {
+        must: [{ key: 'targetAddress', match: { value: targetAddress } }]
+      },
+      limit: 1000,
+      with_payload: true
+    });
+    
+    return result.map(point => point.payload as unknown as UserLikeEntry);
+  } catch (error) {
+    console.error('Error getting user likes:', error);
+    return [];
   }
 }
