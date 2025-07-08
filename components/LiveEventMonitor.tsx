@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo, startTransition } from 'react';
 import { Card } from '@/components/ui/card';
 import { useSSEAlerts } from '@/lib/hooks/useSSEAlerts';
-import { BlockchainEvent } from '@/lib/hooks/useWebSocketStream'; // Note: Legacy import for SSE-based streaming
+import { BlockchainEvent } from '@/lib/hooks/useSSEStream';
 import { lamportsToSol } from '@/components/transaction-graph/utils';
 import { RingBuffer } from '@/lib/utils/ring-buffer';
 import { TransactionTooltip } from './TransactionTooltip';

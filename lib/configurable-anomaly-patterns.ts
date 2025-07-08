@@ -165,12 +165,15 @@ export class AnomalyPatternManager {
       const remotePatterns: AnomalyPatternConfiguration = await response.json();
       
       // Validate the configuration
-      if (this.validateConfiguration(remotePatterns)) {
+      const validation = this.validateConfiguration(remotePatterns);
+      if (validation.valid) {
         this.patterns = remotePatterns;
         this.lastUpdate = new Date();
         console.log(`[AnomalyPatterns] Loaded ${remotePatterns.patterns.length} patterns from remote config`);
       } else {
         console.warn('[AnomalyPatterns] Invalid remote configuration, using defaults');
+        console.warn('[AnomalyPatterns] Validation errors:', validation.errors);
+        throw new Error(`Invalid configuration: ${validation.errors.join('; ')}`);
       }
     } catch (error) {
       console.error('[AnomalyPatterns] Failed to load remote configuration:', error);
@@ -195,25 +198,60 @@ export class AnomalyPatternManager {
   }
 
   /**
-   * Update pattern configuration
+   * Update pattern configuration with validation
    */
-  updatePattern(id: string, updates: Partial<AnomalyPatternConfig>): boolean {
+  updatePattern(id: string, updates: Partial<AnomalyPatternConfig>): { success: boolean; errors?: string[] } {
+    const patternIndex = this.patterns.patterns.findIndex(p => p.id === id);
+    if (patternIndex === -1) {
+      return { success: false, errors: [`Pattern with id '${id}' not found`] };
+    }
+
+    const updatedPattern = {
+      ...this.patterns.patterns[patternIndex],
+      ...updates
+    };
+
+    // Validate the updated pattern
+    const validation = this.validatePatternConfig(updatedPattern);
+    if (!validation.valid) {
+      return { success: false, errors: validation.errors };
+    }
+
+    this.patterns.patterns[patternIndex] = updatedPattern;
+    return { success: true };
+  }
+
+  /**
+   * Add new pattern configuration with validation
+   */
+  addPattern(config: AnomalyPatternConfig): { success: boolean; errors?: string[] } {
+    // Check for duplicate ID
+    if (this.patterns.patterns.some(p => p.id === config.id)) {
+      return { success: false, errors: [`Pattern with id '${config.id}' already exists`] };
+    }
+
+    // Validate the pattern
+    const validation = this.validatePatternConfig(config);
+    if (!validation.valid) {
+      return { success: false, errors: validation.errors };
+    }
+
+    this.patterns.patterns.push(config);
+    return { success: true };
+  }
+
+  /**
+   * Remove pattern by ID
+   */
+  removePattern(id: string): boolean {
     const patternIndex = this.patterns.patterns.findIndex(p => p.id === id);
     if (patternIndex === -1) {
       return false;
     }
 
-    this.patterns.patterns[patternIndex] = {
-      ...this.patterns.patterns[patternIndex],
-      ...updates
-    };
-
+    this.patterns.patterns.splice(patternIndex, 1);
     return true;
   }
-
-  /**
-   * Get configuration metadata
-   */
   getConfigurationInfo() {
     return {
       version: this.patterns.version,
@@ -226,8 +264,134 @@ export class AnomalyPatternManager {
   }
 
   /**
-   * Convert configuration to AnomalyPattern
+   * Validate pattern configuration for required fields and structure
    */
+  private validatePatternConfig(config: AnomalyPatternConfig): { valid: boolean; errors: string[] } {
+    const errors: string[] = [];
+
+    // Required fields validation
+    if (!config.id || typeof config.id !== 'string') {
+      errors.push('Pattern must have a valid string id');
+    }
+
+    if (!config.name || typeof config.name !== 'string') {
+      errors.push('Pattern must have a valid string name');
+    }
+
+    if (!config.description || typeof config.description !== 'string') {
+      errors.push('Pattern must have a valid string description');
+    }
+
+    // Severity validation
+    const validSeverities = ['low', 'medium', 'high', 'critical'];
+    if (!validSeverities.includes(config.severity)) {
+      errors.push(`Severity must be one of: ${validSeverities.join(', ')}`);
+    }
+
+    // Category validation
+    const validCategories = ['financial', 'security', 'performance', 'behavior', 'token_manipulation'];
+    if (!validCategories.includes(config.category)) {
+      errors.push(`Category must be one of: ${validCategories.join(', ')}`);
+    }
+
+    // Threshold validation
+    if (typeof config.threshold !== 'number' || config.threshold < 0) {
+      errors.push('Threshold must be a non-negative number');
+    }
+
+    // Conditions validation
+    if (!Array.isArray(config.conditions) || config.conditions.length === 0) {
+      errors.push('Pattern must have at least one condition');
+    } else {
+      config.conditions.forEach((condition, index) => {
+        if (!condition.type) {
+          errors.push(`Condition ${index}: type is required`);
+        }
+
+        const validTypes = ['fee_spike', 'failure_rate', 'transaction_burst', 'unusual_program', 'large_transfer', 'rapid_trades'];
+        if (!validTypes.includes(condition.type)) {
+          errors.push(`Condition ${index}: type must be one of: ${validTypes.join(', ')}`);
+        }
+
+        const validOperators = ['gt', 'lt', 'eq', 'gte', 'lte', 'contains', 'regex'];
+        if (!validOperators.includes(condition.operator)) {
+          errors.push(`Condition ${index}: operator must be one of: ${validOperators.join(', ')}`);
+        }
+
+        if (condition.value === undefined || condition.value === null) {
+          errors.push(`Condition ${index}: value is required`);
+        }
+
+        // Regex validation
+        if (condition.operator === 'regex' && typeof condition.value === 'string') {
+          try {
+            new RegExp(condition.value);
+          } catch (regexError) {
+            errors.push(`Condition ${index}: invalid regex pattern: ${condition.value}`);
+          }
+        }
+      });
+    }
+
+    // Metadata validation
+    if (config.metadata) {
+      if (config.metadata.mlWeight !== undefined && (typeof config.metadata.mlWeight !== 'number' || config.metadata.mlWeight < 0 || config.metadata.mlWeight > 1)) {
+        errors.push('Metadata mlWeight must be a number between 0 and 1');
+      }
+
+      if (config.metadata.confidence !== undefined && (typeof config.metadata.confidence !== 'number' || config.metadata.confidence < 0 || config.metadata.confidence > 1)) {
+        errors.push('Metadata confidence must be a number between 0 and 1');
+      }
+
+      if (config.metadata.timeWindowMs !== undefined && (typeof config.metadata.timeWindowMs !== 'number' || config.metadata.timeWindowMs <= 0)) {
+        errors.push('Metadata timeWindowMs must be a positive number');
+      }
+    }
+
+    return { valid: errors.length === 0, errors };
+  }
+
+  /**
+   * Validate entire configuration structure
+   */
+  private validateConfiguration(config: AnomalyPatternConfiguration): { valid: boolean; errors: string[] } {
+    const errors: string[] = [];
+
+    if (!config.version || typeof config.version !== 'string') {
+      errors.push('Configuration must have a valid version string');
+    }
+
+    if (!config.lastUpdated || typeof config.lastUpdated !== 'string') {
+      errors.push('Configuration must have a valid lastUpdated timestamp');
+    } else {
+      // Validate ISO timestamp
+      const date = new Date(config.lastUpdated);
+      if (isNaN(date.getTime())) {
+        errors.push('Configuration lastUpdated must be a valid ISO timestamp');
+      }
+    }
+
+    if (!Array.isArray(config.patterns)) {
+      errors.push('Configuration must have a patterns array');
+    } else {
+      // Check for duplicate IDs
+      const ids = config.patterns.map(p => p.id);
+      const duplicateIds = ids.filter((id, index) => ids.indexOf(id) !== index);
+      if (duplicateIds.length > 0) {
+        errors.push(`Duplicate pattern IDs found: ${duplicateIds.join(', ')}`);
+      }
+
+      // Validate each pattern
+      config.patterns.forEach((pattern, index) => {
+        const patternValidation = this.validatePatternConfig(pattern);
+        if (!patternValidation.valid) {
+          errors.push(`Pattern ${index} (${pattern.id || 'unknown'}): ${patternValidation.errors.join('; ')}`);
+        }
+      });
+    }
+
+    return { valid: errors.length === 0, errors };
+  }
   private convertConfigToPattern(config: AnomalyPatternConfig): AnomalyPattern {
     return {
       type: config.id,

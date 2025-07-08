@@ -185,10 +185,14 @@ export function useSSEStream(options: UseSSEStreamOptions = {}): UseSSEStreamRet
           onError?.(new Error(errorMsg));
         }
 
-        // Attempt to reconnect
+        // Attempt to reconnect with exponential backoff, jitter, and cap
         if (reconnectAttempts.current < maxReconnectAttempts && isMountedRef.current) {
-          const delay = Math.pow(2, reconnectAttempts.current) * 1000;
-          console.log(`[SSE] Reconnecting in ${delay}ms (attempt ${reconnectAttempts.current + 1}/${maxReconnectAttempts})`);
+          // Exponential backoff with 30-second cap and jitter
+          const baseDelay = Math.min(Math.pow(2, reconnectAttempts.current) * 1000, 30000);
+          const jitter = Math.random() * 1000; // 0-1s jitter
+          const delay = baseDelay + jitter;
+          
+          console.log(`[SSE] Reconnecting in ${Math.round(delay)}ms (attempt ${reconnectAttempts.current + 1}/${maxReconnectAttempts})`);
           
           reconnectTimeoutRef.current = setTimeout(() => {
             if (isMountedRef.current) {
@@ -196,6 +200,17 @@ export function useSSEStream(options: UseSSEStreamOptions = {}): UseSSEStreamRet
               connect();
             }
           }, delay);
+        } else if (isMountedRef.current) {
+          // After max attempts, wait longer before giving up completely
+          console.error('[SSE] Max reconnection attempts reached. Waiting 5 minutes before final retry...');
+          setError('Connection lost. Retrying in 5 minutes...');
+          
+          reconnectTimeoutRef.current = setTimeout(() => {
+            if (isMountedRef.current) {
+              reconnectAttempts.current = 0; // Reset for final attempt
+              connect();
+            }
+          }, 5 * 60 * 1000); // 5 minutes
         }
       };
 
@@ -366,5 +381,5 @@ export function useSSEStream(options: UseSSEStreamOptions = {}): UseSSEStreamRet
   };
 }
 
-// Legacy export for backward compatibility
+// Legacy export for backward compatibility - DEPRECATED: Use useSSEStream instead
 export const useWebSocketStream = useSSEStream;

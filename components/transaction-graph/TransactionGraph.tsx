@@ -6,6 +6,7 @@ import dagre from 'cytoscape-dagre';
 import { useRouter } from 'next/navigation';
 import { GraphStateCache, ViewportState } from '@/lib/graph-state-cache';
 import { debounce } from '@/lib/utils';
+import { createLogger } from '@/lib/debug-logger';
 import { TrackingStatsPanel } from './TrackingStatsPanel';
 import { TransactionGraphClouds } from '../TransactionGraphClouds';
 import { GPUAcceleratedForceGraph } from './GPUAcceleratedForceGraph';
@@ -81,6 +82,9 @@ function TransactionGraph({
   height = '100%',
   maxDepth = 2 // Reduced from 3 to 2 for better performance
 }: TransactionGraphProps) {
+  // Logger instance
+  const logger = createLogger('TRANSACTION_GRAPH');
+  
   // Component refs 
   const containerRef = useRef<HTMLDivElement>(null);
   const isInitialized = useRef<boolean>(false);
@@ -439,14 +443,14 @@ function TransactionGraph({
   // Convert Cytoscape data to GPU graph format
   const convertToGPUGraphData = useCallback(() => {
     if (!cyRef.current) {
-      console.log('🔄 [GPU_CONVERT] No Cytoscape instance, returning empty data');
+      logger.debug('No Cytoscape instance, returning empty data');
       return { nodes: [], links: [] };
     }
 
     const cytoscapeNodes = cyRef.current.nodes();
     const cytoscapeEdges = cyRef.current.edges();
     
-    console.log(`🔄 [GPU_CONVERT] Converting Cytoscape data: ${cytoscapeNodes.length} nodes, ${cytoscapeEdges.length} edges`);
+    logger.debug(`Converting Cytoscape data: ${cytoscapeNodes.length} nodes, ${cytoscapeEdges.length} edges`);
 
     const nodes = cytoscapeNodes.map((node) => {
       const data = node.data();
@@ -484,7 +488,7 @@ function TransactionGraph({
         accountCount: data.accountCount || 0,
         color: color
       };
-      console.log(`🔄 [GPU_CONVERT] Converted node: ${data.id} (${data.type}/${data.subType || 'none'})`);
+      logger.debug(`Converted node: ${data.id} (${data.type}/${data.subType || 'none'})`);
       return convertedNode;
     });
 
@@ -512,11 +516,11 @@ function TransactionGraph({
         label: data.label,
         color: color
       };
-      console.log(`🔄 [GPU_CONVERT] Converted edge: ${data.source} -> ${data.target} (${data.type})`);
+      logger.debug(`Converted edge: ${data.source} -> ${data.target} (${data.type})`);
       return convertedLink;
     });
 
-    console.log(`✅ [GPU_CONVERT] Conversion complete: ${nodes.length} nodes, ${links.length} links`);
+    logger.debug(`Conversion complete: ${nodes.length} nodes, ${links.length} links`);
     
     // Log summary statistics
     const nodeStats = nodes.reduce((stats: Record<string, number>, node) => {
@@ -524,13 +528,13 @@ function TransactionGraph({
       stats[key] = (stats[key] || 0) + 1;
       return stats;
     }, {});
-    console.log(`✅ [GPU_CONVERT] Node statistics:`, nodeStats);
+    logger.debug(`Node statistics:`, nodeStats);
     
     const linkStats = links.reduce((stats: Record<string, number>, link) => {
       stats[link.type] = (stats[link.type] || 0) + 1;
       return stats;
     }, {});
-    console.log(`✅ [GPU_CONVERT] Link statistics:`, linkStats);
+    logger.debug(`Link statistics:`, linkStats);
     
     return { nodes, links };
   }, []);
@@ -538,39 +542,39 @@ function TransactionGraph({
   // Update GPU graph data when Cytoscape changes
   const updateGPUGraphData = useCallback(() => {
     if (useGPUGraph) {
-      console.log('🔄 [GPU_UPDATE] Updating GPU graph data...');
+      logger.debug('Updating GPU graph data...');
       const newData = convertToGPUGraphData();
-      console.log(`🔄 [GPU_UPDATE] Setting GPU graph data: ${newData.nodes.length} nodes, ${newData.links.length} links`);
+      logger.debug(`Setting GPU graph data: ${newData.nodes.length} nodes, ${newData.links.length} links`);
       
       // Log what types of nodes we have
       const nodeTypes = newData.nodes.reduce((types: Record<string, number>, node) => {
         types[node.type] = (types[node.type] || 0) + 1;
         return types;
       }, {});
-      console.log(`🔄 [GPU_UPDATE] Node types:`, nodeTypes);
+      logger.debug(`Node types:`, nodeTypes);
       
       // Log what types of links we have
       const linkTypes = newData.links.reduce((types: Record<string, number>, link) => {
         types[link.type] = (types[link.type] || 0) + 1;
         return types;
       }, {});
-      console.log(`🔄 [GPU_UPDATE] Link types:`, linkTypes);
+      logger.debug(`Link types:`, linkTypes);
       
       // Log sample data for debugging
       if (newData.nodes.length > 0) {
-        console.log(`🔄 [GPU_UPDATE] Sample node:`, newData.nodes[0]);
+        logger.debug(`Sample node:`, newData.nodes[0]);
       }
       if (newData.links.length > 0) {
-        console.log(`🔄 [GPU_UPDATE] Sample link:`, newData.links[0]);
+        logger.debug(`Sample link:`, newData.links[0]);
       }
       
       setGpuGraphData(newData);
-      console.log('✅ [GPU_UPDATE] GPU graph data updated successfully');
+      logger.debug('GPU graph data updated successfully');
       
       // Enhanced feedback for empty graphs
       if (newData.nodes.length === 0) {
-        console.log('🚨 [GPU_UPDATE] CRITICAL: GPU graph is empty after update');
-        console.log('🚨 [GPU_UPDATE] Cytoscape elements count:', cyRef.current?.elements().length || 0);
+        logger.warn('CRITICAL: GPU graph is empty after update');
+        logger.debug('Cytoscape elements count:', cyRef.current?.elements().length || 0);
         
         // Force an error message to show user why graph is empty
         setError({
@@ -583,7 +587,7 @@ function TransactionGraph({
           setError(null);
         }, 8000);
       } else if (newData.nodes.length === 1 && newData.links.length === 0) {
-        console.log('⚠️ [GPU_UPDATE] WARNING: GPU graph has only isolated node');
+        logger.warn('GPU graph has only isolated node');
         
         // Show informative message about limited data
         setError({
@@ -596,7 +600,7 @@ function TransactionGraph({
           setError(null);
         }, 6000);
       } else {
-        console.log(`✅ [GPU_UPDATE] Good data: ${newData.nodes.length} nodes and ${newData.links.length} links`);
+        logger.debug(`Good data: ${newData.nodes.length} nodes and ${newData.links.length} links`);
         
         // Clear any previous error messages
         setError(null);
@@ -605,13 +609,13 @@ function TransactionGraph({
       // Force a UI re-render to ensure the graph component updates
       setTimeout(() => {
         if (containerRef.current) {
-          console.log('🔄 [GPU_UPDATE] Forcing container resize to trigger re-render');
+          logger.debug('Forcing container resize to trigger re-render');
           const resizeEvent = new Event('resize');
           window.dispatchEvent(resizeEvent);
         }
       }, 100);
     } else {
-      console.log('🔄 [GPU_UPDATE] GPU graph disabled, skipping update');
+      logger.debug('GPU graph disabled, skipping update');
     }
   }, [useGPUGraph, convertToGPUGraphData]);
 
@@ -723,7 +727,7 @@ function TransactionGraph({
         }
         
         // Update GPU graph after adding data
-        console.log(`🔄 [GPU_TRIGGER] Triggering GPU graph update after adding account ${address}`);
+        logger.debug(`Triggering GPU graph update after adding account ${address}`);
         updateGPUGraphData();
       }
 
@@ -1106,11 +1110,11 @@ function TransactionGraph({
   // Update GPU graph data when Cytoscape graph changes
   useEffect(() => {
     if (cyRef.current && useGPUGraph) {
-      console.log('🔄 [GPU_LISTENER] Setting up GPU graph update listeners');
+      logger.debug('Setting up GPU graph update listeners');
       
       // Set up listener for graph changes
       const updateHandler = () => {
-        console.log('🔄 [GPU_LISTENER] Cytoscape graph changed, updating GPU graph');
+        logger.debug('Cytoscape graph changed, updating GPU graph');
         updateGPUGraphData();
       };
       
@@ -1118,12 +1122,12 @@ function TransactionGraph({
       cyRef.current.on('add remove data position', updateHandler);
       
       // Initial update
-      console.log('🔄 [GPU_LISTENER] Performing initial GPU graph update');
+      logger.debug('Performing initial GPU graph update');
       updateGPUGraphData();
       
       return () => {
         if (cyRef.current) {
-          console.log('🔄 [GPU_LISTENER] Removing GPU graph update listeners');
+          logger.debug('Removing GPU graph update listeners');
           cyRef.current.off('add remove data position', updateHandler);
         }
       };
@@ -1219,7 +1223,7 @@ function TransactionGraph({
             console.log('🚀 [PROGRESS] Added initial transaction node, progress: 20%');
             
             // Update GPU graph immediately after adding initial node
-            console.log('🔄 [GPU_INITIAL] Updating GPU graph after adding initial transaction node');
+            logger.debug('Updating GPU graph after adding initial transaction node');
             updateGPUGraphData();
           }
         }
