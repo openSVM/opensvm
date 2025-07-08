@@ -212,6 +212,13 @@ function TransactionGraph({
     }
   }, [isFullscreen]);
 
+  // Resize graph callback for fullscreen changes
+  const resizeGraphCallback = useCallback(() => {
+    if (cyRef.current && containerRef.current) {
+      resizeGraph(cyRef, true);
+    }
+  }, []);
+
   // Listen for fullscreen changes
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -1493,13 +1500,6 @@ function TransactionGraph({
     return () => {
       window.removeEventListener('resize', handleResize);
     };
-  }, []);
-
-  // Resize graph callback for fullscreen changes
-  const resizeGraphCallback = useCallback(() => {
-    if (cyRef.current && containerRef.current) {
-      resizeGraph(cyRef, true);
-    }
   }, []);
 
   // Handle fullscreen change events
