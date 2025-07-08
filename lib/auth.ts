@@ -48,13 +48,21 @@ export function verifySignature(
                publicKey.length >= 32 && signature.length >= 10);
     }
     
-    // Production verification would go here
-    // const messageBytes = new TextEncoder().encode(message);
-    const signatureBytes = bs58.decode(signature);
-    const publicKeyObj = new PublicKey(publicKey);
-    
-    // Basic validation for now
-    return signatureBytes.length >= 32 && publicKeyObj.toBase58() === publicKey;
+    // Try to decode signature as base64 first (matching useAuth.ts encoding)
+    try {
+      const signatureBytes = Buffer.from(signature, 'base64');
+      const publicKeyObj = new PublicKey(publicKey);
+      
+      // Basic validation for now
+      return signatureBytes.length >= 32 && publicKeyObj.toBase58() === publicKey;
+    } catch (base64Error) {
+      // Fallback to bs58 decoding for backward compatibility
+      const signatureBytes = bs58.decode(signature);
+      const publicKeyObj = new PublicKey(publicKey);
+      
+      // Basic validation for now
+      return signatureBytes.length >= 32 && publicKeyObj.toBase58() === publicKey;
+    }
   } catch (error) {
     console.error('Signature verification error:', error);
     

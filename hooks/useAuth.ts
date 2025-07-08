@@ -117,7 +117,9 @@ export function useAuth() {
       });
 
       if (!verifyResponse.ok) {
-        throw new Error('Signature verification failed');
+        const errorText = await verifyResponse.text();
+        console.error('Verification failed:', verifyResponse.status, errorText);
+        throw new Error(`Signature verification failed: ${verifyResponse.status} ${errorText}`);
       }
 
       const { expiresAt } = await verifyResponse.json();

@@ -147,15 +147,11 @@ export function useHistoryTracking() {
     // Only require authentication for user profile pages
     const isUserProfilePage = path.includes('/user/');
     
-    // Check if user is authenticated, if not try to authenticate (only for user pages)
-    if (!isAuthenticated && isUserProfilePage) {
-      setSyncStatus('auth_required');
-      const authSuccess = await authenticate();
-      if (!authSuccess) {
-        setSyncStatus('error');
-        setTimeout(() => setSyncStatus('idle'), 5000);
-        return;
-      }
+    // Skip tracking entirely if on user profile page and not authenticated
+    if (isUserProfilePage && !isAuthenticated) {
+      // Don't automatically authenticate on user pages - let the user decide
+      console.log('Skipping history tracking on user profile page - authentication required');
+      return;
     }
 
     const walletAddress = publicKey.toBase58();
