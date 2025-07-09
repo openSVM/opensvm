@@ -15,18 +15,24 @@ import {
 } from '@/lib/qdrant';
 
 // Authentication check using session validation
-function isValidRequest(request: NextRequest): boolean {
+function isValidRequest(request: NextRequest, walletAddress: string): { isValid: boolean; session?: any } {
   try {
     const session = getSessionFromCookie();
-    if (!session) return false;
+    if (!session) return { isValid: false };
     
     // Check if session is expired
-    if (Date.now() > session.expiresAt) return false;
+    if (Date.now() > session.expiresAt) return { isValid: false };
     
-    return true;
+    // Check if the authenticated user matches the requested wallet address
+    if (session.walletAddress !== walletAddress) {
+      console.log(`Session wallet ${session.walletAddress} doesn't match requested ${walletAddress}`);
+      return { isValid: false };
+    }
+    
+    return { isValid: true, session };
   } catch (error) {
     console.error('Session validation error:', error);
-    return false;
+    return { isValid: false };
   }
 }
 
@@ -41,12 +47,13 @@ export async function GET(
       return NextResponse.json({ error: 'Database unavailable' }, { status: 503 });
     }
 
+    const walletAddress = params.walletAddress;
+
     // Authentication check
-    if (!isValidRequest(request)) {
+    const authResult = isValidRequest(request, walletAddress);
+    if (!authResult.isValid) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-
-    const walletAddress = params.walletAddress;
     
     // Validate wallet address
     const validatedAddress = validateWalletAddress(walletAddress);
@@ -91,12 +98,13 @@ export async function POST(
       return NextResponse.json({ error: 'Database unavailable' }, { status: 503 });
     }
 
+    const walletAddress = params.walletAddress;
+
     // Authentication check
-    if (!isValidRequest(request)) {
+    const authResult = isValidRequest(request, walletAddress);
+    if (!authResult.isValid) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-
-    const walletAddress = params.walletAddress;
     
     // Validate wallet address
     const validatedAddress = validateWalletAddress(walletAddress);
@@ -111,7 +119,7 @@ export async function POST(
       ...body,
       walletAddress: validatedAddress,
       timestamp: Date.now(),
-      id: `${validatedAddress}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      id: crypto.randomUUID(),
       path: sanitizeInput(body.path || ''),
       pageTitle: sanitizeInput(body.pageTitle || ''),
       userAgent: sanitizeInput(body.userAgent || ''),
@@ -159,12 +167,13 @@ export async function DELETE(
       return NextResponse.json({ error: 'Database unavailable' }, { status: 503 });
     }
 
+    const walletAddress = params.walletAddress;
+
     // Authentication check
-    if (!isValidRequest(request)) {
+    const authResult = isValidRequest(request, walletAddress);
+    if (!authResult.isValid) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-
-    const walletAddress = params.walletAddress;
     
     // Validate wallet address
     const validatedAddress = validateWalletAddress(walletAddress);

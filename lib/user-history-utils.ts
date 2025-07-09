@@ -120,9 +120,10 @@ export function calculateSocialStats(
 
 /**
  * Generate unique ID for database entries
+ * Uses UUID v4 format for Qdrant compatibility
  */
 export function generateId(): string {
-  return Date.now().toString(36) + Math.random().toString(36).substr(2);
+  return crypto.randomUUID();
 }
 
 /**
