@@ -27,6 +27,25 @@ export { qdrantClient };
  */
 export async function initializeCollections() {
   try {
+    // Helper function to ensure index exists
+    const ensureIndex = async (collectionName: string, fieldName: string) => {
+      try {
+        await qdrantClient.createPayloadIndex(collectionName, {
+          field_name: fieldName,
+          field_schema: 'keyword'
+        });
+        console.log(`Created index for ${fieldName} in ${collectionName}`);
+      } catch (error: any) {
+        // Index might already exist, check if it's already exists error
+        if (error?.data?.status?.error?.includes('already exists') || 
+            error?.message?.includes('already exists')) {
+          console.log(`Index for ${fieldName} in ${collectionName} already exists`);
+        } else {
+          console.warn(`Failed to create index for ${fieldName} in ${collectionName}:`, error?.data?.status?.error || error?.message);
+        }
+      }
+    };
+
     // Check if user_history collection exists
     const historyExists = await qdrantClient.getCollection(COLLECTIONS.USER_HISTORY).catch(() => null);
     
@@ -37,13 +56,11 @@ export async function initializeCollections() {
           distance: 'Cosine'
         }
       });
-      
-      // Create keyword index for walletAddress filtering
-      await qdrantClient.createPayloadIndex(COLLECTIONS.USER_HISTORY, {
-        field_name: 'walletAddress',
-        field_schema: 'keyword'
-      });
+      console.log('Created user_history collection');
     }
+    
+    // Ensure walletAddress index exists for user_history
+    await ensureIndex(COLLECTIONS.USER_HISTORY, 'walletAddress');
     
     // Check if user_profiles collection exists
     const profilesExists = await qdrantClient.getCollection(COLLECTIONS.USER_PROFILES).catch(() => null);
@@ -55,13 +72,11 @@ export async function initializeCollections() {
           distance: 'Cosine'
         }
       });
-      
-      // Create keyword index for walletAddress filtering
-      await qdrantClient.createPayloadIndex(COLLECTIONS.USER_PROFILES, {
-        field_name: 'walletAddress',
-        field_schema: 'keyword'
-      });
+      console.log('Created user_profiles collection');
     }
+    
+    // Ensure walletAddress index exists for user_profiles
+    await ensureIndex(COLLECTIONS.USER_PROFILES, 'walletAddress');
     
     // Check if user_follows collection exists
     const followsExists = await qdrantClient.getCollection(COLLECTIONS.USER_FOLLOWS).catch(() => null);
@@ -73,17 +88,12 @@ export async function initializeCollections() {
           distance: 'Cosine'
         }
       });
-      
-      // Create keyword indexes for filtering
-      await qdrantClient.createPayloadIndex(COLLECTIONS.USER_FOLLOWS, {
-        field_name: 'followerAddress',
-        field_schema: 'keyword'
-      });
-      await qdrantClient.createPayloadIndex(COLLECTIONS.USER_FOLLOWS, {
-        field_name: 'targetAddress',
-        field_schema: 'keyword'
-      });
+      console.log('Created user_follows collection');
     }
+    
+    // Ensure indexes exist for user_follows
+    await ensureIndex(COLLECTIONS.USER_FOLLOWS, 'followerAddress');
+    await ensureIndex(COLLECTIONS.USER_FOLLOWS, 'targetAddress');
     
     // Check if user_likes collection exists
     const likesExists = await qdrantClient.getCollection(COLLECTIONS.USER_LIKES).catch(() => null);
@@ -95,17 +105,12 @@ export async function initializeCollections() {
           distance: 'Cosine'
         }
       });
-      
-      // Create keyword indexes for filtering
-      await qdrantClient.createPayloadIndex(COLLECTIONS.USER_LIKES, {
-        field_name: 'likerAddress',
-        field_schema: 'keyword'
-      });
-      await qdrantClient.createPayloadIndex(COLLECTIONS.USER_LIKES, {
-        field_name: 'targetAddress',
-        field_schema: 'keyword'
-      });
+      console.log('Created user_likes collection');
     }
+    
+    // Ensure indexes exist for user_likes
+    await ensureIndex(COLLECTIONS.USER_LIKES, 'likerAddress');
+    await ensureIndex(COLLECTIONS.USER_LIKES, 'targetAddress');
     
     console.log('Qdrant collections initialized successfully');
   } catch (error) {
