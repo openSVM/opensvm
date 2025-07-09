@@ -238,6 +238,9 @@ export function ReferralStatsSection({ socialStats }: { socialStats: any }) {
 }
 
 // Referral Program Details component
+// Minimum balance required to claim rewards (1,000,000 SVMAI)
+export const MINIMUM_BALANCE_REQUIRED = 1000000;
+
 export function ReferralProgramDetails() {
   // Functionality now handled in TokenBalance component
 
@@ -250,6 +253,18 @@ export function ReferralProgramDetails() {
         <li className="break-words">Earn 5 SVMAI tokens per follower you have</li>
         <li className="break-words">Claim rewards once every 24 hours</li>
       </ol>
+      
+      <div className="mt-4 p-3 bg-amber-500/10 border border-amber-200 dark:border-amber-800 rounded-md">
+        <h4 className="text-sm font-medium mb-1 flex items-center">
+          <span className="text-amber-600 dark:text-amber-400 mr-1">⚠️</span> Requirements
+        </h4>
+        <ul className="space-y-1 pl-5 list-disc text-xs text-muted-foreground">
+          <li className="break-words">Hold at least {MINIMUM_BALANCE_REQUIRED.toLocaleString()} SVMAI tokens in your wallet</li>
+          <li className="break-words">Have at least one follower to earn rewards</li>
+          <li className="break-words">Wait 24 hours between claims</li>
+        </ul>
+      </div>
+      
       <div className="mt-4 p-2 bg-primary/10 rounded-md">
         <p className="text-xs font-medium break-words">
           💡 Pro Tip: Install this app on your home screen for easier access to your referral program!

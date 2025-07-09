@@ -67,6 +67,37 @@ export async function POST(request: Request) {
     const followerCount = socialStats.followers || 0;
     const potentialRewards = followerCount * 5;
 
+    // Get current user balance to check minimum token requirement
+    let userBalanceResult: any[] = [];
+    let currentBalance = 0;
+    try {
+      userBalanceResult = await qdrantClient.search('user_balances', {
+        vector: Array(384).fill(0),
+        filter: {
+          must: [{ key: 'walletAddress', match: { value: walletAddress } }]
+        },
+        limit: 1
+      });
+
+      if (userBalanceResult.length > 0) {
+        const userBalance = userBalanceResult[0].payload as any;
+        currentBalance = userBalance.balance || 0;
+      }
+    } catch (error) {
+      console.log('Error fetching user balance, assuming 0');
+    }
+    
+    // Check if user has enough tokens to claim (minimum 1,000,000 SVMAI)
+    const MINIMUM_BALANCE_REQUIRED = 1000000;
+    if (currentBalance < MINIMUM_BALANCE_REQUIRED) {
+      return NextResponse.json({
+        error: `Insufficient token balance. You need at least ${MINIMUM_BALANCE_REQUIRED.toLocaleString()} SVMAI to claim rewards.`,
+        code: 'INSUFFICIENT_BALANCE',
+        currentBalance,
+        requiredBalance: MINIMUM_BALANCE_REQUIRED
+      }, { status: 403 });
+    }
+
     if (potentialRewards <= 0) {
       return NextResponse.json({
         error: 'No rewards available to claim',
@@ -172,22 +203,14 @@ export async function POST(request: Request) {
     // First check if user_balances collection exists
     let userBalanceResult: any[] = [];
     let balanceId = uuidv4();
-    let currentBalance = 0;
+    // currentBalance already defined and fetched above
     let balanceUpdated = false;
 
     try {
-      userBalanceResult = await qdrantClient.search('user_balances', {
-        vector: Array(384).fill(0),
-        filter: {
-          must: [{ key: 'walletAddress', match: { value: walletAddress } }]
-        },
-        limit: 1
-      });
-
+      // We already have userBalanceResult from the balance check above
       if (userBalanceResult.length > 0) {
-        const userBalance = userBalanceResult[0].payload as any;
         balanceId = String(userBalanceResult[0].id); // Convert to string for consistency
-        currentBalance = userBalance.balance || 0;
+        // currentBalance is already set above
       }
 
       // Update or create user balance

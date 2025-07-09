@@ -65,8 +65,42 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.addEventListener('message', function(event) {
     const message = event.data;
     
+    // Handle GET_PENDING_CLAIMS message - SW is requesting pending claims
+    if (message && message.type === 'GET_PENDING_CLAIMS') {
+      // Get pending claims from localStorage
+      const pendingClaimsJson = localStorage.getItem('pendingReferralClaims');
+      const pendingClaims = pendingClaimsJson ? JSON.parse(pendingClaimsJson) : [];
+      
+      // Send pending claims back to the service worker through the message port
+      event.ports[0].postMessage(pendingClaims);
+    }
+    
+    // Handle UPDATE_PENDING_CLAIMS message - SW processed a claim successfully
+    else if (message && message.type === 'UPDATE_PENDING_CLAIMS' && message.claim) {
+      // Get current pending claims
+      const pendingClaimsJson = localStorage.getItem('pendingReferralClaims');
+      const pendingClaims = pendingClaimsJson ? JSON.parse(pendingClaimsJson) : [];
+      
+      // Remove the processed claim
+      const updatedPendingClaims = pendingClaims.filter(
+        pendingClaim => pendingClaim.timestamp !== message.claim.timestamp
+      );
+      
+      // Update localStorage
+      localStorage.setItem('pendingReferralClaims', JSON.stringify(updatedPendingClaims));
+      
+      // Update balance display if on user page
+      if (window.location.pathname.includes('/user/')) {
+        const balanceElements = document.querySelectorAll('[data-balance-display]');
+        balanceElements.forEach(element => {
+          // Flag for refresh on next page visit
+          localStorage.setItem('refreshBalanceOnLoad', 'true');
+        });
+      }
+    }
+    
     // Handle successful claim sync
-    if (message && message.type === 'CLAIM_SYNCED') {
+    else if (message && message.type === 'CLAIM_SYNCED') {
       // Show success notification
       const notification = document.createElement('div');
       notification.className = 'success-notification';
@@ -93,6 +127,20 @@ if ('serviceWorker' in navigator) {
         setTimeout(() => {
           window.location.reload();
         }, 1000);
+      }
+    }
+  });
+  
+  // Check if we need to refresh balance on page load (after background sync)
+  document.addEventListener('DOMContentLoaded', function() {
+    if (localStorage.getItem('refreshBalanceOnLoad') === 'true') {
+      localStorage.removeItem('refreshBalanceOnLoad');
+      
+      // If on user page, refresh the balance data
+      if (window.location.pathname.includes('/user/')) {
+        // Trigger a refresh of balance data
+        const refreshEvent = new CustomEvent('refresh-balance');
+        window.dispatchEvent(refreshEvent);
       }
     }
   });

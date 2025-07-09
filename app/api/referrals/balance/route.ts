@@ -5,6 +5,7 @@
 import { NextResponse } from 'next/server';
 import { qdrantClient } from '@/lib/qdrant';
 import { getSessionFromCookie } from '@/lib/auth-server';
+import { MINIMUM_BALANCE_REQUIRED } from '@/components/referrals/ReferralComponents';
 
 export async function GET(request: Request) {
   try {
@@ -52,7 +53,9 @@ export async function GET(request: Request) {
         balance: 0,
         updatedAt: Date.now(),
         isOwner: isOwnBalance,
-        canClaim: isOwnBalance // Allow claiming if it's the user's own profile
+        minimumBalanceRequired: MINIMUM_BALANCE_REQUIRED,
+        hasMinimumBalance: false,
+        canClaim: false // Need both time and balance requirements
       });
     }
     
@@ -62,7 +65,9 @@ export async function GET(request: Request) {
         balance: 0,
         updatedAt: Date.now(),
         isOwner: isOwnBalance,
-        canClaim: isOwnBalance // Allow claiming if it's the user's own profile
+        minimumBalanceRequired: MINIMUM_BALANCE_REQUIRED,
+        hasMinimumBalance: false,
+        canClaim: false // Need both time and balance requirements
       });
     }
     
@@ -71,9 +76,14 @@ export async function GET(request: Request) {
     const updatedAt = userBalance.updatedAt || Date.now();
     
     // Return the balance information with proper typing
+    // Check if user has enough tokens for the minimum requirement
+    const hasMinimumBalance = balance >= MINIMUM_BALANCE_REQUIRED;
+    
     const response: Record<string, any> = {
       balance,
       updatedAt,
+      minimumBalanceRequired: MINIMUM_BALANCE_REQUIRED,
+      hasMinimumBalance,
     };
     
     if (isOwnBalance) {
@@ -105,10 +115,15 @@ export async function GET(request: Request) {
             const lastClaimDate = new Date(sortedRewards[0].claimedAt);
             const nextClaimDate = new Date(lastClaimDate.getTime() + 24 * 60 * 60 * 1000);
             response.nextClaimAt = nextClaimDate.getTime();
-            response.canClaim = Date.now() >= nextClaimDate.getTime();
+            const timeAllowsClaim = Date.now() >= nextClaimDate.getTime();
+            // User must have both: enough time since last claim AND minimum token balance
+            response.canClaim = timeAllowsClaim && hasMinimumBalance;
+            response.timeAllowsClaim = timeAllowsClaim;
           }
         } else {
-          response.canClaim = true;
+          // For first-time users with no claim history, only check balance requirement
+          response.canClaim = hasMinimumBalance;
+          response.timeAllowsClaim = true;
         }
       } catch (error) {
         console.log('No rewards history found, trying to create collection');
@@ -121,7 +136,9 @@ export async function GET(request: Request) {
         } catch (createError) {
           console.error('Failed to create referral_rewards collection:', createError);
         }
-        response.canClaim = true;
+        // For first-time users with no claim history, only check balance requirement
+        response.canClaim = hasMinimumBalance;
+        response.timeAllowsClaim = true;
       }
     }
     

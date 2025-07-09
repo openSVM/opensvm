@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Wallet, Clock, WifiOff } from 'lucide-react';
+import { Wallet, Clock, WifiOff, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { MINIMUM_BALANCE_REQUIRED } from './ReferralComponents';
 
 interface TokenBalanceProps {
   walletAddress: string;
@@ -17,6 +18,10 @@ interface BalanceResponse {
   lastClaimAt?: number;
   nextClaimAt?: number;
   canClaim?: boolean;
+  minimumBalanceRequired?: number;
+  hasMinimumBalance?: boolean;
+  timeAllowsClaim?: boolean;
+  requiredBalance?: number;
   error?: string;
 }
 
@@ -55,6 +60,20 @@ export function TokenBalance({ walletAddress, isMyProfile }: TokenBalanceProps) 
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+  
+  // Listen for refresh-balance event (triggered by service worker)
+  useEffect(() => {
+    const handleRefreshBalance = () => {
+      console.log('Refreshing balance from service worker event');
+      setRefreshKey(prev => prev + 1);
+    };
+    
+    window.addEventListener('refresh-balance', handleRefreshBalance);
+    
+    return () => {
+      window.removeEventListener('refresh-balance', handleRefreshBalance);
     };
   }, []);
 
@@ -111,6 +130,12 @@ export function TokenBalance({ walletAddress, isMyProfile }: TokenBalanceProps) 
   // Handle token claim with offline support
   const handleClaimTokens = async () => {
     if (!isMyProfile) return;
+    // Check if the user meets minimum balance requirement
+    if (balanceData && balanceData.balance < MINIMUM_BALANCE_REQUIRED) {
+      setError(`You need at least ${MINIMUM_BALANCE_REQUIRED.toLocaleString()} SVMAI to claim rewards. Current balance: ${balanceData.balance.toLocaleString()} SVMAI`);
+      return;
+    }
+    
     if (!balanceData?.canClaim) {
       const nextTime = balanceData?.nextClaimAt ? new Date(balanceData.nextClaimAt).toLocaleString() : 'unknown time';
       setError(`You cannot claim rewards yet. Next claim available at ${nextTime}`);
@@ -224,7 +249,7 @@ export function TokenBalance({ walletAddress, isMyProfile }: TokenBalanceProps) 
           <div className="text-sm text-destructive bg-destructive/10 p-2 rounded">{error}</div>
         ) : (
           <>
-            <div className="text-2xl font-bold break-words">
+            <div className="text-2xl font-bold break-words" data-balance-display="true">
               {balance !== null ? `${balance.toFixed(1)} SVMAI` : '0 SVMAI'}
             </div>
             
@@ -243,13 +268,16 @@ export function TokenBalance({ walletAddress, isMyProfile }: TokenBalanceProps) 
                   </div>
                 )}
                 
-                {balanceData.canClaim === false && balanceData.nextClaimAt && (
-                  <div className="text-xs text-muted-foreground bg-muted p-2 rounded mt-2">
-                    Next claim available: {getNextClaimTime()}
+                {/* Time requirement message */}
+                {balanceData.timeAllowsClaim === false && balanceData.nextClaimAt && (
+                  <div className="text-xs text-muted-foreground bg-muted p-2 rounded mt-2 flex items-center gap-1">
+                    <Clock className="h-3 w-3 text-muted-foreground" />
+                    <span>Next claim available: {getNextClaimTime()}</span>
                   </div>
                 )}
                 
-                {balanceData.canClaim && (
+                {/* Show the claim button only if user has enough tokens and can claim */}
+                {balanceData.canClaim && balanceData.balance >= MINIMUM_BALANCE_REQUIRED && (
                   <Button
                     variant="default"
                     size="sm"
@@ -276,6 +304,23 @@ export function TokenBalance({ walletAddress, isMyProfile }: TokenBalanceProps) 
                   </Button>
                 )}
                 
+                {/* Show minimum balance warning if applicable */}
+                {isMyProfile && balanceData && balanceData.balance < MINIMUM_BALANCE_REQUIRED && (
+                  <div className="mt-2 bg-amber-500/10 text-amber-600 dark:text-amber-400 dark:bg-amber-900/20 p-2 rounded text-xs">
+                    <p className="font-medium flex items-center gap-1">
+                      <AlertTriangle className="h-3 w-3" />
+                      Minimum Balance Requirement
+                    </p>
+                    <p className="mt-1">You need at least {MINIMUM_BALANCE_REQUIRED.toLocaleString()} SVMAI to claim rewards.</p>
+                    <p className="mt-1">Current balance: {balanceData.balance.toLocaleString()} SVMAI</p>
+                    <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
+                      {balanceData.balance > 0
+                        ? `You need ${(MINIMUM_BALANCE_REQUIRED - balanceData.balance).toLocaleString()} more SVMAI`
+                        : "Earn SVMAI by getting more followers and engagement"}
+                    </p>
+                  </div>
+                )}
+                
                 {isOffline && (
                   <div className="mt-2 bg-amber-500/10 text-amber-600 dark:text-amber-400 dark:bg-amber-900/20 p-2 rounded text-xs flex items-center gap-1">
                     <WifiOff className="h-3 w-3" />
@@ -289,8 +334,8 @@ export function TokenBalance({ walletAddress, isMyProfile }: TokenBalanceProps) 
         
         <p className="text-xs text-muted-foreground mt-2 max-w-full break-words">
           {isMyProfile ?
-            "This is your current SVMAI token balance. You can earn more tokens through referrals." :
-            "This user's current SVMAI token balance. Users earn tokens through referrals."}
+            `This is your current SVMAI token balance. You need at least ${MINIMUM_BALANCE_REQUIRED.toLocaleString()} SVMAI to claim rewards.` :
+            `This user's current SVMAI token balance. Users need at least ${MINIMUM_BALANCE_REQUIRED.toLocaleString()} SVMAI to claim rewards.`}
         </p>
       </div>
     </div>

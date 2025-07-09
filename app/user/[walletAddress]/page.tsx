@@ -5,7 +5,7 @@
 
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, memo } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { UserProfile } from '@/types/user-history';
@@ -15,6 +15,7 @@ import { UserHistoryStats } from '@/components/user-history/UserHistoryStats';
 import { UserActivityCalendar } from '@/components/user-history/UserActivityCalendar';
 import { UserFollowersList } from '@/components/user-history/UserFollowersList';
 import { UserHistoryExport } from '@/components/user-history/UserHistoryExport';
+import { UserFeedDisplay } from '@/components/user-history/UserFeedDisplay';
 import { ShareButton } from '@/components/ShareButton';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -45,7 +46,8 @@ import {
   Coins,
   Share2,
   Copy,
-  Link as LinkIcon
+  Link as LinkIcon,
+  MessageSquare
 } from 'lucide-react';
 
 export default function UserProfilePage() {
@@ -54,7 +56,7 @@ export default function UserProfilePage() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab] = useState('history');
+  const activeTab = 'history'; // Default tab, no state needed since it never changes
   const [validatedWalletAddress, setValidatedWalletAddress] = useState<string | null>(null);
   const [isFollowing, setIsFollowing] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
@@ -221,12 +223,16 @@ export default function UserProfilePage() {
       setProfile(data.profile);
       // Track profile view (increment view count) if not my own profile
       if (!myWallet || validatedWalletAddress !== myWallet) {
-        await fetch(`/api/user-social/view`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ targetAddress: validatedWalletAddress })
-        }).catch(() => {});
+        try {
+          await fetch(`/api/user-social/view`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ targetAddress: validatedWalletAddress })
+          });
+        } catch (error) {
+          console.warn('Failed to track profile view:', error);
+        }
       }
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Failed to load user profile');
@@ -304,7 +310,8 @@ export default function UserProfilePage() {
     });
   };
 
-  const isMyProfile = myWallet && validatedWalletAddress === myWallet;
+  const isMyProfile = myWallet && validatedWalletAddress &&
+    validatedWalletAddress.toLowerCase() === myWallet.toLowerCase();
   return (
     <div className="min-h-screen bg-background p-3 sm:p-4">
       <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6">
@@ -485,7 +492,7 @@ export default function UserProfilePage() {
 
         {/* Main Content Tabs */}
         <Tabs defaultValue={activeTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-5 overflow-x-auto">
+          <TabsList className="grid w-full grid-cols-6 overflow-x-auto">
             <TabsTrigger value="history" className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3">
               <Activity className="h-4 w-4 flex-shrink-0" />
               <span className="truncate">History</span>
@@ -505,6 +512,10 @@ export default function UserProfilePage() {
             <TabsTrigger value="referrals" className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3">
               <Share2 className="h-4 w-4 flex-shrink-0" />
               <span className="truncate">Referrals</span>
+            </TabsTrigger>
+            <TabsTrigger value="feed" className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3">
+              <MessageSquare className="h-4 w-4 flex-shrink-0" />
+              <span className="truncate">Feed</span>
             </TabsTrigger>
           </TabsList>
           
@@ -701,6 +712,14 @@ export default function UserProfilePage() {
                 <ReferralProgramDetails />
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* Feed Tab Content */}
+          <TabsContent value="feed" className="space-y-4">
+            <UserFeedDisplay
+              walletAddress={validatedWalletAddress || ''}
+              isMyProfile={isMyProfile === true}
+            />
           </TabsContent>
         </Tabs>
       </div>

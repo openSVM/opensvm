@@ -90,11 +90,31 @@ self.addEventListener('sync', event => {
 // Function to sync stored referral claims when online
 async function syncReferralClaims() {
   try {
-    // Use localStorage instead of localforage for simplicity
-    const pendingClaimsJson = localStorage.getItem('pendingReferralClaims');
-    if (!pendingClaimsJson) return;
+    // We need to access client to get/set localStorage since it's not available directly in SW
+    const clients = await self.clients.matchAll();
+    if (clients.length === 0) return;
     
-    const pendingClaims = JSON.parse(pendingClaimsJson);
+    // Get the first available client
+    const client = clients[0];
+    
+    // Use a message to request pendingClaims from the client
+    const pendingClaimsPromise = new Promise((resolve) => {
+      const messageChannel = new MessageChannel();
+      
+      // Listen for the response
+      messageChannel.port1.onmessage = (event) => {
+        resolve(event.data);
+      };
+      
+      // Send the request to the client
+      client.postMessage({
+        type: 'GET_PENDING_CLAIMS'
+      }, [messageChannel.port2]);
+    });
+    
+    // Wait for the response from the client
+    const pendingClaims = await pendingClaimsPromise;
+    
     if (!Array.isArray(pendingClaims) || pendingClaims.length === 0) return;
     
     for (const claim of pendingClaims) {
@@ -107,11 +127,16 @@ async function syncReferralClaims() {
         });
         
         if (response.ok) {
-          // Remove successful claim from pending list
-          const updatedPendingClaims = pendingClaims.filter(
-            pendingClaim => pendingClaim.timestamp !== claim.timestamp
-          );
-          localStorage.setItem('pendingReferralClaims', JSON.stringify(updatedPendingClaims));
+          // Send a message to update the pending claims in localStorage
+          self.clients.matchAll().then(clients => {
+            clients.forEach(client => {
+              client.postMessage({
+                type: 'UPDATE_PENDING_CLAIMS',
+                claim: claim,
+                success: true
+              });
+            });
+          });
           
           // Send a message to the client to update the UI if possible
           self.clients.matchAll().then(clients => {

@@ -103,10 +103,10 @@ async function fetchEntityData(
           walletAddress: profile.walletAddress,
           displayName: profile.displayName,
           avatar: profile.avatar,
-          followers: profile.socialStats.followers,
-          following: profile.socialStats.following,
-          pageViews: profile.socialStats.profileViews,
-          totalVisits: profile.stats.totalVisits,
+          followers: profile.socialStats?.followers || 0,
+          following: profile.socialStats?.following || 0,
+          pageViews: profile.socialStats?.profileViews || 0,
+          totalVisits: profile.stats?.totalVisits || 0,
           joinDate: profile.createdAt
         } as UserOGData;
       }
