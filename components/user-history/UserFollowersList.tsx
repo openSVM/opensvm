@@ -33,9 +33,13 @@ export function UserFollowersList({ walletAddress, type }: UserFollowersListProp
         if (response.ok) {
           const data = await response.json();
           setUsers(data[type] || []);
+        } else {
+          console.warn(`Failed to fetch ${type} data:`, response.status);
+          setUsers([]);
         }
       } catch (error) {
         console.error('Error fetching users:', error);
+        setUsers([]); // Set empty array on error
       } finally {
         setLoading(false);
       }
