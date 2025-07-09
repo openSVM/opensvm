@@ -114,10 +114,13 @@ export async function POST(request: Request) {
         }
       };
 
+      // Get the existing point ID from the search result
+      const pointId = targetProfileResult[0].id;
+      
       await qdrantClient.upsert('user_profiles', {
         points: [
           {
-            id: String(targetProfile.walletAddress),
+            id: pointId,
             vector: Array(384).fill(0),
             payload: updatedProfile
           }

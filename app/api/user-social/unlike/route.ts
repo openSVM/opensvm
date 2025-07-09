@@ -4,13 +4,13 @@
 
 import { NextResponse } from 'next/server';
 import { qdrantClient } from '@/lib/qdrant';
-import { getAuthenticatedSession } from '@/lib/auth-server';
+import { getSessionFromCookie } from '@/lib/auth-server';
 
 export async function POST(request: Request) {
   try {
     // Authenticate the user
-    const session = await getAuthenticatedSession(request);
-    if (!session) {
+    const session = getSessionFromCookie();
+    if (!session || Date.now() > session.expiresAt) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -51,19 +51,30 @@ export async function POST(request: Request) {
     });
 
     if (targetProfileResult.length > 0) {
-      const targetProfile = targetProfileResult[0].payload;
+      const targetProfile = targetProfileResult[0].payload as any;
+      const currentSocialStats = targetProfile.socialStats || {
+        visitsByUsers: 0,
+        followers: 0,
+        following: 0,
+        likes: 0,
+        profileViews: 0
+      };
+      
       const updatedProfile = {
         ...targetProfile,
         socialStats: {
-          ...targetProfile.socialStats,
-          likes: Math.max(0, (targetProfile.socialStats?.likes || 0) - 1)
+          ...currentSocialStats,
+          likes: Math.max(0, (currentSocialStats.likes || 0) - 1)
         }
       };
 
+      // Get the existing point ID from the search result
+      const pointId = targetProfileResult[0].id;
+      
       await qdrantClient.upsert('user_profiles', {
         points: [
           {
-            id: targetProfile.walletAddress,
+            id: pointId,
             vector: Array(384).fill(0),
             payload: updatedProfile
           }

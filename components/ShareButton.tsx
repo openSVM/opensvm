@@ -7,6 +7,7 @@
 
 import { useState } from 'react';
 import { Share2, Copy, Check, ExternalLink } from 'lucide-react';
+import { useCurrentUser } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { 
   DropdownMenu, 
@@ -40,6 +41,8 @@ export function ShareButton({
   const [isGenerating, setIsGenerating] = useState(false);
   const [copied, setCopied] = useState(false);
 
+  const { walletAddress } = useCurrentUser();
+  
   const generateShareLink = async () => {
     try {
       setIsGenerating(true);
@@ -49,7 +52,8 @@ export function ShareButton({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           entityType,
-          entityId
+          entityId,
+          referrerAddress: walletAddress || undefined
         })
       });
       

@@ -7,6 +7,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
+import Link from 'next/link';
 import { UserProfile } from '@/types/user-history';
 import { validateWalletAddress } from '@/lib/user-history-utils';
 import { UserHistoryDisplay } from '@/components/user-history/UserHistoryDisplay';
@@ -14,6 +15,7 @@ import { UserHistoryStats } from '@/components/user-history/UserHistoryStats';
 import { UserActivityCalendar } from '@/components/user-history/UserActivityCalendar';
 import { UserFollowersList } from '@/components/user-history/UserFollowersList';
 import { UserHistoryExport } from '@/components/user-history/UserHistoryExport';
+import { ShareButton } from '@/components/ShareButton';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -21,11 +23,17 @@ import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useCurrentUser } from '@/contexts/AuthContext';
 import { 
-  User, 
-  Activity, 
-  BarChart3, 
-  Calendar, 
-  Eye, 
+  ReferralLinkSection, 
+  ReferralStatsSection, 
+  ReferralProgramDetails 
+} from '@/components/referrals/ReferralComponents';
+import { TokenBalance } from '@/components/referrals/TokenBalance';
+import {
+  User,
+  Activity,
+  BarChart3,
+  Calendar,
+  Eye,
   Globe,
   Loader2,
   AlertCircle,
@@ -34,7 +42,10 @@ import {
   Heart,
   Users,
   Lock,
-  Coins
+  Coins,
+  Share2,
+  Copy,
+  Link as LinkIcon
 } from 'lucide-react';
 
 export default function UserProfilePage() {
@@ -295,8 +306,8 @@ export default function UserProfilePage() {
 
   const isMyProfile = myWallet && validatedWalletAddress === myWallet;
   return (
-    <div className="min-h-screen bg-background p-4">
-      <div className="max-w-7xl mx-auto space-y-6">
+    <div className="min-h-screen bg-background p-3 sm:p-4">
+      <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6">
         {/* Profile Header */}
         <Card className="relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-r from-primary/20 to-secondary/20" />
@@ -327,13 +338,15 @@ export default function UserProfilePage() {
                       </Badge>
                     )}
                   </div>
-                  <p 
+                  <Link
+                    href={`/account/${profile.walletAddress}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
                     className="text-sm text-muted-foreground font-mono cursor-pointer hover:text-primary transition-colors underline-offset-4 hover:underline"
-                    onClick={() => window.open(`/account/${profile.walletAddress}`, '_blank')}
                     title="Click to view account details in new tab"
                   >
                     {profile.walletAddress}
-                  </p>
+                  </Link>
                   <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
                     <div className="flex items-center gap-1">
                       <Calendar className="h-4 w-4" />
@@ -372,6 +385,7 @@ export default function UserProfilePage() {
                     </Button>
                   </>
                 )}
+                <ShareButton entityType="user" entityId={profile.walletAddress} />
                 <UserHistoryExport profile={profile} />
                 <Badge variant="outline" className="flex items-center gap-1">
                   <Eye className="h-3 w-3" />
@@ -471,22 +485,26 @@ export default function UserProfilePage() {
 
         {/* Main Content Tabs */}
         <Tabs defaultValue={activeTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="history" className="flex items-center gap-2">
-              <Activity className="h-4 w-4" />
-              History
+          <TabsList className="grid w-full grid-cols-5 overflow-x-auto">
+            <TabsTrigger value="history" className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3">
+              <Activity className="h-4 w-4 flex-shrink-0" />
+              <span className="truncate">History</span>
             </TabsTrigger>
-            <TabsTrigger value="stats" className="flex items-center gap-2">
-              <BarChart3 className="h-4 w-4" />
-              Statistics
+            <TabsTrigger value="stats" className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3">
+              <BarChart3 className="h-4 w-4 flex-shrink-0" />
+              <span className="truncate">Stats</span>
             </TabsTrigger>
-            <TabsTrigger value="social" className="flex items-center gap-2">
-              <Users className="h-4 w-4" />
-              Social
+            <TabsTrigger value="social" className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3">
+              <Users className="h-4 w-4 flex-shrink-0" />
+              <span className="truncate">Social</span>
             </TabsTrigger>
-            <TabsTrigger value="activity" className="flex items-center gap-2">
-              <Activity className="h-4 w-4" />
-              Activity Feed
+            <TabsTrigger value="activity" className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3">
+              <Activity className="h-4 w-4 flex-shrink-0" />
+              <span className="truncate">Activity</span>
+            </TabsTrigger>
+            <TabsTrigger value="referrals" className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3">
+              <Share2 className="h-4 w-4 flex-shrink-0" />
+              <span className="truncate">Referrals</span>
             </TabsTrigger>
           </TabsList>
           
@@ -657,6 +675,32 @@ export default function UserProfilePage() {
                 </CardContent>
               </Card>
             )}
+          </TabsContent>
+
+          {/* Referrals Tab Content */}
+          <TabsContent value="referrals" className="space-y-4">
+            <Card className="overflow-hidden">
+              <CardHeader className="sm:px-6">
+                <CardTitle className="flex items-center gap-2 break-words">
+                  <Share2 className="h-5 w-5 text-primary flex-shrink-0" />
+                  <span className="truncate">Refer Friends & Earn Rewards</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6 px-4 sm:px-6">
+                <div className="w-full overflow-hidden">
+                  <ReferralLinkSection walletAddress={profile.walletAddress} />
+                </div>
+
+                <ReferralStatsSection socialStats={profile.socialStats} />
+                
+                <TokenBalance
+                  walletAddress={profile.walletAddress}
+                  isMyProfile={isMyProfile === true}
+                />
+
+                <ReferralProgramDetails />
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
       </div>

@@ -3,7 +3,7 @@
  * Defines data structures for the universal ref link and OG image generation system
  */
 
-export type EntityType = 'transaction' | 'account' | 'program' | 'user';
+export type EntityType = 'transaction' | 'account' | 'program' | 'user' | 'block' | 'validator' | 'token';
 
 export interface ShareEntry {
   id: string;
@@ -69,7 +69,7 @@ export interface ShareStats {
 export interface OGImageData {
   entityType: EntityType;
   entityId: string;
-  data: TransactionOGData | AccountOGData | ProgramOGData | UserOGData;
+  data: TransactionOGData | AccountOGData | ProgramOGData | UserOGData | BlockOGData | ValidatorOGData | TokenOGData;
 }
 
 export interface TransactionOGData {
@@ -113,4 +113,40 @@ export interface UserOGData {
   totalVisits: number;
   joinDate: number;
   activityHeatmap?: Array<{ date: string; value: number }>;
+}
+
+export interface BlockOGData {
+  slot: number;
+  timestamp?: number;
+  transactionCount: number;
+  successRate: number;
+  totalSolVolume: number;
+  totalFees: number;
+  parentSlot?: number;
+  blockTime?: number;
+}
+
+export interface ValidatorOGData {
+  voteAccount: string;
+  name?: string;
+  commission: number;
+  activatedStake: number;
+  apy: number;
+  status: 'active' | 'delinquent' | 'inactive';
+  performanceScore: number;
+  uptimePercent: number;
+}
+
+export interface TokenOGData {
+  mint: string;
+  name?: string;
+  symbol?: string;
+  image?: string;
+  price?: number;
+  priceChange24h?: number;
+  marketCap?: number;
+  supply?: number;
+  holders?: number;
+  decimals: number;
+  volume24h?: number;
 }

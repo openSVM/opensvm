@@ -133,10 +133,15 @@ const AccountTooltip = ({
 // Skip EnhancedTransactionVisualizer for now since it requires d3
 const TransactionOverview = ({ tx, signature, className = '' }: { tx: DetailedTransactionInfo; signature: string; className?: string }) => (
   <div className={`bg-background rounded-lg p-4 shadow-lg border border-border flex flex-col ${className}`}>
-    <v className="text-sm space-y-4 flex-mb-4 grow">span className={tx?.success ? 'text-success font-medium' : 'text-destructive font-medium'}>
-          {tx?.success ? 'Success' : 'Failed'}
-        </span>
-      </div>
+    <div className="flex justify-between items-center mb-4">
+      <h2 className="text-xl font-semibold text-foreground">Transaction Overview</h2>
+      <ShareButton entityType="transaction" entityId={signature} />
+    </div>
+    <div className="text-sm space-y-4 flex-mb-4 grow">
+      <span className={tx?.success ? 'text-success font-medium' : 'text-destructive font-medium'}>
+        {tx?.success ? 'Success' : 'Failed'}
+      </span>
+    
       <div>
         <span className="text-muted-foreground block mb-1">Timestamp</span>
         <span className="text-foreground">
@@ -167,12 +172,14 @@ const TransactionOverview = ({ tx, signature, className = '' }: { tx: DetailedTr
                 {tx.details.solChanges.map((change, i) => (
                   <tr key={i} className={i % 2 === 0 ? 'bg-background' : 'bg-muted/20'}>
                     <td className="px-3 py-2">
-                      <Link 
-                        href={`/account/${tx.details.accounts[change.accountIndex]?.pubkey}`}
-                        className="text-primary hover:underline" 
+                      <Link
+                        href={`/account/${tx.details?.accounts[change.accountIndex]?.pubkey}`}
+                        className="text-primary hover:underline"
+                        target="_blank"
+                        rel="noopener noreferrer"
                       >
-                        <AccountTooltip account={tx.details.accounts[change.accountIndex]?.pubkey || ''}>
-                          {tx.details.accounts[change.accountIndex]?.pubkey.slice(0, 4)}...{tx.details.accounts[change.accountIndex]?.pubkey.slice(-4)}
+                        <AccountTooltip account={tx.details?.accounts[change.accountIndex]?.pubkey || ''}>
+                          {tx.details?.accounts[change.accountIndex]?.pubkey.slice(0, 4)}...{tx.details?.accounts[change.accountIndex]?.pubkey.slice(-4)}
                         </AccountTooltip>
                       </Link>
                     </td>

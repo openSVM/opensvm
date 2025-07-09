@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, ExternalLink, TrendingUp, TrendingDown, Users, Zap, Shield, DollarSign, Activity, Calendar, AlertTriangle } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
+import { ShareButton } from '@/components/ShareButton';
 
 interface ValidatorProfile {
   voteAccount: string;
@@ -163,16 +164,19 @@ export default function ValidatorProfilePage() {
         
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold flex items-center">
-              {validatorData.name}
-              <span className={`ml-3 px-2 py-1 text-xs rounded-full ${
-                validatorData.status === 'active' 
-                  ? 'bg-green-100 text-green-800' 
-                  : 'bg-red-100 text-red-800'
-              }`}>
-                {validatorData.status}
-              </span>
-            </h1>
+            <div className="flex items-center justify-between">
+              <h1 className="text-3xl font-bold flex items-center">
+                {validatorData.name}
+                <span className={`ml-3 px-2 py-1 text-xs rounded-full ${
+                  validatorData.status === 'active'
+                    ? 'bg-green-100 text-green-800'
+                    : 'bg-red-100 text-red-800'
+                }`}>
+                  {validatorData.status}
+                </span>
+              </h1>
+              <ShareButton entityType="validator" entityId={validatorData.voteAccount} />
+            </div>
             <p className="text-muted-foreground mt-2 flex items-center">
               <code className="bg-muted px-2 py-1 rounded text-sm mr-2">
                 {validatorData.voteAccount}

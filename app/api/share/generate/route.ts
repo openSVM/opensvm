@@ -24,7 +24,10 @@ import {
   TransactionOGData,
   AccountOGData,
   ProgramOGData,
-  UserOGData
+  UserOGData,
+  BlockOGData,
+  ValidatorOGData,
+  TokenOGData
 } from '@/types/share';
 import { cookies } from 'next/headers';
 import { Connection, PublicKey } from '@solana/web3.js';
@@ -38,9 +41,9 @@ const connection = new Connection(
  * Fetch entity data based on type
  */
 async function fetchEntityData(
-  entityType: EntityType, 
+  entityType: EntityType,
   entityId: string
-): Promise<TransactionOGData | AccountOGData | ProgramOGData | UserOGData | null> {
+): Promise<TransactionOGData | AccountOGData | ProgramOGData | UserOGData | BlockOGData | ValidatorOGData | TokenOGData | null> {
   try {
     switch (entityType) {
       case 'transaction': {
@@ -106,6 +109,78 @@ async function fetchEntityData(
           totalVisits: profile.stats.totalVisits,
           joinDate: profile.createdAt
         } as UserOGData;
+      }
+
+      case 'block': {
+        // Fetch block data
+        // This is a simplified implementation
+        try {
+          const slotNumber = parseInt(entityId, 10);
+          const blockInfo = await connection.getBlockTime(slotNumber);
+          
+          return {
+            slot: slotNumber,
+            timestamp: blockInfo || Date.now() / 1000,
+            transactionCount: 0, // Would need to fetch the block
+            successRate: 98,
+            totalSolVolume: 0,
+            totalFees: 0,
+            blockTime: blockInfo || Date.now() / 1000
+          } as BlockOGData;
+        } catch (err) {
+          console.error('Error fetching block data:', err);
+          return null;
+        }
+      }
+      
+      case 'validator': {
+        // Fetch validator data
+        // This is a simplified implementation
+        try {
+          return {
+            voteAccount: entityId,
+            name: 'Solana Validator',
+            commission: 8,
+            activatedStake: 100000,
+            apy: 5.5,
+            status: 'active',
+            performanceScore: 98,
+            uptimePercent: 99.9
+          } as ValidatorOGData;
+        } catch (err) {
+          console.error('Error fetching validator data:', err);
+          return null;
+        }
+      }
+      
+      case 'token': {
+        // Fetch token data
+        try {
+          // Here we fetch the basic token info from the blockchain
+          const tokenModule = await import('@/lib/solana');
+          const tokenInfo = await tokenModule.getTokenInfo(entityId);
+          
+          if (!tokenInfo) return null;
+          
+          // In a real implementation, you'd fetch additional data from your database
+          // For now, we'll use the basic blockchain data and add placeholders
+          return {
+            mint: entityId,
+            name: tokenInfo.name || 'Unknown Token',
+            symbol: tokenInfo.symbol || '',
+            image: '', // Would come from metadata service
+            price: 0, // Would come from price feed
+            priceChange24h: 0,
+            marketCap: 0,
+            supply: tokenInfo.totalSupply,
+            holders: 0,
+            decimals: tokenInfo.decimals,
+            volume24h: 0
+          } as TokenOGData;
+        } catch (err) {
+          console.error('Error fetching token data:', err);
+          return null;
+        }
       }
       
       default:

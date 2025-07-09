@@ -37,15 +37,15 @@ const pageTypeIcons = {
 };
 
 const pageTypeColors = {
-  transaction: 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300',
-  account: 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300',
-  block: 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300',
-  program: 'bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300',
-  token: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300',
-  validator: 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300',
-  analytics: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300',
-  search: 'bg-pink-100 text-pink-700 dark:bg-pink-900 dark:text-pink-300',
-  other: 'bg-gray-100 text-gray-700 dark:bg-gray-900 dark:text-gray-300'
+  transaction: 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 data-[theme=dos]:bg-blue-200 data-[theme=dos]:text-blue-800',
+  account: 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300 data-[theme=dos]:bg-green-200 data-[theme=dos]:text-green-800',
+  block: 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300 data-[theme=dos]:bg-purple-200 data-[theme=dos]:text-purple-800',
+  program: 'bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300 data-[theme=dos]:bg-orange-200 data-[theme=dos]:text-orange-800',
+  token: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300 data-[theme=dos]:bg-yellow-200 data-[theme=dos]:text-yellow-800',
+  validator: 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300 data-[theme=dos]:bg-red-200 data-[theme=dos]:text-red-800',
+  analytics: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300 data-[theme=dos]:bg-indigo-200 data-[theme=dos]:text-indigo-800',
+  search: 'bg-pink-100 text-pink-700 dark:bg-pink-900 dark:text-pink-300 data-[theme=dos]:bg-pink-200 data-[theme=dos]:text-pink-800',
+  other: 'bg-gray-100 text-gray-700 dark:bg-gray-900 dark:text-gray-300 data-[theme=dos]:bg-gray-200 data-[theme=dos]:text-gray-800'
 };
 
 interface HistoryEntryItemProps {
@@ -105,7 +105,7 @@ export function HistoryEntryItem({ entry }: HistoryEntryItemProps) {
           </div>
         </div>
         
-        <Link href={entry.path}>
+        <Link href={entry.path} target="_blank" rel="noopener noreferrer">
           <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity">
             <ExternalLink className="h-4 w-4" />
           </Button>

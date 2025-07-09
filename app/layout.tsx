@@ -83,11 +83,20 @@ export default function RootLayout({
         />
         
         {/* Meta tags for performance monitoring */}
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5" />
         <meta name="theme-color" content="#000000" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        
+        {/* PWA support */}
+        <link rel="manifest" href="/manifest.json" />
+        <link rel="apple-touch-icon" href="/favicon.svg" />
         
         {/* Base favicon */}
         <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+        
+        {/* Service worker registration script */}
+        <script src="/register-sw.js" defer></script>
       </head>
       <body className={inter.className}>
         <Providers>
