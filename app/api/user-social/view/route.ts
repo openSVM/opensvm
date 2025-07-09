@@ -56,7 +56,8 @@ export async function POST(request: Request) {
     if (viewerAddress) {
       try {
         // Check if this viewer already viewed recently using user_profiles collection
-        const recentViews = await qdrantClient.scroll('user_profiles', {
+        const recentViews = await qdrantClient.search('user_profiles', {
+          vector: new Array(384).fill(0),
           filter: {
             must: [
               { key: 'walletAddress', match: { value: targetAddress } },
@@ -64,9 +65,10 @@ export async function POST(request: Request) {
               { key: 'lastViewTime', range: { gte: hourAgo } }
             ]
           },
-          limit: 1
+          limit: 1,
+          with_payload: true
         });
-        if (recentViews.points && recentViews.points.length > 0) {
+        if (recentViews && recentViews.length > 0) {
           alreadyViewed = true;
         }
       } catch (error) {
@@ -78,15 +80,19 @@ export async function POST(request: Request) {
     if (!alreadyViewed) {
       // Increment profileViews in user_profiles
       try {
-        const targetProfileResult = await qdrantClient.scroll('user_profiles', {
+        const targetProfileResult = await qdrantClient.search('user_profiles', {
+          vector: new Array(384).fill(0),
           filter: {
             must: [{ key: 'walletAddress', match: { value: targetAddress } }]
           },
-          limit: 1
+          limit: 1,
+          with_payload: true
         });
         
-        if (targetProfileResult.points && targetProfileResult.points.length > 0) {
-          const targetProfile = targetProfileResult.points[0].payload as any;
+        if (targetProfileResult && targetProfileResult.length > 0) {
+          const targetProfile = targetProfileResult[0].payload as any;
+          const pointId = targetProfileResult[0].id; // Use the existing UUID point ID
+          
           const currentSocialStats = targetProfile.socialStats || {
             visitsByUsers: 0,
             followers: 0,
@@ -106,14 +112,49 @@ export async function POST(request: Request) {
           };
           
           await qdrantClient.upsert('user_profiles', {
+            wait: true,
             points: [
               {
-                id: String(targetProfile.walletAddress),
+                id: pointId, // Use the existing UUID point ID
                 vector: Array(384).fill(0),
                 payload: updatedProfile
               }
             ]
           });
+          
+          console.log(`Updated profile view count for ${targetAddress}: ${updatedProfile.socialStats.profileViews}`);
+        } else {
+          console.log(`No profile found for ${targetAddress}, creating new profile with view count`);
+          
+          // Create new profile if it doesn't exist
+          const newProfile = {
+            walletAddress: targetAddress,
+            isPublic: true,
+            createdAt: now,
+            lastActive: now,
+            socialStats: {
+              visitsByUsers: 0,
+              followers: 0,
+              following: 0,
+              likes: 0,
+              profileViews: 1
+            },
+            lastViewTime: now,
+            lastViewers: viewerAddress ? [viewerAddress] : []
+          };
+          
+          await qdrantClient.upsert('user_profiles', {
+            wait: true,
+            points: [
+              {
+                id: crypto.randomUUID(), // Generate new UUID for new profile
+                vector: Array(384).fill(0),
+                payload: newProfile
+              }
+            ]
+          });
+          
+          console.log(`Created new profile for ${targetAddress} with initial view count: 1`);
         }
       } catch (profileError) {
         console.error('Error updating profile view count:', profileError);
