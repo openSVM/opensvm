@@ -38,7 +38,11 @@ export async function initializeCollections() {
         }
       });
       
-      // Note: Field indexing is handled automatically by Qdrant for filtering
+      // Create keyword index for walletAddress filtering
+      await qdrantClient.createPayloadIndex(COLLECTIONS.USER_HISTORY, {
+        field_name: 'walletAddress',
+        field_schema: 'keyword'
+      });
     }
     
     // Check if user_profiles collection exists
@@ -52,7 +56,11 @@ export async function initializeCollections() {
         }
       });
       
-      // Note: Field indexing is handled automatically by Qdrant for filtering
+      // Create keyword index for walletAddress filtering
+      await qdrantClient.createPayloadIndex(COLLECTIONS.USER_PROFILES, {
+        field_name: 'walletAddress',
+        field_schema: 'keyword'
+      });
     }
     
     // Check if user_follows collection exists
@@ -65,6 +73,16 @@ export async function initializeCollections() {
           distance: 'Cosine'
         }
       });
+      
+      // Create keyword indexes for filtering
+      await qdrantClient.createPayloadIndex(COLLECTIONS.USER_FOLLOWS, {
+        field_name: 'followerAddress',
+        field_schema: 'keyword'
+      });
+      await qdrantClient.createPayloadIndex(COLLECTIONS.USER_FOLLOWS, {
+        field_name: 'targetAddress',
+        field_schema: 'keyword'
+      });
     }
     
     // Check if user_likes collection exists
@@ -76,6 +94,16 @@ export async function initializeCollections() {
           size: 384,
           distance: 'Cosine'
         }
+      });
+      
+      // Create keyword indexes for filtering
+      await qdrantClient.createPayloadIndex(COLLECTIONS.USER_LIKES, {
+        field_name: 'likerAddress',
+        field_schema: 'keyword'
+      });
+      await qdrantClient.createPayloadIndex(COLLECTIONS.USER_LIKES, {
+        field_name: 'targetAddress',
+        field_schema: 'keyword'
       });
     }
     
@@ -226,6 +254,26 @@ export async function storeUserProfile(profile: UserProfile): Promise<void> {
   try {
     await initializeCollections();
     
+    // First check if profile exists by searching for walletAddress
+    const existingResult = await qdrantClient.search(COLLECTIONS.USER_PROFILES, {
+      vector: new Array(384).fill(0),
+      filter: {
+        must: [{ key: 'walletAddress', match: { value: profile.walletAddress } }]
+      },
+      limit: 1,
+      with_payload: true
+    });
+    
+    let pointId: string;
+    
+    if (existingResult.length > 0) {
+      // Use existing point ID
+      pointId = existingResult[0].id as string;
+    } else {
+      // Generate new UUID for new profile
+      pointId = crypto.randomUUID();
+    }
+    
     // Generate embedding from profile data
     const textContent = `${profile.walletAddress} ${profile.displayName || ''} ${profile.bio || ''}`;
     const vector = generateSimpleEmbedding(textContent);
@@ -233,7 +281,7 @@ export async function storeUserProfile(profile: UserProfile): Promise<void> {
     await qdrantClient.upsert(COLLECTIONS.USER_PROFILES, {
       wait: true,
       points: [{
-        id: profile.walletAddress,
+        id: pointId,
         vector,
         payload: profile as any
       }]
@@ -251,8 +299,13 @@ export async function getUserProfile(walletAddress: string): Promise<UserProfile
   try {
     await initializeCollections();
     
-    const result = await qdrantClient.retrieve(COLLECTIONS.USER_PROFILES, {
-      ids: [walletAddress],
+    // Search for profile by walletAddress instead of using it as ID
+    const result = await qdrantClient.search(COLLECTIONS.USER_PROFILES, {
+      vector: new Array(384).fill(0),
+      filter: {
+        must: [{ key: 'walletAddress', match: { value: walletAddress } }]
+      },
+      limit: 1,
       with_payload: true
     });
     
