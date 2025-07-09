@@ -8,6 +8,7 @@ import LoadingSpinner from '@/components/LoadingSpinner';
 import Link from 'next/link';
 import ErrorBoundaryWrapper from '@/components/ErrorBoundaryWrapper'; 
 import { formatNumber } from '@/lib/utils';
+import { ShareButton } from '@/components/ShareButton';
 
 // Dynamically import components with no SSR and proper loading states
 // Using a ref for the tooltip positioning and timer
@@ -132,15 +133,7 @@ const AccountTooltip = ({
 // Skip EnhancedTransactionVisualizer for now since it requires d3
 const TransactionOverview = ({ tx, signature, className = '' }: { tx: DetailedTransactionInfo; signature: string; className?: string }) => (
   <div className={`bg-background rounded-lg p-4 shadow-lg border border-border flex flex-col ${className}`}>
-    <h2 className="text-xl font-semibold mb-4 text-foreground">Transaction Overview</h2>
-    <div className="text-sm space-y-4 flex-grow">
-      <div className="break-all">
-        <span className="text-muted-foreground block mb-1">Signature</span>
-        <code className="bg-muted px-2 py-1 rounded text-foreground">{signature}</code>
-      </div>
-      <div>
-        <span className="text-muted-foreground block mb-1">Status</span>
-        <span className={tx?.success ? 'text-success font-medium' : 'text-destructive font-medium'}>
+    <v className="text-sm space-y-4 flex-mb-4 grow">span className={tx?.success ? 'text-success font-medium' : 'text-destructive font-medium'}>
           {tx?.success ? 'Success' : 'Failed'}
         </span>
       </div>

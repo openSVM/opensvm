@@ -253,14 +253,35 @@ export function useHistoryTracking() {
 
     const path = pathname + (searchParams.toString() ? `?${searchParams.toString()}` : '');
     const searchQuery = searchParams.get('q') || searchParams.get('search') || undefined;
+    const refCode = searchParams.get('ref') || undefined;
     
     // Small delay to ensure page is fully loaded
     const timer = setTimeout(() => {
       trackPageVisit(path, searchQuery);
+      
+      // Track referral conversion if ref parameter exists
+      if (refCode) {
+        trackReferralConversion(refCode);
+      }
     }, 1000);
 
     return () => clearTimeout(timer);
   }, [pathname, searchParams, trackPageVisit, connected, publicKey]);
+
+  const trackReferralConversion = async (shareCode: string) => {
+    try {
+      await fetch('/api/share/conversion', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          shareCode,
+          converterAddress: publicKey?.toBase58()
+        })
+      });
+    } catch (error) {
+      console.warn('Failed to track referral conversion:', error);
+    }
+  };
 
   return { trackPageVisit, syncStatus };
 }

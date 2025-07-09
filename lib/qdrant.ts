@@ -16,7 +16,9 @@ export const COLLECTIONS = {
   USER_HISTORY: 'user_history',
   USER_PROFILES: 'user_profiles',
   USER_FOLLOWS: 'user_follows',
-  USER_LIKES: 'user_likes'
+  USER_LIKES: 'user_likes',
+  SHARES: 'shares',
+  SHARE_CLICKS: 'share_clicks'
 } as const;
 
 // Export qdrant client for direct access
@@ -111,6 +113,42 @@ export async function initializeCollections() {
     // Ensure indexes exist for user_likes
     await ensureIndex(COLLECTIONS.USER_LIKES, 'likerAddress');
     await ensureIndex(COLLECTIONS.USER_LIKES, 'targetAddress');
+    
+    // Check if shares collection exists
+    const sharesExists = await qdrantClient.getCollection(COLLECTIONS.SHARES).catch(() => null);
+    
+    if (!sharesExists) {
+      await qdrantClient.createCollection(COLLECTIONS.SHARES, {
+        vectors: {
+          size: 384,
+          distance: 'Cosine'
+        }
+      });
+      console.log('Created shares collection');
+    }
+    
+    // Ensure indexes exist for shares
+    await ensureIndex(COLLECTIONS.SHARES, 'shareCode');
+    await ensureIndex(COLLECTIONS.SHARES, 'referrerAddress');
+    await ensureIndex(COLLECTIONS.SHARES, 'entityType');
+    await ensureIndex(COLLECTIONS.SHARES, 'entityId');
+    
+    // Check if share_clicks collection exists
+    const shareClicksExists = await qdrantClient.getCollection(COLLECTIONS.SHARE_CLICKS).catch(() => null);
+    
+    if (!shareClicksExists) {
+      await qdrantClient.createCollection(COLLECTIONS.SHARE_CLICKS, {
+        vectors: {
+          size: 384,
+          distance: 'Cosine'
+        }
+      });
+      console.log('Created share_clicks collection');
+    }
+    
+    // Ensure indexes exist for share_clicks
+    await ensureIndex(COLLECTIONS.SHARE_CLICKS, 'shareCode');
+    await ensureIndex(COLLECTIONS.SHARE_CLICKS, 'clickerAddress');
     
     console.log('Qdrant collections initialized successfully');
   } catch (error) {
@@ -520,5 +558,184 @@ export async function getUserLikes(targetAddress: string): Promise<UserLikeEntry
   } catch (error) {
     console.error('Error getting user likes:', error);
     return [];
+  }
+}
+
+/**
+ * Share System Functions
+ */
+
+// Import share types
+import { ShareEntry, ShareClickEntry } from '@/types/share';
+
+/**
+ * Store share entry
+ */
+export async function storeShareEntry(share: ShareEntry): Promise<void> {
+  try {
+    await initializeCollections();
+    
+    const textContent = `${share.entityType} ${share.entityId} shared by ${share.referrerAddress}`;
+    const vector = generateSimpleEmbedding(textContent);
+    
+    await qdrantClient.upsert(COLLECTIONS.SHARES, {
+      wait: true,
+      points: [{
+        id: share.id,
+        vector,
+        payload: share as any
+      }]
+    });
+  } catch (error) {
+    console.error('Error storing share entry:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get share by code
+ */
+export async function getShareByCode(shareCode: string): Promise<ShareEntry | null> {
+  try {
+    await initializeCollections();
+    
+    const result = await qdrantClient.search(COLLECTIONS.SHARES, {
+      vector: new Array(384).fill(0),
+      filter: {
+        must: [{ key: 'shareCode', match: { value: shareCode } }]
+      },
+      limit: 1,
+      with_payload: true
+    });
+    
+    if (result.length === 0) {
+      return null;
+    }
+    
+    return result[0].payload as unknown as ShareEntry;
+  } catch (error) {
+    console.error('Error getting share by code:', error);
+    return null;
+  }
+}
+
+/**
+ * Get shares by referrer
+ */
+export async function getSharesByReferrer(
+  referrerAddress: string,
+  options: { limit?: number; offset?: number } = {}
+): Promise<{ shares: ShareEntry[]; total: number }> {
+  try {
+    await initializeCollections();
+    
+    const { limit = 50, offset = 0 } = options;
+    
+    const filter = {
+      must: [{ key: 'referrerAddress', match: { value: referrerAddress } }]
+    };
+    
+    const result = await qdrantClient.search(COLLECTIONS.SHARES, {
+      vector: new Array(384).fill(0),
+      filter,
+      limit,
+      offset,
+      with_payload: true
+    });
+    
+    const countResult = await qdrantClient.count(COLLECTIONS.SHARES, { filter });
+    
+    const shares = result.map(point => point.payload as unknown as ShareEntry);
+    shares.sort((a, b) => b.timestamp - a.timestamp);
+    
+    return { shares, total: countResult.count };
+  } catch (error) {
+    console.error('Error getting shares by referrer:', error);
+    return { shares: [], total: 0 };
+  }
+}
+
+/**
+ * Store share click
+ */
+export async function storeShareClick(click: ShareClickEntry): Promise<void> {
+  try {
+    await initializeCollections();
+    
+    const textContent = `Click on share ${click.shareCode} by ${click.clickerAddress || 'anonymous'}`;
+    const vector = generateSimpleEmbedding(textContent);
+    
+    await qdrantClient.upsert(COLLECTIONS.SHARE_CLICKS, {
+      wait: true,
+      points: [{
+        id: click.id,
+        vector,
+        payload: click as any
+      }]
+    });
+  } catch (error) {
+    console.error('Error storing share click:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get share clicks
+ */
+export async function getShareClicks(shareCode: string): Promise<ShareClickEntry[]> {
+  try {
+    await initializeCollections();
+    
+    const result = await qdrantClient.search(COLLECTIONS.SHARE_CLICKS, {
+      vector: new Array(384).fill(0),
+      filter: {
+        must: [{ key: 'shareCode', match: { value: shareCode } }]
+      },
+      limit: 1000,
+      with_payload: true
+    });
+    
+    return result.map(point => point.payload as unknown as ShareClickEntry);
+  } catch (error) {
+    console.error('Error getting share clicks:', error);
+    return [];
+  }
+}
+
+/**
+ * Update share click count
+ */
+export async function incrementShareClicks(shareCode: string): Promise<void> {
+  try {
+    const share = await getShareByCode(shareCode);
+    if (!share) return;
+    
+    share.clicks = (share.clicks || 0) + 1;
+    await storeShareEntry(share);
+  } catch (error) {
+    console.error('Error incrementing share clicks:', error);
+  }
+}
+
+/**
+ * Mark share click as converted
+ */
+export async function markShareConversion(shareCode: string, clickerAddress: string): Promise<void> {
+  try {
+    const share = await getShareByCode(shareCode);
+    if (!share) return;
+    
+    share.conversions = (share.conversions || 0) + 1;
+    await storeShareEntry(share);
+    
+    // Also update the click entry
+    const clicks = await getShareClicks(shareCode);
+    const userClick = clicks.find(c => c.clickerAddress === clickerAddress);
+    if (userClick) {
+      userClick.converted = true;
+      await storeShareClick(userClick);
+    }
+  } catch (error) {
+    console.error('Error marking share conversion:', error);
   }
 }
