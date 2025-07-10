@@ -241,11 +241,36 @@ export function UserFeedDisplay({ walletAddress, isMyProfile }: UserFeedDisplayP
         }
         
         try {
+          console.log('SSE raw data:', event.data);
           const data = JSON.parse(event.data);
+          console.log('Parsed SSE data:', data);
+          
+          if (!data) {
+            console.error('SSE event data is null or undefined');
+            return;
+          }
           
           if (data.type === 'feed-update') {
+            // Validate event data exists and has required fields
+            if (!data.event) {
+              console.error('SSE feed-update missing event data');
+              return;
+            }
+            
+            if (!data.event.id) {
+              console.error('SSE event missing id', data.event);
+              return;
+            }
+            
+            // Ensure userAddress exists to prevent slice errors
+            if (!data.event.userAddress) {
+              console.warn('SSE event missing userAddress, adding placeholder', data.event);
+              data.event.userAddress = 'unknown-address';
+            }
+            
             // Check if event matches current filters
             if (shouldShowEvent(data.event)) {
+              console.log('Adding new event:', data.event);
               // Add new event to the feed
               setEvents(prevEvents => {
                 const exists = prevEvents.some(e => e.id === data.event.id);
@@ -276,6 +301,12 @@ export function UserFeedDisplay({ walletAddress, isMyProfile }: UserFeedDisplayP
               });
             }
           } else if (data.type === 'like-update') {
+            // Validate like-update data
+            if (!data.eventId || typeof data.likes !== 'number') {
+              console.error('SSE like-update missing required fields', data);
+              return;
+            }
+            
             // Update likes count for an event
             setEvents(prevEvents => {
               const updatedEvents = prevEvents.map(event =>
@@ -311,7 +342,7 @@ export function UserFeedDisplay({ walletAddress, isMyProfile }: UserFeedDisplayP
       };
       
       newEventSource.onerror = (error) => {
-        console.error('EventSource error:', error);
+        console.error('Detailed EventSource error:', { error, readyState: newEventSource.readyState });
         setConnectionStatus('disconnected');
         newEventSource.close();
         // Attempt to reconnect after a few seconds
@@ -352,6 +383,12 @@ export function UserFeedDisplay({ walletAddress, isMyProfile }: UserFeedDisplayP
 
   // Check if an event should be shown based on current filters
   const shouldShowEvent = (event: FeedEvent): boolean => {
+    // Validate event has required fields
+    if (!event || !event.eventType || typeof event.timestamp !== 'number') {
+      console.error('Invalid event in shouldShowEvent:', event);
+      return false;
+    }
+    
     // Check event type filter
     if (!filters.eventTypes.includes(event.eventType)) {
       return false;
@@ -375,12 +412,14 @@ export function UserFeedDisplay({ walletAddress, isMyProfile }: UserFeedDisplayP
     // Check search query
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
-      return (
-        event.content.toLowerCase().includes(query) ||
-        (event.userName && event.userName.toLowerCase().includes(query)) ||
-        event.eventType.toLowerCase().includes(query) ||
-        event.userAddress.toLowerCase().includes(query)
-      );
+      
+      // Ensure we always return a boolean by checking each condition separately
+      const contentMatch = event.content ? event.content.toLowerCase().includes(query) : false;
+      const userNameMatch = event.userName ? event.userName.toLowerCase().includes(query) : false;
+      const eventTypeMatch = event.eventType ? event.eventType.toLowerCase().includes(query) : false;
+      const addressMatch = event.userAddress ? event.userAddress.toLowerCase().includes(query) : false;
+      
+      return contentMatch || userNameMatch || eventTypeMatch || addressMatch;
     }
     
     return true;
@@ -510,7 +549,9 @@ export function UserFeedDisplay({ walletAddress, isMyProfile }: UserFeedDisplayP
   };
 
   // Format timestamp
-  const formatTimestamp = (timestamp: number): string => {
+  const formatTimestamp = (timestamp?: number): string => {
+    if (!timestamp) return 'Unknown time';
+    
     const now = Date.now();
     const diff = now - timestamp;
     
@@ -531,7 +572,8 @@ export function UserFeedDisplay({ walletAddress, isMyProfile }: UserFeedDisplayP
   };
 
   // Format wallet address
-  const formatWalletAddress = (address: string): string => {
+  const formatWalletAddress = (address?: string): string => {
+    if (!address) return 'Unknown';
     return `${address.substring(0, 4)}...${address.substring(address.length - 4)}`;
   };
 
@@ -589,7 +631,7 @@ export function UserFeedDisplay({ walletAddress, isMyProfile }: UserFeedDisplayP
       <Avatar className="h-10 w-10 flex-shrink-0">
         <AvatarImage src={event.userAvatar} />
         <AvatarFallback className="bg-primary/10 text-primary">
-          {event.userName?.[0] || formatWalletAddress(event.userAddress)[0]}
+          {event.userName?.[0] || (event.userAddress ? formatWalletAddress(event.userAddress)[0] : '?')}
         </AvatarFallback>
       </Avatar>
       
@@ -597,7 +639,7 @@ export function UserFeedDisplay({ walletAddress, isMyProfile }: UserFeedDisplayP
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1 flex-wrap">
             <span className="font-medium">
-              {event.userName || formatWalletAddress(event.userAddress)}
+              {event.userName || (event.userAddress ? formatWalletAddress(event.userAddress) : 'Unknown User')}
             </span>
             <span className="text-xs text-muted-foreground">
               • {formatTimestamp(event.timestamp)}
