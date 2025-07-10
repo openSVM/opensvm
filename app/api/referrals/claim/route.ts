@@ -201,7 +201,6 @@ export async function POST(request: Request) {
 
     // Update user's token balance
     // First check if user_balances collection exists
-    let userBalanceResult: any[] = [];
     let balanceId = uuidv4();
     // currentBalance already defined and fetched above
     let balanceUpdated = false;
