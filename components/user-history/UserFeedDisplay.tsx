@@ -74,6 +74,7 @@ export function UserFeedDisplay({ walletAddress, isMyProfile }: UserFeedDisplayP
   const [events, setEvents] = useState<FeedEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [likeError, setLikeError] = useState<string | null>(null);
   const [eventSource, setEventSource] = useState<EventSource | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected'>('connecting');
 
@@ -428,6 +429,7 @@ export function UserFeedDisplay({ walletAddress, isMyProfile }: UserFeedDisplayP
   // Handle like action
   const handleLike = async (eventId: string) => {
     try {
+      setLikeError(null); // Clear any previous errors
       const event = events.find(e => e.id === eventId);
       if (!event) return;
       
@@ -487,10 +489,19 @@ export function UserFeedDisplay({ walletAddress, isMyProfile }: UserFeedDisplayP
           hasLiked: event.hasLiked
         }).catch(error => console.error('Error reverting cached event like status:', error));
         
+        // Handle different error types
         if (response.status === 401) {
-          alert('Please connect your wallet to like posts');
+          setLikeError('Please connect your wallet to like posts');
+        } else if (response.status === 403) {
+          // Handle token gating errors
+          const errorData = await response.json();
+          if (errorData.tokenGating) {
+            setLikeError(`You need at least 100,000 SVMAI tokens to like events. Your current balance: ${errorData.tokenGating.current.toLocaleString()}`);
+          } else {
+            setLikeError(errorData.error || 'Access denied');
+          }
         } else {
-          throw new Error('Failed to like/unlike event');
+          setLikeError('Failed to like/unlike event');
         }
       }
     } catch (err) {

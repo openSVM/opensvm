@@ -61,6 +61,7 @@ export default function UserProfilePage() {
   const [isFollowing, setIsFollowing] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
   const [socialLoading, setSocialLoading] = useState(false);
+  const [socialError, setSocialError] = useState<string | null>(null);
   const { walletAddress: myWallet } = useCurrentUser(); // Use auth context instead of direct API call
   const [tokenGating, setTokenGating] = useState<{
     hasAccess: boolean;
@@ -150,6 +151,7 @@ export default function UserProfilePage() {
     if (!validatedWalletAddress || socialLoading || (myWallet && validatedWalletAddress === myWallet)) return;
     try {
       setSocialLoading(true);
+      setSocialError(null);
       const action = isFollowing ? 'unfollow' : 'follow';
       const response = await fetch(`/api/user-social/${action}`, {
         method: 'POST',
@@ -168,9 +170,18 @@ export default function UserProfilePage() {
             }
           });
         }
+      } else {
+        // Handle token gating errors
+        const responseData = await response.json();
+        if (response.status === 403 && responseData.tokenGating) {
+          setSocialError(`You need at least 100,000 SVMAI tokens to follow users. Your current balance: ${responseData.tokenGating.current.toLocaleString()}`);
+        } else {
+          setSocialError(responseData.error || 'Failed to follow user');
+        }
       }
     } catch (error) {
       console.error('Error toggling follow:', error);
+      setSocialError('Network error occurred');
     } finally {
       setSocialLoading(false);
     }
@@ -180,6 +191,7 @@ export default function UserProfilePage() {
     if (!validatedWalletAddress || socialLoading || (myWallet && validatedWalletAddress === myWallet)) return;
     try {
       setSocialLoading(true);
+      setSocialError(null);
       const action = isLiked ? 'unlike' : 'like';
       const response = await fetch(`/api/user-social/${action}`, {
         method: 'POST',
@@ -198,9 +210,18 @@ export default function UserProfilePage() {
             }
           });
         }
+      } else {
+        // Handle token gating errors
+        const responseData = await response.json();
+        if (response.status === 403 && responseData.tokenGating) {
+          setSocialError(`You need at least 100,000 SVMAI tokens to like users. Your current balance: ${responseData.tokenGating.current.toLocaleString()}`);
+        } else {
+          setSocialError(responseData.error || 'Failed to like user');
+        }
       }
     } catch (error) {
       console.error('Error toggling like:', error);
+      setSocialError('Network error occurred');
     } finally {
       setSocialLoading(false);
     }
@@ -401,6 +422,16 @@ export default function UserProfilePage() {
               </div>
             </div>
           </CardHeader>
+          
+          {/* Display social action error */}
+          {socialError && (
+            <CardContent className="pt-0 pb-4">
+              <div className="bg-destructive/10 border border-destructive/30 rounded-md p-3 flex items-start gap-2">
+                <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
+                <div className="text-sm text-destructive">{socialError}</div>
+              </div>
+            </CardContent>
+          )}
         </Card>
 
         {/* Quick Stats */}

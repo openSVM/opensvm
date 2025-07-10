@@ -6,6 +6,7 @@ import { NextResponse } from 'next/server';
 import { qdrantClient } from '@/lib/qdrant';
 import { v4 as uuidv4 } from 'uuid';
 import { getSessionFromCookie } from '@/lib/auth-server';
+import { checkSVMAIAccess, MIN_SVMAI_BALANCE } from '@/lib/token-gating';
 
 export async function POST(request: Request) {
   try {
@@ -13,6 +14,19 @@ export async function POST(request: Request) {
     const session = getSessionFromCookie();
     if (!session || Date.now() > session.expiresAt) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Check if user has enough SVMAI tokens to like
+    const tokenGatingResult = await checkSVMAIAccess(session.walletAddress);
+    if (!tokenGatingResult.hasAccess) {
+      return NextResponse.json({
+        error: `You need at least ${MIN_SVMAI_BALANCE} SVMAI tokens to like users. Your current balance: ${tokenGatingResult.balance}`,
+        tokenGating: {
+          required: MIN_SVMAI_BALANCE,
+          current: tokenGatingResult.balance,
+          sufficient: false
+        }
+      }, { status: 403 });
     }
 
     const { targetAddress } = await request.json();

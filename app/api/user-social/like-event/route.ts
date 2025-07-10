@@ -13,6 +13,7 @@ import {
   storeHistoryEntry
 } from '@/lib/qdrant';
 import { generateId } from '@/lib/user-history-utils';
+import { checkSVMAIAccess, MIN_SVMAI_BALANCE } from '@/lib/token-gating';
 
 // Event Like entry interface
 interface EventLikeEntry {
@@ -50,6 +51,19 @@ export async function POST(request: NextRequest) {
     const auth = isValidRequest(request);
     if (!auth.isValid || !auth.walletAddress) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Check if user has enough SVMAI tokens to like events
+    const tokenGatingResult = await checkSVMAIAccess(auth.walletAddress);
+    if (!tokenGatingResult.hasAccess) {
+      return NextResponse.json({
+        error: `You need at least ${MIN_SVMAI_BALANCE} SVMAI tokens to like events. Your current balance: ${tokenGatingResult.balance}`,
+        tokenGating: {
+          required: MIN_SVMAI_BALANCE,
+          current: tokenGatingResult.balance,
+          sufficient: false
+        }
+      }, { status: 403 });
     }
 
     // Get request body
