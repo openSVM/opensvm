@@ -43,16 +43,33 @@ export default function EnhancedSearchBar() {
 
   useEffect(() => {
     const fetchSuggestions = async () => {
-      if (query.length < 3 || searchSettings.networks.length === 0) {
+      if (searchSettings.networks.length === 0) {
         setSuggestions([]);
         return;
       }
 
       try {
-        // Fetch suggestions based on the query and selected networks
-        const response = await fetch(`/api/search/suggestions?q=${encodeURIComponent(query)}&networks=${searchSettings.networks.join(',')}`);
-        if (!response.ok) { throw new Error('Failed to fetch suggestions'); }
+        let response;
+        
+        if (query.length === 0) {
+          // Fetch empty state suggestions (recent prompts, latest items, popular searches)
+          console.log('Fetching empty state suggestions...');
+          response = await fetch(`/api/search/suggestions/empty-state?networks=${searchSettings.networks.join(',')}`);
+        } else if (query.length < 3) {
+          // For very short queries, just clear suggestions
+          setSuggestions([]);
+          return;
+        } else {
+          // Fetch suggestions based on the query and selected networks
+          response = await fetch(`/api/search/suggestions?q=${encodeURIComponent(query)}&networks=${searchSettings.networks.join(',')}`);
+        }
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch suggestions: ${response.status} ${response.statusText}`);
+        }
+        
         const data = await response.json();
+        console.log('Suggestions fetched:', data);
         setSuggestions(data);
       } catch (error) {
         console.error('Error fetching suggestions:', error);
@@ -60,7 +77,7 @@ export default function EnhancedSearchBar() {
       }
     };
 
-    const debounceTimeout = setTimeout(fetchSuggestions, 300);
+    const debounceTimeout = setTimeout(fetchSuggestions, query.length === 0 ? 0 : 300);
     return () => clearTimeout(debounceTimeout);
   }, [query, searchSettings.networks]);
 

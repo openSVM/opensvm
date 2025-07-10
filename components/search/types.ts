@@ -51,6 +51,13 @@ export interface SearchSuggestion {
     risk?: 'low' | 'medium' | 'high'; // Risk assessment
     category?: string;     // Entity category
     description?: string;  // Entity description
+    section?: string;      // Section identifier (e.g., 'recent_prompts', 'latest_items', 'popular_searches')
+    sectionTitle?: string; // Human-readable section title
+    sectionIcon?: string;  // Icon for the section
+    sectionDescription?: string; // Description of the section
+    icon?: string;         // Item-specific icon
+    timeAgo?: string;      // Relative time string (e.g., "5m ago")
+    trending?: boolean;    // Whether item is trending
     [key: string]: any;    // Flexible container for additional data
   };
 }

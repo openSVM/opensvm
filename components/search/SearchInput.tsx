@@ -56,7 +56,12 @@ export const SearchInput: React.FC<SearchInputProps> = ({
     
     // Set new timeout for showing suggestions
     const timeout = setTimeout(() => {
-      setShowSuggestions(!!value);
+      // Always show suggestions when focused, regardless of value
+      if (isFocused) {
+        setShowSuggestions(true);
+      } else {
+        setShowSuggestions(!!value);
+      }
     }, 300);
     
     setTypingTimeout(timeout);
@@ -70,11 +75,17 @@ export const SearchInput: React.FC<SearchInputProps> = ({
           type="text"
           value={query}
           onChange={handleInputChange}
+          onMouseEnter={() => {
+            // Show suggestions on hover
+            setShowSuggestions(true);
+          }}
           onFocus={() => {
             setIsFocused(true);
-            if (query) setShowSuggestions(true);
+            setShowSuggestions(true); // Always show suggestions on focus
           }}
-          onBlur={() => setIsFocused(false)}
+          onBlur={() => {
+            setIsFocused(false);
+          }}
           placeholder="Search by address, transaction, block or token"
           className={`w-full h-12 rounded-l-md border ${
             isFocused ? 'border-primary ring-1 ring-primary/30' : 'border-gray-200 dark:border-gray-700'

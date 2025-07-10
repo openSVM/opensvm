@@ -69,6 +69,24 @@ export const SearchSuggestions: React.FC<SearchSuggestionsProps> = ({
     return null;
   }
 
+  // Group suggestions by section if they have section metadata
+  const groupedSuggestions = suggestions.reduce((acc, suggestion, index) => {
+    const section = suggestion.metadata?.section || 'general';
+    if (!acc[section]) {
+      acc[section] = {
+        title: suggestion.metadata?.sectionTitle || 'Suggestions',
+        icon: suggestion.metadata?.sectionIcon || '🔍',
+        description: suggestion.metadata?.sectionDescription || '',
+        suggestions: []
+      };
+    }
+    acc[section].suggestions.push({ ...suggestion, originalIndex: index });
+    return acc;
+  }, {} as Record<string, { title: string; icon: string; description: string; suggestions: any[] }>);
+
+  const hasGroupedSections = Object.keys(groupedSuggestions).length > 1 ||
+    (Object.keys(groupedSuggestions).length === 1 && !groupedSuggestions['general']);
+
   const renderSuggestionMetadata = (suggestion: SearchSuggestion) => {
     const primaryMetadata = [];
     const secondaryMetadata = [];
@@ -216,7 +234,7 @@ export const SearchSuggestions: React.FC<SearchSuggestionsProps> = ({
   return (
     <div
       ref={suggestionsRef}
-      className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-50 max-h-80 overflow-y-auto"
+      className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-50 max-h-96 overflow-y-auto"
     >
       {isLoading ? (
         <div className="px-4 py-3 text-center text-gray-500 dark:text-gray-400">
@@ -233,121 +251,249 @@ export const SearchSuggestions: React.FC<SearchSuggestionsProps> = ({
         </div>
       ) : (
         <>
-          {suggestions.map((suggestion, index) => {
-            const { primaryMetadata, secondaryMetadata, detailMetadata } = renderSuggestionMetadata(suggestion);
-            const isHovered = hoveredIndex === index;
-
-            return (
-              <button
-                key={`${suggestion.type}-${suggestion.value}`}
-                type="button"
-                onClick={() => {
-                  setQuery(suggestion.value);
-                  setShowSuggestions(false);
-                  console.log("Suggestion selected:", suggestion.value);
-                  
-                  if (onSubmitValue) {
-                    onSubmitValue(suggestion.value);
-                  } else {
-                    // Fallback: create a simple form submit event
-                    setTimeout(() => {
-                      const form = document.createElement('form');
-                      const input = document.createElement('input');
-                      input.value = suggestion.value;
-                      form.appendChild(input);
-                      
-                      const event = new Event('submit', { bubbles: true, cancelable: true });
-                      Object.defineProperty(event, 'target', { value: input, enumerable: true });
-                      
-                      handleSubmit(event as unknown as React.FormEvent);
-                    }, 50);
-                  }
-                }}
-                className={`w-full px-4 py-4 text-left hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors duration-200 relative border-b border-gray-100 dark:border-gray-800 last:border-b-0 ${
-                  isHovered ? 'bg-gray-50 dark:bg-gray-800' : ''
-                }`}
-                onMouseEnter={() => setHoveredIndex(index)}
-                onMouseLeave={() => setHoveredIndex(null)}
-              >
-                {isHovered && (
-                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary rounded-r" />
-                )}
-                
-                <div className="flex items-start justify-between">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className={`text-xs font-medium px-2 py-1 rounded-full ${
-                        suggestion.type === 'address' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' :
-                        suggestion.type === 'token' ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' :
-                        suggestion.type === 'program' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300' :
-                        suggestion.type === 'recent_global' ? 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300' :
-                        suggestion.type === 'recent_user' ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300' :
-                        'bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300'
-                      }`}>
-                        {suggestion.type === 'recent_global' ? 'POPULAR' :
-                         suggestion.type === 'recent_user' ? 'RECENT' :
-                         suggestion.type.toUpperCase()}
-                      </span>
-                      {suggestion.metadata?.verified && (
-                        <span className="text-xs bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300 px-1.5 py-0.5 rounded">
-                          VERIFIED
-                        </span>
+          {hasGroupedSections ? (
+            // Render grouped sections with headers
+            Object.entries(groupedSuggestions).map(([sectionKey, section], sectionIndex) => (
+              <div key={sectionKey}>
+                {/* Section Header */}
+                <div className="px-4 py-3 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">{section.icon}</span>
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                        {section.title}
+                      </h3>
+                      {section.description && (
+                        <p className="text-xs text-gray-600 dark:text-gray-400">
+                          {section.description}
+                        </p>
                       )}
                     </div>
-                    
-                    <div className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
-                      {suggestion.name || suggestion.label || suggestion.value}
-                    </div>
-                    
-                    {suggestion.symbol && suggestion.symbol !== suggestion.value && (
-                      <div className="text-xs text-gray-600 dark:text-gray-400 mb-2">
-                        {suggestion.symbol}
-                      </div>
-                    )}
-                    
-                    {/* Primary metadata - most important info */}
-                    {primaryMetadata.length > 0 && (
-                      <div className="flex flex-wrap gap-3 mb-1">
-                        {primaryMetadata.map((item, idx) => (
-                          <span key={idx} className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                            {item}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                    
-                    {/* Secondary metadata - additional important info */}
-                    {secondaryMetadata.length > 0 && (
-                      <div className="flex flex-wrap gap-3 mb-1">
-                        {secondaryMetadata.map((item, idx) => (
-                          <span key={idx} className="text-xs text-gray-600 dark:text-gray-400">
-                            {item}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                    
-                    {/* Detail metadata - supplementary info */}
-                    {detailMetadata.length > 0 && (
-                      <div className="flex flex-wrap gap-2 mt-1">
-                        {detailMetadata.map((item, idx) => (
-                          <span key={idx} className="text-xs text-gray-500 dark:text-gray-500 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded">
-                            {item}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                    
-                    {suggestion.metadata?.description && (
-                      <div className="text-xs text-gray-500 dark:text-gray-500 mt-1 line-clamp-2">
-                        {suggestion.metadata.description}
-                      </div>
-                    )}
                   </div>
                 </div>
-              </button>
-            );
-          })}
+                
+                {/* Section Items */}
+                {section.suggestions.map((suggestion, index) => {
+                  const { primaryMetadata, secondaryMetadata, detailMetadata } = renderSuggestionMetadata(suggestion);
+                  const globalIndex = suggestion.originalIndex;
+                  const isHovered = hoveredIndex === globalIndex;
+
+                  return (
+                    <button
+                      key={`${suggestion.type}-${suggestion.value}-${globalIndex}`}
+                      type="button"
+                      onClick={() => {
+                        setQuery(suggestion.value);
+                        setShowSuggestions(false);
+                        console.log("Suggestion selected:", suggestion.value);
+                        
+                        if (onSubmitValue) {
+                          onSubmitValue(suggestion.value);
+                        } else {
+                          // Fallback: create a simple form submit event
+                          setTimeout(() => {
+                            const form = document.createElement('form');
+                            const input = document.createElement('input');
+                            input.value = suggestion.value;
+                            form.appendChild(input);
+                            
+                            const event = new Event('submit', { bubbles: true, cancelable: true });
+                            Object.defineProperty(event, 'target', { value: input, enumerable: true });
+                            
+                            handleSubmit(event as unknown as React.FormEvent);
+                          }, 50);
+                        }
+                      }}
+                      className={`w-full px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors duration-200 relative border-b border-gray-100 dark:border-gray-800 last:border-b-0 ${
+                        isHovered ? 'bg-gray-50 dark:bg-gray-800' : ''
+                      }`}
+                      onMouseEnter={() => setHoveredIndex(globalIndex)}
+                      onMouseLeave={() => setHoveredIndex(null)}
+                    >
+                      {isHovered && (
+                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary rounded-r" />
+                      )}
+                      
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-2">
+                            {suggestion.metadata?.icon && (
+                              <span className="text-sm">{suggestion.metadata.icon}</span>
+                            )}
+                            {suggestion.metadata?.trending && (
+                              <span className="text-xs bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300 px-1.5 py-0.5 rounded font-medium">
+                                TRENDING
+                              </span>
+                            )}
+                            {suggestion.metadata?.timeAgo && (
+                              <span className="text-xs text-gray-500 dark:text-gray-400">
+                                {suggestion.metadata.timeAgo}
+                              </span>
+                            )}
+                          </div>
+                          
+                          <div className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
+                            {suggestion.name || suggestion.label || suggestion.value}
+                          </div>
+                          
+                          {suggestion.symbol && suggestion.symbol !== suggestion.value && (
+                            <div className="text-xs text-gray-600 dark:text-gray-400 mb-1">
+                              {suggestion.symbol}
+                            </div>
+                          )}
+                          
+                          {/* Primary metadata - most important info */}
+                          {primaryMetadata.length > 0 && (
+                            <div className="flex flex-wrap gap-3 mb-1">
+                              {primaryMetadata.map((item, idx) => (
+                                <span key={idx} className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                  {item}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          
+                          {/* Secondary metadata - additional important info */}
+                          {secondaryMetadata.length > 0 && (
+                            <div className="flex flex-wrap gap-3 mb-1">
+                              {secondaryMetadata.map((item, idx) => (
+                                <span key={idx} className="text-xs text-gray-600 dark:text-gray-400">
+                                  {item}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          
+                          {suggestion.metadata?.description && (
+                            <div className="text-xs text-gray-500 dark:text-gray-500 mt-1 line-clamp-2">
+                              {suggestion.metadata.description}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            ))
+          ) : (
+            // Render standard suggestions without sections
+            suggestions.map((suggestion, index) => {
+              const { primaryMetadata, secondaryMetadata, detailMetadata } = renderSuggestionMetadata(suggestion);
+              const isHovered = hoveredIndex === index;
+
+              return (
+                <button
+                  key={`${suggestion.type}-${suggestion.value}`}
+                  type="button"
+                  onClick={() => {
+                    setQuery(suggestion.value);
+                    setShowSuggestions(false);
+                    console.log("Suggestion selected:", suggestion.value);
+                    
+                    if (onSubmitValue) {
+                      onSubmitValue(suggestion.value);
+                    } else {
+                      // Fallback: create a simple form submit event
+                      setTimeout(() => {
+                        const form = document.createElement('form');
+                        const input = document.createElement('input');
+                        input.value = suggestion.value;
+                        form.appendChild(input);
+                        
+                        const event = new Event('submit', { bubbles: true, cancelable: true });
+                        Object.defineProperty(event, 'target', { value: input, enumerable: true });
+                        
+                        handleSubmit(event as unknown as React.FormEvent);
+                      }, 50);
+                    }
+                  }}
+                  className={`w-full px-4 py-4 text-left hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors duration-200 relative border-b border-gray-100 dark:border-gray-800 last:border-b-0 ${
+                    isHovered ? 'bg-gray-50 dark:bg-gray-800' : ''
+                  }`}
+                  onMouseEnter={() => setHoveredIndex(index)}
+                  onMouseLeave={() => setHoveredIndex(null)}
+                >
+                  {isHovered && (
+                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary rounded-r" />
+                  )}
+                  
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className={`text-xs font-medium px-2 py-1 rounded-full ${
+                          suggestion.type === 'address' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' :
+                          suggestion.type === 'token' ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' :
+                          suggestion.type === 'program' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300' :
+                          suggestion.type === 'recent_global' ? 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300' :
+                          suggestion.type === 'recent_user' ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300' :
+                          'bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300'
+                        }`}>
+                          {suggestion.type === 'recent_global' ? 'POPULAR' :
+                           suggestion.type === 'recent_user' ? 'RECENT' :
+                           suggestion.type.toUpperCase()}
+                        </span>
+                        {suggestion.metadata?.verified && (
+                          <span className="text-xs bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300 px-1.5 py-0.5 rounded">
+                            VERIFIED
+                          </span>
+                        )}
+                      </div>
+                      
+                      <div className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
+                        {suggestion.name || suggestion.label || suggestion.value}
+                      </div>
+                      
+                      {suggestion.symbol && suggestion.symbol !== suggestion.value && (
+                        <div className="text-xs text-gray-600 dark:text-gray-400 mb-2">
+                          {suggestion.symbol}
+                        </div>
+                      )}
+                      
+                      {/* Primary metadata - most important info */}
+                      {primaryMetadata.length > 0 && (
+                        <div className="flex flex-wrap gap-3 mb-1">
+                          {primaryMetadata.map((item, idx) => (
+                            <span key={idx} className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                              {item}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      
+                      {/* Secondary metadata - additional important info */}
+                      {secondaryMetadata.length > 0 && (
+                        <div className="flex flex-wrap gap-3 mb-1">
+                          {secondaryMetadata.map((item, idx) => (
+                            <span key={idx} className="text-xs text-gray-600 dark:text-gray-400">
+                              {item}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      
+                      {/* Detail metadata - supplementary info */}
+                      {detailMetadata.length > 0 && (
+                        <div className="flex flex-wrap gap-2 mt-1">
+                          {detailMetadata.map((item, idx) => (
+                            <span key={idx} className="text-xs text-gray-500 dark:text-gray-500 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded">
+                              {item}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      
+                      {suggestion.metadata?.description && (
+                        <div className="text-xs text-gray-500 dark:text-gray-500 mt-1 line-clamp-2">
+                          {suggestion.metadata.description}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </button>
+              );
+            })
+          )}
           
           <div className="px-4 py-2 border-t border-gray-200 dark:border-gray-700 text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-900">
             <div className="flex justify-between items-center">
