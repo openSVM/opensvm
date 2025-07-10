@@ -93,21 +93,36 @@ async function fetchEntityData(
       }
       
       case 'user': {
-        // Fetch user profile from our database
-        const qdrantModule = await import('@/lib/qdrant');
-        const profile = await qdrantModule.getUserProfile(entityId);
+        // Try to fetch user profile from our database, with fallback
+        try {
+          const qdrantModule = await import('@/lib/qdrant');
+          const profile = await qdrantModule.getUserProfile(entityId);
+          
+          if (profile) {
+            return {
+              walletAddress: profile.walletAddress,
+              displayName: profile.displayName,
+              avatar: profile.avatar,
+              followers: profile.socialStats?.followers || 0,
+              following: profile.socialStats?.following || 0,
+              pageViews: profile.socialStats?.profileViews || 0,
+              totalVisits: profile.stats?.totalVisits || 0,
+              joinDate: profile.createdAt
+            } as UserOGData;
+          }
+        } catch (error) {
+          console.warn('Could not fetch user profile from Qdrant, using fallback:', error instanceof Error ? error.message : error);
+        }
         
-        if (!profile) return null;
-        
+        // Fallback: create basic user data
         return {
-          walletAddress: profile.walletAddress,
-          displayName: profile.displayName,
-          avatar: profile.avatar,
-          followers: profile.socialStats?.followers || 0,
-          following: profile.socialStats?.following || 0,
-          pageViews: profile.socialStats?.profileViews || 0,
-          totalVisits: profile.stats?.totalVisits || 0,
-          joinDate: profile.createdAt
+          walletAddress: entityId,
+          displayName: `${entityId.slice(0, 6)}...${entityId.slice(-4)}`,
+          followers: 0,
+          following: 0,
+          pageViews: 0,
+          totalVisits: 0,
+          joinDate: Date.now()
         } as UserOGData;
       }
 
@@ -203,12 +218,17 @@ async function generateAIDescription(prompt: string): Promise<string | null> {
 
 export async function POST(req: NextRequest) {
   try {
+    console.log('Share generation request received');
+    
     const body: GenerateShareRequest = await req.json();
     const { entityType, entityId, referrerAddress } = body;
+    
+    console.log('Request data:', { entityType, entityId, referrerAddress });
     
     // Validate request
     const validation = validateShareRequest(entityType, entityId, referrerAddress);
     if (!validation.isValid) {
+      console.error('Validation failed:', validation.error);
       return NextResponse.json(
         { error: validation.error },
         { status: 400 }
@@ -218,17 +238,40 @@ export async function POST(req: NextRequest) {
     // Get session if referrer not provided
     let finalReferrerAddress = referrerAddress;
     if (!finalReferrerAddress) {
-      // Try to get wallet from cookie
-      const cookieStore = cookies();
-      const walletCookie = cookieStore.get('wallet-address');
-      if (walletCookie?.value) {
-        finalReferrerAddress = walletCookie.value;
+      try {
+        // Try to get wallet from cookie
+        const cookieStore = cookies();
+        const walletCookie = cookieStore.get('wallet-address');
+        if (walletCookie?.value) {
+          finalReferrerAddress = walletCookie.value;
+        }
+      } catch (error) {
+        console.warn('Could not access cookies:', error);
       }
     }
     
-    // Fetch entity data
-    const entityData = await fetchEntityData(entityType, entityId);
+    // Fetch entity data with better error handling
+    let entityData;
+    try {
+      entityData = await fetchEntityData(entityType, entityId);
+    } catch (error) {
+      console.error('Error fetching entity data:', error);
+      // Create fallback data for user type
+      if (entityType === 'user') {
+        entityData = {
+          walletAddress: entityId,
+          displayName: entityId.slice(0, 6) + '...' + entityId.slice(-4),
+          followers: 0,
+          following: 0,
+          pageViews: 0,
+          totalVisits: 0,
+          joinDate: Date.now()
+        };
+      }
+    }
+    
     if (!entityData) {
+      console.error('Entity data not found for:', { entityType, entityId });
       return NextResponse.json(
         { error: 'Entity not found' },
         { status: 404 }
@@ -244,8 +287,14 @@ export async function POST(req: NextRequest) {
     const title = generateTitle(entityType, entityData);
     
     // Try AI description first, fallback to generated
-    const aiPrompt = generateAIPrompt(entityType, entityData);
-    const aiDescription = await generateAIDescription(aiPrompt);
+    let aiDescription: string | null = null;
+    try {
+      const aiPrompt = generateAIPrompt(entityType, entityData);
+      aiDescription = await generateAIDescription(aiPrompt);
+    } catch (error) {
+      console.warn('AI description failed:', error);
+    }
+    
     const description = aiDescription || generateDescriptionFallback(entityType, entityData);
     
     // Extract hashtags from description
@@ -272,8 +321,14 @@ export async function POST(req: NextRequest) {
       expiresAt: calculateShareExpiration()
     };
     
-    // Store in database
-    await storeShareEntry(shareEntry);
+    // Store in database with error handling
+    try {
+      await storeShareEntry(shareEntry);
+      console.log('Share entry stored successfully');
+    } catch (error) {
+      console.warn('Failed to store share entry in database:', error);
+      // Continue anyway - we can still return the share URL
+    }
     
     // Return response
     const response: GenerateShareResponse = {
@@ -289,12 +344,13 @@ export async function POST(req: NextRequest) {
       }
     };
     
+    console.log('Share generation successful:', shareCode);
     return NextResponse.json(response);
     
   } catch (error) {
     console.error('Error generating share:', error);
     return NextResponse.json(
-      { error: 'Failed to generate share link' },
+      { error: 'Failed to generate share link', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     );
   }

@@ -1,5 +1,11 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Enable bundle analyzer when ANALYZE=true
+  ...(process.env.ANALYZE === 'true' && {
+    experimental: {
+      bundlePagesRouterDependencies: true,
+    },
+  }),
   typescript: {
     // Use an alternate config for type checking to ignore test-related files
     tsconfigPath: 'tsconfig.json',
@@ -25,11 +31,27 @@ const nextConfig = {
   // Experimental features (safe subset for Next.js 14)
   experimental: {
     // Server actions are enabled by default in Next.js 14+
+    optimizeCss: true,
+    optimizePackageImports: ['lodash', 'date-fns', 'chart.js'],
+    serverComponentsExternalPackages: ['canvas', 'puppeteer'],
+    esmExternals: 'loose',
+  },
+  // Compiler optimizations
+  compiler: {
+    removeConsole: process.env.NODE_ENV === 'production' ? {
+      exclude: ['error', 'warn']
+    } : false,
+  },
+  // Output configuration
+  output: 'standalone',
+  // Optimize static generation
+  generateBuildId: async () => {
+    return process.env.BUILD_ID || 'build-' + Date.now();
   },
   // Enable React strict mode
-  reactStrictMode: false,
-  // Enable production source maps for better debugging
-  productionBrowserSourceMaps: true,
+  reactStrictMode: true,
+  // Disable production source maps for faster builds
+  productionBrowserSourceMaps: false,
   // Preserve specific Tailwind classes that are dynamically added
   // This ensures animation classes used by interactive components
   // are included in production builds
@@ -54,7 +76,41 @@ const nextConfig = {
     
     // Only apply optimizations in production builds
     if (!dev && !isServer) {
-      //config.optimization.splitChunks.cacheGroups = { ...config.optimization.splitChunks.cacheGroups };
+      // Enable proper code splitting for heavy libraries
+      config.optimization.splitChunks = {
+        ...config.optimization.splitChunks,
+        cacheGroups: {
+          ...config.optimization.splitChunks.cacheGroups,
+          // Split Three.js into separate chunk
+          three: {
+            test: /[\\/]node_modules[\\/](three)[\\/]/,
+            name: 'three',
+            chunks: 'all',
+            priority: 30,
+          },
+          // Split visualization libraries
+          charts: {
+            test: /[\\/]node_modules[\\/](chart\.js|recharts|d3|cytoscape|react-force-graph)[\\/]/,
+            name: 'charts',
+            chunks: 'all',
+            priority: 25,
+          },
+          // Split Solana libraries
+          solana: {
+            test: /[\\/]node_modules[\\/](@solana|@coral-xyz)[\\/]/,
+            name: 'solana',
+            chunks: 'all',
+            priority: 25,
+          },
+          // Split heavy utilities
+          utils: {
+            test: /[\\/]node_modules[\\/](lodash|date-fns|axios)[\\/]/,
+            name: 'utils',
+            chunks: 'all',
+            priority: 20,
+          },
+        },
+      };
     }
     return config;
   },

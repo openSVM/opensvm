@@ -1,5 +1,5 @@
 [build]
-  command = "yarn install && yarn build"
+  command = "npm run build:optimized"
   publish = ".next"
 
 [build.environment]
@@ -8,6 +8,9 @@
   PUPPETEER_SKIP_DOWNLOAD = "true"
   NETLIFY_NEXT_PLUGIN_SKIP = "false"
   NPM_FLAGS = "--legacy-peer-deps"
+  # Build optimization flags
+  NODE_OPTIONS = "--max-old-space-size=4096"
+  ANALYZE = "false"
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"

@@ -212,7 +212,11 @@ class ConnectionPool {
     this.connections = endpoints
       .filter(url => !this.failedEndpoints.has(url))
       .map(url => new ProxyConnection(url, this.config));
-    console.log('Initialized OpenSVM connection pool with', this.connections.length, 'endpoints');
+    
+    // Only log during development or when explicitly needed
+    if (process.env.NODE_ENV === 'development' || process.env.DEBUG_RPC) {
+      console.log('Initialized OpenSVM connection pool with', this.connections.length, 'endpoints');
+    }
   }
 
   public static getInstance(): ConnectionPool {

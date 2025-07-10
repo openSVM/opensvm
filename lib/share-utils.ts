@@ -15,7 +15,10 @@ export function generateShareCode(entityType: EntityType, entityId: string): str
     transaction: 'tx',
     account: 'ac',
     program: 'pg',
-    user: 'us'
+    user: 'us',
+    block: 'bl',
+    validator: 'vl',
+    token: 'tk'
   };
   
   const prefix = prefixes[entityType];
@@ -38,7 +41,10 @@ export function parseShareCode(shareCode: string): { type: EntityType | null; is
     tx: 'transaction',
     ac: 'account',
     pg: 'program',
-    us: 'user'
+    us: 'user',
+    bl: 'block',
+    vl: 'validator',
+    tk: 'token'
   };
   
   const type = typeMap[prefix] || null;
@@ -81,7 +87,7 @@ export function validateShareRequest(
   referrerAddress?: string
 ): { isValid: boolean; error?: string } {
   // Validate entity type
-  const validTypes: EntityType[] = ['transaction', 'account', 'program', 'user'];
+  const validTypes: EntityType[] = ['transaction', 'account', 'program', 'user', 'block', 'validator', 'token'];
   if (!validTypes.includes(entityType)) {
     return { isValid: false, error: 'Invalid entity type' };
   }
@@ -155,6 +161,45 @@ export function generateAIPrompt(entityType: EntityType, data: any): string {
       
       Create a concise description highlighting the user's activity and influence.
       Include relevant emojis and suggest 2-3 hashtags.
+    `,
+    
+    block: (data) => `
+      Analyze this Solana block and create an engaging description:
+      - Slot: ${data.slot}
+      - Transaction count: ${data.transactionCount}
+      - Success rate: ${data.successRate}%
+      - Total SOL volume: ${data.totalSolVolume}
+      - Block time: ${new Date(data.blockTime * 1000).toLocaleString()}
+      
+      Create a concise description highlighting the block's activity and performance.
+      Include relevant emojis and suggest 2-3 hashtags.
+    `,
+    
+    validator: (data) => `
+      Analyze this Solana validator and create an engaging description:
+      - Vote account: ${data.voteAccount}
+      - Name: ${data.name || 'Unknown Validator'}
+      - Commission: ${data.commission}%
+      - Activated stake: ${data.activatedStake.toLocaleString()} SOL
+      - APY: ${data.apy}%
+      - Status: ${data.status}
+      - Performance score: ${data.performanceScore}%
+      
+      Create a concise description highlighting the validator's performance and reliability.
+      Include relevant emojis and suggest 2-3 hashtags.
+    `,
+    
+    token: (data) => `
+      Analyze this Solana token and create an engaging description:
+      - Token: ${data.name || 'Unknown Token'} (${data.symbol || 'N/A'})
+      - Mint: ${data.mint}
+      - Price: ${data.price ? '$' + data.price.toFixed(4) : 'N/A'}
+      - Market cap: ${data.marketCap ? '$' + data.marketCap.toLocaleString() : 'N/A'}
+      - Total supply: ${data.supply ? data.supply.toLocaleString() : 'N/A'}
+      - Holders: ${data.holders ? data.holders.toLocaleString() : 'N/A'}
+      
+      Create a concise description highlighting the token's significance and market performance.
+      Include relevant emojis and suggest 2-3 hashtags.
     `
   };
   
@@ -178,7 +223,10 @@ export function generateTitle(entityType: EntityType, data: any): string {
     transaction: (data) => `${data.status === 'success' ? '✅' : '❌'} Transaction ${formatEntityId(data.hash, 'transaction')}`,
     account: (data) => `🔍 Account ${formatEntityId(data.address, 'account')}`,
     program: (data) => `📦 ${data.name || 'Program'} ${formatEntityId(data.programId, 'program')}`,
-    user: (data) => `👤 ${data.displayName || formatEntityId(data.walletAddress, 'account')}`
+    user: (data) => `👤 ${data.displayName || formatEntityId(data.walletAddress, 'account')}`,
+    block: (data) => `🧱 Block #${data.slot}`,
+    validator: (data) => `⚡ ${data.name || 'Validator'} ${formatEntityId(data.voteAccount, 'account')}`,
+    token: (data) => `🪙 ${data.name || 'Token'} (${data.symbol || formatEntityId(data.mint, 'account')})`
   };
   
   return titles[entityType](data);
@@ -192,7 +240,10 @@ export function generateDescriptionFallback(entityType: EntityType, data: any): 
     transaction: (data) => `${data.status === 'success' ? 'Successful' : 'Failed'} transaction with ${data.programCount} program(s). Fee: ${data.fee} SOL`,
     account: (data) => `Active Solana account with ${data.balance} SOL balance and ${data.tokenCount} token(s)`,
     program: (data) => `Solana program with ${data.transactionCount.toLocaleString()} transactions and ${data.userCount.toLocaleString()} users`,
-    user: (data) => `OpenSVM explorer with ${data.followers} followers and ${data.pageViews} profile views`
+    user: (data) => `OpenSVM explorer with ${data.followers} followers and ${data.pageViews} profile views`,
+    block: (data) => `Solana block #${data.slot} with ${data.transactionCount} transactions and ${data.successRate}% success rate`,
+    validator: (data) => `${data.status} Solana validator with ${data.commission}% commission and ${data.performanceScore}% performance score`,
+    token: (data) => `${data.name || 'Token'} with ${data.supply ? data.supply.toLocaleString() : 'unknown'} supply and ${data.holders || 0} holders`
   };
   
   return descriptions[entityType](data);
