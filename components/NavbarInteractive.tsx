@@ -28,8 +28,23 @@ export const NavbarInteractive: React.FC<NavbarInteractiveProps> = () => {
   const [isResizing, setIsResizing] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [contentPadding, setContentPadding] = useState<string>('0px');
+  const [currentTime, setCurrentTime] = useState<string>('');
   const menuRef = useRef<HTMLDivElement>(null);
   const { connected, publicKey } = useWallet();
+  
+  // Update the clock every minute
+  useEffect(() => {
+    // Set initial time
+    setCurrentTime(new Date().toLocaleTimeString());
+    
+    // Update time every 60 seconds
+    const timer = setInterval(() => {
+      setCurrentTime(new Date().toLocaleTimeString());
+    }, 60000);
+    
+    // Cleanup on unmount
+    return () => clearInterval(timer);
+  }, []);
 
   // Close mobile menu when clicking outside
   useEffect(() => {
@@ -128,7 +143,7 @@ export const NavbarInteractive: React.FC<NavbarInteractiveProps> = () => {
               <span className="font-bold text-lg">OPENSVM</span>
               <span className="text-sm text-foreground/70">[AI]</span>
             </Link>
-            <span className="hidden md:inline-block text-xs text-muted-foreground">{new Date().toLocaleTimeString()}</span>
+            <span className="hidden md:inline-block text-xs text-muted-foreground">{currentTime}</span>
           </div>
           
           {/* Interactive search form */}
@@ -225,28 +240,67 @@ export const NavbarInteractive: React.FC<NavbarInteractiveProps> = () => {
               </DropdownMenuContent>
             </DropdownMenu>
   
-            {/* NFTs Dropdown */}
+            {/* DeFi Dropdown */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button 
-                  variant="ghost" 
+                <Button
+                  variant="ghost"
                   size="sm"
                   className="gap-1 px-3 h-9 text-sm font-medium"
-                  data-testid="nav-dropdown-nfts"
+                  data-testid="nav-dropdown-defi"
                 >
-                  NFTs
+                  DeFi
                   <DropdownIcon />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="duration-300 transition-all">
-                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); router.push('/nfts'); }}>
-                  Collections
+              <DropdownMenuContent align="end" className="duration-300 transition-all max-h-96 overflow-y-auto">
+                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); router.push('/defi/overview'); }}>
+                  Overview
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); router.push('/nfts/trending'); }}>
-                  Trending
+                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); router.push('/defi/coins-screener'); }}>
+                  Coins Screener
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); router.push('/nfts/new'); }}>
-                  New Mints
+                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); router.push('/defi/memecoins-screener'); }}>
+                  Memecoins Screener
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); router.push('/defi/launchpads'); }}>
+                  Launchpads
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); router.push('/defi/amms'); }}>
+                  AMMs
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); router.push('/defi/clobs'); }}>
+                  CLOBs
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); router.push('/defi/perpetuals'); }}>
+                  Perpetuals
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); router.push('/defi/options'); }}>
+                  Options
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); router.push('/defi/bots'); }}>
+                  TG Bots & Other bots
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); router.push('/defi/defai'); }}>
+                  DeFAI
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); router.push('/defi/aggregators'); }}>
+                  Aggregators
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); router.push('/defi/yield-agg'); }}>
+                  Yield Agg
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); router.push('/defi/staking'); }}>
+                  Staking
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); router.push('/defi/stablecoins'); }}>
+                  Stablecoins
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); router.push('/defi/oracles'); }}>
+                  Data providers & Oracles
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); router.push('/defi/tools'); }}>
+                  Tools
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -447,28 +501,119 @@ export const NavbarInteractive: React.FC<NavbarInteractiveProps> = () => {
               </Button>
             </div>
             
-            <div className="font-medium border-b pb-1 mt-5 mb-3 text-sm uppercase tracking-wider text-primary">NFTs</div>
-            <div className="flex flex-col gap-1">
-              <Button 
-                variant="ghost" 
-                className="w-full justify-start font-normal text-foreground/90 hover:text-foreground" 
-                onClick={() => { setIsMobileMenuOpen(false); router.push('/nfts'); }}
+            <div className="font-medium border-b pb-1 mt-5 mb-3 text-sm uppercase tracking-wider text-primary">DeFi</div>
+            <div className="flex flex-col gap-1 max-h-48 overflow-y-auto">
+              <Button
+                variant="ghost"
+                className="w-full justify-start font-normal text-foreground/90 hover:text-foreground"
+                onClick={() => { setIsMobileMenuOpen(false); router.push('/defi/overview'); }}
               >
-                Collections
+                Overview
               </Button>
-              <Button 
-                variant="ghost" 
-                className="w-full justify-start font-normal text-foreground/90 hover:text-foreground" 
-                onClick={() => { setIsMobileMenuOpen(false); router.push('/nfts?tab=trending'); }}
+              <Button
+                variant="ghost"
+                className="w-full justify-start font-normal text-foreground/90 hover:text-foreground"
+                onClick={() => { setIsMobileMenuOpen(false); router.push('/defi/coins-screener'); }}
               >
-                Trending
+                Coins Screener
               </Button>
-              <Button 
-                variant="ghost" 
-                className="w-full justify-start font-normal text-foreground/90 hover:text-foreground" 
-                onClick={() => { setIsMobileMenuOpen(false); router.push('/nfts?tab=new'); }}
+              <Button
+                variant="ghost"
+                className="w-full justify-start font-normal text-foreground/90 hover:text-foreground"
+                onClick={() => { setIsMobileMenuOpen(false); router.push('/defi/memecoins-screener'); }}
               >
-                New Mints
+                Memecoins Screener
+              </Button>
+              <Button
+                variant="ghost"
+                className="w-full justify-start font-normal text-foreground/90 hover:text-foreground"
+                onClick={() => { setIsMobileMenuOpen(false); router.push('/defi/launchpads'); }}
+              >
+                Launchpads
+              </Button>
+              <Button
+                variant="ghost"
+                className="w-full justify-start font-normal text-foreground/90 hover:text-foreground"
+                onClick={() => { setIsMobileMenuOpen(false); router.push('/defi/amms'); }}
+              >
+                AMMs
+              </Button>
+              <Button
+                variant="ghost"
+                className="w-full justify-start font-normal text-foreground/90 hover:text-foreground"
+                onClick={() => { setIsMobileMenuOpen(false); router.push('/defi/clobs'); }}
+              >
+                CLOBs
+              </Button>
+              <Button
+                variant="ghost"
+                className="w-full justify-start font-normal text-foreground/90 hover:text-foreground"
+                onClick={() => { setIsMobileMenuOpen(false); router.push('/defi/perpetuals'); }}
+              >
+                Perpetuals
+              </Button>
+              <Button
+                variant="ghost"
+                className="w-full justify-start font-normal text-foreground/90 hover:text-foreground"
+                onClick={() => { setIsMobileMenuOpen(false); router.push('/defi/options'); }}
+              >
+                Options
+              </Button>
+              <Button
+                variant="ghost"
+                className="w-full justify-start font-normal text-foreground/90 hover:text-foreground"
+                onClick={() => { setIsMobileMenuOpen(false); router.push('/defi/bots'); }}
+              >
+                TG Bots & Other bots
+              </Button>
+              <Button
+                variant="ghost"
+                className="w-full justify-start font-normal text-foreground/90 hover:text-foreground"
+                onClick={() => { setIsMobileMenuOpen(false); router.push('/defi/defai'); }}
+              >
+                DeFAI
+              </Button>
+              <Button
+                variant="ghost"
+                className="w-full justify-start font-normal text-foreground/90 hover:text-foreground"
+                onClick={() => { setIsMobileMenuOpen(false); router.push('/defi/aggregators'); }}
+              >
+                Aggregators
+              </Button>
+              <Button
+                variant="ghost"
+                className="w-full justify-start font-normal text-foreground/90 hover:text-foreground"
+                onClick={() => { setIsMobileMenuOpen(false); router.push('/defi/yield-agg'); }}
+              >
+                Yield Agg
+              </Button>
+              <Button
+                variant="ghost"
+                className="w-full justify-start font-normal text-foreground/90 hover:text-foreground"
+                onClick={() => { setIsMobileMenuOpen(false); router.push('/defi/staking'); }}
+              >
+                Staking
+              </Button>
+              <Button
+                variant="ghost"
+                className="w-full justify-start font-normal text-foreground/90 hover:text-foreground"
+                onClick={() => { setIsMobileMenuOpen(false); router.push('/defi/stablecoins'); }}
+              >
+                Stablecoins
+              </Button>
+              <Button
+                variant="ghost"
+                className="w-full justify-start font-normal text-foreground/90 hover:text-foreground"
+                onClick={() => { setIsMobileMenuOpen(false); router.push('/defi/oracles'); }}
+              >
+                Data providers & Oracles
+              </Button>
+              <Button
+                variant="ghost"
+                className="w-full justify-start font-normal text-foreground/90 hover:text-foreground"
+                onClick={() => { setIsMobileMenuOpen(false); router.push('/defi/tools'); }}
+              >
+                Tools
               </Button>
             </div>
             
