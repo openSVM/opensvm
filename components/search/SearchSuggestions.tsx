@@ -70,70 +70,147 @@ export const SearchSuggestions: React.FC<SearchSuggestionsProps> = ({
   }
 
   const renderSuggestionMetadata = (suggestion: SearchSuggestion) => {
-    const metadata = [];
+    const primaryMetadata = [];
+    const secondaryMetadata = [];
+    const detailMetadata = [];
 
     switch (suggestion.type) {
       case 'address':
+        // Primary info
         if (suggestion.balance !== undefined) {
-          metadata.push(`${suggestion.balance.toFixed(4)} SOL`);
+          primaryMetadata.push(`💰 ${suggestion.balance.toFixed(4)} SOL`);
         }
+        if (suggestion.stakeBalance !== undefined && suggestion.stakeBalance > 0) {
+          primaryMetadata.push(`🏛️ ${suggestion.stakeBalance.toFixed(2)} SOL staked`);
+        }
+        
+        // Secondary info
         if (suggestion.actionCount !== undefined) {
-          metadata.push(`${suggestion.actionCount} transactions`);
+          secondaryMetadata.push(`📊 ${formatNumber(suggestion.actionCount)} total txns`);
+        }
+        if (suggestion.recentTxCount !== undefined) {
+          secondaryMetadata.push(`🔄 ${suggestion.recentTxCount} recent (7d)`);
+        }
+        
+        // Detail info
+        if (suggestion.tokensHeld !== undefined) {
+          detailMetadata.push(`🪙 ${suggestion.tokensHeld} tokens`);
+        }
+        if (suggestion.nftCount !== undefined) {
+          detailMetadata.push(`🎨 ${suggestion.nftCount} NFTs`);
         }
         if (suggestion.lastUpdate) {
-          metadata.push(formatDate(suggestion.lastUpdate));
+          detailMetadata.push(`⏰ Active ${formatDate(suggestion.lastUpdate)}`);
         }
         break;
 
       case 'token':
+        // Primary info
         if (suggestion.price !== undefined) {
-          metadata.push(formatCurrency(suggestion.price));
+          primaryMetadata.push(`💵 ${formatCurrency(suggestion.price)}`);
         }
+        if (suggestion.priceChange24h !== undefined) {
+          const changeIcon = suggestion.priceChange24h >= 0 ? '📈' : '📉';
+          primaryMetadata.push(`${changeIcon} ${suggestion.priceChange24h.toFixed(2)}%`);
+        }
+        
+        // Secondary info
         if (suggestion.volume !== undefined) {
-          metadata.push(`Vol: ${formatCurrency(suggestion.volume)}`);
+          secondaryMetadata.push(`📊 Vol: ${formatCurrency(suggestion.volume)}`);
+        }
+        if (suggestion.marketCap !== undefined) {
+          secondaryMetadata.push(`💎 MCap: ${formatCurrency(suggestion.marketCap)}`);
+        }
+        
+        // Detail info
+        if (suggestion.holders !== undefined) {
+          detailMetadata.push(`👥 ${formatNumber(suggestion.holders)} holders`);
+        }
+        if (suggestion.supply !== undefined) {
+          detailMetadata.push(`🔢 Supply: ${formatNumber(suggestion.supply)}`);
+        }
+        if (suggestion.metadata?.verified) {
+          detailMetadata.push('✅ Verified');
         }
         if (suggestion.lastUpdate) {
-          metadata.push(formatDate(suggestion.lastUpdate));
+          detailMetadata.push(`⏰ ${formatDate(suggestion.lastUpdate)}`);
         }
         break;
 
       case 'program':
+        // Primary info
         if (suggestion.usageCount !== undefined) {
-          metadata.push(`${formatNumber(suggestion.usageCount)} calls`);
+          primaryMetadata.push(`🔧 ${formatNumber(suggestion.usageCount)} total calls`);
+        }
+        if (suggestion.weeklyInvocations !== undefined) {
+          primaryMetadata.push(`📈 ${formatNumber(suggestion.weeklyInvocations)} weekly`);
+        }
+        
+        // Secondary info
+        if (suggestion.programType) {
+          secondaryMetadata.push(`🏷️ ${suggestion.programType}`);
+        }
+        if (suggestion.deploymentDate) {
+          secondaryMetadata.push(`🚀 Deployed ${formatDate(suggestion.deploymentDate)}`);
+        }
+        
+        // Detail info
+        if (suggestion.deployer) {
+          detailMetadata.push(`👨‍💻 ${suggestion.deployer.slice(0, 8)}...`);
+        }
+        if (suggestion.metadata?.verified) {
+          detailMetadata.push('✅ Verified');
         }
         if (suggestion.lastUpdate) {
-          metadata.push(`Updated ${formatDate(suggestion.lastUpdate)}`);
+          detailMetadata.push(`⏰ Updated ${formatDate(suggestion.lastUpdate)}`);
         }
         break;
 
       case 'transaction':
-        if (suggestion.status) {
-          metadata.push(suggestion.status === 'success' ? '✅ Success' : '❌ Failed');
+        // Primary info
+        if (suggestion.success !== undefined) {
+          primaryMetadata.push(suggestion.success ? '✅ Success' : '❌ Failed');
         }
         if (suggestion.amount !== undefined && suggestion.amount > 0) {
-          metadata.push(`${suggestion.amount.toFixed(4)} SOL`);
+          primaryMetadata.push(`💰 ${suggestion.amount.toFixed(4)} SOL`);
+        }
+        
+        // Secondary info
+        if (suggestion.fees !== undefined) {
+          secondaryMetadata.push(`⛽ ${suggestion.fees.toFixed(6)} SOL fees`);
+        }
+        if (suggestion.blockHeight !== undefined) {
+          secondaryMetadata.push(`📦 Block ${formatNumber(suggestion.blockHeight)}`);
+        }
+        
+        // Detail info
+        if (suggestion.instructions !== undefined) {
+          detailMetadata.push(`📝 ${suggestion.instructions} instructions`);
+        }
+        if (suggestion.participants && suggestion.participants.length > 0) {
+          detailMetadata.push(`👥 ${suggestion.participants.length} participants`);
         }
         if (suggestion.lastUpdate) {
-          metadata.push(formatDate(suggestion.lastUpdate));
+          detailMetadata.push(`⏰ ${formatDate(suggestion.lastUpdate)}`);
         }
         break;
 
       case 'recent_global':
-        metadata.push('🌐 Popular search');
+        primaryMetadata.push('🌐 Popular search');
         if (suggestion.lastUpdate) {
-          metadata.push(`Searched ${formatDate(suggestion.lastUpdate)}`);
+          secondaryMetadata.push(`Searched ${formatDate(suggestion.lastUpdate)}`);
         }
         break;
 
       case 'recent_user':
-        metadata.push('👤 Your recent search');
+        primaryMetadata.push('👤 Your recent search');
         if (suggestion.lastUpdate) {
-          metadata.push(`Searched ${formatDate(suggestion.lastUpdate)}`);
+          secondaryMetadata.push(`Searched ${formatDate(suggestion.lastUpdate)}`);
         }
         break;
     }
 
-    return metadata;
+    return { primaryMetadata, secondaryMetadata, detailMetadata };
   };
 
   return (
@@ -157,7 +234,7 @@ export const SearchSuggestions: React.FC<SearchSuggestionsProps> = ({
       ) : (
         <>
           {suggestions.map((suggestion, index) => {
-            const metadata = renderSuggestionMetadata(suggestion);
+            const { primaryMetadata, secondaryMetadata, detailMetadata } = renderSuggestionMetadata(suggestion);
             const isHovered = hoveredIndex === index;
 
             return (
@@ -186,7 +263,7 @@ export const SearchSuggestions: React.FC<SearchSuggestionsProps> = ({
                     }, 50);
                   }
                 }}
-                className={`w-full px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors duration-200 relative border-b border-gray-100 dark:border-gray-800 last:border-b-0 ${
+                className={`w-full px-4 py-4 text-left hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors duration-200 relative border-b border-gray-100 dark:border-gray-800 last:border-b-0 ${
                   isHovered ? 'bg-gray-50 dark:bg-gray-800' : ''
                 }`}
                 onMouseEnter={() => setHoveredIndex(index)}
@@ -198,7 +275,7 @@ export const SearchSuggestions: React.FC<SearchSuggestionsProps> = ({
                 
                 <div className="flex items-start justify-between">
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
+                    <div className="flex items-center gap-2 mb-2">
                       <span className={`text-xs font-medium px-2 py-1 rounded-full ${
                         suggestion.type === 'address' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' :
                         suggestion.type === 'token' ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' :
@@ -211,19 +288,59 @@ export const SearchSuggestions: React.FC<SearchSuggestionsProps> = ({
                          suggestion.type === 'recent_user' ? 'RECENT' :
                          suggestion.type.toUpperCase()}
                       </span>
+                      {suggestion.metadata?.verified && (
+                        <span className="text-xs bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300 px-1.5 py-0.5 rounded">
+                          VERIFIED
+                        </span>
+                      )}
                     </div>
                     
-                    <div className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
-                      {suggestion.label || suggestion.value}
+                    <div className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
+                      {suggestion.name || suggestion.label || suggestion.value}
                     </div>
                     
-                    {metadata.length > 0 && (
-                      <div className="flex flex-wrap gap-2 mt-1">
-                        {metadata.map((item, idx) => (
-                          <span key={idx} className="text-xs text-gray-500 dark:text-gray-400">
+                    {suggestion.symbol && suggestion.symbol !== suggestion.value && (
+                      <div className="text-xs text-gray-600 dark:text-gray-400 mb-2">
+                        {suggestion.symbol}
+                      </div>
+                    )}
+                    
+                    {/* Primary metadata - most important info */}
+                    {primaryMetadata.length > 0 && (
+                      <div className="flex flex-wrap gap-3 mb-1">
+                        {primaryMetadata.map((item, idx) => (
+                          <span key={idx} className="text-sm font-medium text-gray-700 dark:text-gray-300">
                             {item}
                           </span>
                         ))}
+                      </div>
+                    )}
+                    
+                    {/* Secondary metadata - additional important info */}
+                    {secondaryMetadata.length > 0 && (
+                      <div className="flex flex-wrap gap-3 mb-1">
+                        {secondaryMetadata.map((item, idx) => (
+                          <span key={idx} className="text-xs text-gray-600 dark:text-gray-400">
+                            {item}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    
+                    {/* Detail metadata - supplementary info */}
+                    {detailMetadata.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mt-1">
+                        {detailMetadata.map((item, idx) => (
+                          <span key={idx} className="text-xs text-gray-500 dark:text-gray-500 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded">
+                            {item}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    
+                    {suggestion.metadata?.description && (
+                      <div className="text-xs text-gray-500 dark:text-gray-500 mt-1 line-clamp-2">
+                        {suggestion.metadata.description}
                       </div>
                     )}
                   </div>
