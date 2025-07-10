@@ -117,6 +117,20 @@ export const SearchSuggestions: React.FC<SearchSuggestionsProps> = ({
           metadata.push(formatDate(suggestion.lastUpdate));
         }
         break;
+
+      case 'recent_global':
+        metadata.push('🌐 Popular search');
+        if (suggestion.lastUpdate) {
+          metadata.push(`Searched ${formatDate(suggestion.lastUpdate)}`);
+        }
+        break;
+
+      case 'recent_user':
+        metadata.push('👤 Your recent search');
+        if (suggestion.lastUpdate) {
+          metadata.push(`Searched ${formatDate(suggestion.lastUpdate)}`);
+        }
+        break;
     }
 
     return metadata;
@@ -189,9 +203,13 @@ export const SearchSuggestions: React.FC<SearchSuggestionsProps> = ({
                         suggestion.type === 'address' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' :
                         suggestion.type === 'token' ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' :
                         suggestion.type === 'program' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300' :
+                        suggestion.type === 'recent_global' ? 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300' :
+                        suggestion.type === 'recent_user' ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300' :
                         'bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300'
                       }`}>
-                        {suggestion.type.toUpperCase()}
+                        {suggestion.type === 'recent_global' ? 'POPULAR' :
+                         suggestion.type === 'recent_user' ? 'RECENT' :
+                         suggestion.type.toUpperCase()}
                       </span>
                     </div>
                     

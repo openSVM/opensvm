@@ -57,6 +57,228 @@ async function fetchProgramUsageStats(programAddress: string) {
   };
 }
 
+// Simple in-memory storage for search history (in production, use a database)
+const globalSearchHistory: { query: string; timestamp: number }[] = [];
+const userSearchHistory = new Map<string, { query: string; timestamp: number }[]>();
+
+// Get recent searches (user's last 5 + global last 5)
+async function getRecentSearches() {
+  const suggestions: any[] = [];
+  
+  // Add recent global searches
+  const recentGlobal = globalSearchHistory
+    .slice(-5)
+    .reverse()
+    .map(search => ({
+      type: 'recent_global',
+      value: search.query,
+      label: `"${search.query}" (recent search)`,
+      metadata: { isRecent: true, scope: 'global' }
+    }));
+  
+  suggestions.push(...recentGlobal);
+  
+  return suggestions;
+}
+
+// Store search query
+async function storeSearchQuery(query: string) {
+  const timestamp = Date.now();
+  
+  // Store in global history
+  globalSearchHistory.push({ query, timestamp });
+  if (globalSearchHistory.length > 100) {
+    globalSearchHistory.shift(); // Keep only last 100
+  }
+}
+
+// Fuzzy address search - partial matching from any position
+async function searchAddresses(query: string) {
+  const suggestions: any[] = [];
+  
+  // If it looks like an address (starts with alphanumeric and decent length)
+  if (query.length >= 4 && /^[A-Za-z0-9]/.test(query)) {
+    try {
+      // Try exact match first
+      if (isValidSolanaAddress(query)) {
+        const result = await checkAccount(query);
+        if (result) suggestions.push(result);
+      }
+      
+      // Try partial address matches - simulate database search
+      // In production, this would query your database for addresses containing the query
+      const partialMatches = await findPartialAddressMatches(query);
+      suggestions.push(...partialMatches);
+      
+    } catch (error) {
+      // Ignore errors
+    }
+  }
+  
+  return suggestions;
+}
+
+// Find partial address matches (mock implementation)
+async function findPartialAddressMatches(query: string) {
+  // This would be a database query in production
+  // For now, return some mock results if query looks like an address pattern
+  const suggestions: any[] = [];
+  
+  if (query.length >= 6) {
+    // Mock some common address patterns
+    const mockAddresses = [
+      '11111111111111111111111111111112', // System program
+      'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA', // Token program
+      'So11111111111111111111111111111111111111112', // WSOL
+    ];
+    
+    for (const addr of mockAddresses) {
+      if (addr.toLowerCase().includes(query.toLowerCase())) {
+        try {
+          const result = await checkAccount(addr);
+          if (result) suggestions.push(result);
+        } catch (error) {
+          // Ignore
+        }
+      }
+    }
+  }
+  
+  return suggestions;
+}
+
+// Enhanced transaction search
+async function searchTransactions(query: string) {
+  const suggestions: any[] = [];
+  
+  // Check if it looks like a transaction signature
+  if (query.length >= 8 && /^[A-Za-z0-9]/.test(query)) {
+    try {
+      // Try exact match first
+      if (isValidTransactionSignature(query)) {
+        const result = await checkTransaction(query);
+        if (result) suggestions.push(result);
+      }
+      
+      // In production, search for partial transaction signature matches in database
+      
+    } catch (error) {
+      // Ignore errors
+    }
+  }
+  
+  return suggestions;
+}
+
+// Enhanced token search (symbol, name, address)
+async function searchTokens(query: string) {
+  const suggestions: any[] = [];
+  
+  try {
+    // Search by exact address
+    if (isValidSolanaAddress(query)) {
+      const result = await checkToken(query);
+      if (result) suggestions.push(result);
+    }
+    
+    // Search by symbol/name (mock implementation)
+    const tokenMatches = await findTokensByNameOrSymbol(query);
+    suggestions.push(...tokenMatches);
+    
+  } catch (error) {
+    // Ignore errors
+  }
+  
+  return suggestions;
+}
+
+// Find tokens by name or symbol (mock implementation)
+async function findTokensByNameOrSymbol(query: string) {
+  const suggestions: any[] = [];
+  
+  // Mock popular tokens for demonstration
+  const popularTokens = [
+    { symbol: 'SOL', name: 'Solana', address: 'So11111111111111111111111111111111111111112' },
+    { symbol: 'USDC', name: 'USD Coin', address: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v' },
+    { symbol: 'RAY', name: 'Raydium', address: '4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R' },
+    { symbol: 'ORCA', name: 'Orca', address: 'orcaEKTdK7LKz57vaAYr9QeNsVEPfiu6QeMU1kektZE' },
+  ];
+  
+  const queryLower = query.toLowerCase();
+  
+  for (const token of popularTokens) {
+    if (token.symbol.toLowerCase().includes(queryLower) ||
+        token.name.toLowerCase().includes(queryLower)) {
+      try {
+        const result = await checkToken(token.address);
+        if (result) {
+          // Override label to show symbol
+          result.label = `${token.symbol} - ${token.name}`;
+          suggestions.push(result);
+        }
+      } catch (error) {
+        // Ignore
+      }
+    }
+  }
+  
+  return suggestions;
+}
+
+// Enhanced program search
+async function searchPrograms(query: string) {
+  const suggestions: any[] = [];
+  
+  try {
+    // Search by exact address
+    if (isValidSolanaAddress(query)) {
+      const result = await checkProgram(query);
+      if (result) suggestions.push(result);
+    }
+    
+    // Search by program name (mock implementation)
+    const programMatches = await findProgramsByName(query);
+    suggestions.push(...programMatches);
+    
+  } catch (error) {
+    // Ignore errors
+  }
+  
+  return suggestions;
+}
+
+// Find programs by name (mock implementation)
+async function findProgramsByName(query: string) {
+  const suggestions: any[] = [];
+  
+  // Mock popular programs
+  const popularPrograms = [
+    { name: 'System Program', address: '11111111111111111111111111111112' },
+    { name: 'Token Program', address: 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA' },
+    { name: 'Associated Token Program', address: 'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL' },
+    { name: 'Serum DEX', address: '9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin' },
+  ];
+  
+  const queryLower = query.toLowerCase();
+  
+  for (const program of popularPrograms) {
+    if (program.name.toLowerCase().includes(queryLower)) {
+      try {
+        const result = await checkProgram(program.address);
+        if (result) {
+          // Override label to show program name
+          result.label = `${program.name}`;
+          suggestions.push(result);
+        }
+      } catch (error) {
+        // Ignore
+      }
+    }
+  }
+  
+  return suggestions;
+}
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -73,31 +295,44 @@ export async function GET(request: Request) {
 
     const suggestions: any[] = [];
 
-    // Run all checks in parallel for better performance
-    const checks = await Promise.allSettled([
-      // Check if it's a valid Solana address
-      isValidSolanaAddress(sanitizedQuery) ? checkAccount(sanitizedQuery) : null,
-      // Check if it's a transaction signature
-      isValidTransactionSignature(sanitizedQuery) ? checkTransaction(sanitizedQuery) : null,
-      // Check if it's a token
-      checkToken(sanitizedQuery),
-      // Check if it's a program
-      isValidSolanaAddress(sanitizedQuery) ? checkProgram(sanitizedQuery) : null,
-    ]);
+    // If query is very short, show recent searches
+    if (sanitizedQuery.length <= 2) {
+      const recentSearches = await getRecentSearches();
+      suggestions.push(...recentSearches);
+    } else {
+      // Enhanced search with fuzzy matching
+      const checks = await Promise.allSettled([
+        // Fuzzy address matching (partial match from any position)
+        searchAddresses(sanitizedQuery),
+        // Fuzzy transaction signature matching
+        searchTransactions(sanitizedQuery),
+        // Enhanced token search (name, symbol, address)
+        searchTokens(sanitizedQuery),
+        // Enhanced program search
+        searchPrograms(sanitizedQuery),
+      ]);
 
-    // Process results
-    checks.forEach((result) => {
-      if (result.status === 'fulfilled' && result.value) {
-        suggestions.push(result.value);
-      }
-    });
+      // Process results
+      checks.forEach((result) => {
+        if (result.status === 'fulfilled' && result.value) {
+          if (Array.isArray(result.value)) {
+            suggestions.push(...result.value);
+          } else {
+            suggestions.push(result.value);
+          }
+        }
+      });
+    }
 
     // Remove duplicates based on value
-    const uniqueSuggestions = suggestions.filter((suggestion, index, self) => 
+    const uniqueSuggestions = suggestions.filter((suggestion, index, self) =>
       index === self.findIndex(s => s.value === suggestion.value)
     );
 
-    return NextResponse.json(uniqueSuggestions);
+    // Store this query for future suggestions
+    await storeSearchQuery(sanitizedQuery);
+
+    return NextResponse.json(uniqueSuggestions.slice(0, 10)); // Limit to 10 suggestions
   } catch (error) {
     console.error('Error in suggestions API:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

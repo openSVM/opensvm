@@ -1,7 +1,7 @@
 // Common types for search components
 
 export interface SearchSuggestion {
-  type: 'address' | 'transaction' | 'token' | 'program';
+  type: 'address' | 'transaction' | 'token' | 'program' | 'recent_global' | 'recent_user';
   value: string;
   label?: string;
   
@@ -17,6 +17,8 @@ export interface SearchSuggestion {
   
   // Additional metadata container
   metadata?: {
+    isRecent?: boolean;    // Flag for recent search entries
+    scope?: 'global' | 'user';  // Scope for recent searches
     [key: string]: any;    // Flexible container for entity-specific data
   };
 }

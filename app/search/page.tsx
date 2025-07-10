@@ -187,6 +187,12 @@ function SearchResults() {
   useEffect(() => {
     if (!query) return;
     
+    // Only trigger AI response if we have search results or are still loading
+    if (searchResults !== null && searchResults.length === 0) {
+      setShowAiPanel(false);
+      return;
+    }
+    
     // Reset AI states
     setAiResponse('');
     setAiSources([]);
@@ -285,7 +291,7 @@ function SearchResults() {
         setIsAiStreaming(false);
       }
     };
-  }, [query, isAiStreaming]);
+  }, [query, searchResults, isAiStreaming]);
 
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);
@@ -435,16 +441,16 @@ function SearchResults() {
       {/* Results Controls */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full md:w-auto">
-          <Select
+          <select
             value={searchState.itemsPerPage.toString()}
             onChange={(e) => handleItemsPerPageChange(parseInt(e.target.value))}
-            className="w-full sm:w-auto"
+            className="w-full sm:w-auto px-3 py-2 border border-border rounded-md bg-background text-foreground"
             aria-label="Items per page"
           >
             <option value="25">25 per page</option>
             <option value="50">50 per page</option>
             <option value="100">100 per page</option>
-          </Select>
+          </select>
           
           {/* Search Source Tabs - Updated for better visibility and accessibility */}
           <div className="overflow-x-auto w-full sm:w-auto" role="tablist" aria-label="Search sources">
