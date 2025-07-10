@@ -121,10 +121,25 @@ function optimizeDependencies() {
   try {
     // Install dependencies with optimization flags
     log('Installing dependencies...');
-    execSync('npm ci --prefer-offline --no-audit --no-fund', { 
-      stdio: 'pipe',
-      encoding: 'utf8'
-    });
+    
+    // Check if package-lock.json exists
+    const hasLockFile = fs.existsSync('package-lock.json');
+    
+    if (hasLockFile) {
+      // Use 'npm ci' for faster, more reliable builds when lock file exists
+      execSync('npm ci --prefer-offline --no-audit --no-fund', {
+        stdio: 'pipe',
+        encoding: 'utf8'
+      });
+    } else {
+      // Use 'npm install' to generate the lock file when it doesn't exist
+      logWarning('No package-lock.json found - running npm install to generate it');
+      execSync('npm install --prefer-offline --no-audit --no-fund', {
+        stdio: 'pipe',
+        encoding: 'utf8'
+      });
+    }
+    
     logSuccess('Dependencies installed successfully');
     
     // Clean node_modules cache
