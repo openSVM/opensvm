@@ -537,7 +537,7 @@ function TransactionGraph({
     logger.debug(`Link statistics:`, linkStats);
     
     return { nodes, links };
-  }, []);
+  }, [logger]);
 
   // Update GPU graph data when Cytoscape changes
   const updateGPUGraphData = useCallback(() => {
@@ -592,7 +592,7 @@ function TransactionGraph({
         // Show informative message about limited data
         setError({
           message: `Showing limited data: Found ${newData.nodes.length} node(s) but no connections. This account may have minimal transaction activity.`,
-          severity: 'info'
+          severity: 'warning'
         });
         
         // Clear the info message after some time
@@ -617,7 +617,7 @@ function TransactionGraph({
     } else {
       logger.debug('GPU graph disabled, skipping update');
     }
-  }, [useGPUGraph, convertToGPUGraphData]);
+  }, [useGPUGraph, convertToGPUGraphData, logger]);
 
   // Optimized addAccountToGraph with reduced layout calls and fallback depth
   const addAccountToGraph = useCallback(async (

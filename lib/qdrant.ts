@@ -18,7 +18,8 @@ export const COLLECTIONS = {
   USER_FOLLOWS: 'user_follows',
   USER_LIKES: 'user_likes',
   SHARES: 'shares',
-  SHARE_CLICKS: 'share_clicks'
+  SHARE_CLICKS: 'share_clicks',
+  TRANSFERS: 'transfers'
 } as const;
 
 // Export qdrant client for direct access
@@ -737,5 +738,403 @@ export async function markShareConversion(shareCode: string, clickerAddress: str
     }
   } catch (error) {
     console.error('Error marking share conversion:', error);
+  }
+}
+
+/**
+ * Transfer Storage Functions
+ */
+
+// Transfer entry interface for Qdrant storage
+export interface TransferEntry {
+  id: string;
+  walletAddress: string;
+  signature: string;
+  timestamp: number;
+  type: string;
+  amount: number;
+  token: string;
+  tokenSymbol?: string;
+  tokenName?: string;
+  from: string;
+  to: string;
+  mint?: string;
+  usdValue?: number;
+  programId?: string;
+  isSolanaOnly: boolean;
+  cached: boolean;
+  lastUpdated: number;
+}
+
+/**
+ * Initialize transfers collection with proper indexing
+ */
+async function ensureTransfersCollection() {
+  try {
+    const transfersExists = await qdrantClient.getCollection(COLLECTIONS.TRANSFERS).catch(() => null);
+    
+    if (!transfersExists) {
+      await qdrantClient.createCollection(COLLECTIONS.TRANSFERS, {
+        vectors: {
+          size: 384,
+          distance: 'Cosine'
+        }
+      });
+      console.log('Created transfers collection');
+    }
+    
+    // Helper function to ensure index exists
+    const ensureIndex = async (fieldName: string) => {
+      try {
+        await qdrantClient.createPayloadIndex(COLLECTIONS.TRANSFERS, {
+          field_name: fieldName,
+          field_schema: 'keyword'
+        });
+        console.log(`Created index for ${fieldName} in transfers`);
+      } catch (error: any) {
+        if (error?.data?.status?.error?.includes('already exists') ||
+            error?.message?.includes('already exists')) {
+          console.log(`Index for ${fieldName} in transfers already exists`);
+        } else {
+          console.warn(`Failed to create index for ${fieldName}:`, error?.data?.status?.error || error?.message);
+        }
+      }
+    };
+    
+    // Ensure necessary indexes exist
+    await ensureIndex('walletAddress');
+    await ensureIndex('signature');
+    await ensureIndex('token');
+    await ensureIndex('isSolanaOnly');
+    await ensureIndex('cached');
+    
+  } catch (error) {
+    console.error('Error ensuring transfers collection:', error);
+    throw error;
+  }
+}
+
+/**
+ * Store transfer entry in Qdrant
+ */
+export async function storeTransferEntry(entry: TransferEntry): Promise<void> {
+  try {
+    await initializeCollections();
+    await ensureTransfersCollection();
+    
+    // Generate embedding from transfer content
+    const textContent = `${entry.walletAddress} ${entry.type} ${entry.token} ${entry.amount} ${entry.from} ${entry.to}`;
+    const vector = generateSimpleEmbedding(textContent);
+    
+    await qdrantClient.upsert(COLLECTIONS.TRANSFERS, {
+      wait: true,
+      points: [{
+        id: entry.id,
+        vector,
+        payload: entry as any
+      }]
+    });
+  } catch (error) {
+    console.error('Error storing transfer entry:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get cached transfers from Qdrant
+ */
+export async function getCachedTransfers(
+  walletAddress: string,
+  options: {
+    limit?: number;
+    offset?: number;
+    solanaOnly?: boolean;
+    transferType?: 'SOL' | 'TOKEN' | 'ALL';
+  } = {}
+): Promise<{ transfers: TransferEntry[]; total: number }> {
+  try {
+    await initializeCollections();
+    await ensureTransfersCollection();
+    
+    const { limit = 100, offset = 0, solanaOnly = false, transferType = 'ALL' } = options;
+    
+    // Build filter
+    const filter: any = {
+      must: [
+        {
+          key: 'walletAddress',
+          match: { value: walletAddress }
+        },
+        {
+          key: 'cached',
+          match: { value: true }
+        }
+      ]
+    };
+    
+    if (solanaOnly) {
+      filter.must.push({
+        key: 'isSolanaOnly',
+        match: { value: true }
+      });
+    }
+    
+    if (transferType === 'SOL') {
+      filter.must.push({
+        key: 'token',
+        match: { value: 'SOL' }
+      });
+    } else if (transferType === 'TOKEN') {
+      // Use must_not to exclude SOL tokens
+      filter.must_not = [
+        {
+          key: 'token',
+          match: { value: 'SOL' }
+        }
+      ];
+    }
+    
+    // Search with filter
+    const result = await qdrantClient.search(COLLECTIONS.TRANSFERS, {
+      vector: new Array(384).fill(0), // Dummy vector for filtered search
+      filter,
+      limit,
+      offset,
+      with_payload: true
+    });
+    
+    // Get total count
+    const countResult = await qdrantClient.count(COLLECTIONS.TRANSFERS, {
+      filter
+    });
+    
+    const transfers = result.map(point => point.payload as unknown as TransferEntry);
+    
+    // Sort by timestamp (newest first)
+    transfers.sort((a, b) => b.timestamp - a.timestamp);
+    
+    return {
+      transfers,
+      total: countResult.count
+    };
+  } catch (error) {
+    console.error('Error getting cached transfers:', error);
+    return { transfers: [], total: 0 };
+  }
+}
+
+/**
+ * Get last sync timestamp for incremental loading
+ */
+export async function getLastSyncTimestamp(walletAddress: string): Promise<number> {
+  try {
+    await initializeCollections();
+    await ensureTransfersCollection();
+    
+    const result = await qdrantClient.search(COLLECTIONS.TRANSFERS, {
+      vector: new Array(384).fill(0),
+      filter: {
+        must: [
+          { key: 'walletAddress', match: { value: walletAddress } },
+          { key: 'cached', match: { value: true } }
+        ]
+      },
+      limit: 1,
+      with_payload: true
+    });
+    
+    if (result.length === 0) {
+      return 0; // No cached data, start from beginning
+    }
+    
+    // Find the most recent timestamp
+    const transfers = result.map(point => point.payload as unknown as TransferEntry);
+    const maxTimestamp = Math.max(...transfers.map(t => t.lastUpdated));
+    
+    return maxTimestamp;
+  } catch (error) {
+    console.error('Error getting last sync timestamp:', error);
+    return 0;
+  }
+}
+
+/**
+ * Mark transfers as cached with timestamp
+ */
+export async function markTransfersCached(signatures: string[], walletAddress: string): Promise<void> {
+  try {
+    await initializeCollections();
+    await ensureTransfersCollection();
+    
+    const timestamp = Date.now();
+    
+    // Update each transfer to mark as cached
+    for (const signature of signatures) {
+      const filter = {
+        must: [
+          { key: 'signature', match: { value: signature } },
+          { key: 'walletAddress', match: { value: walletAddress } }
+        ]
+      };
+      
+      const result = await qdrantClient.search(COLLECTIONS.TRANSFERS, {
+        vector: new Array(384).fill(0),
+        filter,
+        limit: 1,
+        with_payload: true
+      });
+      
+      if (result.length > 0) {
+        const transfer = result[0].payload as unknown as TransferEntry;
+        transfer.cached = true;
+        transfer.lastUpdated = timestamp;
+        
+        const textContent = `${transfer.walletAddress} ${transfer.type} ${transfer.token} ${transfer.amount} ${transfer.from} ${transfer.to}`;
+        const vector = generateSimpleEmbedding(textContent);
+        
+        await qdrantClient.upsert(COLLECTIONS.TRANSFERS, {
+          wait: true,
+          points: [{
+            id: result[0].id as string,
+            vector,
+            payload: transfer as any
+          }]
+        });
+      }
+    }
+  } catch (error) {
+    console.error('Error marking transfers as cached:', error);
+    throw error;
+  }
+}
+
+/**
+ * Detect if a transaction is Solana-only (not cross-chain)
+ */
+export function isSolanaOnlyTransaction(transfer: any): boolean {
+  // Known Solana program IDs
+  const solanaPrograms = [
+    'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA', // SPL Token Program
+    '11111111111111111111111111111112', // System Program
+    'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL', // Associated Token Program
+    'So11111111111111111111111111111111111111112', // Wrapped SOL
+    '9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM', // Raydium
+    'JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4', // Jupiter
+    'PhoeNiXZ8ByJGLkxNfZRnkUfjvmuYqLR89jjFHGqdXY', // Phoenix
+  ];
+  
+  // Known cross-chain bridge programs (exclude these)
+  const bridgePrograms = [
+    'WormT3McKhFJ2RkiGpdw9GKvNCrB2aB54gb2uV9MfQC', // Wormhole
+    'A4hyUU7t5p2hqUikS2R7ZP5TiSezgHFMGz6HnGw4jDxm', // Portal Bridge
+    'C4Gvtsj4CJVhaNXSG1H4ZKk9mG6s7gvwC4Eo8cMGo7DT', // Allbridge
+  ];
+  
+  const programId = transfer.programId || '';
+  
+  // If it's a known bridge program, it's not Solana-only
+  if (bridgePrograms.includes(programId)) {
+    return false;
+  }
+  
+  // If it's a known Solana program, it's Solana-only
+  if (solanaPrograms.includes(programId)) {
+    return true;
+  }
+  
+  // Default to true for SOL transfers and unknown programs
+  return true;
+}
+
+/**
+ * Store advertisement interaction data
+ */
+export interface AdInteraction {
+  id: string;
+  walletAddress?: string;
+  adId: string;
+  adType: string;
+  action: 'view' | 'click' | 'conversion';
+  timestamp: number;
+  metadata?: Record<string, any>;
+}
+
+export async function storeAdInteraction(interaction: AdInteraction): Promise<void> {
+  try {
+    await initializeCollections();
+    
+    // Use existing user_history collection for ad tracking
+    const textContent = `ad ${interaction.adType} ${interaction.action} ${interaction.adId}`;
+    const vector = generateSimpleEmbedding(textContent);
+    
+    await qdrantClient.upsert(COLLECTIONS.USER_HISTORY, {
+      wait: true,
+      points: [{
+        id: interaction.id,
+        vector,
+        payload: {
+          ...interaction,
+          pageType: 'ad_interaction'
+        } as any
+      }]
+    });
+  } catch (error) {
+    console.error('Error storing ad interaction:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get advertisement analytics
+ */
+export async function getAdAnalytics(adId: string): Promise<{
+  views: number;
+  clicks: number;
+  conversions: number;
+  ctr: number;
+  conversionRate: number;
+}> {
+  try {
+    await initializeCollections();
+    
+    const filter = {
+      must: [
+        { key: 'adId', match: { value: adId } },
+        { key: 'pageType', match: { value: 'ad_interaction' } }
+      ]
+    };
+    
+    const result = await qdrantClient.search(COLLECTIONS.USER_HISTORY, {
+      vector: new Array(384).fill(0),
+      filter,
+      limit: 10000,
+      with_payload: true
+    });
+    
+    const interactions = result.map(point => point.payload as unknown as AdInteraction);
+    
+    const views = interactions.filter(i => i.action === 'view').length;
+    const clicks = interactions.filter(i => i.action === 'click').length;
+    const conversions = interactions.filter(i => i.action === 'conversion').length;
+    
+    const ctr = views > 0 ? (clicks / views) * 100 : 0;
+    const conversionRate = clicks > 0 ? (conversions / clicks) * 100 : 0;
+    
+    return {
+      views,
+      clicks,
+      conversions,
+      ctr,
+      conversionRate
+    };
+  } catch (error) {
+    console.error('Error getting ad analytics:', error);
+    return {
+      views: 0,
+      clicks: 0,
+      conversions: 0,
+      ctr: 0,
+      conversionRate: 0
+    };
   }
 }

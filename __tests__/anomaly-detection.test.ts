@@ -124,20 +124,26 @@ describe('AnomalyDetectionCapability', () => {
     }
   });
 
-  it('should provide anomaly statistics', async () => {
+  it('should provide anomaly statistics via tool', async () => {
     const toolParams = {
-      message: { role: 'user' as const, content: 'get stats' },
+      message: { role: 'user' as const, content: 'get anomaly statistics' },
       context: { messages: [] }
     };
 
-    const stats = await anomalyDetector.getAnomalyStats(toolParams);
+    // Find the getAnomalyStats tool from the public tools array
+    const statsTool = anomalyDetector.tools.find(tool => tool.name === 'getAnomalyStats');
+    expect(statsTool).toBeDefined();
     
-    expect(stats).toBeDefined();
-    expect(stats.stats).toBeDefined();
-    expect(stats.patterns).toBeDefined();
-    expect(stats.systemHealth).toBeDefined();
-    expect(Array.isArray(stats.stats)).toBe(true);
-    expect(Array.isArray(stats.patterns)).toBe(true);
+    if (statsTool) {
+      const response = await statsTool.execute(toolParams);
+      
+      expect(response).toBeDefined();
+      expect(response.stats).toBeDefined();
+      expect(response.patterns).toBeDefined();
+      expect(response.systemHealth).toBeDefined();
+      expect(Array.isArray(response.stats)).toBe(true);
+      expect(Array.isArray(response.patterns)).toBe(true);
+    }
   });
 
   it('should handle malformed events gracefully', async () => {
