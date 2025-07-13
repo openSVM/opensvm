@@ -14,6 +14,15 @@
 /* Import Transaction Graph specific styles */
 @import './styles/transaction-graph.css';
 
+/* Import Chat Accessibility and Browser Compatibility styles */
+@import './styles/chat-accessibility.css';
+
+/* Import Custom Scrollbar styles */
+@import './styles/custom-scrollbar.css';
+
+/* Import Scrollbar Theme styles */
+@import './styles/scrollbar-themes.css';
+
 /* Optimize font loading for LCP */
 @font-face {
   font-family: 'Berkeley Mono';

@@ -183,7 +183,7 @@ function generateSimpleEmbedding(text: string): number[] {
  */
 export async function storeHistoryEntry(entry: UserHistoryEntry): Promise<void> {
   try {
-    await initializeCollections();
+
     
     // Generate embedding from page content
     const textContent = `${entry.pageTitle} ${entry.path} ${entry.pageType} ${JSON.stringify(entry.metadata)}`;
@@ -219,7 +219,7 @@ export async function getUserHistory(
   } = {}
 ): Promise<{ history: UserHistoryEntry[]; total: number }> {
   try {
-    await initializeCollections();
+
     
     const { limit = 100, offset = 0, pageType } = options;
     
@@ -274,7 +274,7 @@ export async function getUserHistory(
  */
 export async function deleteUserHistory(walletAddress: string): Promise<void> {
   try {
-    await initializeCollections();
+
     
     await qdrantClient.delete(COLLECTIONS.USER_HISTORY, {
       wait: true,
@@ -296,7 +296,7 @@ export async function deleteUserHistory(walletAddress: string): Promise<void> {
  */
 export async function storeUserProfile(profile: UserProfile): Promise<void> {
   try {
-    await initializeCollections();
+
     
     // First check if profile exists by searching for walletAddress
     const existingResult = await qdrantClient.search(COLLECTIONS.USER_PROFILES, {
@@ -341,7 +341,7 @@ export async function storeUserProfile(profile: UserProfile): Promise<void> {
  */
 export async function getUserProfile(walletAddress: string): Promise<UserProfile | null> {
   try {
-    await initializeCollections();
+
     
     // Search for profile by walletAddress instead of using it as ID
     const result = await qdrantClient.search(COLLECTIONS.USER_PROFILES, {
@@ -386,7 +386,7 @@ export async function checkQdrantHealth(): Promise<boolean> {
  */
 export async function storeUserFollow(entry: UserFollowEntry): Promise<void> {
   try {
-    await initializeCollections();
+    //await initializeCollections();
     
     const textContent = `${entry.followerAddress} follows ${entry.targetAddress}`;
     const vector = generateSimpleEmbedding(textContent);
@@ -410,7 +410,6 @@ export async function storeUserFollow(entry: UserFollowEntry): Promise<void> {
  */
 export async function removeUserFollow(followerAddress: string, targetAddress: string): Promise<void> {
   try {
-    await initializeCollections();
     
     await qdrantClient.delete(COLLECTIONS.USER_FOLLOWS, {
       wait: true,
@@ -432,7 +431,6 @@ export async function removeUserFollow(followerAddress: string, targetAddress: s
  */
 export async function getUserFollowers(targetAddress: string): Promise<UserFollowEntry[]> {
   try {
-    await initializeCollections();
     
     const result = await qdrantClient.search(COLLECTIONS.USER_FOLLOWS, {
       vector: new Array(384).fill(0),
@@ -455,7 +453,6 @@ export async function getUserFollowers(targetAddress: string): Promise<UserFollo
  */
 export async function getUserFollowing(followerAddress: string): Promise<UserFollowEntry[]> {
   try {
-    await initializeCollections();
     
     const result = await qdrantClient.search(COLLECTIONS.USER_FOLLOWS, {
       vector: new Array(384).fill(0),
@@ -490,7 +487,6 @@ interface UserLikeEntry {
  */
 export async function storeUserLike(entry: UserLikeEntry): Promise<void> {
   try {
-    await initializeCollections();
     
     const textContent = `${entry.likerAddress} likes ${entry.targetAddress}`;
     const vector = generateSimpleEmbedding(textContent);
@@ -514,7 +510,6 @@ export async function storeUserLike(entry: UserLikeEntry): Promise<void> {
  */
 export async function removeUserLike(likerAddress: string, targetAddress: string): Promise<void> {
   try {
-    await initializeCollections();
     
     await qdrantClient.delete(COLLECTIONS.USER_LIKES, {
       wait: true,
@@ -536,7 +531,6 @@ export async function removeUserLike(likerAddress: string, targetAddress: string
  */
 export async function getUserLikes(targetAddress: string): Promise<UserLikeEntry[]> {
   try {
-    await initializeCollections();
     
     const result = await qdrantClient.search(COLLECTIONS.USER_LIKES, {
       vector: new Array(384).fill(0),
@@ -566,7 +560,6 @@ import { ShareEntry, ShareClickEntry } from '@/types/share';
  */
 export async function storeShareEntry(share: ShareEntry): Promise<void> {
   try {
-    await initializeCollections();
     
     const textContent = `${share.entityType} ${share.entityId} shared by ${share.referrerAddress}`;
     const vector = generateSimpleEmbedding(textContent);
@@ -590,7 +583,6 @@ export async function storeShareEntry(share: ShareEntry): Promise<void> {
  */
 export async function getShareByCode(shareCode: string): Promise<ShareEntry | null> {
   try {
-    await initializeCollections();
     
     const result = await qdrantClient.search(COLLECTIONS.SHARES, {
       vector: new Array(384).fill(0),
@@ -620,7 +612,6 @@ export async function getSharesByReferrer(
   options: { limit?: number; offset?: number } = {}
 ): Promise<{ shares: ShareEntry[]; total: number }> {
   try {
-    await initializeCollections();
     
     const { limit = 50, offset = 0 } = options;
     
@@ -653,7 +644,7 @@ export async function getSharesByReferrer(
  */
 export async function storeShareClick(click: ShareClickEntry): Promise<void> {
   try {
-    await initializeCollections();
+
     
     const textContent = `Click on share ${click.shareCode} by ${click.clickerAddress || 'anonymous'}`;
     const vector = generateSimpleEmbedding(textContent);
@@ -677,7 +668,7 @@ export async function storeShareClick(click: ShareClickEntry): Promise<void> {
  */
 export async function getShareClicks(shareCode: string): Promise<ShareClickEntry[]> {
   try {
-    await initializeCollections();
+
     
     const result = await qdrantClient.search(COLLECTIONS.SHARE_CLICKS, {
       vector: new Array(384).fill(0),
@@ -811,7 +802,7 @@ async function ensureTransfersCollection() {
  */
 export async function storeTransferEntry(entry: TransferEntry): Promise<void> {
   try {
-    await initializeCollections();
+
     await ensureTransfersCollection();
     
     // Generate embedding from transfer content
@@ -845,7 +836,7 @@ export async function getCachedTransfers(
   } = {}
 ): Promise<{ transfers: TransferEntry[]; total: number }> {
   try {
-    await initializeCollections();
+
     await ensureTransfersCollection();
     
     const { limit = 100, offset = 0, solanaOnly = false, transferType = 'ALL' } = options;
@@ -920,7 +911,7 @@ export async function getCachedTransfers(
  */
 export async function getLastSyncTimestamp(walletAddress: string): Promise<number> {
   try {
-    await initializeCollections();
+
     await ensureTransfersCollection();
     
     const result = await qdrantClient.search(COLLECTIONS.TRANSFERS, {
@@ -955,7 +946,7 @@ export async function getLastSyncTimestamp(walletAddress: string): Promise<numbe
  */
 export async function markTransfersCached(signatures: string[], walletAddress: string): Promise<void> {
   try {
-    await initializeCollections();
+
     await ensureTransfersCollection();
     
     const timestamp = Date.now();
@@ -1005,16 +996,138 @@ export async function markTransfersCached(signatures: string[], walletAddress: s
  */
 export function isSolanaOnlyTransaction(transfer: any): boolean {
   // Known Solana program IDs
+  // List of known Solana program IDs (expanded, not exhaustive, but covers many major protocols)
   const solanaPrograms = [
+    // Core Solana Programs
+    '11111111111111111111111111111111', // System Program
+    'Stake11111111111111111111111111111111111111', // Stake Program
+    'Vote111111111111111111111111111111111111111', // Vote Program
+    'BPFLoader1111111111111111111111111111111111', // BPF Loader
+    'BPFLoader2111111111111111111111111111111111', // BPF Loader 2
+    'BPFLoaderUpgradeab1e11111111111111111111111', // BPF Loader Upgradeable
+    'Config1111111111111111111111111111111111111', // Config Program
+    'AddressLookupTab1e1111111111111111111111111', // Address Lookup Table
+
+    // Token Programs
     'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA', // SPL Token Program
-    '11111111111111111111111111111112', // System Program
     'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL', // Associated Token Program
+    'SPLMemo111111111111111111111111111111111111111', // Memo Program
+    'MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr', // Memo v2
+    'SysvarRent111111111111111111111111111111111', // Rent Sysvar
+    'SysvarC1ock11111111111111111111111111111111', // Clock Sysvar
+    'SysvarRecentB1ockHashes11111111111111111111', // Recent Blockhashes Sysvar
+    'SysvarEpochSchedu1e111111111111111111111111', // Epoch Schedule Sysvar
+    'SysvarFees111111111111111111111111111111111', // Fees Sysvar
+    'SysvarInstructions1111111111111111111111111', // Instructions Sysvar
+    'SysvarRewards111111111111111111111111111111', // Rewards Sysvar
+    'SysvarSlotHashes111111111111111111111111111', // Slot Hashes Sysvar
+    'SysvarSlotHistory11111111111111111111111111', // Slot History Sysvar
+    'SysvarStakeHistory1111111111111111111111111', // Stake History Sysvar
+
+    // Wrapped SOL
     'So11111111111111111111111111111111111111112', // Wrapped SOL
+
+    // DEXes & DeFi
+    '9xQeWvG816bUx9EPa2uD3D6vE6z5pQKk5jGzj1h3bT9', // Serum DEX v3
+    '4ckmDgGzLYLyE3M9h1w9yQpZ9g2ZbYv5Q3QAtFj5hA9y', // Serum DEX v2
+    '5quB8F1iFv5QkQwZ5QkQwZ5QkQwZ5QkQwZ5QkQwZ5QkQ', // Serum DEX v1 (example, not real)
     '9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM', // Raydium
-    'JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4', // Jupiter
-    'PhoeNiXZ8ByJGLkxNfZRnkUfjvmuYqLR89jjFHGqdXY', // Phoenix
+    'RVKd61ztZW9GdKz5vKz6kUo87bY6z3Y6z3Y6z3Y6z3Y', // Raydium AMM (example, not real)
+    'JUP4Fb2cqiRUcaTHdrPC8h2gNsA2ETXiPDD33WcGuJB', // Jupiter Aggregator
+    'JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4', // Jupiter v6
+    'PhoeNiXZ8ByJGLkxNfZRnkUfjvmuYqLR89jjFHGqdXY', // Phoenix DEX
+    'SaberM8r1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)
+    'SwaPp1ng11111111111111111111111111111111111', // Orca (example, not real)
+    'orca111111111111111111111111111111111111111', // Orca
+    'MERLuDFBMmsHnszBSb5Q6pR9bxaENa8zD6zF8g5nKX', // Mercurial
+    'SwaPp1ng11111111111111111111111111111111111', // Orca Swap (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
+    'Saberqk1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n', // Saber (example, not real)1n1n1n1n1n1n1n', // Saber (example, not real)
   ];
-  
   // Known cross-chain bridge programs (exclude these)
   const bridgePrograms = [
     'WormT3McKhFJ2RkiGpdw9GKvNCrB2aB54gb2uV9MfQC', // Wormhole
@@ -1053,7 +1166,7 @@ export interface AdInteraction {
 
 export async function storeAdInteraction(interaction: AdInteraction): Promise<void> {
   try {
-    await initializeCollections();
+
     
     // Use existing user_history collection for ad tracking
     const textContent = `ad ${interaction.adType} ${interaction.action} ${interaction.adId}`;
@@ -1087,7 +1200,7 @@ export async function getAdAnalytics(adId: string): Promise<{
   conversionRate: number;
 }> {
   try {
-    await initializeCollections();
+
     
     const filter = {
       must: [

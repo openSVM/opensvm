@@ -28,13 +28,13 @@ const nextConfig = {
       },
     ],
   },
+  // Server external packages (moved from experimental)
+  serverExternalPackages: ['canvas', 'puppeteer'],
   // Experimental features (safe subset for Next.js 14)
   experimental: {
     // Server actions are enabled by default in Next.js 14+
     optimizeCss: true,
     optimizePackageImports: ['lodash', 'date-fns', 'chart.js'],
-    serverComponentsExternalPackages: ['canvas', 'puppeteer'],
-    esmExternals: 'loose',
   },
   // Compiler optimizations
   compiler: {

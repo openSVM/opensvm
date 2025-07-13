@@ -8,8 +8,8 @@ import { SessionData } from './auth';
 /**
  * Set session cookie (server-side only)
  */
-export function setSessionCookie(sessionData: SessionData) {
-  const cookieStore = cookies();
+export async function setSessionCookie(sessionData: SessionData) {
+  const cookieStore = await cookies();
   const sessionJson = JSON.stringify(sessionData);
   
   cookieStore.set('opensvm_session', sessionJson, {
@@ -24,9 +24,9 @@ export function setSessionCookie(sessionData: SessionData) {
 /**
  * Get session from cookie (server-side only)
  */
-export function getSessionFromCookie(): SessionData | null {
+export async function getSessionFromCookie(): Promise<SessionData | null> {
   try {
-    const cookieStore = cookies();
+    const cookieStore = await cookies();
     const sessionCookie = cookieStore.get('opensvm_session');
     
     if (!sessionCookie?.value) {
@@ -50,14 +50,14 @@ export function getSessionFromCookie(): SessionData | null {
 /**
  * Clear session cookie (server-side only)
  */
-export function clearSessionCookie() {
-  const cookieStore = cookies();
+export async function clearSessionCookie() {
+  const cookieStore = await cookies();
   cookieStore.delete('opensvm_session');
 }
 
 /**
  * Get authenticated session and validate it
  */
-export function getAuthenticatedSession(): SessionData | null {
-  return getSessionFromCookie();
+export async function getAuthenticatedSession(): Promise<SessionData | null> {
+  return await getSessionFromCookie();
 }

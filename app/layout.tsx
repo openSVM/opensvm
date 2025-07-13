@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from 'next/font/google';
 import "./globals.css";
+import "./styles/custom-scrollbar.css";
+import "./styles/scrollbar-themes.css";
 import dynamic from 'next/dynamic';
 import { Suspense } from 'react';
 // Import Navbar directly
@@ -82,8 +84,8 @@ export default function RootLayout({
           fetchPriority="high"
         />
         
-        {/* Meta tags for performance monitoring */}
-        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5" />
+        {/* Meta tags for viewport control and performance monitoring */}
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
         <meta name="theme-color" content="#000000" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />

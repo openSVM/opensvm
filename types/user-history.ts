@@ -8,7 +8,7 @@ export interface UserHistoryEntry {
   walletAddress: string;
   timestamp: number;
   path: string;
-  pageType: 'transaction' | 'account' | 'block' | 'program' | 'token' | 'validator' | 'analytics' | 'search' | 'other';
+  pageType: 'transaction' | 'account' | 'block' | 'program' | 'token' | 'validator' | 'analytics' | 'search' | 'ai-chat' | 'other';
   pageTitle: string;
   metadata?: {
     transactionId?: string;
@@ -18,6 +18,12 @@ export interface UserHistoryEntry {
     tokenMint?: string;
     validatorAddress?: string;
     searchQuery?: string;
+    // AI Chat specific metadata
+    aiChatMessage?: {
+      role: 'user' | 'assistant' | 'agent';
+      content: string;
+      tabType?: 'agent' | 'assistant' | 'notes';
+    };
     [key: string]: any;
   };
   userAgent?: string;

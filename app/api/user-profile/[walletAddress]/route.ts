@@ -31,10 +31,10 @@ function isValidRequest(_request: NextRequest): boolean {
 
 export async function GET(
   _request: NextRequest,
-  { params }: { params: { walletAddress: string } }
+  context: { params: Promise<{ walletAddress: string }> }
 ) {
   try {
-    const walletAddress = params.walletAddress;
+    const { walletAddress } = await context.params;
     
     // Validate wallet address
     const validatedAddress = validateWalletAddress(walletAddress);
@@ -104,27 +104,31 @@ export async function GET(
     console.error('Error fetching user profile:', error);
     
     // Return a basic profile even if everything fails
-    const walletAddress = params.walletAddress;
-    const validatedAddress = validateWalletAddress(walletAddress);
-    
-    if (validatedAddress) {
-      const fallbackProfile = {
-        walletAddress: validatedAddress,
-        isPublic: true,
-        createdAt: Date.now(),
-        lastActive: Date.now(),
-        stats: calculateStats([]),
-        socialStats: {
-          visitsByUsers: 0,
-          followers: 0,
-          following: 0,
-          likes: 0,
-          profileViews: 0
-        },
-        history: []
-      };
+    try {
+      const { walletAddress } = await context.params;
+      const validatedAddress = validateWalletAddress(walletAddress);
       
-      return NextResponse.json({ profile: fallbackProfile });
+      if (validatedAddress) {
+        const fallbackProfile = {
+          walletAddress: validatedAddress,
+          isPublic: true,
+          createdAt: Date.now(),
+          lastActive: Date.now(),
+          stats: calculateStats([]),
+          socialStats: {
+            visitsByUsers: 0,
+            followers: 0,
+            following: 0,
+            likes: 0,
+            profileViews: 0
+          },
+          history: []
+        };
+        
+        return NextResponse.json({ profile: fallbackProfile });
+      }
+    } catch (paramError) {
+      console.error('Error accessing params in fallback:', paramError);
     }
     
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
@@ -133,7 +137,7 @@ export async function GET(
 
 export async function PUT(
   _request: NextRequest,
-  { params }: { params: { walletAddress: string } }
+  context: { params: Promise<{ walletAddress: string }> }
 ) {
   try {
     // Check Qdrant health first
@@ -142,12 +146,15 @@ export async function PUT(
       return NextResponse.json({ error: 'Database unavailable' }, { status: 503 });
     }
 
+    const { walletAddress } = await context.params;
+    if (!isHealthy) {
+      return NextResponse.json({ error: 'Database unavailable' }, { status: 503 });
+    }
+
     // Authentication check
     if (!isValidRequest(_request)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-
-    const walletAddress = params.walletAddress;
     
     // Validate wallet address
     const validatedAddress = validateWalletAddress(walletAddress);

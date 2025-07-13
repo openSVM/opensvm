@@ -15,9 +15,9 @@ import {
 } from '@/lib/qdrant';
 
 // Authentication check using session validation
-function isValidRequest(_request: NextRequest, walletAddress: string): { isValid: boolean; session?: any } {
+async function isValidRequest(_request: NextRequest, walletAddress: string): Promise<{ isValid: boolean; session?: any }> {
   try {
-    const session = getSessionFromCookie();
+    const session = await getSessionFromCookie();
     if (!session) return { isValid: false };
     
     // Check if session is expired
@@ -38,7 +38,7 @@ function isValidRequest(_request: NextRequest, walletAddress: string): { isValid
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { walletAddress: string } }
+  context: { params: Promise<{ walletAddress: string }> }
 ) {
   try {
     // Check Qdrant health first
@@ -47,7 +47,7 @@ export async function GET(
       return NextResponse.json({ error: 'Database unavailable' }, { status: 503 });
     }
 
-    const walletAddress = params.walletAddress;
+    const { walletAddress } = await context.params;
 
     // Authentication check
     const authResult = isValidRequest(request, walletAddress);
@@ -89,7 +89,7 @@ export async function GET(
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { walletAddress: string } }
+  context: { params: Promise<{ walletAddress: string }> }
 ) {
   try {
     // Check Qdrant health first
@@ -98,7 +98,7 @@ export async function POST(
       return NextResponse.json({ error: 'Database unavailable' }, { status: 503 });
     }
 
-    const walletAddress = params.walletAddress;
+    const { walletAddress } = await context.params;
 
     // Authentication check
     const authResult = isValidRequest(request, walletAddress);
