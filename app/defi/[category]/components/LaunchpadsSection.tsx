@@ -1,12 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import React, { useState, useEffect } from 'react';
+import { Rocket, TrendingUp, Calendar, Users, DollarSign, Target, Crown, CheckCircle } from 'lucide-react';
+import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import LoadingSpinner from '@/components/LoadingSpinner';
-import { formatNumber } from '@/lib/utils';
-import { ExternalLink, Rocket, Users, Timer, TrendingUp, AlertCircle, CheckCircle } from 'lucide-react';
 
 interface LaunchpadProject {
   id: string;
@@ -14,176 +11,215 @@ interface LaunchpadProject {
   symbol: string;
   description: string;
   platform: string;
-  status: 'upcoming' | 'live' | 'ended' | 'success' | 'failed';
-  launchDate: number;
-  endDate?: number;
+  status: 'upcoming' | 'live' | 'completed' | 'cancelled';
+  launchDate: string;
+  endDate?: string;
   targetRaise: number;
   currentRaise: number;
-  participants: number;
-  minInvestment: number;
-  maxInvestment: number;
   tokenPrice: number;
   totalSupply: number;
-  allocationForSale: number;
+  participants: number;
+  minAllocation: number;
+  maxAllocation: number;
   vesting: string;
-  website: string;
-  twitter: string;
-  telegram: string;
+  website?: string;
+  twitter?: string;
+  telegram?: string;
   category: string;
-  blockchain: string;
-  logo?: string;
-  riskLevel: 'low' | 'medium' | 'high';
-  kycCompleted: boolean;
-  auditCompleted: boolean;
-  teamDoxxed: boolean;
+  imageUrl?: string;
+}
+
+interface LaunchpadPlatform {
+  name: string;
+  totalProjects: number;
+  successRate: number;
+  totalRaised: number;
+  averageRoi: number;
+  description: string;
 }
 
 export default function LaunchpadsSection() {
   const [projects, setProjects] = useState<LaunchpadProject[]>([]);
+  const [platforms, setPlatforms] = useState<LaunchpadPlatform[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [platformFilter, setPlatformFilter] = useState<string>('all');
 
   useEffect(() => {
-    async function fetchLaunchpadData() {
+    const fetchLaunchpadData = async () => {
       try {
-        // Fetch from our existing launchpads API
-        const response = await fetch('/api/analytics/launchpads');
-        if (!response.ok) {
-          throw new Error('Failed to fetch launchpad data');
-        }
+        setLoading(true);
         
-        const data = await response.json();
-        
-        // Transform the API data to our interface
-        const projectsData: LaunchpadProject[] = data.platforms.flatMap((platform: any) => 
-          platform.projects.map((project: any) => ({
-            id: project.id || `${platform.name}_${project.name.replace(/\s+/g, '_')}`,
-            name: project.name,
-            symbol: project.symbol || project.name.substring(0, 4).toUpperCase(),
-            description: project.description || `${project.name} project launching on ${platform.name}`,
-            platform: platform.name,
-            status: project.status || 'upcoming',
-            launchDate: project.launchDate || Date.now() + Math.random() * 30 * 24 * 60 * 60 * 1000,
-            endDate: project.endDate,
-            targetRaise: project.targetRaise || Math.random() * 1000000 + 100000,
-            currentRaise: project.currentRaise || 0,
-            participants: project.participants || Math.floor(Math.random() * 1000),
-            minInvestment: project.minInvestment || 100,
-            maxInvestment: project.maxInvestment || 10000,
-            tokenPrice: project.tokenPrice || Math.random() * 0.1 + 0.01,
-            totalSupply: project.totalSupply || Math.random() * 1000000000 + 100000000,
-            allocationForSale: project.allocationForSale || Math.random() * 30 + 10,
-            vesting: project.vesting || 'TGE 25%, 6 months linear',
-            website: project.website || '#',
-            twitter: project.twitter || '#',
-            telegram: project.telegram || '#',
-            category: project.category || 'DeFi',
-            blockchain: 'Solana',
-            riskLevel: project.riskLevel || (Math.random() > 0.7 ? 'high' : Math.random() > 0.4 ? 'medium' : 'low'),
-            kycCompleted: project.kycCompleted ?? Math.random() > 0.3,
-            auditCompleted: project.auditCompleted ?? Math.random() > 0.5,
-            teamDoxxed: project.teamDoxxed ?? Math.random() > 0.4
-          }))
-        );
-
-        // Add some additional realistic launchpad projects
-        const additionalProjects: LaunchpadProject[] = [
+        // Mock platforms data - Solana-native launchpads
+        const mockPlatforms: LaunchpadPlatform[] = [
           {
-            id: 'solswap_v2_launch',
-            name: 'SolSwap V2',
-            symbol: 'SSWAP',
-            description: 'Next generation AMM with concentrated liquidity and yield farming',
-            platform: 'Solanium',
-            status: 'live',
-            launchDate: Date.now() - 2 * 24 * 60 * 60 * 1000,
-            endDate: Date.now() + 5 * 24 * 60 * 60 * 1000,
-            targetRaise: 500000,
-            currentRaise: 350000,
-            participants: 1247,
-            minInvestment: 50,
-            maxInvestment: 5000,
-            tokenPrice: 0.25,
-            totalSupply: 100000000,
-            allocationForSale: 15,
-            vesting: 'TGE 20%, 8 months linear',
-            website: 'https://solswap.io',
-            twitter: 'https://twitter.com/solswap',
-            telegram: 'https://t.me/solswap',
-            category: 'DeFi',
-            blockchain: 'Solana',
-            riskLevel: 'medium',
-            kycCompleted: true,
-            auditCompleted: true,
-            teamDoxxed: true
+            name: 'Magic Eden Launchpad',
+            totalProjects: 156,
+            successRate: 87.5,
+            totalRaised: 89000000,
+            averageRoi: 245.6,
+            description: 'Premier NFT and token launchpad on Solana'
           },
           {
-            id: 'metaplex_studio_launch',
-            name: 'Metaplex Studio',
-            symbol: 'MSTD',
-            description: 'NFT creation and marketplace infrastructure for creators',
-            platform: 'Starlaunch',
-            status: 'upcoming',
-            launchDate: Date.now() + 7 * 24 * 60 * 60 * 1000,
-            targetRaise: 1000000,
-            currentRaise: 0,
-            participants: 0,
-            minInvestment: 100,
-            maxInvestment: 10000,
-            tokenPrice: 0.15,
-            totalSupply: 500000000,
-            allocationForSale: 12,
-            vesting: 'TGE 15%, 12 months linear',
-            website: 'https://metaplex.studio',
-            twitter: 'https://twitter.com/metaplexstudio',
-            telegram: 'https://t.me/metaplexstudio',
-            category: 'NFT',
-            blockchain: 'Solana',
-            riskLevel: 'low',
-            kycCompleted: true,
-            auditCompleted: false,
-            teamDoxxed: true
+            name: 'Raydium AcceleRaytor',
+            totalProjects: 89,
+            successRate: 78.9,
+            totalRaised: 45000000,
+            averageRoi: 189.3,
+            description: 'Community-driven IDO platform on Raydium'
           },
           {
-            id: 'pyth_gaming_launch',
-            name: 'Pyth Gaming',
-            symbol: 'PYGM',
-            description: 'Decentralized gaming platform with real-time price feeds',
-            platform: 'AcceleRaytor',
-            status: 'ended',
-            launchDate: Date.now() - 30 * 24 * 60 * 60 * 1000,
-            endDate: Date.now() - 25 * 24 * 60 * 60 * 1000,
-            targetRaise: 750000,
-            currentRaise: 750000,
-            participants: 2156,
-            minInvestment: 25,
-            maxInvestment: 2500,
-            tokenPrice: 0.08,
-            totalSupply: 1000000000,
-            allocationForSale: 20,
-            vesting: 'TGE 30%, 6 months linear',
-            website: 'https://pythgaming.io',
-            twitter: 'https://twitter.com/pythgaming',
-            telegram: 'https://t.me/pythgaming',
-            category: 'Gaming',
-            blockchain: 'Solana',
-            riskLevel: 'medium',
-            kycCompleted: true,
-            auditCompleted: true,
-            teamDoxxed: true
+            name: 'Solanium',
+            totalProjects: 123,
+            successRate: 82.1,
+            totalRaised: 67000000,
+            averageRoi: 167.8,
+            description: 'Decentralized fundraising platform for Solana projects'
+          },
+          {
+            name: 'Jupiter Launchpad',
+            totalProjects: 67,
+            successRate: 91.2,
+            totalRaised: 34000000,
+            averageRoi: 298.7,
+            description: 'New token launches integrated with Jupiter aggregator'
+          },
+          {
+            name: 'Step Finance Launchpad',
+            totalProjects: 45,
+            successRate: 75.6,
+            totalRaised: 23000000,
+            averageRoi: 134.5,
+            description: 'Portfolio management and token launch platform'
           }
         ];
 
-        const allProjects = [...projectsData, ...additionalProjects];
-        setProjects(allProjects);
-      } catch (err) {
-        console.error('Error fetching launchpad data:', err);
-        setError('Failed to load launchpad data');
+        // Mock projects data - Solana token projects
+        const mockProjects: LaunchpadProject[] = [
+          {
+            id: '1',
+            name: 'SolanaVault Protocol',
+            symbol: 'SVAULT',
+            description: 'Advanced yield farming and vault management protocol on Solana',
+            platform: 'Magic Eden Launchpad',
+            status: 'live',
+            launchDate: '2024-12-20T10:00:00Z',
+            endDate: '2024-12-25T10:00:00Z',
+            targetRaise: 2000000,
+            currentRaise: 1450000,
+            tokenPrice: 0.15,
+            totalSupply: 100000000,
+            participants: 3456,
+            minAllocation: 50,
+            maxAllocation: 5000,
+            vesting: '20% TGE, 80% over 12 months',
+            category: 'DeFi'
+          },
+          {
+            id: '2',
+            name: 'MetaPlex Studio',
+            symbol: 'MSTUDIO',
+            description: 'Next-generation NFT creation and trading platform',
+            platform: 'Jupiter Launchpad',
+            status: 'upcoming',
+            launchDate: '2024-12-28T15:00:00Z',
+            targetRaise: 5000000,
+            currentRaise: 0,
+            tokenPrice: 0.25,
+            totalSupply: 200000000,
+            participants: 0,
+            minAllocation: 100,
+            maxAllocation: 10000,
+            vesting: '15% TGE, 85% over 18 months',
+            category: 'NFT'
+          },
+          {
+            id: '3',
+            name: 'SolanaOracle Network',
+            symbol: 'SORACLE',
+            description: 'Decentralized oracle network providing real-time data feeds',
+            platform: 'Raydium AcceleRaytor',
+            status: 'completed',
+            launchDate: '2024-12-10T12:00:00Z',
+            endDate: '2024-12-15T12:00:00Z',
+            targetRaise: 3000000,
+            currentRaise: 3000000,
+            tokenPrice: 0.08,
+            totalSupply: 500000000,
+            participants: 8923,
+            minAllocation: 25,
+            maxAllocation: 2500,
+            vesting: '25% TGE, 75% over 24 months',
+            category: 'Infrastructure'
+          },
+          {
+            id: '4',
+            name: 'SolGame Protocol',
+            symbol: 'SGAME',
+            description: 'Gaming infrastructure and marketplace for Solana gaming ecosystem',
+            platform: 'Solanium',
+            status: 'live',
+            launchDate: '2024-12-22T08:00:00Z',
+            endDate: '2024-12-27T08:00:00Z',
+            targetRaise: 1500000,
+            currentRaise: 890000,
+            tokenPrice: 0.12,
+            totalSupply: 150000000,
+            participants: 2167,
+            minAllocation: 75,
+            maxAllocation: 7500,
+            vesting: '30% TGE, 70% over 15 months',
+            category: 'Gaming'
+          },
+          {
+            id: '5',
+            name: 'SolStable Finance',
+            symbol: 'SSTABLE',
+            description: 'Algorithmic stablecoin protocol with yield generation',
+            platform: 'Step Finance Launchpad',
+            status: 'upcoming',
+            launchDate: '2024-12-30T14:00:00Z',
+            targetRaise: 4000000,
+            currentRaise: 0,
+            tokenPrice: 0.20,
+            totalSupply: 300000000,
+            participants: 0,
+            minAllocation: 200,
+            maxAllocation: 15000,
+            vesting: '10% TGE, 90% over 36 months',
+            category: 'Stablecoin'
+          },
+          {
+            id: '6',
+            name: 'SolanaAI Assistant',
+            symbol: 'SOLAI',
+            description: 'AI-powered trading and portfolio management for Solana DeFi',
+            platform: 'Magic Eden Launchpad',
+            status: 'completed',
+            launchDate: '2024-12-05T16:00:00Z',
+            endDate: '2024-12-08T16:00:00Z',
+            targetRaise: 2500000,
+            currentRaise: 2500000,
+            tokenPrice: 0.18,
+            totalSupply: 180000000,
+            participants: 5678,
+            minAllocation: 100,
+            maxAllocation: 8000,
+            vesting: '20% TGE, 80% over 20 months',
+            category: 'AI'
+          }
+        ];
+
+        setPlatforms(mockPlatforms);
+        setProjects(mockProjects);
+      } catch (error) {
+        console.error('Failed to fetch launchpad data:', error);
+        setPlatforms([]);
+        setProjects([]);
       } finally {
         setLoading(false);
       }
-    }
+    };
 
     fetchLaunchpadData();
   }, []);
@@ -194,242 +230,246 @@ export default function LaunchpadsSection() {
     return matchesStatus && matchesPlatform;
   });
 
+  const formatCurrency = (value: number) => {
+    if (value >= 1e6) return `$${(value / 1e6).toFixed(1)}M`;
+    if (value >= 1e3) return `$${(value / 1e3).toFixed(1)}K`;
+    return `$${value.toLocaleString()}`;
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'live': return 'bg-green-500';
-      case 'upcoming': return 'bg-blue-500';
-      case 'ended': return 'bg-gray-500';
-      case 'success': return 'bg-emerald-500';
-      case 'failed': return 'bg-red-500';
-      default: return 'bg-gray-500';
+      case 'upcoming': return 'text-blue-600 bg-blue-100';
+      case 'live': return 'text-green-600 bg-green-100';
+      case 'completed': return 'text-gray-600 bg-gray-100';
+      case 'cancelled': return 'text-red-600 bg-red-100';
+      default: return 'text-gray-600 bg-gray-100';
     }
   };
 
-  const getRiskColor = (risk: string) => {
-    switch (risk) {
-      case 'low': return 'text-green-500';
-      case 'medium': return 'text-yellow-500';
-      case 'high': return 'text-red-500';
-      default: return 'text-gray-500';
-    }
-  };
-
-  const getTimeRemaining = (date: number) => {
-    const diff = date - Date.now();
-    if (diff <= 0) return 'Ended';
-    
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-    
-    if (days > 0) return `${days}d ${hours}h`;
-    return `${hours}h`;
-  };
-
-  const getFundingProgress = (current: number, target: number) => {
+  const getProgressPercentage = (current: number, target: number) => {
     return Math.min((current / target) * 100, 100);
   };
 
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <LoadingSpinner />
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       </div>
     );
   }
-
-  if (error) {
-    return (
-      <div className="text-center py-20">
-        <p className="text-red-500 mb-4">{error}</p>
-        <Button onClick={() => window.location.reload()}>
-          Retry
-        </Button>
-      </div>
-    );
-  }
-
-  const platforms = ['all', ...Array.from(new Set(projects.map(p => p.platform)))];
-  const statuses = ['all', 'upcoming', 'live', 'ended', 'success', 'failed'];
 
   return (
     <div className="space-y-6">
-      {/* Filters */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Launchpad Filters</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-2">Status</label>
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-              >
-                {statuses.map(status => (
-                  <option key={status} value={status}>
-                    {status === 'all' ? 'All Statuses' : status.charAt(0).toUpperCase() + status.slice(1)}
-                  </option>
-                ))}
-              </select>
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium mb-2">Platform</label>
-              <select
-                value={platformFilter}
-                onChange={(e) => setPlatformFilter(e.target.value)}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-              >
-                {platforms.map(platform => (
-                  <option key={platform} value={platform}>
-                    {platform === 'all' ? 'All Platforms' : platform}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Header */}
+      <div className="flex items-center gap-3 mb-6">
+        <Rocket className="h-8 w-8 text-primary" />
+        <h2 className="text-2xl font-bold">Solana Launchpads</h2>
+      </div>
 
-      {/* Projects Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredProjects.map((project) => (
-          <Card key={project.id} className="h-full">
-            <CardHeader>
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg flex items-center justify-center text-white font-bold">
-                    {project.symbol.substring(0, 2)}
-                  </div>
-                  <div>
-                    <CardTitle className="text-lg">{project.name}</CardTitle>
-                    <div className="flex items-center gap-2 mt-1">
-                      <Badge className={`${getStatusColor(project.status)} text-white`}>
-                        {project.status.toUpperCase()}
-                      </Badge>
-                      <Badge variant="outline">{project.platform}</Badge>
-                    </div>
-                  </div>
+      {/* Platform Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+        {platforms.map((platform, index) => (
+          <Card key={index} className="p-4">
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Crown className="h-5 w-5 text-yellow-500" />
+                <h3 className="font-semibold">{platform.name}</h3>
+              </div>
+              <p className="text-sm text-muted-foreground">{platform.description}</p>
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span>Projects:</span>
+                  <span className="font-medium">{platform.totalProjects}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span>Success Rate:</span>
+                  <span className="font-medium text-green-600">{platform.successRate}%</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span>Total Raised:</span>
+                  <span className="font-medium">{formatCurrency(platform.totalRaised)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span>Avg ROI:</span>
+                  <span className="font-medium text-blue-600">{platform.averageRoi}%</span>
                 </div>
               </div>
-            </CardHeader>
-            
-            <CardContent className="space-y-4">
-              <p className="text-sm text-muted-foreground line-clamp-2">
-                {project.description}
-              </p>
-              
-              {/* Key Metrics */}
-              <div className="grid grid-cols-2 gap-3 text-sm">
-                <div>
-                  <span className="text-muted-foreground">Target Raise:</span>
-                  <p className="font-medium">${formatNumber(project.targetRaise)}</p>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Token Price:</span>
-                  <p className="font-medium">${project.tokenPrice}</p>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Participants:</span>
-                  <p className="font-medium flex items-center gap-1">
-                    <Users className="h-3 w-3" />
-                    {formatNumber(project.participants)}
-                  </p>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Min Investment:</span>
-                  <p className="font-medium">${project.minInvestment}</p>
-                </div>
-              </div>
-              
-              {/* Funding Progress */}
-              {project.status === 'live' && (
-                <div>
-                  <div className="flex justify-between text-sm mb-2">
-                    <span>Funding Progress</span>
-                    <span className="font-medium">
-                      {getFundingProgress(project.currentRaise, project.targetRaise).toFixed(0)}%
-                    </span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div 
-                      className="bg-green-500 h-2 rounded-full"
-                      style={{ width: `${getFundingProgress(project.currentRaise, project.targetRaise)}%` }}
-                    />
-                  </div>
-                  <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                    <span>${formatNumber(project.currentRaise)}</span>
-                    <span>${formatNumber(project.targetRaise)}</span>
-                  </div>
-                </div>
-              )}
-              
-              {/* Time Information */}
-              {(project.status === 'live' || project.status === 'upcoming') && project.endDate && (
-                <div className="flex items-center gap-2 text-sm">
-                  <Timer className="h-4 w-4 text-muted-foreground" />
-                  <span>
-                    {project.status === 'upcoming' ? 'Starts in: ' : 'Ends in: '}
-                    {getTimeRemaining(project.status === 'upcoming' ? project.launchDate : project.endDate)}
-                  </span>
-                </div>
-              )}
-              
-              {/* Risk and Verification */}
-              <div className="flex items-center justify-between">
-                <div className={`text-sm font-medium ${getRiskColor(project.riskLevel)}`}>
-                  Risk: {project.riskLevel.toUpperCase()}
-                </div>
-                <div className="flex gap-2">
-                  {project.kycCompleted && (
-                    <div title="KYC Completed">
-                      <CheckCircle className="h-4 w-4 text-green-500" />
-                    </div>
-                  )}
-                  {project.auditCompleted && (
-                    <div title="Audit Completed">
-                      <CheckCircle className="h-4 w-4 text-blue-500" />
-                    </div>
-                  )}
-                  {project.teamDoxxed && (
-                    <div title="Team Doxxed">
-                      <CheckCircle className="h-4 w-4 text-purple-500" />
-                    </div>
-                  )}
-                </div>
-              </div>
-              
-              {/* Vesting */}
-              <div className="text-sm">
-                <span className="text-muted-foreground">Vesting: </span>
-                <span className="font-medium">{project.vesting}</span>
-              </div>
-              
-              {/* Actions */}
-              <div className="flex gap-2 pt-2">
-                <Button 
-                  size="sm" 
-                  className="flex-1"
-                  disabled={project.status === 'ended' || project.status === 'failed'}
-                >
-                  <Rocket className="h-3 w-3 mr-1" />
-                  {project.status === 'upcoming' ? 'Notify Me' : project.status === 'live' ? 'Participate' : 'View Details'}
-                </Button>
-                <Button size="sm" variant="outline">
-                  <ExternalLink className="h-3 w-3" />
-                </Button>
-              </div>
-            </CardContent>
+            </div>
           </Card>
         ))}
       </div>
-      
-      {filteredProjects.length === 0 && (
-        <div className="text-center py-20">
-          <p className="text-muted-foreground">No launchpad projects found matching your filters.</p>
+
+      {/* Filters */}
+      <Card className="p-4">
+        <div className="flex flex-col md:flex-row gap-4 items-center">
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="px-4 py-2 border rounded-lg bg-background"
+          >
+            <option value="all">All Status</option>
+            <option value="upcoming">Upcoming</option>
+            <option value="live">Live</option>
+            <option value="completed">Completed</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
+
+          <select
+            value={platformFilter}
+            onChange={(e) => setPlatformFilter(e.target.value)}
+            className="px-4 py-2 border rounded-lg bg-background"
+          >
+            <option value="all">All Platforms</option>
+            {platforms.map((platform) => (
+              <option key={platform.name} value={platform.name}>
+                {platform.name}
+              </option>
+            ))}
+          </select>
+
+          <Button variant="outline" className="ml-auto">
+            <Target className="h-4 w-4 mr-2" />
+            Apply for Launchpad
+          </Button>
         </div>
+      </Card>
+
+      {/* Projects Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {filteredProjects.map((project) => (
+          <Card key={project.id} className="p-6 hover:shadow-lg transition-shadow">
+            <div className="space-y-4">
+              {/* Header */}
+              <div className="flex items-start justify-between">
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <h3 className="text-lg font-semibold">{project.name}</h3>
+                    <span className="text-sm text-muted-foreground">({project.symbol})</span>
+                  </div>
+                  <span className={`px-2 py-1 text-xs rounded uppercase font-medium ${getStatusColor(project.status)}`}>
+                    {project.status}
+                  </span>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm text-muted-foreground">Token Price</p>
+                  <p className="font-bold">{formatCurrency(project.tokenPrice)}</p>
+                </div>
+              </div>
+
+              {/* Description */}
+              <p className="text-sm text-muted-foreground">{project.description}</p>
+
+              {/* Platform & Category */}
+              <div className="flex items-center gap-4 text-sm">
+                <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded">
+                  {project.platform}
+                </span>
+                <span className="px-2 py-1 bg-purple-100 text-purple-800 rounded">
+                  {project.category}
+                </span>
+              </div>
+
+              {/* Progress (for live projects) */}
+              {project.status === 'live' && (
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span>Progress</span>
+                    <span>{formatCurrency(project.currentRaise)} / {formatCurrency(project.targetRaise)}</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div 
+                      className="bg-green-500 h-2 rounded-full transition-all duration-300"
+                      style={{ width: `${getProgressPercentage(project.currentRaise, project.targetRaise)}%` }}
+                    ></div>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {getProgressPercentage(project.currentRaise, project.targetRaise).toFixed(1)}% funded
+                  </p>
+                </div>
+              )}
+
+              {/* Stats Grid */}
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                  <div>
+                    <p className="text-muted-foreground">Launch Date</p>
+                    <p className="font-medium">{formatDate(project.launchDate)}</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  <Users className="h-4 w-4 text-muted-foreground" />
+                  <div>
+                    <p className="text-muted-foreground">Participants</p>
+                    <p className="font-medium">{project.participants.toLocaleString()}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <DollarSign className="h-4 w-4 text-muted-foreground" />
+                  <div>
+                    <p className="text-muted-foreground">Min Allocation</p>
+                    <p className="font-medium">{formatCurrency(project.minAllocation)}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Target className="h-4 w-4 text-muted-foreground" />
+                  <div>
+                    <p className="text-muted-foreground">Max Allocation</p>
+                    <p className="font-medium">{formatCurrency(project.maxAllocation)}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Vesting */}
+              <div className="p-3 bg-muted/50 rounded-lg">
+                <p className="text-sm font-medium mb-1">Vesting Schedule</p>
+                <p className="text-xs text-muted-foreground">{project.vesting}</p>
+              </div>
+
+              {/* Action Button */}
+              <div className="pt-2">
+                {project.status === 'upcoming' && (
+                  <Button className="w-full" variant="outline">
+                    <Calendar className="h-4 w-4 mr-2" />
+                    Set Reminder
+                  </Button>
+                )}
+                {project.status === 'live' && (
+                  <Button className="w-full">
+                    <Rocket className="h-4 w-4 mr-2" />
+                    Participate Now
+                  </Button>
+                )}
+                {project.status === 'completed' && (
+                  <Button className="w-full" variant="outline" disabled>
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Completed
+                  </Button>
+                )}
+              </div>
+            </div>
+          </Card>
+        ))}
+      </div>
+
+      {filteredProjects.length === 0 && (
+        <Card className="p-8 text-center">
+          <Rocket className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+          <p className="text-muted-foreground">No projects found matching your criteria</p>
+        </Card>
       )}
     </div>
   );

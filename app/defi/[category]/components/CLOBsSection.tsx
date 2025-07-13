@@ -1,485 +1,596 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import React, { useState, useEffect } from 'react';
+import { BookOpen, TrendingUp, TrendingDown, DollarSign, BarChart3, Users, Clock, RefreshCw } from 'lucide-react';
+import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import LoadingSpinner from '@/components/LoadingSpinner';
-import { formatNumber } from '@/lib/utils';
-import { ExternalLink, TrendingUp, TrendingDown, BookOpen, Clock, Zap, BarChart3, Search, Users } from 'lucide-react';
 
-interface CLOBData {
-  name: string;
-  protocol: string;
+interface OrderBookEntry {
+  price: number;
+  size: number;
+  total: number;
+}
+
+interface MarketData {
+  symbol: string;
+  baseToken: string;
+  quoteToken: string;
+  platform: string;
+  lastPrice: number;
+  priceChange24h: number;
   volume24h: number;
-  trades24h: number;
-  avgSpread: number;
-  liquidity: number;
-  pairs: number;
-  orderBookDepth: number;
-  avgLatency: number;
-  feeStructure: {
-    maker: number;
-    taker: number;
+  high24h: number;
+  low24h: number;
+  spread: number;
+  marketCap?: number;
+  orderBook: {
+    bids: OrderBookEntry[];
+    asks: OrderBookEntry[];
   };
-  chains: string[];
-  category: string;
+  recentTrades: Array<{
+    price: number;
+    size: number;
+    time: string;
+    side: 'buy' | 'sell';
+  }>;
+}
+
+interface CLOBPlatform {
+  name: string;
+  totalVolume24h: number;
+  totalMarkets: number;
+  totalUsers: number;
+  averageSpread: number;
   description: string;
   website: string;
-  change24h: number;
-  activeOrders: number;
-  uniqueTraders24h: number;
-  nativeToken: string;
-  isLive: boolean;
   features: string[];
 }
 
 export default function CLOBsSection() {
-  const [clobs, setClobs] = useState<CLOBData[]>([]);
+  const [markets, setMarkets] = useState<MarketData[]>([]);
+  const [platforms, setPlatforms] = useState<CLOBPlatform[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [sortBy, setSortBy] = useState<'volume24h' | 'liquidity' | 'trades24h' | 'avgSpread'>('volume24h');
+  const [selectedMarket, setSelectedMarket] = useState<string>('');
+  const [platformFilter, setPlatformFilter] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<'volume' | 'priceChange' | 'spread'>('volume');
 
   useEffect(() => {
-    async function fetchCLOBData() {
+    const fetchCLOBData = async () => {
       try {
-        // In a real implementation, this would fetch from CLOB-specific APIs
-        // For now, we'll create realistic CLOB data for Solana ecosystem
-        const clobList: CLOBData[] = [
-          {
-            name: 'OpenBook (Serum V2)',
-            protocol: 'OpenBook',
-            volume24h: 125000000,
-            trades24h: 45600,
-            avgSpread: 0.05,
-            liquidity: 45000000,
-            pairs: 156,
-            orderBookDepth: 2500000,
-            avgLatency: 12,
-            feeStructure: {
-              maker: 0.0,
-              taker: 0.04
-            },
-            chains: ['Solana'],
-            category: 'Central Limit Order Book',
-            description: 'Solana\'s premier CLOB DEX with institutional-grade order matching',
-            website: 'https://openbookdex.com',
-            change24h: 8.3,
-            activeOrders: 12400,
-            uniqueTraders24h: 8900,
-            nativeToken: 'BOOK',
-            isLive: true,
-            features: ['Limit Orders', 'Market Orders', 'Stop Loss', 'Institutional APIs']
-          },
+        setLoading(true);
+        
+        // Mock CLOB platforms data - Solana-native order book DEXs
+        const mockPlatforms: CLOBPlatform[] = [
           {
             name: 'Phoenix',
-            protocol: 'Phoenix',
-            volume24h: 78000000,
-            trades24h: 23400,
-            avgSpread: 0.08,
-            liquidity: 28000000,
-            pairs: 89,
-            orderBookDepth: 1800000,
-            avgLatency: 8,
-            feeStructure: {
-              maker: -0.01,
-              taker: 0.03
-            },
-            chains: ['Solana'],
-            category: 'High-Performance CLOB',
-            description: 'Ultra-fast CLOB with maker rebates and advanced order types',
+            totalVolume24h: 450000000,
+            totalMarkets: 89,
+            totalUsers: 34567,
+            averageSpread: 0.08,
+            description: 'High-performance orderbook DEX on Solana',
             website: 'https://phoenix.trade',
-            change24h: 15.7,
-            activeOrders: 8700,
-            uniqueTraders24h: 5600,
-            nativeToken: 'PHX',
-            isLive: true,
-            features: ['Maker Rebates', 'Advanced Orders', 'Sub-second Execution', 'API Trading']
+            features: ['Limit Orders', 'Market Orders', 'Stop Loss', 'Advanced Charts']
           },
           {
-            name: 'Mango Markets',
-            protocol: 'Mango',
-            volume24h: 89000000,
-            trades24h: 34500,
-            avgSpread: 0.12,
-            liquidity: 67000000,
-            pairs: 234,
-            orderBookDepth: 3200000,
-            avgLatency: 15,
-            feeStructure: {
-              maker: 0.02,
-              taker: 0.06
-            },
-            chains: ['Solana'],
-            category: 'Margin Trading CLOB',
-            description: 'Decentralized trading platform with leverage and perpetuals',
-            website: 'https://mango.markets',
-            change24h: -3.2,
-            activeOrders: 15600,
-            uniqueTraders24h: 11200,
-            nativeToken: 'MNGO',
-            isLive: true,
-            features: ['Margin Trading', 'Perpetuals', 'Cross-collateral', 'Portfolio Margin']
+            name: 'Serum (Legacy)',
+            totalVolume24h: 234000000,
+            totalMarkets: 156,
+            totalUsers: 78901,
+            averageSpread: 0.12,
+            description: 'Original central limit order book on Solana',
+            website: 'https://serum.academy',
+            features: ['Limit Orders', 'Market Orders', 'Cross-Chain', 'DeFi Integration']
           },
           {
-            name: 'Zeta Markets',
-            protocol: 'Zeta',
-            volume24h: 45000000,
-            trades24h: 12800,
-            avgSpread: 0.15,
-            liquidity: 34000000,
-            pairs: 67,
-            orderBookDepth: 1200000,
-            avgLatency: 18,
-            feeStructure: {
-              maker: 0.0,
-              taker: 0.05
-            },
-            chains: ['Solana'],
-            category: 'Options & Perps CLOB',
-            description: 'Derivatives trading platform for options and perpetual swaps',
-            website: 'https://zeta.markets',
-            change24h: 6.8,
-            activeOrders: 4200,
-            uniqueTraders24h: 2800,
-            nativeToken: 'ZETA',
-            isLive: true,
-            features: ['Options Trading', 'Perpetual Swaps', 'Risk Management', 'Portfolio View']
+            name: 'OpenBook',
+            totalVolume24h: 189000000,
+            totalMarkets: 234,
+            totalUsers: 23456,
+            averageSpread: 0.15,
+            description: 'Community fork of Serum with enhanced features',
+            website: 'https://openbook.dev',
+            features: ['Limit Orders', 'Market Orders', 'Governance', 'Open Source']
           },
           {
-            name: 'Drift Protocol',
-            protocol: 'Drift',
-            volume24h: 156000000,
-            trades24h: 56700,
-            avgSpread: 0.06,
-            liquidity: 78000000,
-            pairs: 145,
-            orderBookDepth: 4500000,
-            avgLatency: 10,
-            feeStructure: {
-              maker: -0.005,
-              taker: 0.045
-            },
-            chains: ['Solana'],
-            category: 'Hybrid CLOB/AMM',
-            description: 'Hybrid protocol combining CLOB efficiency with AMM liquidity',
+            name: 'Drift (Spot)',
+            totalVolume24h: 123000000,
+            totalMarkets: 67,
+            totalUsers: 12345,
+            averageSpread: 0.09,
+            description: 'Spot trading component of Drift Protocol',
             website: 'https://drift.trade',
-            change24h: 12.1,
-            activeOrders: 18900,
-            uniqueTraders24h: 14500,
-            nativeToken: 'DRIFT',
-            isLive: true,
-            features: ['Hybrid Model', 'JIT Liquidity', 'Perp Trading', 'Cross-margin']
+            features: ['Limit Orders', 'Market Orders', 'Cross Margin', 'JIT Liquidity']
           },
           {
-            name: 'GooseFX',
-            protocol: 'GooseFX',
-            volume24h: 23000000,
-            trades24h: 8900,
-            avgSpread: 0.18,
-            liquidity: 18000000,
-            pairs: 45,
-            orderBookDepth: 890000,
-            avgLatency: 22,
-            feeStructure: {
-              maker: 0.03,
-              taker: 0.07
-            },
-            chains: ['Solana'],
-            category: 'Multi-Asset CLOB',
-            description: 'Full-stack DeFi platform with CLOB, NFTs, and synthetics',
-            website: 'https://goosefx.io',
-            change24h: 4.3,
-            activeOrders: 2800,
-            uniqueTraders24h: 1900,
-            nativeToken: 'GOFX',
-            isLive: true,
-            features: ['Multi-Asset Trading', 'Synthetic Assets', 'NFT Integration', 'SSL Pools']
-          },
-          {
-            name: 'Cypher Protocol',
-            protocol: 'Cypher',
-            volume24h: 34000000,
-            trades24h: 11200,
-            avgSpread: 0.14,
-            liquidity: 25000000,
-            pairs: 78,
-            orderBookDepth: 1100000,
-            avgLatency: 16,
-            feeStructure: {
-              maker: 0.01,
-              taker: 0.04
-            },
-            chains: ['Solana'],
-            category: 'Cross-Margin CLOB',
-            description: 'Cross-margined futures and spot trading with shared collateral',
-            website: 'https://cypher.trade',
-            change24h: -1.8,
-            activeOrders: 3600,
-            uniqueTraders24h: 2300,
-            nativeToken: 'CYP',
-            isLive: true,
-            features: ['Cross-Margin', 'Shared Collateral', 'Futures Trading', 'Risk Engine']
-          },
-          {
-            name: 'Ellipsis Labs',
-            protocol: 'Ellipsis',
-            volume24h: 67000000,
-            trades24h: 28900,
-            avgSpread: 0.07,
-            liquidity: 42000000,
-            pairs: 112,
-            orderBookDepth: 2100000,
-            avgLatency: 9,
-            feeStructure: {
-              maker: -0.02,
-              taker: 0.035
-            },
-            chains: ['Solana'],
-            category: 'Institutional CLOB',
-            description: 'Institutional-grade CLOB with advanced order management',
-            website: 'https://ellipsis.trade',
-            change24h: 9.7,
-            activeOrders: 7800,
-            uniqueTraders24h: 4200,
-            nativeToken: 'ELP',
-            isLive: true,
-            features: ['Institutional Tools', 'Advanced Orders', 'Market Making', 'Low Latency']
+            name: 'Zeta Markets (Spot)',
+            totalVolume24h: 89000000,
+            totalMarkets: 45,
+            totalUsers: 8901,
+            averageSpread: 0.11,
+            description: 'Spot trading on Zeta Markets DeFi platform',
+            website: 'https://zeta.markets',
+            features: ['Limit Orders', 'Market Orders', 'Options Integration', 'Risk Management']
           }
         ];
 
-        // Sort by volume by default
-        clobList.sort((a, b) => b.volume24h - a.volume24h);
-        setClobs(clobList);
-      } catch (err) {
-        console.error('Error fetching CLOB data:', err);
-        setError('Failed to load CLOB data');
+        // Mock market data for major Solana trading pairs
+        const mockMarkets: MarketData[] = [
+          {
+            symbol: 'SOL/USDC',
+            baseToken: 'SOL',
+            quoteToken: 'USDC',
+            platform: 'Phoenix',
+            lastPrice: 98.45,
+            priceChange24h: 5.67,
+            volume24h: 89000000,
+            high24h: 102.34,
+            low24h: 94.12,
+            spread: 0.05,
+            orderBook: {
+              bids: [
+                { price: 98.43, size: 1250, total: 1250 },
+                { price: 98.42, size: 890, total: 2140 },
+                { price: 98.41, size: 2340, total: 4480 },
+                { price: 98.40, size: 1560, total: 6040 },
+                { price: 98.39, size: 3450, total: 9490 }
+              ],
+              asks: [
+                { price: 98.48, size: 980, total: 980 },
+                { price: 98.49, size: 1670, total: 2650 },
+                { price: 98.50, size: 2890, total: 5540 },
+                { price: 98.51, size: 1230, total: 6770 },
+                { price: 98.52, size: 4560, total: 11330 }
+              ]
+            },
+            recentTrades: [
+              { price: 98.45, size: 234, time: '15:42:18', side: 'buy' },
+              { price: 98.44, size: 567, time: '15:42:15', side: 'sell' },
+              { price: 98.46, size: 123, time: '15:42:12', side: 'buy' }
+            ]
+          },
+          {
+            symbol: 'RAY/USDC',
+            baseToken: 'RAY',
+            quoteToken: 'USDC',
+            platform: 'Phoenix',
+            lastPrice: 2.34,
+            priceChange24h: -3.21,
+            volume24h: 23000000,
+            high24h: 2.67,
+            low24h: 2.23,
+            spread: 0.08,
+            orderBook: {
+              bids: [
+                { price: 2.339, size: 5670, total: 5670 },
+                { price: 2.338, size: 3450, total: 9120 },
+                { price: 2.337, size: 7890, total: 17010 },
+                { price: 2.336, size: 2340, total: 19350 },
+                { price: 2.335, size: 6780, total: 26130 }
+              ],
+              asks: [
+                { price: 2.342, size: 4560, total: 4560 },
+                { price: 2.343, size: 2890, total: 7450 },
+                { price: 2.344, size: 6780, total: 14230 },
+                { price: 2.345, size: 3450, total: 17680 },
+                { price: 2.346, size: 8900, total: 26580 }
+              ]
+            },
+            recentTrades: [
+              { price: 2.341, size: 1234, time: '15:41:58', side: 'sell' },
+              { price: 2.342, size: 567, time: '15:41:55', side: 'buy' },
+              { price: 2.340, size: 890, time: '15:41:52', side: 'sell' }
+            ]
+          },
+          {
+            symbol: 'ORCA/USDC',
+            baseToken: 'ORCA',
+            quoteToken: 'USDC',
+            platform: 'OpenBook',
+            lastPrice: 3.67,
+            priceChange24h: 7.89,
+            volume24h: 12000000,
+            high24h: 3.89,
+            low24h: 3.34,
+            spread: 0.12,
+            orderBook: {
+              bids: [
+                { price: 3.665, size: 2340, total: 2340 },
+                { price: 3.664, size: 1890, total: 4230 },
+                { price: 3.663, size: 4560, total: 8790 },
+                { price: 3.662, size: 1230, total: 10020 },
+                { price: 3.661, size: 3450, total: 13470 }
+              ],
+              asks: [
+                { price: 3.675, size: 1670, total: 1670 },
+                { price: 3.676, size: 2890, total: 4560 },
+                { price: 3.677, size: 1230, total: 5790 },
+                { price: 3.678, size: 4560, total: 10350 },
+                { price: 3.679, size: 2340, total: 12690 }
+              ]
+            },
+            recentTrades: [
+              { price: 3.671, size: 456, time: '15:41:45', side: 'buy' },
+              { price: 3.670, size: 789, time: '15:41:42', side: 'sell' },
+              { price: 3.672, size: 234, time: '15:41:39', side: 'buy' }
+            ]
+          },
+          {
+            symbol: 'JUP/SOL',
+            baseToken: 'JUP',
+            quoteToken: 'SOL',
+            platform: 'Drift (Spot)',
+            lastPrice: 0.89,
+            priceChange24h: 12.45,
+            volume24h: 8900000,
+            high24h: 0.95,
+            low24h: 0.78,
+            spread: 0.15,
+            orderBook: {
+              bids: [
+                { price: 0.8895, size: 8900, total: 8900 },
+                { price: 0.8890, size: 5670, total: 14570 },
+                { price: 0.8885, size: 12340, total: 26910 },
+                { price: 0.8880, size: 3450, total: 30360 },
+                { price: 0.8875, size: 7890, total: 38250 }
+              ],
+              asks: [
+                { price: 0.8910, size: 6780, total: 6780 },
+                { price: 0.8915, size: 4560, total: 11340 },
+                { price: 0.8920, size: 8900, total: 20240 },
+                { price: 0.8925, size: 2340, total: 22580 },
+                { price: 0.8930, size: 5670, total: 28250 }
+              ]
+            },
+            recentTrades: [
+              { price: 0.8901, size: 2340, time: '15:41:32', side: 'buy' },
+              { price: 0.8900, size: 1567, time: '15:41:29', side: 'sell' },
+              { price: 0.8905, size: 890, time: '15:41:26', side: 'buy' }
+            ]
+          }
+        ];
+
+        setPlatforms(mockPlatforms);
+        setMarkets(mockMarkets);
+        if (!selectedMarket && mockMarkets.length > 0) {
+          setSelectedMarket(mockMarkets[0].symbol);
+        }
+      } catch (error) {
+        console.error('Failed to fetch CLOB data:', error);
+        setPlatforms([]);
+        setMarkets([]);
       } finally {
         setLoading(false);
       }
-    }
+    };
 
     fetchCLOBData();
-  }, []);
+  }, [selectedMarket]);
 
-  const filteredClobs = clobs
-    .filter(clob => 
-      clob.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      clob.category.toLowerCase().includes(searchTerm.toLowerCase())
-    )
-    .sort((a, b) => b[sortBy] - a[sortBy]);
+  const filteredAndSortedMarkets = markets
+    .filter(market => {
+      const matchesPlatform = platformFilter === 'all' || market.platform === platformFilter;
+      return matchesPlatform;
+    })
+    .sort((a, b) => {
+      switch (sortBy) {
+        case 'volume':
+          return b.volume24h - a.volume24h;
+        case 'priceChange':
+          return b.priceChange24h - a.priceChange24h;
+        case 'spread':
+          return a.spread - b.spread; // Lower spread is better
+        default:
+          return 0;
+      }
+    });
+
+  const selectedMarketData = markets.find(m => m.symbol === selectedMarket);
+
+  const formatCurrency = (value: number, decimals: number = 2) => {
+    if (value >= 1e9) return `$${(value / 1e9).toFixed(decimals)}B`;
+    if (value >= 1e6) return `$${(value / 1e6).toFixed(decimals)}M`;
+    if (value >= 1e3) return `$${(value / 1e3).toFixed(decimals)}K`;
+    return `$${value.toFixed(decimals)}`;
+  };
+
+  const formatPrice = (price: number, symbol: string) => {
+    const decimals = symbol.includes('SOL') || symbol.includes('USDC') ? 4 : 6;
+    return price.toFixed(decimals);
+  };
+
+  const getPlatformColor = (platform: string) => {
+    const colors: { [key: string]: string } = {
+      'Phoenix': 'bg-orange-100 text-orange-800',
+      'Serum (Legacy)': 'bg-blue-100 text-blue-800',
+      'OpenBook': 'bg-green-100 text-green-800',
+      'Drift (Spot)': 'bg-purple-100 text-purple-800',
+      'Zeta Markets (Spot)': 'bg-red-100 text-red-800'
+    };
+    return colors[platform] || 'bg-gray-100 text-gray-800';
+  };
 
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <LoadingSpinner />
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="text-center py-20">
-        <p className="text-red-500 mb-4">{error}</p>
-        <Button onClick={() => window.location.reload()}>
-          Retry
-        </Button>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      {/* Controls */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Central Limit Order Books (CLOBs)</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search CLOBs..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            <div className="flex gap-2">
-              <Button
-                variant={sortBy === 'volume24h' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setSortBy('volume24h')}
-              >
-                Volume
-              </Button>
-              <Button
-                variant={sortBy === 'liquidity' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setSortBy('liquidity')}
-              >
-                Liquidity
-              </Button>
-              <Button
-                variant={sortBy === 'trades24h' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setSortBy('trades24h')}
-              >
-                Trades
-              </Button>
-              <Button
-                variant={sortBy === 'avgSpread' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setSortBy('avgSpread')}
-              >
-                Spread
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Header */}
+      <div className="flex items-center gap-3 mb-6">
+        <BookOpen className="h-8 w-8 text-primary" />
+        <h2 className="text-2xl font-bold">Solana CLOBs (Central Limit Order Books)</h2>
+      </div>
 
-      {/* CLOB Cards */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {filteredClobs.map((clob) => (
-          <Card key={clob.name} className="h-full">
-            <CardHeader>
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-gradient-to-r from-orange-500 to-red-500 rounded-lg flex items-center justify-center text-white font-bold text-sm">
-                    {clob.nativeToken.substring(0, 3)}
-                  </div>
-                  <div>
-                    <CardTitle className="text-lg">{clob.name}</CardTitle>
-                    <div className="flex items-center gap-2 mt-1">
-                      <Badge variant="outline">{clob.category}</Badge>
-                      {clob.isLive && <Badge className="bg-green-500 text-white">Live</Badge>}
-                    </div>
-                  </div>
-                </div>
-                <Button size="sm" variant="ghost">
-                  <ExternalLink className="h-4 w-4" />
-                </Button>
-              </div>
-            </CardHeader>
-            
-            <CardContent className="space-y-4">
-              <p className="text-sm text-muted-foreground line-clamp-2">
-                {clob.description}
-              </p>
+      {/* Platform Overview */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+        {platforms.map((platform) => (
+          <Card key={platform.name} className="p-4">
+            <div className="space-y-3">
+              <h3 className="font-semibold text-lg">{platform.name}</h3>
+              <p className="text-sm text-muted-foreground">{platform.description}</p>
               
-              {/* Key Trading Metrics */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-muted/50 p-3 rounded-lg">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-                    <BarChart3 className="h-3 w-3" />
-                    24h Volume
-                  </div>
-                  <p className="font-bold text-lg">${formatNumber(clob.volume24h)}</p>
-                  <div className={`flex items-center gap-1 text-xs ${
-                    clob.change24h >= 0 ? 'text-green-500' : 'text-red-500'
-                  }`}>
-                    {clob.change24h >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-                    {Math.abs(clob.change24h).toFixed(1)}%
-                  </div>
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span>24h Volume:</span>
+                  <span className="font-medium">{formatCurrency(platform.totalVolume24h)}</span>
                 </div>
-                
-                <div className="bg-muted/50 p-3 rounded-lg">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-                    <BookOpen className="h-3 w-3" />
-                    Liquidity
-                  </div>
-                  <p className="font-bold text-lg">${formatNumber(clob.liquidity)}</p>
-                  <p className="text-xs text-muted-foreground">
-                    Depth: ${formatNumber(clob.orderBookDepth)}
-                  </p>
+                <div className="flex justify-between text-sm">
+                  <span>Markets:</span>
+                  <span className="font-medium">{platform.totalMarkets}</span>
                 </div>
-                
-                <div className="bg-muted/50 p-3 rounded-lg">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-                    <Zap className="h-3 w-3" />
-                    Avg Spread
-                  </div>
-                  <p className="font-bold text-lg text-blue-500">{clob.avgSpread.toFixed(2)}%</p>
-                  <p className="text-xs text-muted-foreground">
-                    Latency: {clob.avgLatency}ms
-                  </p>
+                <div className="flex justify-between text-sm">
+                  <span>Users:</span>
+                  <span className="font-medium">{platform.totalUsers.toLocaleString()}</span>
                 </div>
-                
-                <div className="bg-muted/50 p-3 rounded-lg">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-                    <Users className="h-3 w-3" />
-                    24h Trades
-                  </div>
-                  <p className="font-bold text-lg">{formatNumber(clob.trades24h)}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {formatNumber(clob.uniqueTraders24h)} traders
-                  </p>
+                <div className="flex justify-between text-sm">
+                  <span>Avg Spread:</span>
+                  <span className="font-medium">{platform.averageSpread}%</span>
                 </div>
               </div>
-              
-              {/* Fee Structure */}
-              <div className="border-t pt-3">
-                <h4 className="font-medium text-sm mb-2">Fee Structure</h4>
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Maker:</span>
-                    <span className={`font-medium ${clob.feeStructure.maker < 0 ? 'text-green-500' : ''}`}>
-                      {clob.feeStructure.maker > 0 ? '+' : ''}{(clob.feeStructure.maker * 100).toFixed(2)}%
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Taker:</span>
-                    <span className="font-medium">+{(clob.feeStructure.taker * 100).toFixed(2)}%</span>
-                  </div>
-                </div>
+
+              <div className="flex flex-wrap gap-1">
+                {platform.features.map((feature, index) => (
+                  <span key={index} className="px-2 py-1 text-xs bg-muted rounded">
+                    {feature}
+                  </span>
+                ))}
               </div>
-              
-              {/* Features */}
-              <div>
-                <h4 className="font-medium text-sm mb-2">Features</h4>
-                <div className="flex flex-wrap gap-1">
-                  {clob.features.map(feature => (
-                    <Badge key={feature} variant="secondary" className="text-xs">
-                      {feature}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-              
-              {/* Trading Activity */}
-              <div className="border-t pt-3">
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-muted-foreground">Active Orders:</span>
-                  <span className="font-medium">{formatNumber(clob.activeOrders)}</span>
-                </div>
-                <div className="flex justify-between items-center text-sm mt-1">
-                  <span className="text-muted-foreground">Trading Pairs:</span>
-                  <span className="font-medium">{clob.pairs}</span>
-                </div>
-              </div>
-              
-              {/* Actions */}
-              <div className="flex gap-2 pt-2">
-                <Button size="sm" className="flex-1">
-                  Start Trading
-                </Button>
-                <Button size="sm" variant="outline" className="flex-1">
-                  View Markets
-                </Button>
-              </div>
-            </CardContent>
+            </div>
           </Card>
         ))}
       </div>
-      
-      {filteredClobs.length === 0 && (
-        <div className="text-center py-20">
-          <p className="text-muted-foreground">No CLOB protocols found matching your search.</p>
+
+      {/* Market Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <Card className="p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Total Volume 24h</p>
+              <p className="text-2xl font-bold">{formatCurrency(platforms.reduce((sum, p) => sum + p.totalVolume24h, 0))}</p>
+            </div>
+            <DollarSign className="h-8 w-8 text-green-500" />
+          </div>
+        </Card>
+
+        <Card className="p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Total Markets</p>
+              <p className="text-2xl font-bold">{platforms.reduce((sum, p) => sum + p.totalMarkets, 0)}</p>
+            </div>
+            <BarChart3 className="h-8 w-8 text-blue-500" />
+          </div>
+        </Card>
+
+        <Card className="p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Total Users</p>
+              <p className="text-2xl font-bold">{platforms.reduce((sum, p) => sum + p.totalUsers, 0).toLocaleString()}</p>
+            </div>
+            <Users className="h-8 w-8 text-purple-500" />
+          </div>
+        </Card>
+
+        <Card className="p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Avg Spread</p>
+              <p className="text-2xl font-bold">{(platforms.reduce((sum, p) => sum + p.averageSpread, 0) / platforms.length).toFixed(2)}%</p>
+            </div>
+            <Clock className="h-8 w-8 text-orange-500" />
+          </div>
+        </Card>
+      </div>
+
+      {/* Controls */}
+      <Card className="p-4">
+        <div className="flex flex-col md:flex-row gap-4 items-center">
+          <select
+            value={platformFilter}
+            onChange={(e) => setPlatformFilter(e.target.value)}
+            className="px-4 py-2 border rounded-lg bg-background"
+          >
+            <option value="all">All Platforms</option>
+            {platforms.map((platform) => (
+              <option key={platform.name} value={platform.name}>
+                {platform.name}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as any)}
+            className="px-4 py-2 border rounded-lg bg-background"
+          >
+            <option value="volume">Sort by Volume</option>
+            <option value="priceChange">Sort by Price Change</option>
+            <option value="spread">Sort by Spread</option>
+          </select>
+
+          <select
+            value={selectedMarket}
+            onChange={(e) => setSelectedMarket(e.target.value)}
+            className="px-4 py-2 border rounded-lg bg-background"
+          >
+            {markets.map((market) => (
+              <option key={market.symbol} value={market.symbol}>
+                {market.symbol} ({market.platform})
+              </option>
+            ))}
+          </select>
+
+          <Button variant="outline" className="ml-auto">
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
         </div>
+      </Card>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Markets List */}
+        <div className="lg:col-span-2">
+          <Card className="overflow-hidden">
+            <div className="p-4 border-b">
+              <h3 className="font-semibold">Markets</h3>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-muted/50">
+                  <tr>
+                    <th className="text-left p-4 font-medium">Market</th>
+                    <th className="text-center p-4 font-medium">Platform</th>
+                    <th className="text-right p-4 font-medium">Price</th>
+                    <th className="text-right p-4 font-medium">24h Change</th>
+                    <th className="text-right p-4 font-medium">Volume</th>
+                    <th className="text-right p-4 font-medium">Spread</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredAndSortedMarkets.map((market) => (
+                    <tr 
+                      key={market.symbol} 
+                      className={`border-t hover:bg-muted/30 transition-colors cursor-pointer ${
+                        selectedMarket === market.symbol ? 'bg-muted/50' : ''
+                      }`}
+                      onClick={() => setSelectedMarket(market.symbol)}
+                    >
+                      <td className="p-4">
+                        <div>
+                          <p className="font-medium">{market.symbol}</p>
+                          <p className="text-xs text-muted-foreground">{market.baseToken}/{market.quoteToken}</p>
+                        </div>
+                      </td>
+                      <td className="p-4 text-center">
+                        <span className={`px-2 py-1 text-xs rounded font-medium ${getPlatformColor(market.platform)}`}>
+                          {market.platform}
+                        </span>
+                      </td>
+                      <td className="p-4 text-right font-mono">
+                        ${formatPrice(market.lastPrice, market.symbol)}
+                      </td>
+                      <td className="p-4 text-right">
+                        <span className={`flex items-center justify-end gap-1 ${
+                          market.priceChange24h >= 0 ? 'text-green-600' : 'text-red-600'
+                        }`}>
+                          {market.priceChange24h >= 0 ? (
+                            <TrendingUp className="h-3 w-3" />
+                          ) : (
+                            <TrendingDown className="h-3 w-3" />
+                          )}
+                          {market.priceChange24h >= 0 ? '+' : ''}{market.priceChange24h.toFixed(2)}%
+                        </span>
+                      </td>
+                      <td className="p-4 text-right font-mono">
+                        {formatCurrency(market.volume24h)}
+                      </td>
+                      <td className="p-4 text-right">
+                        <span className="text-sm">{market.spread.toFixed(2)}%</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        </div>
+
+        {/* Order Book */}
+        <div>
+          {selectedMarketData && (
+            <Card className="overflow-hidden">
+              <div className="p-4 border-b">
+                <h3 className="font-semibold">Order Book - {selectedMarketData.symbol}</h3>
+                <p className="text-sm text-muted-foreground">Last: ${formatPrice(selectedMarketData.lastPrice, selectedMarketData.symbol)}</p>
+              </div>
+              
+              <div className="p-4 space-y-4">
+                {/* Asks (Sell Orders) */}
+                <div>
+                  <h4 className="text-sm font-medium text-red-600 mb-2">Asks (Sell)</h4>
+                  <div className="space-y-1">
+                    {selectedMarketData.orderBook.asks.slice().reverse().map((ask, index) => (
+                      <div key={index} className="flex justify-between text-xs bg-red-50 p-1 rounded">
+                        <span className="text-red-600">${formatPrice(ask.price, selectedMarketData.symbol)}</span>
+                        <span>{ask.size.toLocaleString()}</span>
+                        <span className="text-muted-foreground">{ask.total.toLocaleString()}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Current Price */}
+                <div className="text-center py-2 border-y">
+                  <span className="font-mono font-bold">
+                    ${formatPrice(selectedMarketData.lastPrice, selectedMarketData.symbol)}
+                  </span>
+                </div>
+
+                {/* Bids (Buy Orders) */}
+                <div>
+                  <h4 className="text-sm font-medium text-green-600 mb-2">Bids (Buy)</h4>
+                  <div className="space-y-1">
+                    {selectedMarketData.orderBook.bids.map((bid, index) => (
+                      <div key={index} className="flex justify-between text-xs bg-green-50 p-1 rounded">
+                        <span className="text-green-600">${formatPrice(bid.price, selectedMarketData.symbol)}</span>
+                        <span>{bid.size.toLocaleString()}</span>
+                        <span className="text-muted-foreground">{bid.total.toLocaleString()}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Recent Trades */}
+                <div>
+                  <h4 className="text-sm font-medium mb-2">Recent Trades</h4>
+                  <div className="space-y-1">
+                    {selectedMarketData.recentTrades.map((trade, index) => (
+                      <div key={index} className="flex justify-between text-xs p-1">
+                        <span className={trade.side === 'buy' ? 'text-green-600' : 'text-red-600'}>
+                          ${formatPrice(trade.price, selectedMarketData.symbol)}
+                        </span>
+                        <span>{trade.size.toLocaleString()}</span>
+                        <span className="text-muted-foreground">{trade.time}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </Card>
+          )}
+        </div>
+      </div>
+
+      {filteredAndSortedMarkets.length === 0 && (
+        <Card className="p-8 text-center">
+          <BookOpen className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+          <p className="text-muted-foreground">No markets found matching your criteria</p>
+        </Card>
       )}
     </div>
   );

@@ -1,543 +1,666 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import React, { useState, useEffect } from 'react';
+import { Target, TrendingUp, TrendingDown, DollarSign, Calendar, Users, RefreshCw, Calculator } from 'lucide-react';
+import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import LoadingSpinner from '@/components/LoadingSpinner';
-import { formatNumber } from '@/lib/utils';
-import { ExternalLink, TrendingUp, TrendingDown, Target, Clock, Zap, BarChart3, Search, Users, Calculator } from 'lucide-react';
 
-interface OptionData {
-  name: string;
-  protocol: string;
-  volume24h: number;
-  openInterest: number;
-  totalContracts: number;
-  activeExpiries: number;
-  chains: string[];
-  category: string;
-  description: string;
-  website: string;
-  change24h: number;
-  uniqueTraders24h: number;
-  avgPremium: number;
+interface OptionContract {
+  id: string;
+  underlying: string;
+  type: 'call' | 'put';
+  strike: number;
+  expiry: string;
+  premium: number;
   impliedVolatility: number;
-  feeStructure: {
-    trading: number;
-    exercise: number;
-    settlement: number;
-  };
-  nativeToken: string;
-  isLive: boolean;
-  features: string[];
+  delta: number;
+  gamma: number;
+  theta: number;
+  vega: number;
+  openInterest: number;
+  volume24h: number;
+  platform: string;
+  isActive: boolean;
+  moneyness: 'ITM' | 'ATM' | 'OTM'; // In/At/Out of the money
+  timeToExpiry: number; // days
+}
+
+interface OptionsPlatform {
+  name: string;
+  totalVolume24h: number;
+  totalOpenInterest: number;
+  totalContracts: number;
   supportedAssets: string[];
+  description: string;
+  features: string[];
   maxExpiry: string;
   minStrike: number;
-  maxStrike: number;
-  settlementType: 'Cash' | 'Physical' | 'Both';
+}
+
+interface UnderlyingAsset {
+  symbol: string;
+  currentPrice: number;
+  priceChange24h: number;
+  impliedVolatility: number;
+  totalCallOI: number;
+  totalPutOI: number;
+  putCallRatio: number;
 }
 
 export default function OptionsSection() {
-  const [options, setOptions] = useState<OptionData[]>([]);
+  const [options, setOptions] = useState<OptionContract[]>([]);
+  const [platforms, setPlatforms] = useState<OptionsPlatform[]>([]);
+  const [underlyingAssets, setUnderlyingAssets] = useState<UnderlyingAsset[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [sortBy, setSortBy] = useState<'volume24h' | 'openInterest' | 'totalContracts' | 'impliedVolatility'>('volume24h');
+  const [platformFilter, setPlatformFilter] = useState<string>('all');
+  const [underlyingFilter, setUnderlyingFilter] = useState<string>('all');
+  const [typeFilter, setTypeFilter] = useState<string>('all');
+  const [moneynessFilter, setMoneynessFilter] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<'volume' | 'openInterest' | 'premium' | 'expiry'>('volume');
 
   useEffect(() => {
-    async function fetchOptionsData() {
+    const fetchOptionsData = async () => {
       try {
-        // In a real implementation, this would fetch from options-specific APIs
-        // For now, we'll create realistic options data for Solana ecosystem
-        const optionsList: OptionData[] = [
+        setLoading(true);
+        
+        // Mock options platforms data - Solana-native options platforms
+        const mockPlatforms: OptionsPlatform[] = [
           {
             name: 'Zeta Markets',
-            protocol: 'Zeta',
-            volume24h: 45000000,
-            openInterest: 78000000,
-            totalContracts: 12400,
-            activeExpiries: 8,
-            chains: ['Solana'],
-            category: 'European Options',
-            description: 'Leading options platform with sophisticated Greeks analytics and portfolio management',
-            website: 'https://zeta.markets',
-            change24h: 12.3,
-            uniqueTraders24h: 3400,
-            avgPremium: 0.045,
-            impliedVolatility: 85.2,
-            feeStructure: {
-              trading: 0.05,
-              exercise: 0.02,
-              settlement: 0.01
-            },
-            nativeToken: 'ZETA',
-            isLive: true,
-            features: ['European Style', 'Greeks Analytics', 'Portfolio Margin', 'Auto-Exercise'],
-            supportedAssets: ['SOL', 'BTC', 'ETH', 'BONK', 'JUP'],
+            totalVolume24h: 45000000,
+            totalOpenInterest: 23000000,
+            totalContracts: 1250,
+            supportedAssets: ['SOL', 'BTC', 'ETH', 'RAY', 'ORCA'],
+            description: 'Leading options and perpetuals platform on Solana',
+            features: ['American Options', 'European Options', 'Portfolio Margin', 'Risk Management'],
             maxExpiry: '3 months',
-            minStrike: 0.1,
-            maxStrike: 1000,
-            settlementType: 'Cash'
+            minStrike: 0.1
           },
           {
-            name: 'PsyOptions',
-            protocol: 'PsyOptions',
-            volume24h: 23000000,
-            openInterest: 34000000,
-            totalContracts: 6700,
-            activeExpiries: 12,
-            chains: ['Solana'],
-            category: 'American Options',
-            description: 'Decentralized options protocol with American-style exercise and yield strategies',
-            website: 'https://psyoptions.io',
-            change24h: 8.7,
-            uniqueTraders24h: 1800,
-            avgPremium: 0.067,
-            impliedVolatility: 92.1,
-            feeStructure: {
-              trading: 0.08,
-              exercise: 0.03,
-              settlement: 0.015
-            },
-            nativeToken: 'PSY',
-            isLive: true,
-            features: ['American Style', 'Early Exercise', 'Yield Strategies', 'Covered Calls'],
-            supportedAssets: ['SOL', 'RAY', 'SRM', 'ORCA', 'MNGO'],
+            name: 'Cypher Protocol',
+            totalVolume24h: 23000000,
+            totalOpenInterest: 12000000,
+            totalContracts: 890,
+            supportedAssets: ['SOL', 'BTC', 'ETH', 'JUP'],
+            description: 'Multi-asset derivatives platform with options and futures',
+            features: ['Binary Options', 'Vanilla Options', 'Cross Margin', 'Auto Exercise'],
             maxExpiry: '6 months',
-            minStrike: 0.05,
-            maxStrike: 500,
-            settlementType: 'Physical'
+            minStrike: 0.01
           },
           {
-            name: 'Katana Options',
-            protocol: 'Katana',
-            volume24h: 34000000,
-            openInterest: 45000000,
-            totalContracts: 8900,
-            activeExpiries: 6,
-            chains: ['Solana'],
-            category: 'Exotic Options',
-            description: 'Advanced options with exotic payoffs and structured products',
-            website: 'https://katana.trade/options',
-            change24h: 15.8,
-            uniqueTraders24h: 2300,
-            avgPremium: 0.089,
-            impliedVolatility: 78.9,
-            feeStructure: {
-              trading: 0.12,
-              exercise: 0.05,
-              settlement: 0.02
-            },
-            nativeToken: 'KATA',
-            isLive: true,
-            features: ['Exotic Payoffs', 'Barrier Options', 'Binary Options', 'Structured Products'],
-            supportedAssets: ['SOL', 'BTC', 'ETH', 'AVAX', 'NEAR'],
-            maxExpiry: '1 year',
-            minStrike: 1,
-            maxStrike: 10000,
-            settlementType: 'Both'
-          },
-          {
-            name: 'Solrise Options',
-            protocol: 'Solrise',
-            volume24h: 12000000,
-            openInterest: 18000000,
-            totalContracts: 3400,
-            activeExpiries: 4,
-            chains: ['Solana'],
-            category: 'Vault Options',
-            description: 'Options strategies integrated with automated vaults and yield generation',
-            website: 'https://solrise.finance/options',
-            change24h: 6.2,
-            uniqueTraders24h: 890,
-            avgPremium: 0.034,
-            impliedVolatility: 65.4,
-            feeStructure: {
-              trading: 0.06,
-              exercise: 0.025,
-              settlement: 0.01
-            },
-            nativeToken: 'SLRS',
-            isLive: true,
-            features: ['Vault Integration', 'Automated Strategies', 'Yield Generation', 'Risk Management'],
-            supportedAssets: ['SOL', 'USDC', 'RAY', 'SRM', 'FTT'],
+            name: 'Drift Options',
+            totalVolume24h: 12000000,
+            totalOpenInterest: 8900000,
+            totalContracts: 567,
+            supportedAssets: ['SOL', 'RAY', 'BONK'],
+            description: 'Options trading integrated with Drift Protocol',
+            features: ['JIT Options', 'Dynamic Pricing', 'Liquidity Mining', 'Governance'],
             maxExpiry: '2 months',
-            minStrike: 0.5,
-            maxStrike: 200,
-            settlementType: 'Cash'
+            minStrike: 1.0
           },
           {
-            name: 'Friktion',
-            protocol: 'Friktion',
-            volume24h: 18000000,
-            openInterest: 28000000,
-            totalContracts: 5600,
-            activeExpiries: 5,
-            chains: ['Solana'],
-            category: 'Structured Options',
-            description: 'Institutional-grade structured options products and portfolio strategies',
-            website: 'https://friktion.fi',
-            change24h: 4.1,
-            uniqueTraders24h: 1200,
-            avgPremium: 0.056,
-            impliedVolatility: 71.8,
-            feeStructure: {
-              trading: 0.075,
-              exercise: 0.035,
-              settlement: 0.015
-            },
-            nativeToken: 'FRIK',
-            isLive: true,
-            features: ['Structured Products', 'Institutional Tools', 'Portfolio Strategies', 'Risk Analytics'],
-            supportedAssets: ['SOL', 'BTC', 'ETH', 'USDC', 'USDT'],
-            maxExpiry: '4 months',
-            minStrike: 0.1,
-            maxStrike: 2000,
-            settlementType: 'Cash'
-          },
-          {
-            name: 'Symmetry Options',
-            protocol: 'Symmetry',
-            volume24h: 8900000,
-            openInterest: 14000000,
-            totalContracts: 2800,
-            activeExpiries: 3,
-            chains: ['Solana'],
-            category: 'Basket Options',
-            description: 'Options on baskets of assets with sector and thematic exposure',
-            website: 'https://symmetry.fi/options',
-            change24h: 11.4,
-            uniqueTraders24h: 650,
-            avgPremium: 0.078,
-            impliedVolatility: 89.3,
-            feeStructure: {
-              trading: 0.09,
-              exercise: 0.04,
-              settlement: 0.02
-            },
-            nativeToken: 'SYM',
-            isLive: true,
-            features: ['Basket Options', 'Sector Exposure', 'Thematic Trading', 'Index Options'],
-            supportedAssets: ['DeFi Basket', 'Gaming Basket', 'Meme Basket', 'L1 Basket', 'AI Basket'],
-            maxExpiry: '3 months',
-            minStrike: 10,
-            maxStrike: 1000,
-            settlementType: 'Cash'
-          },
-          {
-            name: 'Hedge Protocol',
-            protocol: 'Hedge',
-            volume24h: 15000000,
-            openInterest: 22000000,
-            totalContracts: 4200,
-            activeExpiries: 7,
-            chains: ['Solana'],
-            category: 'Hedging Options',
-            description: 'Specialized options for portfolio hedging and risk management',
-            website: 'https://hedge.so',
-            change24h: -2.3,
-            uniqueTraders24h: 980,
-            avgPremium: 0.042,
-            impliedVolatility: 76.5,
-            feeStructure: {
-              trading: 0.04,
-              exercise: 0.02,
-              settlement: 0.008
-            },
-            nativeToken: 'HEDGE',
-            isLive: true,
-            features: ['Portfolio Hedging', 'Tail Risk Protection', 'Delta Hedging', 'Volatility Trading'],
-            supportedAssets: ['SOL', 'BTC', 'ETH', 'Portfolio', 'VIX'],
-            maxExpiry: '6 months',
-            minStrike: 0.01,
-            maxStrike: 5000,
-            settlementType: 'Both'
-          },
-          {
-            name: 'Thetanuts',
-            protocol: 'Thetanuts',
-            volume24h: 6700000,
-            openInterest: 11000000,
-            totalContracts: 1900,
-            activeExpiries: 4,
-            chains: ['Solana'],
-            category: 'Covered Call Vaults',
-            description: 'Automated covered call and put writing strategies for yield generation',
-            website: 'https://thetanuts.finance',
-            change24h: 7.8,
-            uniqueTraders24h: 540,
-            avgPremium: 0.029,
-            impliedVolatility: 58.7,
-            feeStructure: {
-              trading: 0.05,
-              exercise: 0.02,
-              settlement: 0.01
-            },
-            nativeToken: 'NUTS',
-            isLive: true,
-            features: ['Covered Calls', 'Put Writing', 'Automated Strategies', 'Yield Optimization'],
-            supportedAssets: ['SOL', 'USDC', 'BTC', 'ETH', 'RAY'],
+            name: 'Solana Options',
+            totalVolume24h: 8900000,
+            totalOpenInterest: 5600000,
+            totalContracts: 345,
+            supportedAssets: ['SOL', 'USDC'],
+            description: 'Specialized Solana native options trading platform',
+            features: ['Weekly Options', 'Monthly Options', 'Low Fees', 'Fast Settlement'],
             maxExpiry: '1 month',
-            minStrike: 1,
-            maxStrike: 300,
-            settlementType: 'Physical'
+            minStrike: 5.0
           }
         ];
 
-        // Sort by volume by default
-        optionsList.sort((a, b) => b.volume24h - a.volume24h);
-        setOptions(optionsList);
-      } catch (err) {
-        console.error('Error fetching options data:', err);
-        setError('Failed to load options data');
+        // Mock underlying assets data
+        const mockUnderlyingAssets: UnderlyingAsset[] = [
+          {
+            symbol: 'SOL',
+            currentPrice: 98.45,
+            priceChange24h: 5.67,
+            impliedVolatility: 0.85,
+            totalCallOI: 15000000,
+            totalPutOI: 8900000,
+            putCallRatio: 0.59
+          },
+          {
+            symbol: 'BTC',
+            currentPrice: 43250.67,
+            priceChange24h: 2.34,
+            impliedVolatility: 0.72,
+            totalCallOI: 12000000,
+            totalPutOI: 9800000,
+            putCallRatio: 0.82
+          },
+          {
+            symbol: 'ETH',
+            currentPrice: 2567.89,
+            priceChange24h: -1.23,
+            impliedVolatility: 0.78,
+            totalCallOI: 8900000,
+            totalPutOI: 11200000,
+            putCallRatio: 1.26
+          },
+          {
+            symbol: 'RAY',
+            currentPrice: 2.34,
+            priceChange24h: -3.21,
+            impliedVolatility: 1.23,
+            totalCallOI: 3400000,
+            totalPutOI: 2800000,
+            putCallRatio: 0.82
+          }
+        ];
+
+        // Mock options contracts data
+        const mockOptions: OptionContract[] = [
+          {
+            id: '1',
+            underlying: 'SOL',
+            type: 'call',
+            strike: 100,
+            expiry: '2024-12-29T08:00:00Z',
+            premium: 3.45,
+            impliedVolatility: 0.85,
+            delta: 0.62,
+            gamma: 0.045,
+            theta: -0.12,
+            vega: 0.23,
+            openInterest: 2340000,
+            volume24h: 890000,
+            platform: 'Zeta Markets',
+            isActive: true,
+            moneyness: 'ITM',
+            timeToExpiry: 7
+          },
+          {
+            id: '2',
+            underlying: 'SOL',
+            type: 'put',
+            strike: 95,
+            expiry: '2024-12-29T08:00:00Z',
+            premium: 1.89,
+            impliedVolatility: 0.78,
+            delta: -0.38,
+            gamma: 0.035,
+            theta: -0.08,
+            vega: 0.19,
+            openInterest: 1890000,
+            volume24h: 567000,
+            platform: 'Zeta Markets',
+            isActive: true,
+            moneyness: 'OTM',
+            timeToExpiry: 7
+          },
+          {
+            id: '3',
+            underlying: 'BTC',
+            type: 'call',
+            strike: 45000,
+            expiry: '2025-01-31T08:00:00Z',
+            premium: 1250.67,
+            impliedVolatility: 0.72,
+            delta: 0.45,
+            gamma: 0.002,
+            theta: -2.34,
+            vega: 12.45,
+            openInterest: 1200000,
+            volume24h: 234000,
+            platform: 'Cypher Protocol',
+            isActive: true,
+            moneyness: 'OTM',
+            timeToExpiry: 40
+          },
+          {
+            id: '4',
+            underlying: 'ETH',
+            type: 'put',
+            strike: 2500,
+            expiry: '2025-01-15T08:00:00Z',
+            premium: 89.34,
+            impliedVolatility: 0.82,
+            delta: -0.52,
+            gamma: 0.008,
+            theta: -1.23,
+            vega: 4.56,
+            openInterest: 890000,
+            volume24h: 156000,
+            platform: 'Cypher Protocol',
+            isActive: true,
+            moneyness: 'ATM',
+            timeToExpiry: 24
+          },
+          {
+            id: '5',
+            underlying: 'SOL',
+            type: 'call',
+            strike: 110,
+            expiry: '2024-12-25T08:00:00Z',
+            premium: 0.78,
+            impliedVolatility: 1.05,
+            delta: 0.23,
+            gamma: 0.028,
+            theta: -0.15,
+            vega: 0.12,
+            openInterest: 567000,
+            volume24h: 123000,
+            platform: 'Drift Options',
+            isActive: true,
+            moneyness: 'OTM',
+            timeToExpiry: 3
+          },
+          {
+            id: '6',
+            underlying: 'RAY',
+            type: 'call',
+            strike: 2.5,
+            expiry: '2024-12-27T08:00:00Z',
+            premium: 0.12,
+            impliedVolatility: 1.23,
+            delta: 0.34,
+            gamma: 0.15,
+            theta: -0.05,
+            vega: 0.08,
+            openInterest: 345000,
+            volume24h: 89000,
+            platform: 'Solana Options',
+            isActive: true,
+            moneyness: 'OTM',
+            timeToExpiry: 5
+          }
+        ];
+
+        setPlatforms(mockPlatforms);
+        setUnderlyingAssets(mockUnderlyingAssets);
+        setOptions(mockOptions);
+      } catch (error) {
+        console.error('Failed to fetch options data:', error);
+        setPlatforms([]);
+        setUnderlyingAssets([]);
+        setOptions([]);
       } finally {
         setLoading(false);
       }
-    }
+    };
 
     fetchOptionsData();
   }, []);
 
-  const filteredOptions = options
-    .filter(option => 
-      option.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      option.category.toLowerCase().includes(searchTerm.toLowerCase())
-    )
-    .sort((a, b) => b[sortBy] - a[sortBy]);
+  const filteredAndSortedOptions = options
+    .filter(option => {
+      const matchesPlatform = platformFilter === 'all' || option.platform === platformFilter;
+      const matchesUnderlying = underlyingFilter === 'all' || option.underlying === underlyingFilter;
+      const matchesType = typeFilter === 'all' || option.type === typeFilter;
+      const matchesMoneyness = moneynessFilter === 'all' || option.moneyness === moneynessFilter;
+      return matchesPlatform && matchesUnderlying && matchesType && matchesMoneyness;
+    })
+    .sort((a, b) => {
+      switch (sortBy) {
+        case 'volume':
+          return b.volume24h - a.volume24h;
+        case 'openInterest':
+          return b.openInterest - a.openInterest;
+        case 'premium':
+          return b.premium - a.premium;
+        case 'expiry':
+          return a.timeToExpiry - b.timeToExpiry;
+        default:
+          return 0;
+      }
+    });
+
+  const formatCurrency = (value: number) => {
+    if (value >= 1e9) return `$${(value / 1e9).toFixed(2)}B`;
+    if (value >= 1e6) return `$${(value / 1e6).toFixed(2)}M`;
+    if (value >= 1e3) return `$${(value / 1e3).toFixed(2)}K`;
+    return `$${value.toFixed(2)}`;
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
+  };
+
+  const getPlatformColor = (platform: string) => {
+    const colors: { [key: string]: string } = {
+      'Zeta Markets': 'bg-purple-100 text-purple-800',
+      'Cypher Protocol': 'bg-green-100 text-green-800',
+      'Drift Options': 'bg-blue-100 text-blue-800',
+      'Solana Options': 'bg-orange-100 text-orange-800'
+    };
+    return colors[platform] || 'bg-gray-100 text-gray-800';
+  };
+
+  const getMoneynessColor = (moneyness: string) => {
+    switch (moneyness) {
+      case 'ITM': return 'text-green-600 bg-green-100';
+      case 'ATM': return 'text-blue-600 bg-blue-100';
+      case 'OTM': return 'text-orange-600 bg-orange-100';
+      default: return 'text-gray-600 bg-gray-100';
+    }
+  };
+
+  const getTypeColor = (type: string) => {
+    return type === 'call' ? 'text-green-600' : 'text-red-600';
+  };
 
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <LoadingSpinner />
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="text-center py-20">
-        <p className="text-red-500 mb-4">{error}</p>
-        <Button onClick={() => window.location.reload()}>
-          Retry
-        </Button>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      {/* Controls */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Options Trading</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search options platforms..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            <div className="flex gap-2">
-              <Button
-                variant={sortBy === 'volume24h' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setSortBy('volume24h')}
-              >
-                Volume
-              </Button>
-              <Button
-                variant={sortBy === 'openInterest' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setSortBy('openInterest')}
-              >
-                Open Interest
-              </Button>
-              <Button
-                variant={sortBy === 'totalContracts' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setSortBy('totalContracts')}
-              >
-                Contracts
-              </Button>
-              <Button
-                variant={sortBy === 'impliedVolatility' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setSortBy('impliedVolatility')}
-              >
-                IV
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Header */}
+      <div className="flex items-center gap-3 mb-6">
+        <Target className="h-8 w-8 text-primary" />
+        <h2 className="text-2xl font-bold">Solana Options Trading</h2>
+      </div>
 
-      {/* Options Cards */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {filteredOptions.map((option) => (
-          <Card key={option.name} className="h-full">
-            <CardHeader>
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-lg flex items-center justify-center text-white font-bold text-sm">
-                    {option.nativeToken.substring(0, 3)}
-                  </div>
-                  <div>
-                    <CardTitle className="text-lg">{option.name}</CardTitle>
-                    <div className="flex items-center gap-2 mt-1">
-                      <Badge variant="outline">{option.category}</Badge>
-                      {option.isLive && <Badge className="bg-green-500 text-white">Live</Badge>}
-                      <Badge variant="secondary">{option.settlementType}</Badge>
-                    </div>
-                  </div>
-                </div>
-                <Button size="sm" variant="ghost">
-                  <ExternalLink className="h-4 w-4" />
-                </Button>
-              </div>
-            </CardHeader>
-            
-            <CardContent className="space-y-4">
-              <p className="text-sm text-muted-foreground line-clamp-2">
-                {option.description}
-              </p>
+      {/* Platform Overview */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        {platforms.map((platform) => (
+          <Card key={platform.name} className="p-4">
+            <div className="space-y-3">
+              <h3 className="font-semibold">{platform.name}</h3>
+              <p className="text-xs text-muted-foreground">{platform.description}</p>
               
-              {/* Key Trading Metrics */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-muted/50 p-3 rounded-lg">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-                    <BarChart3 className="h-3 w-3" />
-                    24h Volume
-                  </div>
-                  <p className="font-bold text-lg">${formatNumber(option.volume24h)}</p>
-                  <div className={`flex items-center gap-1 text-xs ${
-                    option.change24h >= 0 ? 'text-green-500' : 'text-red-500'
-                  }`}>
-                    {option.change24h >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-                    {Math.abs(option.change24h).toFixed(1)}%
-                  </div>
+              <div className="space-y-1">
+                <div className="flex justify-between text-sm">
+                  <span>Volume 24h:</span>
+                  <span className="font-medium">{formatCurrency(platform.totalVolume24h)}</span>
                 </div>
-                
-                <div className="bg-muted/50 p-3 rounded-lg">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-                    <Target className="h-3 w-3" />
-                    Open Interest
-                  </div>
-                  <p className="font-bold text-lg">${formatNumber(option.openInterest)}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {formatNumber(option.totalContracts)} contracts
-                  </p>
+                <div className="flex justify-between text-sm">
+                  <span>Open Interest:</span>
+                  <span className="font-medium">{formatCurrency(platform.totalOpenInterest)}</span>
                 </div>
-                
-                <div className="bg-muted/50 p-3 rounded-lg">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-                    <Zap className="h-3 w-3" />
-                    Implied Vol
-                  </div>
-                  <p className="font-bold text-lg text-purple-500">{option.impliedVolatility.toFixed(1)}%</p>
-                  <p className="text-xs text-muted-foreground">
-                    Avg Premium: {(option.avgPremium * 100).toFixed(2)}%
-                  </p>
-                </div>
-                
-                <div className="bg-muted/50 p-3 rounded-lg">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-                    <Users className="h-3 w-3" />
-                    Expiries
-                  </div>
-                  <p className="font-bold text-lg">{option.activeExpiries}</p>
-                  <p className="text-xs text-muted-foreground">
-                    Max: {option.maxExpiry}
-                  </p>
+                <div className="flex justify-between text-sm">
+                  <span>Contracts:</span>
+                  <span className="font-medium">{platform.totalContracts}</span>
                 </div>
               </div>
-              
-              {/* Fee Structure */}
-              <div className="border-t pt-3">
-                <h4 className="font-medium text-sm mb-2">Fee Structure</h4>
-                <div className="grid grid-cols-3 gap-2 text-xs">
-                  <div className="text-center">
-                    <p className="text-muted-foreground">Trading</p>
-                    <p className="font-medium">{(option.feeStructure.trading * 100).toFixed(2)}%</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-muted-foreground">Exercise</p>
-                    <p className="font-medium">{(option.feeStructure.exercise * 100).toFixed(2)}%</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-muted-foreground">Settlement</p>
-                    <p className="font-medium">{(option.feeStructure.settlement * 100).toFixed(2)}%</p>
-                  </div>
-                </div>
+
+              <div className="flex flex-wrap gap-1">
+                {platform.supportedAssets.slice(0, 3).map((asset) => (
+                  <span key={asset} className="px-1.5 py-0.5 text-xs bg-muted rounded">
+                    {asset}
+                  </span>
+                ))}
+                {platform.supportedAssets.length > 3 && (
+                  <span className="px-1.5 py-0.5 text-xs bg-muted rounded">
+                    +{platform.supportedAssets.length - 3}
+                  </span>
+                )}
               </div>
-              
-              {/* Features */}
-              <div>
-                <h4 className="font-medium text-sm mb-2">Features</h4>
-                <div className="flex flex-wrap gap-1">
-                  {option.features.map(feature => (
-                    <Badge key={feature} variant="secondary" className="text-xs">
-                      {feature}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-              
-              {/* Supported Assets */}
-              <div>
-                <h4 className="font-medium text-sm mb-2">Supported Assets</h4>
-                <div className="flex flex-wrap gap-1">
-                  {option.supportedAssets.slice(0, 4).map(asset => (
-                    <Badge key={asset} variant="outline" className="text-xs">
-                      {asset}
-                    </Badge>
-                  ))}
-                  {option.supportedAssets.length > 4 && (
-                    <Badge variant="outline" className="text-xs">
-                      +{option.supportedAssets.length - 4} more
-                    </Badge>
-                  )}
-                </div>
-              </div>
-              
-              {/* Strike Range */}
-              <div className="border-t pt-3">
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-muted-foreground">Strike Range:</span>
-                  <span className="font-medium">${option.minStrike} - ${formatNumber(option.maxStrike)}</span>
-                </div>
-                <div className="flex justify-between items-center text-sm mt-1">
-                  <span className="text-muted-foreground">24h Traders:</span>
-                  <span className="font-medium">{formatNumber(option.uniqueTraders24h)}</span>
-                </div>
-              </div>
-              
-              {/* Actions */}
-              <div className="flex gap-2 pt-2">
-                <Button size="sm" className="flex-1">
-                  <Calculator className="h-3 w-3 mr-1" />
-                  Trade Options
-                </Button>
-                <Button size="sm" variant="outline" className="flex-1">
-                  View Chain
-                </Button>
-              </div>
-            </CardContent>
+            </div>
           </Card>
         ))}
       </div>
-      
-      {filteredOptions.length === 0 && (
-        <div className="text-center py-20">
-          <p className="text-muted-foreground">No options platforms found matching your search.</p>
+
+      {/* Underlying Assets Stats */}
+      <Card className="p-4">
+        <h3 className="font-semibold mb-4">Underlying Assets</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {underlyingAssets.map((asset) => (
+            <div key={asset.symbol} className="p-3 border rounded-lg">
+              <div className="flex justify-between items-start mb-2">
+                <span className="font-medium">{asset.symbol}</span>
+                <span className={`text-sm ${asset.priceChange24h >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  {asset.priceChange24h >= 0 ? '+' : ''}{asset.priceChange24h.toFixed(2)}%
+                </span>
+              </div>
+              <p className="text-lg font-bold mb-2">${asset.currentPrice.toFixed(2)}</p>
+              <div className="space-y-1 text-xs">
+                <div className="flex justify-between">
+                  <span>IV:</span>
+                  <span>{(asset.impliedVolatility * 100).toFixed(0)}%</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>P/C Ratio:</span>
+                  <span>{asset.putCallRatio.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Call OI:</span>
+                  <span>{formatCurrency(asset.totalCallOI)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Put OI:</span>
+                  <span>{formatCurrency(asset.totalPutOI)}</span>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
+      </Card>
+
+      {/* Total Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <Card className="p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Total Volume 24h</p>
+              <p className="text-2xl font-bold">{formatCurrency(platforms.reduce((sum, p) => sum + p.totalVolume24h, 0))}</p>
+            </div>
+            <DollarSign className="h-8 w-8 text-green-500" />
+          </div>
+        </Card>
+
+        <Card className="p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Open Interest</p>
+              <p className="text-2xl font-bold">{formatCurrency(platforms.reduce((sum, p) => sum + p.totalOpenInterest, 0))}</p>
+            </div>
+            <Target className="h-8 w-8 text-blue-500" />
+          </div>
+        </Card>
+
+        <Card className="p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Total Contracts</p>
+              <p className="text-2xl font-bold">{platforms.reduce((sum, p) => sum + p.totalContracts, 0)}</p>
+            </div>
+            <Calendar className="h-8 w-8 text-purple-500" />
+          </div>
+        </Card>
+
+        <Card className="p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Platforms</p>
+              <p className="text-2xl font-bold">{platforms.length}</p>
+            </div>
+            <Users className="h-8 w-8 text-orange-500" />
+          </div>
+        </Card>
+      </div>
+
+      {/* Filters */}
+      <Card className="p-4">
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-4 items-center">
+          <select
+            value={platformFilter}
+            onChange={(e) => setPlatformFilter(e.target.value)}
+            className="px-3 py-2 border rounded-lg bg-background text-sm"
+          >
+            <option value="all">All Platforms</option>
+            {platforms.map((platform) => (
+              <option key={platform.name} value={platform.name}>
+                {platform.name}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={underlyingFilter}
+            onChange={(e) => setUnderlyingFilter(e.target.value)}
+            className="px-3 py-2 border rounded-lg bg-background text-sm"
+          >
+            <option value="all">All Assets</option>
+            {underlyingAssets.map((asset) => (
+              <option key={asset.symbol} value={asset.symbol}>
+                {asset.symbol}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={typeFilter}
+            onChange={(e) => setTypeFilter(e.target.value)}
+            className="px-3 py-2 border rounded-lg bg-background text-sm"
+          >
+            <option value="all">All Types</option>
+            <option value="call">Calls</option>
+            <option value="put">Puts</option>
+          </select>
+
+          <select
+            value={moneynessFilter}
+            onChange={(e) => setMoneynessFilter(e.target.value)}
+            className="px-3 py-2 border rounded-lg bg-background text-sm"
+          >
+            <option value="all">All Moneyness</option>
+            <option value="ITM">In the Money</option>
+            <option value="ATM">At the Money</option>
+            <option value="OTM">Out of the Money</option>
+          </select>
+
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as any)}
+            className="px-3 py-2 border rounded-lg bg-background text-sm"
+          >
+            <option value="volume">Sort by Volume</option>
+            <option value="openInterest">Sort by OI</option>
+            <option value="premium">Sort by Premium</option>
+            <option value="expiry">Sort by Expiry</option>
+          </select>
+
+          <Button variant="outline" size="sm">
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
+        </div>
+      </Card>
+
+      {/* Options Chain */}
+      <Card className="overflow-hidden">
+        <div className="p-4 border-b">
+          <h3 className="font-semibold">Options Chain</h3>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-muted/50">
+              <tr>
+                <th className="text-left p-3 font-medium">Contract</th>
+                <th className="text-center p-3 font-medium">Platform</th>
+                <th className="text-right p-3 font-medium">Strike</th>
+                <th className="text-right p-3 font-medium">Premium</th>
+                <th className="text-right p-3 font-medium">IV</th>
+                <th className="text-right p-3 font-medium">Delta</th>
+                <th className="text-right p-3 font-medium">Gamma</th>
+                <th className="text-right p-3 font-medium">Volume</th>
+                <th className="text-right p-3 font-medium">Open Interest</th>
+                <th className="text-center p-3 font-medium">Expiry</th>
+                <th className="text-center p-3 font-medium">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredAndSortedOptions.map((option) => (
+                <tr key={option.id} className="border-t hover:bg-muted/30 transition-colors">
+                  <td className="p-3">
+                    <div className="flex items-center gap-2">
+                      <span className={`px-2 py-1 text-xs rounded uppercase font-medium ${getMoneynessColor(option.moneyness)}`}>
+                        {option.moneyness}
+                      </span>
+                      <div>
+                        <p className="font-medium">
+                          {option.underlying} 
+                          <span className={`ml-1 ${getTypeColor(option.type)}`}>
+                            {option.type.toUpperCase()}
+                          </span>
+                        </p>
+                        <p className="text-xs text-muted-foreground">{option.timeToExpiry}d to expiry</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="p-3 text-center">
+                    <span className={`px-2 py-1 text-xs rounded font-medium ${getPlatformColor(option.platform)}`}>
+                      {option.platform.split(' ')[0]}
+                    </span>
+                  </td>
+                  <td className="p-3 text-right font-mono">
+                    ${option.strike.toFixed(2)}
+                  </td>
+                  <td className="p-3 text-right font-mono font-medium">
+                    ${option.premium.toFixed(2)}
+                  </td>
+                  <td className="p-3 text-right">
+                    {(option.impliedVolatility * 100).toFixed(0)}%
+                  </td>
+                  <td className="p-3 text-right">
+                    <span className={option.delta >= 0 ? 'text-green-600' : 'text-red-600'}>
+                      {option.delta.toFixed(3)}
+                    </span>
+                  </td>
+                  <td className="p-3 text-right">
+                    {option.gamma.toFixed(3)}
+                  </td>
+                  <td className="p-3 text-right font-mono">
+                    {formatCurrency(option.volume24h)}
+                  </td>
+                  <td className="p-3 text-right font-mono">
+                    {formatCurrency(option.openInterest)}
+                  </td>
+                  <td className="p-3 text-center text-sm">
+                    {formatDate(option.expiry)}
+                  </td>
+                  <td className="p-3 text-center">
+                    <div className="flex gap-1 justify-center">
+                      <Button size="sm" variant="outline">
+                        Buy
+                      </Button>
+                      <Button size="sm" variant="ghost">
+                        <Calculator className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      {filteredAndSortedOptions.length === 0 && (
+        <Card className="p-8 text-center">
+          <Target className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+          <p className="text-muted-foreground">No options found matching your criteria</p>
+        </Card>
       )}
+
+      {/* Options Info */}
+      <Card className="p-4 border-blue-200 bg-blue-50">
+        <div className="flex items-start gap-3">
+          <div className="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center flex-shrink-0 mt-0.5">
+            <span className="text-white text-xs font-bold">i</span>
+          </div>
+          <div>
+            <h4 className="font-medium text-blue-800 mb-1">Options Trading Information</h4>
+            <p className="text-sm text-blue-700">
+              Options are complex financial instruments that can result in significant losses. ITM = In the Money, 
+              ATM = At the Money, OTM = Out of the Money. Greeks measure option sensitivities to various factors.
+              Always understand the risks before trading options.
+            </p>
+          </div>
+        </div>
+      </Card>
     </div>
   );
 }

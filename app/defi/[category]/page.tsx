@@ -2,96 +2,92 @@ import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { Suspense } from 'react';
 import LoadingSpinner from '@/components/LoadingSpinner';
-import OverviewSection from './components/OverviewSection';
+import ErrorBoundary from './components/ErrorBoundary';
+import DeFAISection from './components/DeFAISection';
+import AggregatorsSection from './components/AggregatorsSection';
+import YieldAggregatorsSection from './components/YieldAggregatorsSection';
+import StakingSection from './components/StakingSection';
+import StablecoinsSection from './components/StablecoinsSection';
+import OraclesSection from './components/OraclesSection';
+import ToolsSection from './components/ToolsSection';
 import CoinsScreenerSection from './components/CoinsScreenerSection';
-import MemecoinsScreenerSection from './components/MemecoinScreenerSection';
+import MemecoinScreenerSection from './components/MemecoinScreenerSection';
 import LaunchpadsSection from './components/LaunchpadsSection';
 import AMMsSection from './components/AMMsSection';
 import CLOBsSection from './components/CLOBsSection';
 import PerpetualsSection from './components/PerpetualsSection';
 import OptionsSection from './components/OptionsSection';
-import TGBotsSection from './components/TGBotsSection';
 
 const categoryConfig = {
-  'overview': {
-    title: 'DeFi Overview',
-    description: 'Comprehensive overview of DeFi ecosystem on Solana',
-    component: OverviewSection
-  },
-  'coins-screener': {
-    title: 'Coins Screener',
-    description: 'Advanced token screening with real-time market data',
-    component: CoinsScreenerSection
-  },
-  'memecoins-screener': {
-    title: 'Memecoins Screener',
-    description: 'Track memecoins that are yet to be bonded on major exchanges',
-    component: MemecoinsScreenerSection
-  },
-  'launchpads': {
-    title: 'Launchpads',
-    description: 'Analytics for token launch platforms and IDO statistics',
-    component: LaunchpadsSection
-  },
-  'amms': {
-    title: 'AMMs',
-    description: 'Automated Market Makers liquidity and volume analytics',
-    component: AMMsSection
-  },
-  'clobs': {
-    title: 'CLOBs',
-    description: 'Central Limit Order Book exchanges and trading data',
-    component: CLOBsSection
-  },
-  'perpetuals': {
-    title: 'Perpetuals',
-    description: 'Perpetual futures trading platforms and analytics',
-    component: PerpetualsSection
-  },
-  'options': {
-    title: 'Options',
-    description: 'Options trading platforms and derivatives analytics',
-    component: OptionsSection
-  },
-  'bots': {
-    title: 'TG Bots & Other bots',
-    description: 'Telegram and trading bot analytics and performance',
-    component: TGBotsSection
-  },
   'defai': {
     title: 'DeFAI',
     description: 'AI-powered DeFi tools and analytics platforms',
-    component: () => <div className="text-center py-20"><p className="text-muted-foreground">DeFAI section coming soon...</p></div>
+    component: DeFAISection
   },
   'aggregators': {
     title: 'Aggregators',
     description: 'DEX aggregators and swap optimization platforms',
-    component: () => <div className="text-center py-20"><p className="text-muted-foreground">Aggregators section coming soon...</p></div>
+    component: AggregatorsSection
   },
   'yield-agg': {
     title: 'Yield Aggregators',
     description: 'Yield farming and optimization platform analytics',
-    component: () => <div className="text-center py-20"><p className="text-muted-foreground">Yield Aggregators section coming soon...</p></div>
+    component: YieldAggregatorsSection
   },
   'staking': {
     title: 'Staking',
     description: 'Staking pools, validators, and reward analytics',
-    component: () => <div className="text-center py-20"><p className="text-muted-foreground">Staking section coming soon...</p></div>
+    component: StakingSection
   },
   'stablecoins': {
     title: 'Stablecoins',
     description: 'Stablecoin analytics, peg stability, and market data',
-    component: () => <div className="text-center py-20"><p className="text-muted-foreground">Stablecoins section coming soon...</p></div>
+    component: StablecoinsSection
   },
   'oracles': {
     title: 'Data Providers & Oracles',
     description: 'Oracle networks and data feed analytics',
-    component: () => <div className="text-center py-20"><p className="text-muted-foreground">Data Providers & Oracles section coming soon...</p></div>
+    component: OraclesSection
   },
   'tools': {
     title: 'Tools',
     description: 'DeFi tools, utilities, and infrastructure platforms',
-    component: () => <div className="text-center py-20"><p className="text-muted-foreground">Tools section coming soon...</p></div>
+    component: ToolsSection
+  },
+  'coins-screener': {
+    title: 'Coins Screener',
+    description: 'Solana token screening and analytics platform',
+    component: CoinsScreenerSection
+  },
+  'memecoins': {
+    title: 'Memecoin Screener',
+    description: 'Solana memecoin tracking and analysis tools',
+    component: MemecoinScreenerSection
+  },
+  'launchpads': {
+    title: 'Launchpads',
+    description: 'Solana token launch platforms and IDO analytics',
+    component: LaunchpadsSection
+  },
+  'amms': {
+    title: 'AMMs',
+    description: 'Solana automated market makers and liquidity pools',
+    component: AMMsSection
+  },
+  'clobs': {
+    title: 'CLOBs',
+    description: 'Solana central limit order books and spot trading',
+    component: CLOBsSection
+  },
+  'perpetuals': {
+    title: 'Perpetuals',
+    description: 'Solana perpetual futures and derivatives trading',
+    component: PerpetualsSection
+  },
+  'options': {
+    title: 'Options',
+    description: 'Solana options trading and derivatives analytics',
+    component: OptionsSection
   }
 };
 
@@ -144,13 +140,15 @@ export default function DeFiCategoryPage({ params }: PageProps) {
           </p>
         </div>
         
-        <Suspense fallback={
-          <div className="flex items-center justify-center py-20">
-            <LoadingSpinner />
-          </div>
-        }>
-          <ComponentToRender />
-        </Suspense>
+        <ErrorBoundary componentName={config.title}>
+          <Suspense fallback={
+            <div className="flex items-center justify-center py-20">
+              <LoadingSpinner />
+            </div>
+          }>
+            <ComponentToRender />
+          </Suspense>
+        </ErrorBoundary>
       </div>
     </div>
   );
