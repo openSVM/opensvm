@@ -8,15 +8,10 @@ import { Input } from '@/components/ui/input';
 import { 
   Shield, 
   TrendingUp, 
-  Clock, 
   Users, 
-  Lock,
-  AlertTriangle,
-  CheckCircle,
   DollarSign,
   Activity,
   Search,
-  Filter,
   ArrowUpDown
 } from 'lucide-react';
 

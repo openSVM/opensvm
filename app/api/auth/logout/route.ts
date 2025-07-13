@@ -3,10 +3,10 @@
  * POST /api/auth/logout
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { clearSessionCookie } from '@/lib/auth-server';
 
-export async function POST(request: NextRequest) {
+export async function POST() {
   try {
     // Clear session cookie
     clearSessionCookie();

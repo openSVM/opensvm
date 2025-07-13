@@ -62,8 +62,9 @@ export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
 
 export async function POST(request: NextRequest) {
+  let body: any;
   try {
-    const body = await request.json();
+    body = await request.json();
     
     // Try to get from cache first
     const cacheKey = getCacheKey(body.method, body.params);
@@ -190,4 +191,3 @@ export async function POST(request: NextRequest) {
     }, { status });
   }
 }
-

@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useCallback, useState, useEffect } from 'react';
+import { useRef, useCallback, useState } from 'react';
 import cytoscape from 'cytoscape';
 import { initializeCytoscape } from '../layout';
 import { setupGraphInteractions } from '../interaction-handlers';
@@ -59,8 +59,16 @@ export function useGraphInitialization() {
 
       cyRef.current = cy;
 
-      // Setup interactions
-      setupGraphInteractions(cy, onTransactionSelect);
+      // Setup interactions with dummy refs - this may need proper implementation
+      const dummyContainerRef = { current: null };
+      const dummyFocusSignatureRef = { current: '' };
+      const dummySetViewportState = () => {};
+      const wrappedOnTransactionSelect = (signature: string, _incrementalLoad: boolean) => {
+        if (onTransactionSelect) {
+          onTransactionSelect(signature);
+        }
+      };
+      setupGraphInteractions(cy, dummyContainerRef, dummyFocusSignatureRef, wrappedOnTransactionSelect, dummySetViewportState);
 
       // Mark as initialized
       isInitialized.current = true;

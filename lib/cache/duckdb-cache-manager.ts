@@ -8,6 +8,20 @@
 import * as duckdb from '@duckdb/duckdb-wasm';
 import { generateSecureUUID } from '@/lib/crypto-utils';
 
+// Type definitions for DuckDB result objects
+interface DuckDBRow {
+  data?: Uint8Array;
+  compressed?: boolean;
+  ttl?: number;
+  timestamp?: number;
+  entry_count?: number;
+  total_size?: number;
+  oldest_entry?: number;
+  newest_entry?: number;
+  total_entries?: number;
+  [key: string]: any;
+}
+
 export interface CacheEntry {
   id: string;
   key: string;
@@ -200,10 +214,10 @@ export class DuckDBCacheManager {
 
     try {
       const result = await this.conn!.query(`
-        SELECT data, compressed, ttl, timestamp 
-        FROM cache_entries 
-        WHERE cache_key = ? AND (timestamp + ttl) > ?
-      `, [key, Date.now()]);
+        SELECT data, compressed, ttl, timestamp
+        FROM cache_entries
+        WHERE cache_key = '${key.replace(/'/g, "''")}' AND (timestamp + ttl) > ${Date.now()}
+      `);
 
       if (result.numRows === 0) {
         this.stats.misses++;
@@ -212,16 +226,26 @@ export class DuckDBCacheManager {
 
       // Update access statistics
       await this.conn!.query(`
-        UPDATE cache_entries 
-        SET last_accessed = ?, hit_count = hit_count + 1 
-        WHERE cache_key = ?
-      `, [Date.now(), key]);
+        UPDATE cache_entries
+        SET last_accessed = ${Date.now()}, hit_count = hit_count + 1
+        WHERE cache_key = '${key.replace(/'/g, "''")}'
+      `);
 
       this.stats.hits++;
 
-      const row = result.get(0);
+      const row = result.get(0) as DuckDBRow | null;
+      if (!row) {
+        this.stats.misses++;
+        return null;
+      }
+
       const dataBlob = row.data;
       const isCompressed = row.compressed;
+
+      if (!dataBlob) {
+        this.stats.misses++;
+        return null;
+      }
 
       // Decompress if needed and parse
       let data;
@@ -267,10 +291,10 @@ export class DuckDBCacheManager {
 
       // Upsert cache entry
       await this.conn!.query(`
-        INSERT OR REPLACE INTO cache_entries 
+        INSERT OR REPLACE INTO cache_entries
         (id, cache_key, data, timestamp, ttl, size_bytes, last_accessed, hit_count, compressed)
-        VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?)
-      `, [id, key, dataBlob, now, ttl, dataBlob.length, now, compressed]);
+        VALUES ('${id}', '${key.replace(/'/g, "''")}', '${Buffer.from(dataBlob).toString('base64')}', ${now}, ${ttl}, ${dataBlob.length}, ${now}, 0, ${compressed})
+      `);
 
     } catch (error) {
       console.error('Cache set error:', error);
@@ -281,7 +305,7 @@ export class DuckDBCacheManager {
     if (!this.conn) return;
 
     try {
-      await this.conn.query(`DELETE FROM cache_entries WHERE cache_key = ?`, [key]);
+      await this.conn.query(`DELETE FROM cache_entries WHERE cache_key = '${key.replace(/'/g, "''")}'`);
     } catch (error) {
       console.error('Cache delete error:', error);
     }
@@ -309,13 +333,16 @@ export class DuckDBCacheManager {
 
     try {
       const result = await this.conn!.query(`
-        SELECT data FROM cached_transactions 
-        WHERE signature = ? AND cached_at > ?
-      `, [signature, Date.now() - this.config.defaultTtlMs]);
+        SELECT data FROM cached_transactions
+        WHERE signature = '${signature.replace(/'/g, "''")}' AND cached_at > ${Date.now() - this.config.defaultTtlMs}
+      `);
 
       if (result.numRows === 0) return null;
 
-      const dataBlob = result.get(0).data;
+      const row = result.get(0) as DuckDBRow | null;
+      if (!row || !row.data) return null;
+      
+      const dataBlob = row.data;
       return JSON.parse(new TextDecoder().decode(dataBlob));
     } catch (error) {
       console.error('Transaction cache error:', error);
@@ -330,22 +357,16 @@ export class DuckDBCacheManager {
       const data = new TextEncoder().encode(JSON.stringify(transaction));
       const now = Date.now();
 
+      const logs = JSON.stringify(transaction.meta?.logMessages || []);
+      const accounts = JSON.stringify(transaction.transaction?.message?.accountKeys || []);
+      const programs = JSON.stringify([]);
+      const dataBase64 = Buffer.from(data).toString('base64');
+      
       await this.conn!.query(`
-        INSERT OR REPLACE INTO cached_transactions 
+        INSERT OR REPLACE INTO cached_transactions
         (signature, slot, block_time, fee, success, logs, accounts, programs, cached_at, data)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `, [
-        signature,
-        transaction.slot || 0,
-        transaction.blockTime || 0,
-        transaction.meta?.fee || 0,
-        !transaction.meta?.err,
-        transaction.meta?.logMessages || [],
-        transaction.transaction?.message?.accountKeys || [],
-        [], // Programs extracted from account keys
-        now,
-        data
-      ]);
+        VALUES ('${signature.replace(/'/g, "''")}', ${transaction.slot || 0}, ${transaction.blockTime || 0}, ${transaction.meta?.fee || 0}, ${!transaction.meta?.err}, '${logs.replace(/'/g, "''")}', '${accounts.replace(/'/g, "''")}', '${programs}', ${now}, '${dataBase64}')
+      `);
     } catch (error) {
       console.error('Set transaction cache error:', error);
     }
@@ -356,13 +377,16 @@ export class DuckDBCacheManager {
 
     try {
       const result = await this.conn!.query(`
-        SELECT data FROM cached_blocks 
-        WHERE slot = ? AND cached_at > ?
-      `, [slot, Date.now() - this.config.defaultTtlMs]);
+        SELECT data FROM cached_blocks
+        WHERE slot = ${slot} AND cached_at > ${Date.now() - this.config.defaultTtlMs}
+      `);
 
       if (result.numRows === 0) return null;
 
-      const dataBlob = result.get(0).data;
+      const row = result.get(0) as DuckDBRow | null;
+      if (!row || !row.data) return null;
+      
+      const dataBlob = row.data;
       return JSON.parse(new TextDecoder().decode(dataBlob));
     } catch (error) {
       console.error('Block cache error:', error);
@@ -377,19 +401,14 @@ export class DuckDBCacheManager {
       const data = new TextEncoder().encode(JSON.stringify(block));
       const now = Date.now();
 
+      const dataBase64 = Buffer.from(data).toString('base64');
+      const blockhash = (block.blockhash || '').replace(/'/g, "''");
+      
       await this.conn!.query(`
-        INSERT OR REPLACE INTO cached_blocks 
+        INSERT OR REPLACE INTO cached_blocks
         (slot, blockhash, parent_slot, block_time, transaction_count, cached_at, data)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-      `, [
-        slot,
-        block.blockhash || '',
-        block.parentSlot || 0,
-        block.blockTime || 0,
-        block.transactions?.length || 0,
-        now,
-        data
-      ]);
+        VALUES (${slot}, '${blockhash}', ${block.parentSlot || 0}, ${block.blockTime || 0}, ${block.transactions?.length || 0}, ${now}, '${dataBase64}')
+      `);
     } catch (error) {
       console.error('Set block cache error:', error);
     }
@@ -400,13 +419,16 @@ export class DuckDBCacheManager {
 
     try {
       const result = await this.conn!.query(`
-        SELECT data FROM cached_accounts 
-        WHERE address = ? AND last_updated > ?
-      `, [address, Date.now() - (5 * 60 * 1000)]); // 5 minute TTL for accounts
+        SELECT data FROM cached_accounts
+        WHERE address = '${address.replace(/'/g, "''")}' AND last_updated > ${Date.now() - (5 * 60 * 1000)}
+      `); // 5 minute TTL for accounts
 
       if (result.numRows === 0) return null;
 
-      const dataBlob = result.get(0).data;
+      const row = result.get(0) as DuckDBRow | null;
+      if (!row || !row.data) return null;
+      
+      const dataBlob = row.data;
       return JSON.parse(new TextDecoder().decode(dataBlob));
     } catch (error) {
       console.error('Account cache error:', error);
@@ -421,19 +443,14 @@ export class DuckDBCacheManager {
       const data = new TextEncoder().encode(JSON.stringify(account));
       const now = Date.now();
 
+      const dataBase64 = Buffer.from(data).toString('base64');
+      const owner = (account.owner || '').replace(/'/g, "''");
+      
       await this.conn!.query(`
-        INSERT OR REPLACE INTO cached_accounts 
+        INSERT OR REPLACE INTO cached_accounts
         (address, owner, lamports, executable, rent_epoch, last_updated, data)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-      `, [
-        address,
-        account.owner || '',
-        account.lamports || 0,
-        account.executable || false,
-        account.rentEpoch || 0,
-        now,
-        data
-      ]);
+        VALUES ('${address.replace(/'/g, "''")}', '${owner}', ${account.lamports || 0}, ${account.executable || false}, ${account.rentEpoch || 0}, ${now}, '${dataBase64}')
+      `);
     } catch (error) {
       console.error('Set account cache error:', error);
     }
@@ -450,7 +467,11 @@ export class DuckDBCacheManager {
         FROM cache_entries
       `);
 
-      const { entry_count, total_size } = sizeResult.get(0);
+      const row = sizeResult.get(0) as DuckDBRow | null;
+      if (!row) return;
+      
+      const entry_count = row.entry_count || 0;
+      const total_size = row.total_size || 0;
 
       if (total_size > this.config.maxSizeBytes || entry_count > this.config.maxEntries) {
         await this.evictEntries();
@@ -500,7 +521,10 @@ export class DuckDBCacheManager {
           break;
       }
 
-      await this.conn.query(evictionQuery, this.config.evictionPolicy === 'ttl' ? [Date.now()] : []);
+      if (this.config.evictionPolicy === 'ttl') {
+        evictionQuery = evictionQuery.replace('?', Date.now().toString());
+      }
+      await this.conn.query(evictionQuery);
       this.stats.evictions++;
     } catch (error) {
       console.error('Eviction error:', error);
@@ -520,17 +544,17 @@ export class DuckDBCacheManager {
     try {
       // Remove expired entries
       await this.conn.query(`
-        DELETE FROM cache_entries 
-        WHERE (timestamp + ttl) < ?
-      `, [Date.now()]);
+        DELETE FROM cache_entries
+        WHERE (timestamp + ttl) < ${Date.now()}
+      `);
 
       // Remove expired blockchain data
       const expiredTime = Date.now() - this.config.defaultTtlMs;
       
-      await this.conn.query(`DELETE FROM cached_transactions WHERE cached_at < ?`, [expiredTime]);
-      await this.conn.query(`DELETE FROM cached_blocks WHERE cached_at < ?`, [expiredTime]);
-      await this.conn.query(`DELETE FROM cached_accounts WHERE last_updated < ?`, [expiredTime]);
-      await this.conn.query(`DELETE FROM cached_tokens WHERE cached_at < ?`, [expiredTime]);
+      await this.conn.query(`DELETE FROM cached_transactions WHERE cached_at < ${expiredTime}`);
+      await this.conn.query(`DELETE FROM cached_blocks WHERE cached_at < ${expiredTime}`);
+      await this.conn.query(`DELETE FROM cached_accounts WHERE last_updated < ${expiredTime}`);
+      await this.conn.query(`DELETE FROM cached_tokens WHERE cached_at < ${expiredTime}`);
 
     } catch (error) {
       console.error('Cleanup error:', error);
@@ -560,7 +584,23 @@ export class DuckDBCacheManager {
         FROM cache_entries
       `);
 
-      const { total_entries, total_size, oldest_entry, newest_entry } = result.get(0);
+      const row = result.get(0) as DuckDBRow | null;
+      if (!row) {
+        return {
+          totalEntries: 0,
+          totalSize: 0,
+          hitRate: 0,
+          missRate: 1,
+          evictionCount: this.stats.evictions,
+          oldestEntry: 0,
+          newestEntry: 0
+        };
+      }
+      
+      const total_entries = row.total_entries || 0;
+      const total_size = row.total_size || 0;
+      const oldest_entry = row.oldest_entry || 0;
+      const newest_entry = row.newest_entry || 0;
       const totalRequests = this.stats.hits + this.stats.misses;
 
       return {

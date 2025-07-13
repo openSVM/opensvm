@@ -5,7 +5,7 @@
 
 'use client';
 
-import { useEffect, useState, useCallback, memo } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { UserProfile } from '@/types/user-history';
@@ -45,8 +45,6 @@ import {
   Lock,
   Coins,
   Share2,
-  Copy,
-  Link as LinkIcon,
   MessageSquare
 } from 'lucide-react';
 

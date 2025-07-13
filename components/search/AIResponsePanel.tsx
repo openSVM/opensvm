@@ -5,11 +5,11 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardHeader, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { openrouter } from '@/lib/openrouter-api';
-import { moralis } from '@/lib/moralis-api';
+import openrouter from '@/lib/openrouter-api';
+import moralis from '@/lib/moralis-api';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Tooltip } from '@/components/ui/tooltip';
 import { Copy, Info, ExternalLink, RefreshCw, ThumbsUp, ThumbsDown } from 'lucide-react';
 
 interface AIResponsePanelProps {
@@ -36,7 +36,7 @@ const AIResponsePanel: React.FC<AIResponsePanelProps> = ({ query, onClose }) => 
   const [error, setError] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [selectedModel, setSelectedModel] = useState<string>('');
-  const [activeTab, setActiveTab] = useState<string>('ai');
+  const [_activeTab, _setActiveTab] = useState<string>('ai');
   const [copySuccess, setCopySuccess] = useState<boolean>(false);
   const [feedbackGiven, setFeedbackGiven] = useState<'up' | 'down' | null>(null);
 
@@ -93,7 +93,7 @@ const AIResponsePanel: React.FC<AIResponsePanelProps> = ({ query, onClose }) => 
       // Use streaming response
       await openrouter.generateStreamingAIResponse(
         prompt,
-        (chunk) => {
+        (chunk: string) => {
           setAiResponse(prev => prev + chunk);
         },
         () => {
@@ -204,19 +204,12 @@ const AIResponsePanel: React.FC<AIResponsePanelProps> = ({ query, onClose }) => 
             <h3 className="text-lg font-semibold">AI-Enhanced Results</h3>
             {blockchainDataType !== 'unknown' && getDataTypeBadge()}
             {selectedModel && (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <div className="flex items-center text-xs text-muted-foreground">
-                      <Info className="h-3 w-3 mr-1" />
-                      {getModelInfo()}
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Using {getModelInfo()} for this analysis</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+              <Tooltip content={`Using ${getModelInfo()} for this analysis`}>
+                <div className="flex items-center text-xs text-muted-foreground">
+                  <Info className="h-3 w-3 mr-1" />
+                  {getModelInfo()}
+                </div>
+              </Tooltip>
             )}
           </div>
           
@@ -258,7 +251,7 @@ const AIResponsePanel: React.FC<AIResponsePanelProps> = ({ query, onClose }) => 
         </div>
       </CardHeader>
       
-      <Tabs defaultValue="ai" value={activeTab} onValueChange={setActiveTab} className="w-full">
+      <Tabs defaultValue="ai" className="w-full">
         <TabsList className="grid grid-cols-2 mx-4 mt-2">
           <TabsTrigger value="ai">AI Analysis</TabsTrigger>
           <TabsTrigger value="data">Blockchain Data</TabsTrigger>

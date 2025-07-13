@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 
 // Comprehensive DeFi Overview API aggregating data from all DeFi sectors
 interface OverviewMetrics {
@@ -244,7 +244,7 @@ async function fetchOverviewData(): Promise<OverviewMetrics> {
   }
 }
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const overview = await fetchOverviewData();
 

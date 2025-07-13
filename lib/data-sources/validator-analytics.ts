@@ -10,7 +10,7 @@ import {
 } from '@/lib/types/solana-analytics';
 
 export class ValidatorAnalytics extends BaseAnalytics {
-  private connection: Connection;
+  protected connection: Connection;
   private validators: Map<string, ValidatorMetrics> = new Map();
 
   constructor(config: AnalyticsConfig) {
@@ -126,9 +126,12 @@ export class ValidatorAnalytics extends BaseAnalytics {
           commission: validator.commission,
           activatedStake: validator.activatedStake,
           lastVote: validator.lastVote,
-          rootSlot: validator.rootSlot,
-          credits: validator.epochCredits,
-          epochCredits: validator.epochCredits,
+          credits: Array.isArray(validator.epochCredits)
+            ? validator.epochCredits.reduce((sum, arr) => sum + (arr[2] || 0), 0)
+            : 0,
+          epochCredits: Array.isArray(validator.epochCredits)
+            ? validator.epochCredits.reduce((sum, arr) => sum + (arr[2] || 0), 0)
+            : 0,
           version: nodeInfo?.version || 'unknown',
           status: voteAccounts.current.includes(validator) ? 'active' : 'delinquent',
           datacenter: geoInfo.datacenter,
@@ -255,7 +258,15 @@ export class ValidatorAnalytics extends BaseAnalytics {
         averageCommission,
         nakamotoCoefficient,
         averageUptime: averageUptime / 100,
-        networkHealth: this.calculateNetworkHealth(averageUptime, activeValidators / validators.length)
+        networkHealth: this.calculateNetworkHealth(averageUptime, activeValidators / validators.length),
+        blocksProduced: 0, // TODO: calculate actual value
+        expectedBlocks: 0, // TODO: calculate actual value
+        missedBlocks: 0, // TODO: calculate actual value
+        productionRate: 0, // TODO: calculate actual value
+        voteAccuracy: 0, // TODO: calculate actual value
+        skipRate: 0, // TODO: calculate actual value
+        slashingEvents: 0, // TODO: calculate actual value
+        performanceScore: 0 // TODO: calculate actual value
       };
       
       this.emit('performance', performanceData);
@@ -297,11 +308,24 @@ export class ValidatorAnalytics extends BaseAnalytics {
       const clientDist = this.calculateClientDistribution(validators);
       
       const decentralizationData: NetworkDecentralization = {
-        geograficDistribution: geograficDist,
-        datacenterDistribution: datacenterDist,
+        geograficDistribution: geograficDist.map(item => ({
+          country: item.name,
+          validatorCount: item.validatorCount,
+          stakePercent: item.stakePercent
+        })),
+        datacenterDistribution: datacenterDist.map(item => ({
+          datacenter: item.name,
+          validatorCount: item.validatorCount,
+          stakePercent: item.stakePercent
+        })),
         clientDistribution: clientDist,
         herfindahlIndex: this.calculateHerfindahlIndex(validators, totalStake),
-        nakamotoCoefficient: await this.calculateNakamotoCoefficient(validators, totalStake)
+        nakamotoCoefficient: await this.calculateNakamotoCoefficient(validators, totalStake),
+        topValidatorsStakeShare: 0, // TODO: calculate actual value
+        geographicDistribution: { continents: {}, countries: {}, regions: {}, diversityScore: 0 }, // TODO: calculate actual value
+        clientDiversity: { clients: {}, diversityScore: 0, majorityConcern: false }, // TODO: calculate actual value
+        stakingRatio: 0, // TODO: calculate actual value
+        validatorCount: validators.length
       };
       
       this.emit('decentralization', decentralizationData);
@@ -418,7 +442,15 @@ export class ValidatorAnalytics extends BaseAnalytics {
         averageCommission,
         nakamotoCoefficient,
         averageUptime: averageUptime / 100,
-        networkHealth: this.calculateNetworkHealth(averageUptime, activeValidators / validators.length)
+        networkHealth: this.calculateNetworkHealth(averageUptime, activeValidators / validators.length),
+        blocksProduced: 0, // TODO: calculate actual value
+        expectedBlocks: 0, // TODO: calculate actual value
+        missedBlocks: 0, // TODO: calculate actual value
+        productionRate: 0, // TODO: calculate actual value
+        voteAccuracy: 0, // TODO: calculate actual value
+        skipRate: 0, // TODO: calculate actual value
+        slashingEvents: 0, // TODO: calculate actual value
+        performanceScore: 0 // TODO: calculate actual value
       };
       
       return {
@@ -457,7 +489,12 @@ export class ValidatorAnalytics extends BaseAnalytics {
         })),
         clientDistribution: clientDist,
         herfindahlIndex: this.calculateHerfindahlIndex(validators, totalStake),
-        nakamotoCoefficient: await this.calculateNakamotoCoefficient(validators, totalStake)
+        nakamotoCoefficient: await this.calculateNakamotoCoefficient(validators, totalStake),
+        topValidatorsStakeShare: 0, // TODO: calculate actual value
+        geographicDistribution: { continents: {}, countries: {}, regions: {}, diversityScore: 0 }, // TODO: calculate actual value
+        clientDiversity: { clients: {}, diversityScore: 0, majorityConcern: false }, // TODO: calculate actual value
+        stakingRatio: 0, // TODO: calculate actual value
+        validatorCount: validators.length
       };
       
       return {

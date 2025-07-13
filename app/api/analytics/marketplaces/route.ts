@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 
 // Real Marketplace Analytics API
 interface MarketplaceMetrics {
@@ -137,18 +137,7 @@ async function fetchMarketplaceData(): Promise<MarketplaceMetrics[]> {
     ];
 
     // Try to fetch additional market data from CoinGecko
-    let coinGeckoData: any[] = [];
-    try {
-      const coinGeckoResponse = await fetch(
-        'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&category=non-fungible-tokens-nft&order=market_cap_desc&per_page=50&page=1'
-      );
-      
-      if (coinGeckoResponse.ok) {
-        coinGeckoData = await coinGeckoResponse.json();
-      }
-    } catch (error) {
-      console.error('Error fetching CoinGecko data:', error);
-    }
+    // CoinGecko data fetch removed (was unused)
 
     // Process each marketplace
     for (const marketplace of solanaMarketplaces) {
@@ -228,7 +217,7 @@ async function fetchMarketplaceData(): Promise<MarketplaceMetrics[]> {
   }
 }
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const marketplaces = await fetchMarketplaceData();
 

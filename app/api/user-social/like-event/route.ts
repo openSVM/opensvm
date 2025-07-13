@@ -7,8 +7,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSessionFromCookie } from '@/lib/auth-server';
 import {
   checkQdrantHealth,
-  qdrantClient,
-  COLLECTIONS,
   getUserHistory,
   storeHistoryEntry
 } from '@/lib/qdrant';
@@ -24,7 +22,7 @@ interface EventLikeEntry {
 }
 
 // Authentication check using session validation
-function isValidRequest(request: NextRequest): { isValid: boolean; walletAddress?: string } {
+function isValidRequest(_request: NextRequest): { isValid: boolean; walletAddress?: string } {
   try {
     const session = getSessionFromCookie();
     if (!session) return { isValid: false };

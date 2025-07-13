@@ -153,10 +153,6 @@ test.describe('Blockchain Event Streaming and Anomaly Detection E2E', () => {
     
     // Should detect pump-related anomalies
     const alerts = data.data.alerts;
-    const hasPumpAnomalies = alerts.some((alert: any) => 
-      alert.type.includes('pump') || alert.type.includes('suspicious_fee_spike')
-    );
-    
     // If no pump anomalies detected, that's also valid for this mock data
     expect(Array.isArray(alerts)).toBe(true);
   });
@@ -314,8 +310,6 @@ test.describe('Blockchain Event Streaming and Anomaly Detection E2E', () => {
     await expect(alertsSection).toBeVisible();
     
     // Check if alerts appear (may be empty initially)
-    const alertsContainer = page.locator('[data-testid="alert-item"]');
-    
     // Even if no alerts, the container should exist
     await expect(alertsSection).toContainText(/Anomaly Alerts|No alerts/);
   });

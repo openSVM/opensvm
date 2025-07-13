@@ -9,7 +9,7 @@ import { validateWalletAddress } from '@/lib/user-history-utils';
 import { EntityType } from '@/types/share';
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: { walletAddress: string } }
 ) {
   try {

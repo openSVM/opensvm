@@ -172,8 +172,7 @@ export const createGraphStyle = (): cytoscape.StylesheetCSS[] => [
     css: {
       'background-color': '#10b981',
       'border-width': 3,
-      'border-color': '#34d399',
-      'box-shadow': '0 0 20px rgba(16, 185, 129, 0.6)',
+      'border-color': '#34d399'
     }
   },
   {
@@ -181,8 +180,7 @@ export const createGraphStyle = (): cytoscape.StylesheetCSS[] => [
     css: {
       'background-color': '#8b5cf6',
       'border-width': 3,
-      'border-color': '#a78bfa',
-      'box-shadow': '0 0 20px rgba(139, 92, 246, 0.6)',
+      'border-color': '#a78bfa'
     }
   },
   {
@@ -247,10 +245,7 @@ export const createGraphStyle = (): cytoscape.StylesheetCSS[] => [
       'line-color': '#10b981',
       'target-arrow-color': '#34d399',
       'line-style': 'dashed',
-      'opacity': 0.8,
-      'animation-name': 'pulse',
-      'animation-duration': '2s',
-      'animation-iteration-count': 'infinite',
+      'opacity': 0.8
     }
   },
   { 
@@ -310,23 +305,13 @@ export const initializeCytoscape = (container: HTMLElement): cytoscape.Core => {
     minZoom: 0.2,
     maxZoom: 3,
     wheelSensitivity: 1.0, // Using default value for consistent zoom behavior across different mice
-    // Enable GPU acceleration through renderer options
-    renderer: {
-      name: 'canvas', // Use canvas renderer with GPU acceleration
-      showFps: false,
-      textureOnViewport: false,
-      hideEdgesOnViewport: false,
-      hideLabelsOnViewport: false,
-      // Enable hardware acceleration
-      motionBlur: false,
-      pixelRatio: typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1,
-    } as any,
     // Performance optimizations
     styleEnabled: true,
     hideEdgesOnViewport: false,
     hideLabelsOnViewport: false,
     textureOnViewport: false,
     motionBlur: false,
+    pixelRatio: typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1,
     // Enable batching for better performance
     autoungrabify: false,
     autolock: false,

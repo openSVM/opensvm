@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Together from 'together-ai';
-import { createParser, ParsedEvent, ReconnectInterval } from 'eventsource-parser';
+import { createParser } from 'eventsource-parser';
 
 export const runtime = 'edge';
 
@@ -43,8 +43,14 @@ function extractSourcesFromText(text: string): { title: string, url: string }[] 
 }
 
 export async function POST(req: NextRequest) {
+  let query: string | undefined;
   try {
-    const { query } = await req.json();
+    try {
+      const body = await req.json();
+      query = body.query;
+    } catch {
+      query = undefined;
+    }
     
     if (!query) {
       return NextResponse.json(
@@ -70,7 +76,7 @@ export async function POST(req: NextRequest) {
 
     // Initialize Together AI client with API key
     const together = new Together({
-      apiKey: apiKey,
+      apiKey: apiKey || "",
     });
 
     // Define the model to use
@@ -84,7 +90,7 @@ export async function POST(req: NextRequest) {
     At the end of your response, include a "Sources:" section with 2-3 relevant sources for the information provided.`;
 
     // Create a prompt that includes context about the search
-    const prompt = `The user is searching for information related to: "${query}" on a Solana blockchain explorer.
+    const prompt = `The user is searching for information related to: "${query ? query : ""}" on a Solana blockchain explorer.
     Provide relevant information about this query in the context of Solana blockchain.
     If it appears to be an address, token, or transaction, explain what it might be.
     If it's a general concept, explain how it relates to Solana.
@@ -101,12 +107,13 @@ export async function POST(req: NextRequest) {
       const stream = new ReadableStream({
         async start(controller) {
           // Function to handle streaming events
-          function onParse(event: ParsedEvent | ReconnectInterval) {
+          function onParse(event: { type: string; data?: string }) {
             if (event.type === 'event') {
               const data = event.data;
               
               // Handle different event types
               try {
+                if (!data) return;
                 const json = JSON.parse(data);
                 
                 if (json.choices?.[0]?.delta?.content) {
@@ -127,23 +134,25 @@ export async function POST(req: NextRequest) {
           }
 
           // Create parser for SSE
-          const parser = createParser(onParse);
+          const parser = createParser({ onParse } as any);
           
           // Call Together AI API with streaming
           try {
             const response = await together.chat.completions.create({
-              model: MODEL,
+              model: MODEL as string,
               messages: [
-                { role: 'system', content: systemPrompt },
-                { role: 'user', content: prompt }
+                { role: 'system' as const, content: systemPrompt as string },
+                { role: 'user' as const, content: prompt as string }
               ],
               temperature: 0.7,
               max_tokens: 800,
               stream: true,
-            });
+            } as any);
             
             // Process the streaming response
+            // @ts-ignore: body may exist on the response
             if (response.body) {
+              // @ts-ignore: body may exist on the response
               const reader = response.body.getReader();
               
               while (true) {
@@ -182,11 +191,10 @@ export async function POST(req: NextRequest) {
       });
     } catch (streamError) {
       console.error('Error creating stream:', streamError);
-      
       // Fallback to non-streaming response
       return NextResponse.json({
-        text: `Failed to create streaming response for "${query}". Please try again later.`,
-        error: streamError.message,
+        text: `Failed to create streaming response for "${typeof query !== "undefined" ? query : ""}". Please try again later.`,
+        error: streamError instanceof Error ? streamError.message : String(streamError),
         sources: extractSourcesFromText('')
       });
     }
@@ -195,8 +203,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       { 
         error: 'Failed to generate AI response',
-        message: error.message,
-        text: `There was an error processing your query "${query}". Please try again later.`,
+        message: error instanceof Error ? error.message : String(error),
+        text: `There was an error processing your query "${typeof query !== "undefined" ? query : ""}". Please try again later.`,
         sources: [
           { title: 'Solana Documentation', url: 'https://docs.solana.com' },
           { title: 'Solana Explorer', url: 'https://explorer.solana.com' }

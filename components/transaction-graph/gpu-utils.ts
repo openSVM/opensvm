@@ -60,11 +60,10 @@ export const setupGPUCanvas = (canvas: HTMLCanvasElement): CanvasRenderingContex
 export class GPUAnimationScheduler {
   private animationFrameId: number | null = null;
   private lastFrameTime: number = 0;
-  private targetFPS: number = 60;
+  // Removed unused targetFPS variable
   private frameInterval: number;
   
   constructor(targetFPS: number = 60) {
-    this.targetFPS = targetFPS;
     this.frameInterval = 1000 / targetFPS;
   }
   

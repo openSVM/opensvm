@@ -10,7 +10,9 @@
 import React, { useEffect, useRef, useMemo, useCallback, useState } from 'react';
 import { ListTable } from '@visactor/vtable';
 import { BlockchainEvent } from './LiveEventMonitor';
-import { lamportsToSol } from '@/components/transaction-graph/utils';
+
+// Simple helper function to convert lamports to SOL
+const lamportsToSol = (lamports: number): number => lamports / 1000000000;
 
 interface VirtualEventTableProps {
   events: BlockchainEvent[];
@@ -110,104 +112,61 @@ export const VirtualEventTable = React.memo(function VirtualEventTable({
 
   // Ultra-optimized columns with reduced styling complexity
   const columnsConfig = useMemo(() => {
-    const theme = getThemeColors();
-    
+    // @ts-ignore - VTable ColumnDefine typing is complex, using simplified config
     return [
       {
         field: 'type',
         title: 'Type',
-        width: 60, // Reduced width
-        style: {
-          color: theme.foreground,
-          fontWeight: 'bold',
-          fontSize: 11,
-          fontFamily: 'monospace'
-        }
+        width: 60,
+        cellType: 'text'
       },
       {
         field: 'timestamp',
         title: 'Time',
-        width: 80, // Reduced width
-        style: {
-          fontSize: 10,
-          color: theme.mutedForeground,
-          fontFamily: 'monospace'
-        }
+        width: 80,
+        cellType: 'text'
       },
       {
         field: 'signature',
         title: 'Sig',
-        width: 80, // Reduced width
-        style: {
-          fontFamily: 'monospace',
-          fontSize: 10,
-          color: theme.foreground
-        }
+        width: 80,
+        cellType: 'text'
       },
       {
         field: 'status',
         title: 'Status',
-        width: 60, // Reduced width
-        style: {
-          fontSize: 11,
-          fontFamily: 'monospace',
-          textAlign: 'center'
-        }
+        width: 60,
+        cellType: 'text'
       },
       {
         field: 'fee',
         title: 'Fee',
-        width: 90, // Reduced width
-        style: {
-          fontFamily: 'monospace',
-          fontSize: 10,
-          textAlign: 'right',
-          color: theme.foreground
-        }
+        width: 90,
+        cellType: 'text'
       },
       {
         field: 'program',
         title: 'Program',
-        width: 70, // Reduced width
-        style: {
-          fontSize: 10,
-          fontFamily: 'monospace',
-          color: theme.foreground
-        }
+        width: 70,
+        cellType: 'text'
       },
       {
         field: 'slot',
         title: 'Slot',
-        width: 80, // Reduced width
-        style: {
-          fontFamily: 'monospace',
-          fontSize: 10,
-          textAlign: 'right',
-          color: theme.mutedForeground
-        }
+        width: 80,
+        cellType: 'text'
       },
       {
         field: 'logs',
         title: 'Logs',
-        width: 50, // Reduced width
-        style: {
-          fontSize: 10,
-          textAlign: 'center',
-          color: theme.mutedForeground,
-          fontFamily: 'monospace'
-        }
+        width: 50,
+        cellType: 'text'
       },
       {
         field: 'addresses',
         title: 'Address',
         width: 100,
-        style: {
-          fontSize: 10,
-          fontFamily: 'monospace',
-          color: theme.primary,
-          cursor: 'pointer',
-          textDecoration: 'underline'
-        }
+        cellType: 'text'
       }
     ];
   }, [getThemeColors]);
@@ -252,7 +211,6 @@ export const VirtualEventTable = React.memo(function VirtualEventTable({
           },
           bodyStyle: {
             bgColor: theme.background,
-            hoverColor: theme.accent,
             borderColor: theme.border,
             fontFamily: 'monospace'
           }
@@ -267,18 +225,19 @@ export const VirtualEventTable = React.memo(function VirtualEventTable({
         widthMode: 'standard',
         heightMode: 'autoHeight',
         autoFillHeight: true,
-        rowHeight: 24, // Reduced from 28
-        defaultHeaderRowHeight: 28, // Reduced from 32
-        // Disable expensive features for better performance
+        rowHeight: 24,
+        defaultHeaderRowHeight: 28,
         allowFrozenColCount: 0,
         frozenColCount: 0,
-        select: false, // Disable selection for better performance
-        animationAppear: false, // Disable animations
+        select: {
+          disableSelect: true
+        },
+        animationAppear: false,
         animationEnter: false
-      });
+      } as any);
 
       // Ultra-lightweight click handler
-      table.on('click', (event: any) => {
+      table.on('click_cell', (event: any) => {
         try {
           const { row, col } = event.target;
           if (row >= 0 && row < tableData.length) {

@@ -64,7 +64,6 @@ async function fetchEntityData(
       case 'account': {
         // Fetch account data
         const pubkey = new PublicKey(entityId);
-        const accountInfo = await connection.getAccountInfo(pubkey);
         const balance = await connection.getBalance(pubkey);
         
         // Get transaction count (approximate)
@@ -210,7 +209,7 @@ async function fetchEntityData(
 /**
  * Generate AI-powered description (placeholder for now)
  */
-async function generateAIDescription(prompt: string): Promise<string | null> {
+async function generateAIDescription(_prompt: string): Promise<string | null> {
   // TODO: Integrate with OpenAI or other AI service
   // For now, return null to use fallback
   return null;

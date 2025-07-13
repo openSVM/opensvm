@@ -4,7 +4,6 @@ import React, { useRef, useEffect, useCallback, useMemo } from 'react';
 import ForceGraph3D from 'react-force-graph-3d';
 import ForceGraph2D from 'react-force-graph-2d';
 import * as THREE from 'three';
-import { createLogger } from '@/lib/debug-logger';
 
 interface Node {
   id: string;
@@ -60,7 +59,6 @@ export const GPUAcceleratedForceGraph: React.FC<GPUAcceleratedForceGraphProps> =
   const graphRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const animationFrameRef = useRef<number | null>(null);
-  const logger = createLogger('GPU_GRAPH');
 
   // GPU-optimized node colors
   const nodeColors = useMemo(() => ({
@@ -199,39 +197,11 @@ export const GPUAcceleratedForceGraph: React.FC<GPUAcceleratedForceGraphProps> =
 
   // Optimize graph performance on data changes
   useEffect(() => {
-    logger.debug(`Data update received: ${graphData.nodes.length} nodes, ${graphData.links.length} links`);
-    
-    // Log detailed information about the received data
-    if (graphData.nodes.length > 0) {
-      logger.debug(`Sample node data:`, graphData.nodes[0]);
-      const nodeTypes = graphData.nodes.reduce((types: Record<string, number>, node) => {
-        types[node.type] = (types[node.type] || 0) + 1;
-        return types;
-      }, {});
-      logger.debug(`Node type distribution:`, nodeTypes);
-    } else {
-      logger.warn(`No nodes received for rendering`);
-    }
-    
-    if (graphData.links.length > 0) {
-      logger.debug(`Sample link data:`, graphData.links[0]);
-      const linkTypes = graphData.links.reduce((types: Record<string, number>, link) => {
-        types[link.type || 'unknown'] = (types[link.type || 'unknown'] || 0) + 1;
-        return types;
-      }, {});
-      logger.debug(`Link type distribution:`, linkTypes);
-    } else {
-      logger.warn(`No links received for rendering`);
-    }
-    
     // Force a re-render if we have data but the graph might not be showing
     if (graphData.nodes.length > 0 && graphRef.current) {
-      logger.debug(`Forcing graph re-render with new data`);
-      
       // Trigger force simulation restart
       setTimeout(() => {
         if (graphRef.current) {
-          logger.debug(`Restarting force simulation`);
           try {
             // Type-safe way to access d3ReheatSimulation if it exists
             const graph = graphRef.current as { d3ReheatSimulation?: () => void };
@@ -239,28 +209,13 @@ export const GPUAcceleratedForceGraph: React.FC<GPUAcceleratedForceGraphProps> =
               graph.d3ReheatSimulation();
             }
           } catch (error) {
-            logger.warn(`Could not restart simulation:`, error);
+            console.warn(`Could not restart simulation:`, error);
           }
         }
       }, 100);
     }
     
-    // Log node types for debugging
-    const nodeTypes = graphData.nodes.reduce((types: Record<string, number>, node) => {
-      types[node.type] = (types[node.type] || 0) + 1;
-      return types;
-    }, {});
-    logger.debug(`Node types:`, nodeTypes);
-    
-    // Log link types for debugging
-    const linkTypes = graphData.links.reduce((types: Record<string, number>, link) => {
-      types[link.type || 'unknown'] = (types[link.type || 'unknown'] || 0) + 1;
-      return types;
-    }, {});
-    logger.debug(`Link types:`, linkTypes);
-    
     if (!graphRef.current) {
-      logger.debug(`No graph ref available`);
       return;
     }
 
@@ -367,10 +322,6 @@ export const GPUAcceleratedForceGraph: React.FC<GPUAcceleratedForceGraphProps> =
       ) : (
         <ForceGraph2D
           {...commonProps}
-          rendererConfig={{
-            alpha: true,
-            powerPreference: 'high-performance'
-          }}
         />
       )}
     </div>

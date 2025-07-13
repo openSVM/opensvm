@@ -11,7 +11,6 @@ import {
   checkQdrantHealth,
   getUserHistory
 } from '@/lib/qdrant';
-import { UserHistoryEntry } from '@/types/user-history';
 
 // Feed event interface
 interface FeedEvent {
@@ -30,7 +29,7 @@ interface FeedEvent {
 }
 
 // Get authenticated user from session
-function getAuthenticatedUser(request: NextRequest): string | null {
+function getAuthenticatedUser(_request: NextRequest): string | null {
   try {
     const session = getSessionFromCookie();
     if (!session) return null;
@@ -175,7 +174,7 @@ async function getRealFeedEvents(
 }
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: { walletAddress: string } }
 ) {
   try {
@@ -194,11 +193,11 @@ export async function GET(
     }
     
     // Get feed type from query params
-    const url = new URL(request.url);
+    const url = new URL(_request.url);
     const feedType = (url.searchParams.get('type') || 'for-you') as 'for-you' | 'following';
     
     // Get current authenticated user (if any)
-    const currentUserWallet = getAuthenticatedUser(request);
+    const currentUserWallet = getAuthenticatedUser(_request);
     
     // Parse query parameters
     const page = parseInt(url.searchParams.get('page') || '1');

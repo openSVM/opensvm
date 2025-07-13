@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 
 interface DexProfileData {
   name: string;
@@ -346,7 +346,7 @@ const DEX_CONFIGS: Record<string, Partial<DexProfileData>> = {
 };
 
 // Generate historical data
-function generateHistoricalData(dexName: string, volume24h: number, tvl: number) {
+function generateHistoricalData(volume24h: number, tvl: number) {
   const days = 30;
   const volumeHistory = [];
   const feeHistory = [];
@@ -442,7 +442,6 @@ async function fetchDexData(dexName: string): Promise<Partial<DexProfileData> | 
 }
 
 export async function GET(
-  request: NextRequest,
   { params }: { params: { name: string } }
 ) {
   try {
@@ -546,11 +545,11 @@ export async function GET(
       const pool = pools[i % pools.length];
       const [tokenA, tokenB] = pool.split('/');
       const isSwap = Math.random() > 0.5;
-      
+      const tradeType: 'buy' | 'sell' = isSwap ? 'buy' : 'sell';
       return {
         signature: `${dexName}_trade_${i + 1}_${Date.now()}`,
         timestamp: Date.now() - Math.random() * 3600000, // Within last hour
-        type: isSwap ? 'buy' : 'sell',
+        type: tradeType,
         tokenA,
         tokenB,
         amountA: Math.random() * 1000,
@@ -561,7 +560,7 @@ export async function GET(
     });
     
     // Generate historical data
-    const historicalData = generateHistoricalData(dexName, volume24h, tvl);
+    const historicalData = generateHistoricalData(volume24h, tvl);
     
     // Calculate security score and recommendations
     const securityScore = config.security?.audited ? 70 : 30;
@@ -570,7 +569,7 @@ export async function GET(
     
     const recommendations = {
       shouldTrade: totalScore > 50,
-      riskLevel: totalScore > 70 ? 'low' : totalScore > 50 ? 'medium' : 'high',
+      riskLevel: (totalScore > 70 ? 'low' : totalScore > 50 ? 'medium' : 'high') as 'low' | 'medium' | 'high',
       reasons: [
         `Security score: ${securityScore}/100`,
         `Volume score: ${volumeScore.toFixed(0)}/30`,
@@ -591,6 +590,14 @@ export async function GET(
     const profile: DexProfileData = {
       ...config,
       name: dexName,
+      description: config.description || `${dexName.charAt(0).toUpperCase() + dexName.slice(1)} DEX on Solana.`,
+      logo: config.logo || `https://opensvm.com/assets/dex-logos/${dexName}.png`,
+      website: config.website || `https://${dexName}.com`,
+      twitter: config.twitter || `https://twitter.com/${dexName}`,
+      telegram: config.telegram || `https://t.me/${dexName}`,
+      github: config.github || `https://github.com/${dexName}`,
+      programId: config.programId || `${dexName}_program_id`,
+      status: config.status || 'active',
       totalVolume,
       volume24h,
       volumeChange,
@@ -607,6 +614,14 @@ export async function GET(
       topPools,
       recentTrades,
       recommendations,
+      security: config.security || {
+        audited: false,
+        auditors: [],
+        lastAudit: '',
+        bugBounty: false,
+        multisig: false,
+        timelock: false,
+      },
       metrics: {
         uptime: 98 + Math.random() * 2,
         avgSlippage: 0.1 + Math.random() * 0.5,

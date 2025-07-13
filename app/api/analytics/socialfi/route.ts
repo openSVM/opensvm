@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 
 // Real Social Fi Analytics API
 interface SocialFiMetrics {
@@ -243,7 +243,7 @@ async function fetchSocialFiData(): Promise<SocialFiMetrics[]> {
   }
 }
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const platforms = await fetchSocialFiData();
 

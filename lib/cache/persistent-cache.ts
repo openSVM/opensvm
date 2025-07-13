@@ -51,7 +51,7 @@ export interface CacheBackend {
  */
 export class MemoryCacheBackend implements CacheBackend {
   private cache = new Map<string, CacheEntry>();
-  private stats: CacheStats = {
+  private _stats: CacheStats = {
     totalEntries: 0,
     memoryUsage: 0,
     hitRate: 0,
@@ -65,19 +65,19 @@ export class MemoryCacheBackend implements CacheBackend {
     const entry = this.cache.get(key);
     
     if (!entry) {
-      this.stats.totalMisses++;
+      this._stats.totalMisses++;
       return null;
     }
     
     // Check if entry has expired
     if (Date.now() - entry.timestamp > entry.ttl) {
       this.cache.delete(key);
-      this.stats.totalMisses++;
-      this.stats.evictionCount++;
+      this._stats.totalMisses++;
+      this._stats.evictionCount++;
       return null;
     }
     
-    this.stats.totalHits++;
+    this._stats.totalHits++;
     return entry as CacheEntry<T>;
   }
 
@@ -143,7 +143,7 @@ export class MemoryCacheBackend implements CacheBackend {
   }
 
   async stats(): Promise<CacheStats> {
-    return { ...this.stats };
+    return { ...this._stats };
   }
 
   async cleanup(): Promise<number> {
@@ -157,8 +157,8 @@ export class MemoryCacheBackend implements CacheBackend {
       }
     }
     
-    this.stats.evictionCount += cleaned;
-    this.stats.lastCleanup = now;
+    this._stats.evictionCount += cleaned;
+    this._stats.lastCleanup = now;
     this.updateStats();
     
     return cleaned;
@@ -170,12 +170,12 @@ export class MemoryCacheBackend implements CacheBackend {
   }
 
   private updateStats(): void {
-    this.stats.totalEntries = this.cache.size;
-    this.stats.memoryUsage = Array.from(this.cache.values())
+    this._stats.totalEntries = this.cache.size;
+    this._stats.memoryUsage = Array.from(this.cache.values())
       .reduce((sum, entry) => sum + (entry.metadata?.size || 0), 0);
     
-    const total = this.stats.totalHits + this.stats.totalMisses;
-    this.stats.hitRate = total > 0 ? this.stats.totalHits / total : 0;
+    const total = this._stats.totalHits + this._stats.totalMisses;
+    this._stats.hitRate = total > 0 ? this._stats.totalHits / total : 0;
   }
 }
 
@@ -197,10 +197,12 @@ export class MemoryCacheBackend implements CacheBackend {
  * 5. Implement automatic partitioning by date/type
  */
 export class DuckDBCacheBackend implements CacheBackend {
-  private db: any; // TODO: Import proper DuckDB types
+  // @ts-ignore - TODO: Will be used when DuckDB implementation is complete
+  private _db: any; // TODO: Import proper DuckDB types
   private isInitialized = false;
 
-  constructor(private dbPath: string = ':memory:') {
+  // @ts-ignore - TODO: Will be used when DuckDB implementation is complete
+  constructor(private _dbPath: string = ':memory:') {
     // TODO: Initialize DuckDB connection
     console.warn('DuckDBCacheBackend is not yet implemented');
   }
@@ -234,36 +236,36 @@ export class DuckDBCacheBackend implements CacheBackend {
     this.isInitialized = true;
   }
 
-  async get<T>(key: string): Promise<CacheEntry<T> | null> {
+  async get<T>(_key: string): Promise<CacheEntry<T> | null> {
     // TODO: Implement DuckDB query
     // SELECT * FROM cache_entries WHERE key = ? AND (timestamp + ttl) > CURRENT_TIMESTAMP
     throw new Error('DuckDBCacheBackend not implemented yet');
   }
 
-  async set<T>(key: string, data: T, ttl?: number, tags?: string[]): Promise<void> {
+  async set<T>(_key: string, _data: T, _ttl?: number, _tags?: string[]): Promise<void> {
     // TODO: Implement DuckDB insert/upsert
     // INSERT OR REPLACE INTO cache_entries (key, data, timestamp, ttl, tags) VALUES (?, ?, ?, ?, ?)
     throw new Error('DuckDBCacheBackend not implemented yet');
   }
 
-  async delete(key: string): Promise<boolean> {
+  async delete(_key: string): Promise<boolean> {
     // TODO: Implement DuckDB delete
     // DELETE FROM cache_entries WHERE key = ?
     throw new Error('DuckDBCacheBackend not implemented yet');
   }
 
-  async clear(pattern?: string): Promise<number> {
+  async clear(_pattern?: string): Promise<number> {
     // TODO: Implement DuckDB bulk delete with optional pattern matching
     throw new Error('DuckDBCacheBackend not implemented yet');
   }
 
-  async exists(key: string): Promise<boolean> {
+  async exists(_key: string): Promise<boolean> {
     // TODO: Implement DuckDB exists check
     // SELECT EXISTS(SELECT 1 FROM cache_entries WHERE key = ?)
     throw new Error('DuckDBCacheBackend not implemented yet');
   }
 
-  async keys(pattern?: string): Promise<string[]> {
+  async keys(_pattern?: string): Promise<string[]> {
     // TODO: Implement DuckDB key listing with optional pattern
     throw new Error('DuckDBCacheBackend not implemented yet');
   }
@@ -303,10 +305,12 @@ export class DuckDBCacheBackend implements CacheBackend {
  * 5. Add background cleanup process
  */
 export class LevelDBCacheBackend implements CacheBackend {
-  private db: any; // TODO: Import proper Level types
+  // @ts-ignore - TODO: Will be used when LevelDB implementation is complete
+  private _db: any; // TODO: Import proper Level types
   private isInitialized = false;
 
-  constructor(private dbPath: string = './cache.leveldb') {
+  // @ts-ignore - TODO: Will be used when LevelDB implementation is complete
+  constructor(private _dbPath: string = './cache.leveldb') {
     // TODO: Initialize LevelDB
     console.warn('LevelDBCacheBackend is not yet implemented');
   }
@@ -322,32 +326,32 @@ export class LevelDBCacheBackend implements CacheBackend {
     this.isInitialized = true;
   }
 
-  async get<T>(key: string): Promise<CacheEntry<T> | null> {
+  async get<T>(_key: string): Promise<CacheEntry<T> | null> {
     // TODO: Implement LevelDB get with TTL check
     throw new Error('LevelDBCacheBackend not implemented yet');
   }
 
-  async set<T>(key: string, data: T, ttl?: number, tags?: string[]): Promise<void> {
+  async set<T>(_key: string, _data: T, _ttl?: number, _tags?: string[]): Promise<void> {
     // TODO: Implement LevelDB put with TTL index
     throw new Error('LevelDBCacheBackend not implemented yet');
   }
 
-  async delete(key: string): Promise<boolean> {
+  async delete(_key: string): Promise<boolean> {
     // TODO: Implement LevelDB del
     throw new Error('LevelDBCacheBackend not implemented yet');
   }
 
-  async clear(pattern?: string): Promise<number> {
+  async clear(_pattern?: string): Promise<number> {
     // TODO: Implement LevelDB range deletion
     throw new Error('LevelDBCacheBackend not implemented yet');
   }
 
-  async exists(key: string): Promise<boolean> {
+  async exists(_key: string): Promise<boolean> {
     // TODO: Implement LevelDB key existence check
     throw new Error('LevelDBCacheBackend not implemented yet');
   }
 
-  async keys(pattern?: string): Promise<string[]> {
+  async keys(_pattern?: string): Promise<string[]> {
     // TODO: Implement LevelDB key iteration
     throw new Error('LevelDBCacheBackend not implemented yet');
   }

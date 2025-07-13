@@ -1,104 +1,185 @@
-import { z } from 'zod';
+/**
+ * Stream Request Validation Schemas
+ * Validates incoming stream API requests
+ */
 
-// Event validation schemas
-export const BlockchainEventSchema = z.object({
-  type: z.enum(['transaction', 'block', 'account_change']),
-  timestamp: z.number().positive(),
-  data: z.record(z.any()),
-  metadata: z.record(z.any()).optional()
-});
+export interface StreamRequestValidation {
+  success: boolean;
+  data?: any;
+  errors?: any;
+}
 
-export const TransactionEventDataSchema = z.object({
-  signature: z.string().min(88, 'Invalid signature length'),
-  slot: z.number().positive(),
-  logs: z.array(z.string()).optional(),
-  err: z.string().nullable(),
-  fee: z.number().nullable(),
-  preBalances: z.array(z.number()).optional(),
-  postBalances: z.array(z.number()).optional(),
-  accountKeys: z.array(z.string()).optional(),
-  signer: z.string().optional()
-});
+export interface StreamRequestBody {
+  action: string;
+  clientId?: string;
+  eventTypes?: string[];
+  authToken?: string;
+}
 
-export const BlockEventDataSchema = z.object({
-  slot: z.number().positive(),
-  parent: z.number().positive(),
-  root: z.number().positive()
-});
-
-// Stream API request schemas
-export const StreamRequestSchema = z.object({
-  action: z.enum(['authenticate', 'subscribe', 'unsubscribe', 'start_monitoring']),
-  clientId: z.string().min(1).optional(),
-  eventTypes: z.array(z.enum(['transaction', 'block', 'account_change', 'all'])).optional(),
-  authToken: z.string().optional()
-});
-
-export const AnomalyAnalysisRequestSchema = z.object({
-  action: z.enum(['analyze', 'bulk_analyze']),
-  event: z.union([
-    BlockchainEventSchema,
-    z.array(BlockchainEventSchema)
-  ])
-});
-
-// Validation helper functions
-export function validateStreamRequest(data: any): { success: true; data: z.infer<typeof StreamRequestSchema> } | { success: false; errors: string[] } {
+export function validateStreamRequest(body: any): StreamRequestValidation {
   try {
-    const validated = StreamRequestSchema.parse(data);
-    return { success: true, data: validated };
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return { 
-        success: false, 
-        errors: error.errors.map(e => `${e.path.join('.')}: ${e.message}`)
+    if (!body || typeof body !== 'object') {
+      return {
+        success: false,
+        errors: { message: 'Request body must be an object' }
       };
     }
-    return { success: false, errors: ['Unknown validation error'] };
+    
+    const { action, clientId, eventTypes, authToken } = body;
+    
+    // Validate action
+    if (!action || typeof action !== 'string') {
+      return {
+        success: false,
+        errors: { action: 'Action is required and must be a string' }
+      };
+    }
+    
+    const validActions = ['authenticate', 'subscribe', 'unsubscribe', 'start_monitoring', 'status'];
+    if (!validActions.includes(action)) {
+      return {
+        success: false,
+        errors: { 
+          action: `Invalid action. Must be one of: ${validActions.join(', ')}`,
+          validActions
+        }
+      };
+    }
+    
+    // Validate clientId if provided
+    if (clientId !== undefined && typeof clientId !== 'string') {
+      return {
+        success: false,
+        errors: { clientId: 'ClientId must be a string' }
+      };
+    }
+    
+    // Validate eventTypes if provided
+    if (eventTypes !== undefined) {
+      if (!Array.isArray(eventTypes)) {
+        return {
+          success: false,
+          errors: { eventTypes: 'EventTypes must be an array' }
+        };
+      }
+      
+      if (!eventTypes.every(type => typeof type === 'string')) {
+        return {
+          success: false,
+          errors: { eventTypes: 'All event types must be strings' }
+        };
+      }
+      
+      const validEventTypes = ['transaction', 'block', 'account_change', 'all'];
+      const invalidTypes = eventTypes.filter(type => !validEventTypes.includes(type));
+      if (invalidTypes.length > 0) {
+        return {
+          success: false,
+          errors: { 
+            eventTypes: `Invalid event types: ${invalidTypes.join(', ')}. Valid types: ${validEventTypes.join(', ')}`,
+            invalidTypes,
+            validEventTypes
+          }
+        };
+      }
+    }
+    
+    // Validate authToken if provided
+    if (authToken !== undefined && typeof authToken !== 'string') {
+      return {
+        success: false,
+        errors: { authToken: 'AuthToken must be a string' }
+      };
+    }
+    
+    return {
+      success: true,
+      data: { action, clientId, eventTypes, authToken }
+    };
+    
+  } catch (error) {
+    return {
+      success: false,
+      errors: { message: 'Invalid request format', error: error instanceof Error ? error.message : 'Unknown error' }
+    };
   }
 }
 
-export function validateBlockchainEvent(data: any): { success: true; data: z.infer<typeof BlockchainEventSchema> } | { success: false; errors: string[] } {
+export function validateAnomalyRequest(body: any): StreamRequestValidation {
   try {
-    const validated = BlockchainEventSchema.parse(data);
-    return { success: true, data: validated };
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return { 
-        success: false, 
-        errors: error.errors.map(e => `${e.path.join('.')}: ${e.message}`)
+    if (!body || typeof body !== 'object') {
+      return {
+        success: false,
+        errors: { message: 'Request body must be an object' }
       };
     }
-    return { success: false, errors: ['Unknown validation error'] };
+
+    // Basic anomaly request validation
+    return {
+      success: true,
+      data: body
+    };
+    
+  } catch (error) {
+    return {
+      success: false,
+      errors: { message: 'Invalid anomaly request format', error: error instanceof Error ? error.message : 'Unknown error' }
+    };
   }
 }
 
-export function validateTransactionEvent(data: any): { success: true; data: z.infer<typeof TransactionEventDataSchema> } | { success: false; errors: string[] } {
+export function validateBlockchainEvent(event: any): StreamRequestValidation {
   try {
-    const validated = TransactionEventDataSchema.parse(data);
-    return { success: true, data: validated };
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return { 
-        success: false, 
-        errors: error.errors.map(e => `${e.path.join('.')}: ${e.message}`)
+    if (!event || typeof event !== 'object') {
+      return {
+        success: false,
+        errors: { message: 'Event must be an object' }
       };
     }
-    return { success: false, errors: ['Unknown validation error'] };
-  }
-}
 
-export function validateAnomalyRequest(data: any): { success: true; data: z.infer<typeof AnomalyAnalysisRequestSchema> } | { success: false; errors: string[] } {
-  try {
-    const validated = AnomalyAnalysisRequestSchema.parse(data);
-    return { success: true, data: validated };
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return { 
-        success: false, 
-        errors: error.errors.map(e => `${e.path.join('.')}: ${e.message}`)
+    const { type, data, timestamp } = event;
+
+    if (!type || typeof type !== 'string') {
+      return {
+        success: false,
+        errors: { type: 'Event type is required and must be a string' }
       };
     }
-    return { success: false, errors: ['Unknown validation error'] };
+
+    const validTypes = ['transaction', 'block', 'account_change'];
+    if (!validTypes.includes(type)) {
+      return {
+        success: false,
+        errors: { 
+          type: `Invalid event type. Must be one of: ${validTypes.join(', ')}`,
+          validTypes
+        }
+      };
+    }
+
+    if (!data) {
+      return {
+        success: false,
+        errors: { data: 'Event data is required' }
+      };
+    }
+
+    if (timestamp && typeof timestamp !== 'number') {
+      return {
+        success: false,
+        errors: { timestamp: 'Timestamp must be a number' }
+      };
+    }
+
+    return {
+      success: true,
+      data: event
+    };
+    
+  } catch (error) {
+    return {
+      success: false,
+      errors: { message: 'Invalid blockchain event format', error: error instanceof Error ? error.message : 'Unknown error' }
+    };
   }
 }

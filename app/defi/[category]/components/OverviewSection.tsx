@@ -42,7 +42,6 @@ export default function OverviewSection() {
           // Combine data from different DeFi sectors
           const dexVolume = dexData.data?.volume?.reduce((sum: number, v: any) => sum + v.volume24h, 0) || 0;
           const dexTvl = dexData.data?.liquidity?.reduce((sum: number, l: any) => sum + l.liquidityUSD, 0) || 0;
-          const launchpadVolume = launchpadsData.data?.reduce((sum: number, l: any) => sum + (l.totalRaised || 0), 0) || 0;
           const aggregatorVolume = aggregatorsData.data?.volume?.reduce((sum: number, v: any) => sum + v.volume24h, 0) || 0;
 
           // Create top protocols list from all sources

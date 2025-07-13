@@ -7,7 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getShareByCode, incrementShareClicks } from '@/lib/qdrant';
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: { shareCode: string } }
 ) {
   try {

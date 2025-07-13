@@ -36,7 +36,6 @@ export interface SavedGraphState {
 }
 
 // Cache TTL in milliseconds (30 minutes)
-const CACHE_TTL = 30 * 60 * 1000;
 // Maximum number of transaction states to store in memory
 const MAX_MEMORY_CACHE_SIZE = 200000000;
 

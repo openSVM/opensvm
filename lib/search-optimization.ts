@@ -69,8 +69,8 @@ export function optimizeSearchResults(
   
   // Limit cache size to prevent memory leaks
   if (optimizationCache.size > 100) {
-    const oldestKey = [...optimizationCache.entries()]
-      .sort((a, b) => a[1].timestamp - b[1].timestamp)[0][0];
+    const entries = Array.from(optimizationCache.entries());
+    const oldestKey = entries.sort((a, b) => a[1].timestamp - b[1].timestamp)[0][0];
     optimizationCache.delete(oldestKey);
   }
   
@@ -198,9 +198,9 @@ export function clearOptimizationCache() {
 export function getOptimizationCacheStats() {
   return {
     size: optimizationCache.size,
-    keys: [...optimizationCache.keys()],
-    oldestTimestamp: Math.min(...[...optimizationCache.values()].map(v => v.timestamp)),
-    newestTimestamp: Math.max(...[...optimizationCache.values()].map(v => v.timestamp))
+    keys: Array.from(optimizationCache.keys()),
+    oldestTimestamp: Math.min(...Array.from(optimizationCache.values()).map(v => v.timestamp)),
+    newestTimestamp: Math.max(...Array.from(optimizationCache.values()).map(v => v.timestamp))
   };
 }
 

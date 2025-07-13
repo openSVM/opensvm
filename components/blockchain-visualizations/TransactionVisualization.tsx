@@ -7,14 +7,11 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { 
   BarChart,
   Bar,
-  LineChart,
-  Line,
   XAxis, 
   YAxis, 
   CartesianGrid, 
   Tooltip, 
   ResponsiveContainer,
-  Sankey,
   Scatter,
   ScatterChart,
   ZAxis
@@ -95,23 +92,11 @@ const TransactionVisualization: React.FC<TransactionVisualizationProps> = ({
     to: transfer.toUserAccount.substring(0, 6) + '...'
   })) || [];
 
-  // Format transaction timing data
-  const timingData = [
-    { name: 'Confirmation Time', value: transaction.confirmationTime || 0 },
-    { name: 'Block Time', value: transaction.blockTime ? new Date(transaction.blockTime * 1000).getTime() : 0 }
-  ].filter(item => item.value > 0);
-
   // Format transaction fee comparison
   const feeComparisonData = [
     { name: 'This Transaction', fee: transaction.fee || 0 },
     { name: 'Average Fee', fee: 0.000005 }, // Example average fee
     { name: 'Median Fee', fee: 0.000004 }  // Example median fee
-  ];
-
-  // Format transaction status data for visualization
-  const statusData = [
-    { name: 'Success', value: transaction.status === 'success' ? 1 : 0 },
-    { name: 'Failed', value: transaction.status === 'failed' ? 1 : 0 }
   ];
 
   return (
@@ -277,7 +262,7 @@ const TransactionVisualization: React.FC<TransactionVisualizationProps> = ({
                   </tr>
                 </thead>
                 <tbody>
-                  {tokenTransfersData.map((transfer, index) => (
+                  {tokenTransfersData.map((transfer: any, index: any) => (
                     <tr key={index} className="border-b">
                       <td className="py-2">{transfer.token}</td>
                       <td className="text-right py-2">{transfer.amount.toLocaleString()}</td>
@@ -307,7 +292,7 @@ const TransactionVisualization: React.FC<TransactionVisualizationProps> = ({
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="name" />
                 <YAxis />
-                <Tooltip formatter={(value) => value.toFixed(6) + ' SOL'} />
+                <Tooltip formatter={(value) => typeof value === 'number' ? value.toFixed(6) + ' SOL' : value} />
                 <Bar dataKey="fee" fill="#82ca9d" name="Fee (SOL)" />
               </BarChart>
             </ResponsiveContainer>

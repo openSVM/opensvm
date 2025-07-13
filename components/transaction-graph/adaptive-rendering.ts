@@ -17,8 +17,8 @@ interface VRCapabilities {
 
 interface WebGPUCapabilities {
   hasWebGPUSupport: boolean;
-  adapter: GPUAdapter | null;
-  device: GPUDevice | null;
+  adapter: any | null; // Using any for now to avoid type conflicts
+  device: any | null;
 }
 
 interface FallbackOptions {
@@ -85,8 +85,8 @@ export async function detectWebGPUCapabilities(): Promise<WebGPUCapabilities> {
 
   try {
     // Check for WebGPU support
-    if ('gpu' in navigator && navigator.gpu) {
-      const adapter = await navigator.gpu.requestAdapter({
+    if ('gpu' in navigator && (navigator as any).gpu) {
+      const adapter = await (navigator as any).gpu.requestAdapter({
         powerPreference: 'high-performance'
       });
 

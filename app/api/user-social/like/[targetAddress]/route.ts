@@ -15,7 +15,7 @@ import {
 } from '@/lib/qdrant';
 
 // Authentication check using session validation
-function isValidRequest(request: NextRequest): { isValid: boolean; walletAddress?: string } {
+function isValidRequest(_request: NextRequest): { isValid: boolean; walletAddress?: string } {
   try {
     const session = getSessionFromCookie();
     if (!session) return { isValid: false };
@@ -31,7 +31,7 @@ function isValidRequest(request: NextRequest): { isValid: boolean; walletAddress
 }
 
 export async function POST(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: { targetAddress: string } }
 ) {
   try {
@@ -42,7 +42,7 @@ export async function POST(
     }
 
     // Authentication check
-    const auth = isValidRequest(request);
+    const auth = isValidRequest(_request);
     if (!auth.isValid || !auth.walletAddress) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -81,7 +81,7 @@ export async function POST(
 }
 
 export async function DELETE(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: { targetAddress: string } }
 ) {
   try {
@@ -92,7 +92,7 @@ export async function DELETE(
     }
 
     // Authentication check
-    const auth = isValidRequest(request);
+    const auth = isValidRequest(_request);
     if (!auth.isValid || !auth.walletAddress) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -118,7 +118,7 @@ export async function DELETE(
 }
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: { targetAddress: string } }
 ) {
   try {

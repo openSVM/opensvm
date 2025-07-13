@@ -104,7 +104,7 @@ export const TrackingStatsPanel: React.FC<TrackingStatsPanelProps> = ({
             Top 5 Volume by Address
           </h4>
           <div className="space-y-1">
-            {stats.topVolumeByAddress.slice(0, 5).map((item, index) => (
+            {stats.topVolumeByAddress.slice(0, 5).map((item, _) => (
               <div key={item.address} className="flex justify-between text-xs">
                 <span className="font-mono text-gray-600 dark:text-gray-400">
                   {formatAddress(item.address)}
@@ -122,7 +122,7 @@ export const TrackingStatsPanel: React.FC<TrackingStatsPanelProps> = ({
             Top 5 Volume by Token
           </h4>
           <div className="space-y-1">
-            {stats.topVolumeByToken.slice(0, 5).map((item, index) => (
+            {stats.topVolumeByToken.slice(0, 5).map((item, _) => (
               <div key={item.token} className="flex justify-between text-xs">
                 <span className="text-gray-600 dark:text-gray-400">
                   {item.token}

@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import { formatNumber } from '@/lib/utils';
-import { ExternalLink, TrendingUp, TrendingDown, Zap, BarChart3, Search, Sprout, Shield, Target, DollarSign, Users } from 'lucide-react';
+import { ExternalLink, TrendingUp, TrendingDown, BarChart3, Search, Sprout, Shield, Target, DollarSign, Users } from 'lucide-react';
 
 interface YieldAggregatorData {
   name: string;

@@ -5,15 +5,14 @@ import { useTransfers } from '@/app/account/[address]/components/shared/hooks';
 import type { Transfer } from '@/app/account/[address]/components/shared/types';
 import { VTableWrapper } from '@/components/vtable';
 import { Button } from '@/components/ui/button';
-import { formatNumber, truncateMiddle } from '@/lib/utils';
+import { formatNumber } from '@/lib/utils';
 import { Tooltip } from '@/components/ui/tooltip';
-import { useRouter, usePathname } from 'next/navigation';
-import { PinIcon, Search, X, Filter, Database, Wifi, WifiOff } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { PinIcon, Search, X, Filter } from 'lucide-react';
 import Link from 'next/link';
 import {
   getCachedTransfers,
   storeTransferEntry,
-  getLastSyncTimestamp,
   markTransfersCached,
   isSolanaOnlyTransaction,
   type TransferEntry
@@ -41,26 +40,22 @@ export function TransfersTable({ address, transferType = 'ALL' }: TransfersTable
   const [cachedTransfers, setCachedTransfers] = useState<TransferEntry[]>([]);
   const [cachingInProgress, setCachingInProgress] = useState(false);
   const [solanaOnlyFilter, setSolanaOnlyFilter] = useState(true);
-  const [lastSyncTime, setLastSyncTime] = useState<number>(0);
 
   // Load cached data and sync timestamp on component mount
   useEffect(() => {
     const loadCachedData = async () => {
       try {
-        const [cached, syncTime] = await Promise.all([
+        const [cached] = await Promise.all([
           getCachedTransfers(address, {
             solanaOnly: solanaOnlyFilter,
             transferType: transferType
-          }),
-          getLastSyncTimestamp(address)
+          })
         ]);
         
         setCachedTransfers(cached.transfers);
-        setLastSyncTime(syncTime);
         
-        // Use cached data if available and recent (within 5 minutes)
-        const fiveMinutesAgo = Date.now() - (5 * 60 * 1000);
-        if (cached.transfers.length > 0 && syncTime > fiveMinutesAgo) {
+        // Use cached data if available
+        if (cached.transfers.length > 0) {
           setUseCachedData(true);
         }
       } catch (error) {

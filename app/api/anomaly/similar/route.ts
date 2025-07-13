@@ -1,10 +1,7 @@
 import { NextRequest } from 'next/server';
-import { getConnection } from '@/lib/solana-connection';
 import { 
   createSuccessResponse, 
-  createErrorResponse, 
   CommonErrors, 
-  ErrorCodes 
 } from '@/lib/api-response';
 
 export async function GET(request: NextRequest) {

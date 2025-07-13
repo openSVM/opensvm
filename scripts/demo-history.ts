@@ -85,10 +85,17 @@ export function addSampleHistoryData() {
   // Create profile
   const profile: Omit<UserProfile, 'stats' | 'history'> = {
     walletAddress: DEMO_WALLET,
-    displayName: 'Demo User',
+    displayName: `User ${DEMO_WALLET.slice(0, 6)}`,
     isPublic: true,
-    createdAt: now - (7 * 24 * 60 * 60 * 1000), // 7 days ago
-    lastActive: now
+    createdAt: Date.now() - 86400000 * Math.floor(Math.random() * 30), // Random creation within last 30 days
+    lastActive: Date.now() - Math.floor(Math.random() * 86400000), // Random activity within last day
+    socialStats: {
+      visitsByUsers: Math.floor(Math.random() * 100),
+      followers: Math.floor(Math.random() * 50),
+      following: Math.floor(Math.random() * 50),
+      likes: Math.floor(Math.random() * 200),
+      profileViews: Math.floor(Math.random() * 150)
+    }
   };
 
   localStorage.setItem(

@@ -30,7 +30,6 @@ export async function POST(request: Request) {
     const preFiltered = transactions
       .filter(tx => {
         const amount = parseFloat(tx.tokenAmount || '0');
-        const token = (tx.tokenSymbol || '').toLowerCase();
         const from = tx.from || '';
         const to = tx.to || '';
         
@@ -118,7 +117,7 @@ Return only a JSON array of transaction IDs for the top ${MAX_TRANSFER_COUNT} tr
     if (!response.ok) {
       // Fallback: if AI analysis fails, apply enhanced basic filtering with top transfer limit
       const basicFiltered = transactions
-        .filter(tx => {
+        .filter((tx: any) => {
           const amount = parseFloat(tx.tokenAmount || '0');
           const from = tx.from || '';
           const to = tx.to || '';
@@ -153,7 +152,7 @@ Return only a JSON array of transaction IDs for the top ${MAX_TRANSFER_COUNT} tr
       validTxIds = aiResponse.validTransactions || aiResponse;
     } catch (parseError) {
       console.warn('Failed to parse AI response, using fallback filtering');
-      const basicFiltered = transactions.filter(tx => {
+      const basicFiltered = transactions.filter((tx: any) => {
         const amount = parseFloat(tx.tokenAmount || '0');
         const from = tx.from || '';
         const to = tx.to || '';
@@ -191,7 +190,7 @@ Return only a JSON array of transaction IDs for the top ${MAX_TRANSFER_COUNT} tr
     // Fallback to basic filtering if anything fails
     try {
       const { transactions } = await request.json();
-      const basicFiltered = transactions.filter(tx => {
+      const basicFiltered = transactions.filter((tx: any) => {
         const amount = parseFloat(tx.tokenAmount || '0');
         const from = tx.from || '';
         const to = tx.to || '';

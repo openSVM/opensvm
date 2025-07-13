@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Loader2, Shield, AlertTriangle, TrendingUp, TrendingDown, DollarSign, Activity, Zap, Heart } from 'lucide-react';
+import { Loader2, Shield, AlertTriangle, TrendingUp, TrendingDown, DollarSign, Activity, Heart } from 'lucide-react';
 
 interface DeFiHealthData {
   protocols: Array<{

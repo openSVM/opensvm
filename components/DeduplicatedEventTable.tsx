@@ -1,13 +1,12 @@
 /**
- * Deduplicated Event Table Component
+ * Deduplicated Even}: DeduplicatedEventTableProps) => {Table Component
  * 
  * Shows events with deduplication and count indicators
  */
 
 'use client';
 
-import React, { useState, useCallback, useMemo } from 'react';
-import { Card } from '@/components/ui/card';
+import React, { useCallback, useState } from 'react';
 import { Copy, ExternalLink, Clock, Layers } from 'lucide-react';
 import { DeduplicatedEvent } from '@/lib/utils/deduplication';
 
@@ -24,7 +23,7 @@ export const DeduplicatedEventTable = React.memo(function DeduplicatedEventTable
   onAddressClick,
   height = 400
 }: DeduplicatedEventTableProps) {
-  const [selectedEvent, setSelectedEvent] = useState<DeduplicatedEvent | null>(null);
+  const [_selectedEvent, _setSelectedEvent] = useState<DeduplicatedEvent | null>(null);
 
   const getEventTypeColor = useCallback((type: string) => {
     switch (type) {
@@ -60,7 +59,7 @@ export const DeduplicatedEventTable = React.memo(function DeduplicatedEventTable
   }, []);
 
   const handleEventClick = useCallback((event: DeduplicatedEvent) => {
-    setSelectedEvent(event);
+    _setSelectedEvent(event);
     onEventClick?.(event);
     
     // Open in explorer based on type

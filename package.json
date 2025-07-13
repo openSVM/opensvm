@@ -98,6 +98,7 @@
     "@playwright/test": "^1.50.1",
     "@swc/jest": "^0.2.37",
     "@tailwindcss/typography": "^0.5.15",
+    "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.4.0",
     "@testing-library/react": "^16.2.0",
     "@types/cytoscape": "^3.21.9",

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, ExternalLink, TrendingUp, TrendingDown, Users, Zap, Shield, DollarSign, Activity, Calendar, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, ExternalLink, TrendingUp, TrendingDown, Zap, Shield, DollarSign, Activity, AlertTriangle } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import { ShareButton } from '@/components/ShareButton';
 
@@ -86,13 +86,6 @@ export default function ValidatorProfilePage() {
       fetchValidatorData();
     }
   }, [validatorAddress]);
-
-  const formatCurrency = (value: number) => {
-    if (value >= 1e9) return `$${(value / 1e9).toFixed(2)}B`;
-    if (value >= 1e6) return `$${(value / 1e6).toFixed(2)}M`;
-    if (value >= 1e3) return `$${(value / 1e3).toFixed(2)}K`;
-    return `$${value.toFixed(2)}`;
-  };
 
   const formatSOL = (lamports: number) => {
     const sol = lamports / 1e9;

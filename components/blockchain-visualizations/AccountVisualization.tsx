@@ -56,8 +56,6 @@ const AccountVisualization: React.FC<AccountVisualizationProps> = ({
     tokenBalances, 
     nfts, 
     recentTransactions, 
-    solTransfers, 
-    splTransfers, 
     recentSwaps, 
     domains 
   } = accountData.data;
@@ -158,13 +156,13 @@ const AccountVisualization: React.FC<AccountVisualizationProps> = ({
                       outerRadius={100}
                       fill="#8884d8"
                       dataKey="value"
-                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                      label={({ name, percent }) => `${name} ${((percent || 0) * 100).toFixed(0)}%`}
                     >
-                      {portfolioData.map((entry, index) => (
+                      {portfolioData.map((_, index) => (
                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                       ))}
                     </Pie>
-                    <Tooltip formatter={(value) => value.toFixed(4)} />
+                    <Tooltip formatter={(value) => typeof value === 'number' ? value.toFixed(4) : value} />
                     <Legend />
                   </PieChart>
                 </ResponsiveContainer>
@@ -194,7 +192,7 @@ const AccountVisualization: React.FC<AccountVisualizationProps> = ({
                       height={60} 
                     />
                     <YAxis />
-                    <Tooltip formatter={(value) => value.toFixed(4)} />
+                    <Tooltip formatter={(value) => typeof value === 'number' ? value.toFixed(4) : value} />
                     <Bar dataKey="value" fill="#82ca9d" name="Amount" />
                   </BarChart>
                 </ResponsiveContainer>

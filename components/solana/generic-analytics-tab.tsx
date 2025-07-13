@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Loader2, ExternalLink, Heart, TrendingUp, Users, Star, Target, DollarSign, Activity, BarChart3 } from 'lucide-react';
+import { Loader2, ExternalLink, Heart, TrendingUp, Users, Star, Target, DollarSign } from 'lucide-react';
 
 interface GenericItem {
   name: string;

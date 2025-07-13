@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import { formatNumber } from '@/lib/utils';
-import { ExternalLink, TrendingUp, TrendingDown, Zap, BarChart3, Search, Route, Timer, Shield, Target } from 'lucide-react';
+import { ExternalLink, TrendingUp, TrendingDown, BarChart3, Search, Route, Timer, Shield, Target } from 'lucide-react';
 
 interface AggregatorData {
   name: string;

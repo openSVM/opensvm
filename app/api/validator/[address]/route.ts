@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Connection, PublicKey } from '@solana/web3.js';
+import { Connection } from '@solana/web3.js';
 
 const SOLANA_RPC_URL = process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com';
 
 export async function GET(
-  request: NextRequest,
-  { params }: { params: { address: string } }
+  _request: NextRequest,
+  { params: _params }: { params: { address: string } }
 ) {
   try {
-    const validatorAddress = params.address;
+    const validatorAddress = _params.address;
     
     if (!validatorAddress) {
       return NextResponse.json({
@@ -185,7 +185,7 @@ export async function GET(
       commission: validator.commission,
       activatedStake: validator.activatedStake,
       lastVote: validator.lastVote,
-      rootSlot: validator.rootSlot,
+      // rootSlot: validator.rootSlot, // Removed as it doesn't exist on VoteAccountInfo
       credits: totalCredits,
       epochCredits: validator.epochCredits[validator.epochCredits.length - 1]?.[1] || 0,
       version: clusterNode?.version || 'Unknown',
@@ -212,4 +212,15 @@ export async function GET(
       error: error instanceof Error ? error.message : 'Failed to fetch validator profile'
     }, { status: 500 });
   }
+}
+
+export async function POST(
+  _request: NextRequest,
+  { params: _params }: { params: { address: string } }
+) {
+  // This is a placeholder for future functionality, e.g., staking or voting
+  return NextResponse.json({
+    success: false,
+    error: 'POST method not implemented for validator endpoint'
+  }, { status: 501 });
 }

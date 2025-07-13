@@ -5,7 +5,7 @@
 import { NextRequest } from 'next/server';
 import { validateWalletAddress } from '@/lib/user-history-utils';
 import { getSessionFromCookie } from '@/lib/auth-server';
-import { getUserHistory, getUserFollowing, getUserProfile } from '@/lib/qdrant';
+import { getUserHistory, getUserFollowing } from '@/lib/qdrant';
 
 // Feed event interface
 interface FeedEvent {

@@ -66,7 +66,7 @@ export interface UserProfile {
 export interface UserFollowEntry {
   id: string;
   followerAddress: string;
-  followingAddress: string;
+  targetAddress: string; // Added to match lib/qdrant.ts
   timestamp: number;
 }
 

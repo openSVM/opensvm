@@ -2,7 +2,6 @@
 
 import { VTableWrapper } from '@/components/vtable';
 import { useTheme } from '@/lib/theme';
-import { useState } from 'react';
 
 // Mock data for testing
 const mockData = [

@@ -7,12 +7,20 @@ import { UserHistoryService } from '@/lib/user-history';
 import { UserHistoryEntry } from '@/types/user-history';
 
 // Mock localStorage for testing
-const mockLocalStorage = {
+const mockLocalStorage: {
+  data: Record<string, string>;
+  setItem: (key: string, value: string) => void;
+  getItem: (key: string) => string | null;
+  removeItem: (key: string) => void;
+  clear: () => void;
+  length: number;
+  key: (index?: number) => string | null;
+} = {
   data: {} as Record<string, string>,
   setItem: jest.fn((key: string, value: string) => {
     mockLocalStorage.data[key] = value;
   }),
-  getItem: jest.fn((key: string) => {
+  getItem: jest.fn((key: string): string | null => {
     return mockLocalStorage.data[key] || null;
   }),
   removeItem: jest.fn((key: string) => {

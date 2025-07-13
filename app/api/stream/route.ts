@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { getConnection } from '@/lib/solana-connection';
-import { Connection, PublicKey } from '@solana/web3.js';
+import { Connection } from '@solana/web3.js';
 import { getStreamingAnomalyDetector } from '@/lib/streaming-anomaly-detector';
 import { validateStreamRequest } from '@/lib/validation/stream-schemas';
 import { getRateLimiter, type RateLimitResult } from '@/lib/rate-limiter';
@@ -13,52 +13,10 @@ import {
 } from '@/lib/api-response';
 import { generateSecureAuthToken, generateSecureClientId } from '@/lib/crypto-utils';
 import { createLogger } from '@/lib/debug-logger';
-import { KNOWN_PROGRAM_IDS, getProtocolFromProgramId, getProtocolDisplayName } from '@/lib/constants/program-ids';
+import { getProtocolFromProgramId, getProtocolDisplayName } from '@/lib/constants/program-ids';
 
 // Enhanced logger for stream API
 const logger = createLogger('STREAM_API');
-interface StreamRequestBody {
-  action: string;
-  clientId?: string;
-  eventTypes?: string[];
-  authToken?: string;
-}
-
-// Safe JSON parsing with validation
-function parseAndValidateRequest(body: any): StreamRequestBody | null {
-  try {
-    if (!body || typeof body !== 'object') {
-      return null;
-    }
-    
-    const { action, clientId, eventTypes, authToken } = body;
-    
-    // Validate action
-    if (!action || typeof action !== 'string') {
-      return null;
-    }
-    
-    // Validate clientId if provided
-    if (clientId && typeof clientId !== 'string') {
-      return null;
-    }
-    
-    // Validate eventTypes if provided
-    if (eventTypes && (!Array.isArray(eventTypes) || !eventTypes.every(type => typeof type === 'string'))) {
-      return null;
-    }
-    
-    // Validate authToken if provided
-    if (authToken && typeof authToken !== 'string') {
-      return null;
-    }
-    
-    return { action, clientId, eventTypes, authToken };
-  } catch (error) {
-    logger.error('Failed to parse request body:', error);
-    return null;
-  }
-}
 
 interface StreamClient {
   id: string;
@@ -80,68 +38,12 @@ const AUTH_FAILURES = new Map<string, {
 const rateLimiter = getRateLimiter();
 
 // Token cleanup worker - runs every 5 minutes
-let tokenCleanupInterval: NodeJS.Timeout | null = null;
+// Removed unused function: stopTokenCleanupWorker
 
-function startTokenCleanupWorker(): void {
-  if (tokenCleanupInterval) return;
-  
-  tokenCleanupInterval = setInterval(() => {
-    cleanupExpiredTokens();
-    cleanupOldAuthFailures();
-  }, 5 * 60 * 1000); // 5 minutes
-  
-  logger.debug('Token cleanup worker started');
-}
-
-function stopTokenCleanupWorker(): void {
-  if (tokenCleanupInterval) {
-    clearInterval(tokenCleanupInterval);
-    tokenCleanupInterval = null;
-    logger.debug('Token cleanup worker stopped');
-  }
-}
-
-function cleanupExpiredTokens(): void {
-  const now = Date.now();
-  const expiredTokens: string[] = [];
-  
-  for (const [clientId, authData] of CLIENT_AUTH_TOKENS.entries()) {
-    if (now - authData.createdAt > 3600000) { // 1 hour
-      expiredTokens.push(clientId);
-    }
-  }
-  
-  expiredTokens.forEach(clientId => {
-    CLIENT_AUTH_TOKENS.delete(clientId);
-  });
-  
-  if (expiredTokens.length > 0) {
-    logger.debug(`Cleaned up ${expiredTokens.length} expired tokens`);
-  }
-}
-
-function cleanupOldAuthFailures(): void {
-  const now = Date.now();
-  const staleFailures: string[] = [];
-  
-  for (const [clientId, failures] of AUTH_FAILURES.entries()) {
-    // Remove failure records older than 24 hours
-    if (now - failures.lastAttempt > 24 * 60 * 60 * 1000) {
-      staleFailures.push(clientId);
-    }
-  }
-  
-  staleFailures.forEach(clientId => {
-    AUTH_FAILURES.delete(clientId);
-  });
-  
-  if (staleFailures.length > 0) {
-    logger.debug(`Cleaned up ${staleFailures.length} stale auth failure records`);
-  }
-}
+// Cleanup functions removed as they were not being called
 
 // Start cleanup worker when module loads
-startTokenCleanupWorker();
+// Removed unused function call: startTokenCleanupWorker();
 
 function generateAuthToken(): string {
   return generateSecureAuthToken();
@@ -149,23 +51,10 @@ function generateAuthToken(): string {
 
 function validateAuthToken(clientId: string, token: string): boolean {
   const authData = CLIENT_AUTH_TOKENS.get(clientId);
-  if (!authData) {
-    logAuthFailure(clientId, 'Token not found');
+  if (!authData || authData.token !== token) {
+    logAuthFailure(clientId, 'Invalid auth token');
     return false;
   }
-  
-  // Token expires after 1 hour
-  if (Date.now() - authData.createdAt > 3600000) {
-    CLIENT_AUTH_TOKENS.delete(clientId);
-    logAuthFailure(clientId, 'Token expired');
-    return false;
-  }
-  
-  if (authData.token !== token) {
-    logAuthFailure(clientId, 'Invalid token');
-    return false;
-  }
-
   return true;
 }
 
@@ -225,16 +114,6 @@ function isClientBlocked(clientId: string): boolean {
 
 function checkRateLimit(clientId: string, type: string, tokens: number = 1): RateLimitResult {
   return rateLimiter.checkRateLimit(clientId, type, tokens);
-}
-
-interface StreamClient {
-  id: string;
-  send: (data: any) => void;
-  close: () => void;
-  subscriptions: Set<string>;
-  authenticated: boolean;
-  connectionTime: number;
-  lastActivity: number;
 }
 
 interface BlockchainEvent {
@@ -422,11 +301,23 @@ class EventStreamManager {
               }
 
               // Create event with available data (whether we got tx details or not)
-              const accountKeys = txDetails?.transaction?.message?.accountKeys?.map(key => key.toString()) || [];
+              let accountKeys: string[] = [];
+              if (txDetails?.transaction?.message) {
+                try {
+                  // Use getAccountKeys() method for versioned transactions
+                  const keys = txDetails.transaction.message.getAccountKeys();
+                  accountKeys = keys.keySegments().flat().map((key: any) => key.toString());
+                } catch (error) {
+                  // Fallback for legacy transactions
+                  if ('accountKeys' in txDetails.transaction.message) {
+                    accountKeys = (txDetails.transaction.message as any).accountKeys?.map((key: any) => key.toString()) || [];
+                  }
+                }
+              }
               
               // Only filter out pure system transactions if we have account keys
               if (accountKeys.length > 0) {
-                const isPureSystemTransaction = accountKeys.every(key => 
+                const isPureSystemTransaction = accountKeys.every((key: string) => 
                   SYSTEM_PROGRAMS.has(key) && 
                   !key.includes('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA')
                 );

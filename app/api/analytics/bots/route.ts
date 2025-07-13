@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 
 // Real Bot Analytics API for Telegram/Discord/Matrix bots
 interface BotMetrics {
@@ -234,7 +234,7 @@ async function fetchBotData(): Promise<BotMetrics[]> {
   }
 }
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const bots = await fetchBotData();
 

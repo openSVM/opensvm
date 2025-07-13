@@ -143,30 +143,9 @@ export interface VestingEvent {
 }
 
 // Validator Analytics Types
-export interface ValidatorMetrics {
-  validatorAddress: string;
-  name?: string;
-  totalStake: number;
-  ownStake: number;
-  delegatedStake: number;
-  commission: number;
-  performance: ValidatorPerformance;
-  votingBehavior: VotingMetrics;
-  decentralizationScore: number;
-  rewardsGenerated: number;
-  uptimeScore: number;
-}
+/* Removed duplicate ValidatorMetrics definition. See below for the correct definition. */
 
-export interface ValidatorPerformance {
-  blocksProduced: number;
-  expectedBlocks: number;
-  missedBlocks: number;
-  productionRate: number;
-  voteAccuracy: number;
-  skipRate: number;
-  slashingEvents: number;
-  performanceScore: number;
-}
+/* Removed duplicate ValidatorPerformance definition. See below for the correct definition. */
 
 export interface VotingMetrics {
   voteSuccessRate: number;
@@ -175,15 +154,7 @@ export interface VotingMetrics {
   governanceParticipation: number;
 }
 
-export interface NetworkDecentralization {
-  nakamotoCoefficient: number;
-  topValidatorsStakeShare: number;
-  herfindahlIndex: number;
-  geographicDistribution: GeographicMetrics;
-  clientDiversity: ClientDiversityMetrics;
-  stakingRatio: number;
-  validatorCount: number;
-}
+/* Removed duplicate NetworkDecentralization definition. See below for the correct definition. */
 
 export interface GeographicMetrics {
   continents: Record<string, number>;
@@ -215,7 +186,6 @@ export interface ValidatorMetrics {
   commission: number;
   activatedStake: number;
   lastVote: number;
-  rootSlot: number;
   credits: number;
   epochCredits: number;
   version: string;
@@ -238,6 +208,14 @@ export interface ValidatorPerformance {
   nakamotoCoefficient: number;
   averageUptime: number;
   networkHealth: 'excellent' | 'good' | 'fair' | 'poor';
+  blocksProduced: number;
+  expectedBlocks: number;
+  missedBlocks: number;
+  productionRate: number;
+  voteAccuracy: number;
+  skipRate: number;
+  slashingEvents: number;
+  performanceScore: number;
 }
 
 export interface NetworkDecentralization {
@@ -258,6 +236,11 @@ export interface NetworkDecentralization {
   }>;
   herfindahlIndex: number;
   nakamotoCoefficient: number;
+  topValidatorsStakeShare: number;
+  geographicDistribution: GeographicMetrics;
+  clientDiversity: ClientDiversityMetrics;
+  stakingRatio: number;
+  validatorCount: number;
 }
 
 // Callback types for real-time updates

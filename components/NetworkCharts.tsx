@@ -42,7 +42,8 @@ const NetworkChartsComponent = function({ networkId, isLive = false }: NetworkCh
   const { tpsData, responseData } = useMemo(() => {
     const tpsData = chartData.map(d => ({
       timestamp: d.timestamp,
-      tps: d.tps
+      tps: d.tps,
+      blockTime: d.blockTime
     }));
 
     const responseData = chartData.map(d => ({

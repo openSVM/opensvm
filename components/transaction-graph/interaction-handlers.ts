@@ -1,9 +1,8 @@
 'use client';
 
 import cytoscape from 'cytoscape';
-import { debounce, throttle } from '@/lib/utils';
+import { debounce } from '@/lib/utils';
 import { ViewportState } from '@/lib/graph-state-cache';
-import { runLayout } from './layout';
 import { gpuThrottle, optimizeCytoscapeContainer } from './gpu-utils';
 
 /**
@@ -27,10 +26,10 @@ export async function focusOnTransaction(
   focusSignatureRef: React.MutableRefObject<string>,
   setCurrentSignature: (signature: string) => void,
   viewportState: ViewportState | null,
-  setViewportState: (state: ViewportState) => void,
+  _setViewportState: (state: ViewportState) => void,
   expandTransactionGraph: (signature: string, signal: AbortSignal) => Promise<boolean>,
   onTransactionSelect: (signature: string) => void,
-  router: any,
+  _router: any,
   clientSideNavigation = true,
   incrementalLoad = false,
   preserveViewport = true
@@ -171,7 +170,7 @@ export const setupGraphInteractions = (
   }
   
   // GPU-accelerated throttle hover effects for better performance
-  const throttledHoverIn = gpuThrottle((event) => {
+  const throttledHoverIn = gpuThrottle((event: any) => {
     const ele = event.target;
     
     if (ele.isNode() && ele.data('type') === 'transaction') {
@@ -200,10 +199,9 @@ export const setupGraphInteractions = (
   // Debounce viewport state updates for better performance
   const updateViewportState = debounce(() => {
     if (cy) {
-      const viewport = cy.viewport();
       setViewportState({
-        zoom: viewport.zoom,
-        pan: viewport.pan
+        zoom: cy.zoom(),
+        pan: cy.pan()
       });
     }
   }, 250); // 250ms delay to reduce overhead from frequent pan/zoom events
@@ -263,7 +261,7 @@ export const setupGraphInteractions = (
     edge.connectedNodes().addClass('highlighted');
     
     // If one of the connected nodes is a transaction, focus on it
-    const connectedTxs = edge.connectedNodes().filter(node => node.data('type') === 'transaction');
+    const connectedTxs = edge.connectedNodes().filter((node: any) => node.data('type') === 'transaction');
     if (connectedTxs.length > 0) {
       const txSignature = connectedTxs[0].id();
       if (txSignature !== focusSignatureRef.current) {

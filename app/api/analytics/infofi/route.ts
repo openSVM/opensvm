@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 
 // Real Info Fi Analytics API
 interface InfoFiMetrics {
@@ -263,7 +263,7 @@ async function fetchInfoFiData(): Promise<InfoFiMetrics[]> {
   }
 }
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const platforms = await fetchInfoFiData();
 

@@ -3,7 +3,7 @@
 import type { DetailedTransactionInfo } from '@/lib/solana';
 import dynamic from 'next/dynamic';
 import { useRouter, usePathname } from 'next/navigation';
-import { useRef, Suspense, useEffect, useState, useCallback, useTransition, useMemo } from 'react';
+import { useRef, Suspense, useEffect, useState, useCallback, useTransition } from 'react';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import Link from 'next/link';
 import ErrorBoundaryWrapper from '@/components/ErrorBoundaryWrapper'; 
@@ -47,7 +47,7 @@ const TransactionGPTAnalysis = dynamic(
 );
 
 const TransactionGraph = dynamic(
-  () => import('@/components/TransactionGraph').catch(err => {
+  () => import('@/components/transaction-graph/TransactionGraph').catch(err => {
     console.error('Failed to load TransactionGraph:', err);
     return () => <div>Error loading transaction graph</div>;
   }),
@@ -66,7 +66,6 @@ const AccountTooltip = ({
   children: React.ReactNode 
 }) => {
   const [showTooltip, setShowTooltip] = useState(false);
-  const [accountData, setAccountData] = useState(null);
   const [tooltipPosition, setTooltipPosition] = useState({ top: 0, left: 0 });
   
   // Timer ref for delayed hiding
@@ -523,8 +522,6 @@ function ErrorDisplay({ error, signature }: { error: Error; signature: string })
 // Community Notes component
 function CommunityNotes({ signature }: { signature: string }) {
   const [notes, setNotes] = useState<any[]>([]);
-  const [newNote, setNewNote] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Mock notes for now - would be replaced with actual backend integration
   useEffect(() => {
@@ -533,23 +530,6 @@ function CommunityNotes({ signature }: { signature: string }) {
       { id: 2, text: "Executed during high network congestion period, explaining the higher than usual fees.", votes: 8, author: "0xabcd...ef01" }
     ]);
   }, [signature]);
-  
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newNote.trim()) return;
-    
-    setIsSubmitting(true);
-    
-    // Mock submission - would normally be a fetch call
-    setTimeout(() => {
-      setNotes(prev => [
-        ...prev,
-        { id: Date.now(), text: newNote, votes: 0, author: "You" }
-      ]);
-      setNewNote('');
-      setIsSubmitting(false);
-    }, 500);
-  };
   
   return (
     <div className="bg-background rounded-lg p-4 md:p-6 shadow-lg border border-border min-h-[200px]">
@@ -617,7 +597,6 @@ export default function TransactionContent({ signature }: { signature: string })
   const [transitionState, setTransitionState] = useState<'idle' | 'loading' | 'success'>('idle');
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const [preloadedAccounts, setPreloadedAccounts] = useState<string[]>([]);
   
   // Enhanced cache with Map for better performance and key management
   const transactionDataCache = useRef<Map<string, DetailedTransactionInfo>>(new Map());
@@ -654,7 +633,7 @@ export default function TransactionContent({ signature }: { signature: string })
     startTransition(() => {
       if (transactionDataCache.current.has(newSignature)) {
         const data = transactionDataCache.current.get(newSignature);
-        setTx(data);
+        setTx(data || null);
         if (data?.details?.accounts && data.details.accounts.length > 0) {
           setInitialAccount(data.details.accounts[0].pubkey);
         }
@@ -747,7 +726,7 @@ export default function TransactionContent({ signature }: { signature: string })
     };
 
     // Listen for popstate events (browser back/forward)
-    const handlePopState = (event: PopStateEvent) => {
+    const handlePopState = () => {
       // Skip if this is a programmatic navigation we initiated
       if (sessionStorage.getItem('programmatic_nav')) {
         return;
@@ -782,9 +761,6 @@ export default function TransactionContent({ signature }: { signature: string })
   useEffect(() => {
     if (!tx?.details?.accounts) return;
     
-    // Get a list of connected accounts from the current transaction
-    const accounts = tx.details.accounts.slice(0, 10); // Limit to first 3 for efficiency
-    
     // In the background, we could preload transactions for these accounts
     // This would be implemented as a low-priority background task
     // to improve perceived performance when clicking through transactions
@@ -797,7 +773,6 @@ export default function TransactionContent({ signature }: { signature: string })
     
     // Preload transactions for first 2 accounts to speed up future navigation
     const preloadAccounts = tx.details.accounts.slice(0, 2);
-    setPreloadedAccounts(preloadAccounts.map(account => account.pubkey).filter(Boolean));
     
     preloadAccounts.forEach(account => {
       if (!account.pubkey) return;

@@ -112,10 +112,10 @@ const formatTimeAgo = (timestamp: number): string => {
   return `${diffDays}d ago`;
 };
 
-export async function GET(request: Request) {
+export async function GET() {
   try {
-    const { searchParams } = new URL(request.url);
-    const networks = searchParams.get('networks')?.split(',') || ['solana'];
+    // const { searchParams } = new URL(request.url);
+    // const networks = searchParams.get('networks')?.split(',') || ['solana'];
 
     const suggestions: any[] = [];
 
@@ -210,11 +210,9 @@ export async function GET(request: Request) {
     // Flatten suggestions with section metadata
     sectionsData.forEach(section => {
       section.suggestions.forEach(suggestion => {
+        // Only include allowed properties in metadata
         suggestion.metadata = {
-          ...suggestion.metadata,
-          sectionTitle: section.sectionTitle,
-          sectionIcon: section.sectionIcon,
-          sectionDescription: section.sectionDescription
+          ...suggestion.metadata
         };
         suggestions.push(suggestion);
       });

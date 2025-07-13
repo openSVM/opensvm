@@ -67,13 +67,12 @@ async function fetchBridgeData(): Promise<BridgeData[]> {
   try {
     // Use Wormhole API for real bridge data
     const wormholeResponse = await fetch('https://api.wormhole.com/v1/observations');
-    const portalResponse = await fetch('https://api.coingecko.com/api/v3/coins/wormhole');
     
     const realBridges: BridgeData[] = [];
     
     // Add Wormhole data if available
     if (wormholeResponse.ok) {
-      const wormholeData = await wormholeResponse.json();
+      await wormholeResponse.json(); // Only for side effect, not used
       realBridges.push({
         name: 'Wormhole',
         volume24h: 25000000, // $25M typical daily volume
@@ -169,7 +168,7 @@ async function fetchCrossChainVolume(): Promise<any[]> {
     // Use real CoinGecko data for cross-chain volume estimates
     const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=wormhole,solana&vs_currencies=usd&include_24hr_vol=true');
     if (!response.ok) return [];
-    const data = await response.json();
+    await response.json(); // Only for side effect, not used
     
     // Generate realistic flow data based on market data
     const flows = [
@@ -202,7 +201,7 @@ export async function GET(request: NextRequest) {
     
     // Fetch real bridge data
     const bridgeData = await fetchBridgeData();
-    const crossChainVolume = await fetchCrossChainVolume();
+    await fetchCrossChainVolume(); // Only for side effect, not used
     
     // Generate flows data from real bridge information with weighted distribution
     const flowsData: any[] = [];
@@ -338,4 +337,3 @@ export async function GET(request: NextRequest) {
     );
   }
 }
-

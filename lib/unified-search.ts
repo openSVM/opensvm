@@ -5,7 +5,7 @@
  * into a unified search interface with consistent result formatting and display.
  */
 
-import { moralis, getComprehensiveBlockchainData } from './moralis-api';
+import { getComprehensiveBlockchainData } from './moralis-api';
 import { searchTelegramChats, formatTelegramResults } from './telegram-search';
 import { searchDuckDuckGo, formatDuckDuckGoResults } from './duckduckgo-search';
 import { searchXCom, formatXComResults } from './xcom-search';
@@ -95,12 +95,12 @@ export async function unifiedSearch(query: string, options: SearchOptions = {}) 
     // Fetch blockchain data if requested
     if (includeBlockchainData) {
       const blockchainDataPromise = getComprehensiveBlockchainData(query)
-        .then(data => {
+        .then((data: any) => {
           if (data) {
             results.blockchainData = data;
           }
         })
-        .catch(error => {
+        .catch((error: any) => {
           console.error('Error fetching blockchain data:', error);
         });
       
@@ -148,12 +148,12 @@ export async function unifiedSearch(query: string, options: SearchOptions = {}) 
     }
     
     // DuckDuckGo search
-    if (searchDuckDuckGo) {
+    if (sources.includes('duckduckgo') || sources.includes('all')) {
       const duckDuckGoSearchPromise = searchDuckDuckGo(query, limit)
-        .then(data => {
+        .then((data: any) => {
           results.duckduckgo = formatDuckDuckGoResults(data);
         })
-        .catch(error => {
+        .catch((error: any) => {
           console.error('Error in DuckDuckGo search:', error);
           results.duckduckgo = [];
         });

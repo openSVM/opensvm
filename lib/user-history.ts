@@ -107,6 +107,13 @@ export class UserHistoryService {
           createdAt: Date.now(),
           lastActive: Date.now(),
           stats: {} as UserHistoryStats,
+          socialStats: {
+            visitsByUsers: 0,
+            followers: 0,
+            following: 0,
+            likes: 0,
+            profileViews: 0
+          },
           history: []
         };
       }

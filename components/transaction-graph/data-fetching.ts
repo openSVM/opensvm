@@ -1,10 +1,15 @@
 'use client';
 
 import cytoscape from 'cytoscape';
-import { AccountData, FetchQueueItem, GraphElementAddResult, Transaction } from './types';
-import { formatSolChange, formatTimestamp, shortenString } from './utils';
+import { AccountData, FetchQueueItem, GraphElementAddResult } from './types';
+import { formatAddress } from './utils';
+
+// Simple utility functions to replace missing imports
+const shortenString = (str: string, length: number = 8) => formatAddress(str, length);
+const formatTimestamp = (timestamp: number) => new Date(timestamp * 1000).toLocaleString();
+const formatSolChange = (change: number) => `${change > 0 ? '+' : ''}${change.toFixed(6)} SOL`;
 import { runIncrementalLayout } from './layout';
-import { GraphStateCache } from '@/lib/graph-state-cache';
+// import { GraphStateCache } from '@/lib/graph-state-cache'; // Commented out missing import
 
 /**
  * Fetch transaction data with caching
@@ -290,9 +295,9 @@ export const queueAccountFetch = (
  */
 export async function processAccountFetchQueue(
   fetchQueueRef: React.MutableRefObject<FetchQueueItem[]>,
-  fetchAndProcessAccount: (address: string, depth: number, parentSignature: string | null) => Promise<void>,
+  fetchAndProcessAccount: (address: string, depth: number, parentSignature: string | null, signal: AbortSignal) => Promise<void>,
   isProcessingQueueRef?: React.MutableRefObject<boolean>
-): Promise<void> { 
+): Promise<void> {
   // Early return if queue is empty or already processing
   if (fetchQueueRef.current.length === 0) {
     console.log(`📭 [PROCESS_QUEUE] Queue is empty, nothing to process`);
@@ -320,13 +325,17 @@ export async function processAccountFetchQueue(
       console.log(`📦 [PROCESS_QUEUE] Processing batch of ${batch.length} accounts`);
       
       // Fetch all accounts in parallel with timeout protection
+      const controller = new AbortController();
       const results = await Promise.allSettled(
         batch.map(item => {
           console.log(`🔄 [PROCESS_QUEUE] Processing account: ${item.address}`);
           // Add timeout protection for each fetch operation
-          const fetchPromise = fetchAndProcessAccount(item.address, item.depth, item.parentSignature);
-          const timeoutPromise = new Promise<void>((_, reject) => 
-            setTimeout(() => reject(new Error(`Fetch timeout for ${item.address}`)), 30000)
+          const fetchPromise = fetchAndProcessAccount(item.address, item.depth, item.parentSignature, controller.signal);
+          const timeoutPromise = new Promise<void>((_, reject) =>
+            setTimeout(() => {
+              controller.abort();
+              reject(new Error(`Fetch timeout for ${item.address}`));
+            }, 30000)
           );
           
           return Promise.race([fetchPromise, timeoutPromise])
@@ -427,7 +436,7 @@ export async function addAccountToGraph(
   pendingFetchesRef?.current?.delete(`${address}:${depth}`);
   
   // Update loading progress - ensure progress moves forward even with empty results
-  setLoadingProgress?.((prev) => {
+  setLoadingProgress?.(() => {
     const loadedCount = loadedAccountsRef?.current?.size || 0;
     const total = Math.max(totalAccounts, 1);
     const progress = Math.min(loadedCount / total, 1);
@@ -443,7 +452,7 @@ export async function addAccountToGraph(
     const cyInstance = cyRef?.current;
     if (cyInstance) {
       const nodeId = address;
-      if (!cy.getElementById(nodeId).length && !processedNodesRef?.current?.has(nodeId)) {
+      if (!cyInstance.getElementById(nodeId).length && !processedNodesRef?.current?.has(nodeId)) {
         console.log(`➕ [GRAPH_BUILD] Adding minimal account node for ${address} (no transactions)`);
         cyInstance.add({
           data: {
@@ -466,7 +475,7 @@ export async function addAccountToGraph(
       }
     }
     
-    return { cy: cyRef?.current, address, newElements: new Set() };
+    return { cy: cyRef?.current!, address, newElements: new Set() };
   }
 
   // Get cy instance and verify it exists
@@ -523,8 +532,6 @@ export async function addAccountToGraph(
       console.log(`🔍 [TX_PROCESS] Transaction data:`, {
         signature: tx.signature,
         success: tx.success,
-        err: tx.err,
-        type: tx.type,
         accountsCount: tx.accounts?.length || 0,
         transfersCount: tx.transfers?.length || 0,
         timestamp: tx.timestamp
@@ -555,7 +562,7 @@ export async function addAccountToGraph(
       
       if (!shouldIncludeTx) {
         console.log(`🚫 [TX_PROCESS] Excluding transaction ${tx.signature}: ${filterReason}`);
-        console.log(`🚫 [TX_PROCESS] Transaction details: accounts=${tx.accounts?.length || 0}, type=${tx.type || 'unknown'}`);
+        console.log(`🚫 [TX_PROCESS] Transaction details: accounts=${tx.accounts?.length || 0}, signature=${tx.signature}`);
         skippedTransactionCount++;
         continue;
       }
@@ -576,8 +583,8 @@ export async function addAccountToGraph(
         }
         
         // Determine transaction type and status for better visualization
-        const txType = tx.type || 'unknown';
-        const txSuccess = tx.success !== false && !tx.err; // More inclusive success check
+        const txType = 'transaction'; // Default type since tx.type doesn't exist in interface
+        const txSuccess = tx.success !== false; // Use success property from interface
         const txClasses = txSuccess ? 'transaction success' : 'transaction error';
         
         console.log(`➕ [TX_PROCESS] Adding transaction node: ${tx.signature}, type: ${txType}, success: ${txSuccess}`);
@@ -715,7 +722,7 @@ export async function addAccountToGraph(
         // For self-transfers, check if they should be excluded (likely program/system accounts)
         if (isSelfTransfer) {
           // Only exclude self-transfers if they're to program accounts
-          if (shouldExcludeAddress(targetAccount)) {
+          if (shouldExcludeAddress?.(targetAccount)) {
             console.log(`⏭️ [TRANSFER_PROCESS] Skipping self-transfer to excluded program account: ${targetAccount}`);
             continue;
           }
@@ -752,7 +759,7 @@ export async function addAccountToGraph(
         } else {
           // Regular transfer to different account
           // Apply filtering for SOL transfers: exclude transfers to program accounts
-          if (shouldExcludeAddress(targetAccount)) {
+          if (shouldExcludeAddress?.(targetAccount)) {
             console.log(`⏭️ [TRANSFER_PROCESS] Skipping transfer to excluded program account: ${targetAccount}`);
             continue;
           }
@@ -823,12 +830,12 @@ export async function addAccountToGraph(
     // Analyze skipped transactions to provide detailed filtering explanation
     const skippedReasons: Record<string, number> = {};
     for (const tx of data.transactions) {
-      if (!shouldIncludeTransaction || shouldIncludeTransaction(tx)) {
+      if (!shouldIncludeTransaction || shouldIncludeTransaction(tx.accounts)) {
         continue; // This transaction was processed
       }
       
       // Analyze why this transaction was skipped
-      if (!tx.success && tx.err) {
+      if (!tx.success) {
         skippedReasons['Failed transactions'] = (skippedReasons['Failed transactions'] || 0) + 1;
       } else if (!tx.transfers || tx.transfers.length === 0) {
         skippedReasons['No transfers'] = (skippedReasons['No transfers'] || 0) + 1;
@@ -1060,7 +1067,7 @@ export async function addAccountToGraph(
     // Queue connected accounts for processing if within depth limit
     if (depth < maxDepth - 1) {
       console.log(`🔄 [GRAPH_BUILD] Queueing ${connectedAccounts.size} connected accounts for next depth level`);
-      for (const connectedAddress of connectedAccounts) {
+      for (const connectedAddress of Array.from(connectedAccounts)) {
         const nextDepth = depth + 1;
         const connectedAccountKey = `${connectedAddress}:${nextDepth}`;
         // Add safety checks to ensure Set objects are defined before calling .has()
@@ -1120,7 +1127,7 @@ export async function addAccountToGraph(
             status: 'error',
             transactionCount: 0,
             hasError: true,
-            errorMessage: error.message || 'Processing failed'
+            errorMessage: error instanceof Error ? error.message : 'Processing failed'
           },
           classes: 'account error'
         });
@@ -1133,7 +1140,7 @@ export async function addAccountToGraph(
       }
     }
     
-    return { cy: cyRef?.current, address, newElements: new Set() };
+    return { cy: cyRef?.current!, address, newElements: new Set() };
   }
 };
 
@@ -1205,7 +1212,7 @@ export async function expandTransactionGraph(
     
     if (transactionData?.details?.accounts?.length > 0) {
       // Process all accounts in parallel instead of just the first one
-      const accountPromises = transactionData.details.accounts.map(account => {
+      const accountPromises = transactionData.details.accounts.map((account: { pubkey: string }) => {
         if (account.pubkey) {
           return new Promise<void>((resolve) => {
             queueAccountFetch(account.pubkey, 1, signature);

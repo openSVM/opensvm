@@ -11,7 +11,6 @@ export function ReferralLinkSection({ walletAddress }: { walletAddress: string }
   const [copied, setCopied] = useState(false);
   const [isOffline, setIsOffline] = useState(false);
   const [copySuccess, setCopySuccess] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
   
   // Simple toast replacement since useToast is not available
   const toast = {
@@ -81,7 +80,7 @@ export function ReferralLinkSection({ walletAddress }: { walletAddress: string }
         
         // If offline and no cached link, show a message
         if (isOffline && !referralLink) {
-          setError('Cannot generate link while offline');
+          toast.error('Cannot generate link while offline');
         }
       } finally {
         setIsGenerating(false);

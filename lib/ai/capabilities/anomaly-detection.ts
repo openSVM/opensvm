@@ -32,13 +32,13 @@ export class AnomalyDetectionCapability extends BaseCapability {
   private alerts: RingBuffer<AnomalyAlert>;
   private maxEventHistory = 1000;
   private maxAlertHistory = 100;
+  public tools: Tool[] = this.createTools(); // Initialize directly here
 
   constructor(connection: Connection) {
     super(connection);
     this.recentEvents = new RingBuffer<any>(this.maxEventHistory);
     this.alerts = new RingBuffer<AnomalyAlert>(this.maxAlertHistory);
     this.initializePatterns(); // Now async but fire-and-forget
-    this.tools = this.createTools();
   }
 
   canHandle(message: Message): boolean {
@@ -354,7 +354,7 @@ export class AnomalyDetectionCapability extends BaseCapability {
     }
   }
 
-  private async getAnomalyAlerts(params: ToolParams): Promise<any> {
+  public async getAnomalyAlerts(): Promise<any> {
     const allAlerts = this.alerts.toArray();
     const recentAlerts = allAlerts
       .filter(alert => alert.timestamp > Date.now() - (24 * 60 * 60 * 1000)) // Last 24 hours
@@ -381,7 +381,7 @@ export class AnomalyDetectionCapability extends BaseCapability {
     };
   }
 
-  private async getAnomalyStats(params: ToolParams): Promise<any> {
+  public async getAnomalyStats(): Promise<any> {
     const now = Date.now();
     const periods = [
       { name: '1h', duration: 60 * 60 * 1000 },

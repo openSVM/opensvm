@@ -29,17 +29,11 @@ export async function GET(request: NextRequest) {
     
     switch (action) {
       case 'alerts':
-        const alerts = await detector.getAnomalyAlerts({ 
-          message: { role: 'user', content: 'get alerts' },
-          context: { messages: [] }
-        });
+        const alerts = await detector.getAnomalyAlerts();
         return Response.json(createSuccessResponse(alerts));
         
       case 'stats':
-        const stats = await detector.getAnomalyStats({
-          message: { role: 'user', content: 'get stats' },
-          context: { messages: [] }
-        });
+        const stats = await detector.getAnomalyStats();
         return Response.json(createSuccessResponse(stats));
         
       default:

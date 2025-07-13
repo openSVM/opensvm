@@ -4,7 +4,6 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import Image from 'next/image';
 import { 
   BarChart,
   Bar,
@@ -52,7 +51,7 @@ const NFTVisualization: React.FC<NFTVisualizationProps> = ({
   const { metadata, collectionStats, collectionItems } = nftData.data;
 
   // Format attributes for visualization
-  const attributesData = [];
+  const attributesData: any[] = [];
   if (metadata?.attributes) {
     const attributeTypes = new Set(metadata.attributes.map((attr: any) => attr.trait_type));
     
@@ -284,9 +283,9 @@ const NFTVisualization: React.FC<NFTVisualizationProps> = ({
                     outerRadius={100}
                     fill="#8884d8"
                     dataKey="value"
-                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                    label={({ name, percent }) => `${name} ${((percent || 0) * 100).toFixed(0)}%`}
                   >
-                    {rarityDistribution.map((entry, index) => (
+                    {rarityDistribution.map((_, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>

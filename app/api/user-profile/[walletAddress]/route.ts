@@ -4,7 +4,6 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { UserProfile } from '@/types/user-history';
 import { calculateStats, validateWalletAddress, sanitizeInput } from '@/lib/user-history-utils';
 import { getSessionFromCookie } from '@/lib/auth-server';
 import { 
@@ -15,7 +14,7 @@ import {
 } from '@/lib/qdrant';
 
 // Authentication check using session validation
-function isValidRequest(request: NextRequest): boolean {
+function isValidRequest(_request: NextRequest): boolean {
   try {
     const session = getSessionFromCookie();
     if (!session) return false;
@@ -31,7 +30,7 @@ function isValidRequest(request: NextRequest): boolean {
 }
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: { walletAddress: string } }
 ) {
   try {
@@ -133,7 +132,7 @@ export async function GET(
 }
 
 export async function PUT(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: { walletAddress: string } }
 ) {
   try {
@@ -144,7 +143,7 @@ export async function PUT(
     }
 
     // Authentication check
-    if (!isValidRequest(request)) {
+    if (!isValidRequest(_request)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -156,7 +155,7 @@ export async function PUT(
       return NextResponse.json({ error: 'Invalid wallet address format' }, { status: 400 });
     }
 
-    const body = await request.json();
+    const body = await _request.json();
     
     // Get existing profile or create new one
     let profile = await getUserProfile(validatedAddress);

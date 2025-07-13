@@ -7,21 +7,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { 
   Wrench, 
-  BarChart3, 
-  Shield, 
-  Wallet, 
-  Code, 
   Users,
   TrendingUp,
   Activity,
   Search,
   ArrowUpDown,
   Eye,
-  Lock,
-  Globe,
-  Zap,
-  Target,
-  BookOpen
+  Target
 } from 'lucide-react';
 
 interface Tool {

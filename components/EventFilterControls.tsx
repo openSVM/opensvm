@@ -6,7 +6,7 @@
 
 'use client';
 
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback } from 'react';
 import { Card } from '@/components/ui/card';
 
 export interface EventFilters {
@@ -62,14 +62,6 @@ export const EventFilterControls = React.memo(function EventFilterControls({
       }
     });
   }, [filters, onFiltersChange]);
-
-  // Memoize expensive calculations
-  const filterStats = useMemo(() => ({
-    activeFilters: Object.values(filters).filter(v => 
-      typeof v === 'boolean' ? v : true
-    ).length,
-    programFilters: Object.values(filters.showKnownPrograms).filter(Boolean).length
-  }), [filters]);
 
   const resetFilters = useCallback(() => {
     onFiltersChange({

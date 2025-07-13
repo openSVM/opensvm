@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, ExternalLink, TrendingUp, TrendingDown, Users, Zap, Shield, DollarSign, Activity, Calendar, AlertTriangle, InfoIcon } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell } from 'recharts';
+import { ArrowLeft, ExternalLink, Users, Shield, DollarSign, Activity, AlertTriangle, InfoIcon } from 'lucide-react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
 interface DexProfile {
   name: string;
@@ -340,7 +340,7 @@ export default function DexProfilePage() {
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="date" />
               <YAxis />
-              <Tooltip />
+              <RechartsTooltip />
               <Line type="monotone" dataKey="volume" stroke="#8884d8" strokeWidth={2} />
             </LineChart>
           </ResponsiveContainer>
@@ -364,7 +364,7 @@ export default function DexProfilePage() {
                   <Cell key={`cell-${index}`} fill={entry.color} />
                 ))}
               </Pie>
-              <Tooltip />
+              <RechartsTooltip />
             </PieChart>
           </ResponsiveContainer>
         </div>
@@ -444,7 +444,7 @@ export default function DexProfilePage() {
                 </tr>
               </thead>
               <tbody>
-                {profile.topPools.map((pool, index) => (
+                {profile.topPools.map((pool) => (
                   <tr key={pool.address} className="border-b border-border">
                     <td className="py-3 font-medium">{pool.tokenA}/{pool.tokenB}</td>
                     <td className="py-3">{formatCurrency(pool.tvl)}</td>

@@ -6,7 +6,7 @@
 
 'use client';
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Card } from '@/components/ui/card';
 import { ChevronDown, ChevronRight, AlertTriangle, Clock, Eye } from 'lucide-react';
 import { AnomalyStack, DeduplicatedAnomaly } from '@/lib/utils/deduplication';

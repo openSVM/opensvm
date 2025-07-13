@@ -74,7 +74,6 @@ export default function AccountPage({ params, searchParams }: PageProps) {
   const [accountInfo, setAccountInfo] = useState<AccountData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [address, setAddress] = useState<string>('');
   const [activeTab, setActiveTab] = useState<string>('tokens');
 
   useEffect(() => {
@@ -109,7 +108,6 @@ export default function AccountPage({ params, searchParams }: PageProps) {
           throw new Error('Invalid address length. Solana addresses must be between 32 and 44 characters.');
         }
 
-        setAddress(cleanAddress);
         
         // Fetch account info
         const accountData = await getAccountData(cleanAddress);

@@ -3,7 +3,7 @@
  */
 
 import { QdrantClient } from '@qdrant/js-client-rest';
-import { UserHistoryEntry, UserProfile } from '@/types/user-history';
+import { UserHistoryEntry, UserProfile, UserFollowEntry } from '@/types/user-history';
 
 // Initialize Qdrant client
 const qdrantClient = new QdrantClient({
@@ -380,14 +380,6 @@ export async function checkQdrantHealth(): Promise<boolean> {
 /**
  * Social Features - Follow functionality
  */
-
-// User follow entry interface
-interface UserFollowEntry {
-  id: string;
-  followerAddress: string;
-  targetAddress: string;
-  timestamp: number;
-}
 
 /**
  * Store user follow relationship

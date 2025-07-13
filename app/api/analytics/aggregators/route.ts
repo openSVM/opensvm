@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 
 // Real Aggregator Analytics API
 interface AggregatorMetrics {
@@ -219,7 +219,7 @@ async function fetchAggregatorData(): Promise<AggregatorMetrics[]> {
   }
 }
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const aggregators = await fetchAggregatorData();
 

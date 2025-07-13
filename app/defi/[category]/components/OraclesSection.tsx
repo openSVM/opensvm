@@ -5,22 +5,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { 
-  Database, 
-  Zap, 
-  Shield, 
-  Clock, 
+import {
+  Database,
+  Shield,
+  Clock,
   TrendingUp,
   Activity,
-  Globe,
-  CheckCircle,
-  AlertTriangle,
   Search,
   ArrowUpDown,
-  BarChart3,
-  Network,
-  Eye,
-  Lock
+  Eye
 } from 'lucide-react';
 
 interface Oracle {

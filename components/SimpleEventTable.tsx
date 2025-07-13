@@ -9,7 +9,9 @@
 
 import React, { useMemo, useCallback, useState, useRef, useEffect } from 'react';
 import { BlockchainEvent } from './LiveEventMonitor';
-import { lamportsToSol } from '@/components/transaction-graph/utils';
+
+// Simple helper function to convert lamports to SOL
+const lamportsToSol = (lamports: number): number => lamports / 1000000000;
 
 interface SimpleEventTableProps {
   events: BlockchainEvent[];
@@ -129,7 +131,7 @@ export const SimpleEventTable = React.memo(function SimpleEventTable({
           className="flex bg-muted text-muted-foreground text-xs font-bold border-b sticky top-0 z-10"
           style={{ height: `${headerHeight}px` }}
         >
-          {columns.map((column, index) => (
+          {columns.map((column) => (
             <div
               key={column.key}
               className="px-3 py-2 border-r last:border-r-0 flex items-center font-mono"

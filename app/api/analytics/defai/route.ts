@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 
 // Real DeFAI Analytics API
 interface DeFAIMetrics {
@@ -253,7 +253,7 @@ async function fetchDeFAIData(): Promise<DeFAIMetrics[]> {
   }
 }
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const platforms = await fetchDeFAIData();
 

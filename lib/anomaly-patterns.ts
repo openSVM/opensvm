@@ -209,7 +209,7 @@ export const CORE_PATTERNS: AnomalyPattern[] = [
     severity: 'high',
     threshold: 0.3,
     category: 'performance',
-    check: (event, context) => {
+    check: (_event, context) => {
       // Enhanced statistical analysis for failure rate
       if (!context.baselineData || context.baselineData.dataPoints < 30) {
         return context.errorRate > 0.3; // Fallback to simple threshold
@@ -221,7 +221,6 @@ export const CORE_PATTERNS: AnomalyPattern[] = [
       // Calculate recent error rates for standard deviation
       const recentTxs = context.recentEvents.filter(e => e.type === 'transaction');
       const recentWindowSize = Math.min(50, recentTxs.length);
-      const recentFailures = recentTxs.slice(-recentWindowSize).filter(e => e.data.err !== null);
       const recentErrorRates = [];
       
       // Calculate rolling error rates
@@ -297,7 +296,6 @@ export const CORE_PATTERNS: AnomalyPattern[] = [
       
       // Statistical analysis of intervals
       const meanInterval = AnomalyStatistics.calculateMean(intervals);
-      const medianInterval = AnomalyStatistics.calculateMedian(intervals);
       
       // Burst detected if intervals are consistently very short
       const shortIntervals = intervals.filter(interval => interval < 5000).length; // < 5 seconds
@@ -338,7 +336,7 @@ export const CORE_PATTERNS: AnomalyPattern[] = [
       const totalUsage = allPrograms.length;
       
       // Check for interactions with rarely used programs
-      const rarePrograms = currentPrograms.filter(program => {
+      const rarePrograms = currentPrograms.filter((program: string) => {
         const usage = programFreq.get(program) || 0;
         const frequency = totalUsage > 0 ? usage / totalUsage : 0;
         return frequency < 0.01 && usage < 3; // < 1% frequency and < 3 total uses
@@ -450,7 +448,7 @@ export const PUMP_CHAN_PATTERNS: AnomalyPattern[] = [
     severity: 'critical',
     threshold: 1,
     category: 'security',
-    check: (event, context) => {
+    check: (event, _context) => {
       if (event.type !== 'transaction') return false;
       const logs = event.data.logs || [];
       
@@ -509,7 +507,7 @@ export const ML_ENHANCED_PATTERNS: AnomalyPattern[] = [
       const trendAnalysis = AnomalyStatistics.detectTrendAnomaly(recentIntervals);
       
       // Detect periodic patterns (potential automated behavior)
-      const periodicPattern = this.detectPeriodicPattern(intervals);
+      const periodicPattern = MLHelpers.detectPeriodicPattern(intervals);
       
       return isOutlier || isExtremeDeviation || trendAnalysis.isAnomaly || periodicPattern.isDetected;
     },
@@ -532,11 +530,11 @@ export const ML_ENHANCED_PATTERNS: AnomalyPattern[] = [
         .filter(e => e.type === 'transaction' && e.data.accountKeys)
         .forEach(e => {
           const programs = e.data.accountKeys.slice(1);
-          programs.forEach(program => {
+          programs.forEach((program: string) => {
             programUsageFreq.set(program, (programUsageFreq.get(program) || 0) + 1);
             
             // Build co-occurrence graph
-            programs.forEach(otherProgram => {
+            programs.forEach((otherProgram: string) => {
               if (program !== otherProgram) {
                 if (!interactionGraph.has(program)) {
                   interactionGraph.set(program, new Set());
@@ -564,9 +562,9 @@ export const ML_ENHANCED_PATTERNS: AnomalyPattern[] = [
         
         // Unusual co-occurrence patterns
         const expectedCoOccurrences = interactionGraph.get(program) || new Set();
-        const actualCoOccurrences = currentPrograms.filter(p => p !== program);
+        const actualCoOccurrences = currentPrograms.filter((p: string) => p !== program);
         
-        const unexpectedCoOccurrences = actualCoOccurrences.filter(p => 
+        const unexpectedCoOccurrences = actualCoOccurrences.filter((p: string) =>
           !expectedCoOccurrences.has(p) && (programUsageFreq.get(p) || 0) > 0);
         
         if (unexpectedCoOccurrences.length > 0) {
@@ -575,7 +573,7 @@ export const ML_ENHANCED_PATTERNS: AnomalyPattern[] = [
       }
       
       // Program chain complexity analysis
-      const complexity = this.calculateProgramComplexity(currentPrograms, interactionGraph);
+      const complexity = MLHelpers.calculateProgramComplexity(currentPrograms, interactionGraph);
       if (complexity.isUnusual) {
         anomalyScore += 0.4;
       }
@@ -590,10 +588,9 @@ export const ML_ENHANCED_PATTERNS: AnomalyPattern[] = [
     severity: 'medium',
     threshold: 0.75,
     category: 'behavior',
-    check: (event, context) => {
+    check: (_event, context) => {
       if (!context.transactionStatistics) return false;
       
-      const currentVolume = context.transactionVolume;
       const { volumeMovingAverage, volumeStdDev } = context.transactionStatistics;
       
       // Multi-timeframe analysis
@@ -618,7 +615,7 @@ export const ML_ENHANCED_PATTERNS: AnomalyPattern[] = [
       });
       
       // Pattern analysis - detect if this is part of a larger pattern
-      const volumeHistory = this.getVolumeHistory(context.recentEvents, 20);
+      const volumeHistory = MLHelpers.getVolumeHistory(context.recentEvents, 20);
       const patternAnalysis = AnomalyStatistics.detectTrendAnomaly(volumeHistory, 10);
       
       return anomalyCount >= 2 || patternAnalysis.trendStrength > 0.8;
@@ -645,11 +642,11 @@ export const ML_ENHANCED_PATTERNS: AnomalyPattern[] = [
       if (senderHistory.length < 5) return false; // Need history to establish pattern
       
       // Analyze behavioral patterns
-      const fingerprint = this.buildBehavioralFingerprint(senderHistory);
-      const currentBehavior = this.analyzeBehavior(event);
+      const fingerprint = MLHelpers.buildBehavioralFingerprint(senderHistory);
+      const currentBehavior = MLHelpers.analyzeBehavior(event);
       
       // Compare current behavior against established fingerprint
-      const deviation = this.calculateBehavioralDeviation(fingerprint, currentBehavior);
+      const deviation = MLHelpers.calculateBehavioralDeviation(fingerprint, currentBehavior);
       
       return deviation > 0.7; // Significant deviation from established pattern
     },
@@ -658,6 +655,7 @@ export const ML_ENHANCED_PATTERNS: AnomalyPattern[] = [
 ];
 
 // Helper methods for ML analysis (would be implemented as static methods)
+// @ts-ignore - Used in pattern check functions above
 const MLHelpers = {
   detectPeriodicPattern(intervals: number[]): { isDetected: boolean; period?: number } {
     if (intervals.length < 6) return { isDetected: false };

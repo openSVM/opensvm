@@ -270,45 +270,6 @@ function calculateArbitrageOpportunities(
     .slice(0, 10);
 }
 
-// Fetch real data from Jupiter API
-async function fetchJupiterData(): Promise<DexMetrics | null> {
-  try {
-    const response = await fetch('https://stats-api.jup.ag/coingecko/coins/jupiter-exchange-solana');
-    if (!response.ok) return null;
-    const data = await response.json();
-    
-    return {
-      name: 'jupiter',
-      volume24h: data.total_volume || 0,
-      tvl: data.market_cap || 0,
-      volumeChange: data.price_change_percentage_24h || 0,
-      marketShare: 0 // Will be calculated later
-    };
-  } catch (error) {
-    console.error('Error fetching Jupiter data:', error);
-    return null;
-  }
-}
-
-// Fetch real data from Raydium API
-async function fetchRaydiumData(): Promise<DexMetrics | null> {
-  try {
-    const response = await fetch('https://api.raydium.io/v2/main/info');
-    if (!response.ok) return null;
-    const data = await response.json();
-    
-    return {
-      name: 'raydium',
-      volume24h: parseFloat(data.totalvolume || '0'),
-      tvl: parseFloat(data.tvl || '0'),
-      volumeChange: 0, // Would need historical data
-      marketShare: 0
-    };
-  } catch (error) {
-    console.error('Error fetching Raydium data:', error);
-    return null;
-  }
-}
 
 // Standardize DEX names to lowercase single words
 function standardizeDexName(name: string): string {
@@ -394,33 +355,6 @@ function getFallbackDexData(): DexMetrics[] {
   ];
 }
 
-// Fetch real Solana ecosystem data
-async function fetchSolanaEcosystemData(): Promise<DexMetrics[]> {
-  try {
-    const response = await fetch('https://api.coingecko.com/api/v3/exchanges');
-    if (!response.ok) return [];
-    const data = await response.json();
-    
-    // Filter for Solana-based exchanges
-    const solanaExchanges = data.filter((exchange: any) => 
-      exchange.name?.toLowerCase().includes('solana') ||
-      exchange.name?.toLowerCase().includes('raydium') ||
-      exchange.name?.toLowerCase().includes('orca') ||
-      exchange.name?.toLowerCase().includes('serum')
-    );
-    
-    return solanaExchanges.map((exchange: any) => ({
-      name: exchange.name,
-      volume24h: parseFloat(exchange.trade_volume_24h_btc || '0') * 50000, // Estimate USD
-      tvl: 0, // Not available from this endpoint
-      volumeChange: 0,
-      marketShare: 0
-    }));
-  } catch (error) {
-    console.error('Error fetching Solana ecosystem data:', error);
-    return [];
-  }
-}
 
 export async function GET(request: NextRequest) {
   try {
@@ -543,7 +477,7 @@ export async function GET(request: NextRequest) {
       }));
     
     // Health status based on real data
-    const totalTvl = liquidityData.reduce((sum, l) => sum + l.liquidityUSD, 0);
+    // const totalTvl = liquidityData.reduce((sum, l) => sum + l.liquidityUSD, 0);
     const totalVolumeSum = volumeData.reduce((sum, v) => sum + v.volume24h, 0);
     const activeDexes = volumeData.filter(v => v.volume24h > DEX_CONSTANTS.VOLUME_THRESHOLDS.MINIMAL_DAILY_VOLUME).length;
     
@@ -580,4 +514,3 @@ export async function GET(request: NextRequest) {
     );
   }
 }
-

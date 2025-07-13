@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { checkSVMAIAccess } from '@/lib/token-gating';
 import { getSessionFromCookie } from '@/lib/auth-server';
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   console.log(`[Token Gating] Checking access...`);
 
   // Get the authenticated session

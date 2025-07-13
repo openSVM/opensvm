@@ -271,7 +271,10 @@ export const AnomalyAlertsTable = React.memo(function AnomalyAlertsTable({
                       onClick={() => window.open(`/tx/${getTransactionIdFromAlert(selectedAlert)}`, '_blank', 'noopener,noreferrer')}
                       className="text-xs text-primary hover:underline font-mono"
                     >
-                      {getTransactionIdFromAlert(selectedAlert)?.substring(0, 8)}...{getTransactionIdFromAlert(selectedAlert)?.substring(getTransactionIdFromAlert(selectedAlert)?.length - 8)}
+                      {(() => {
+                        const txId = getTransactionIdFromAlert(selectedAlert);
+                        return txId ? `${txId.substring(0, 8)}...${txId.substring(txId.length - 8)}` : 'N/A';
+                      })()}
                     </button>
                     <CopyButton text={getTransactionIdFromAlert(selectedAlert)!} />
                   </div>

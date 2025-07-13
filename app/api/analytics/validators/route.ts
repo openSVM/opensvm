@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { Connection, PublicKey } from '@solana/web3.js';
+import { NextResponse } from 'next/server';
+import { Connection } from '@solana/web3.js';
 import { VALIDATOR_CONSTANTS, PERFORMANCE_CONSTANTS } from '@/lib/constants/analytics-constants';
 
 // Real Solana RPC endpoint - using public mainnet RPC
@@ -199,13 +199,13 @@ function calculatePerformanceScore(
   );
 }
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const connection = new Connection(SOLANA_RPC_URL, 'confirmed');
     
     // Fetch real validator data from Solana RPC
     const voteAccounts = await connection.getVoteAccounts('confirmed');
-    const epochInfo = await connection.getEpochInfo('confirmed');
+    // const epochInfo = await connection.getEpochInfo('confirmed');
     const clusterNodes = await connection.getClusterNodes();
     
     // Process real validator data
@@ -252,7 +252,7 @@ export async function GET(request: NextRequest) {
         
         // Calculate performance metrics from real data
         const totalCredits = validator.epochCredits.reduce((sum, credit) => sum + credit[1], 0);
-        const recentCredits = validator.epochCredits.slice(-5).reduce((sum, credit) => sum + credit[1], 0);
+        // const recentCredits = validator.epochCredits.slice(-5).reduce((sum, credit) => sum + credit[1], 0);
         const currentEpochCredits = validator.epochCredits[validator.epochCredits.length - 1]?.[1] || 0;
         
         // Calculate performance score using standardized algorithm
@@ -279,7 +279,7 @@ export async function GET(request: NextRequest) {
           commission: validator.commission,
           activatedStake: validator.activatedStake,
           lastVote: validator.lastVote,
-          rootSlot: validator.rootSlot,
+          // rootSlot: validator.rootSlot, // Property does not exist, remove
           credits: totalCredits,
           epochCredits: currentEpochCredits,
           version: clusterNode?.version || 'Unknown',
@@ -345,8 +345,9 @@ export async function GET(request: NextRequest) {
       });
       
       // Datacenter distribution based on ISP/organization
-      const currentDatacenter = datacenterMap.get(validator.datacenter) || { count: 0, stake: 0 };
-      datacenterMap.set(validator.datacenter, {
+      const datacenterKey = validator.datacenter || 'Unknown';
+      const currentDatacenter = datacenterMap.get(datacenterKey) || { count: 0, stake: 0 };
+      datacenterMap.set(datacenterKey, {
         count: currentDatacenter.count + 1,
         stake: currentDatacenter.stake + validator.activatedStake
       });
@@ -427,4 +428,3 @@ export async function GET(request: NextRequest) {
     }, { status: 500 });
   }
 }
-

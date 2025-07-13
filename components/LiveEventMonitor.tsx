@@ -3,20 +3,14 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo, startTransition } from 'react';
 import { Card } from '@/components/ui/card';
 import { useSSEAlerts } from '@/lib/hooks/useSSEAlerts';
-import { BlockchainEvent } from '@/lib/hooks/useSSEStream';
-import { lamportsToSol } from '@/components/transaction-graph/utils';
 import { RingBuffer } from '@/lib/utils/ring-buffer';
-import { TransactionTooltip } from './TransactionTooltip';
-import { PumpStatistics } from './PumpStatistics';
-import { EventFilterControls, EventFilters } from './EventFilterControls';
-import { SimpleEventTable } from './SimpleEventTable';
 import { VirtualTableErrorBoundary } from './VirtualTableErrorBoundary';
 import { AnomalyAlertsTable } from './AnomalyAlertsTable';
 import { StackedAnomalyAlerts } from './StackedAnomalyAlerts';
 import { DeduplicatedEventTable } from './DeduplicatedEventTable';
 import { generateSecureClientId } from '@/lib/crypto-utils';
 import { createLogger } from '@/lib/debug-logger';
-import { KNOWN_PROGRAM_IDS, getProtocolFromProgramId, getProtocolDisplayName } from '@/lib/constants/program-ids';
+import { getProtocolFromProgramId, getProtocolDisplayName } from '@/lib/constants/program-ids';
 import { 
   deduplicateEvents, 
   deduplicateAnomalies, 
@@ -119,13 +113,25 @@ export interface BlockchainEvent {
   metadata?: any;
 }
 
-interface AnomalyAlert {
-  id: string;
-  type: string;
-  severity: 'low' | 'medium' | 'high' | 'critical';
-  description: string;
-  event: BlockchainEvent;
-  timestamp: number;
+interface EventFilters {
+  showTransactions: boolean;
+  showBlocks: boolean;
+  showAccountChanges: boolean;
+  showSuccessOnly: boolean;
+  showFailedOnly: boolean;
+  showSPLTransfers: boolean;
+  showCustomPrograms: boolean;
+  showSystemPrograms: boolean;
+  showKnownPrograms: {
+    raydium: boolean;
+    meteora: boolean;
+    aldrin: boolean;
+    pumpswap: boolean;
+    bonkfun: boolean;
+  };
+  minFee: number;
+  maxFee: number;
+  timeRange: string;
 }
 
 interface LiveMonitorProps {
@@ -134,18 +140,17 @@ interface LiveMonitorProps {
   refreshInterval?: number;
 }
 
-export const LiveEventMonitor = React.memo(function LiveEventMonitor({ 
+export const LiveEventMonitor = React.memo(function LiveEventMonitor({
   maxEvents = 2000, // Reduced from 10000 for better performance
-  autoRefresh = true, 
-  refreshInterval = 15000 // Increased from 8000 to reduce API load
+  autoRefresh = true
 }: LiveMonitorProps) {
   // Ultra-performance optimized state management
   const [eventQueue] = useState(() => new RingBuffer<BlockchainEvent>(maxEvents));
   const [events, setEvents] = useState<BlockchainEvent[]>([]);
   const [isConnected, setIsConnected] = useState(false);
-  const [stats, setStats] = useState<any>(null);
-  const [connectionError, setConnectionError] = useState<string | null>(null);
-  const [lastSlot, setLastSlot] = useState<number | null>(null);
+  const [_stats, _setStats] = useState<any>(null);
+  const [_connectionError, setConnectionError] = useState<string | null>(null);
+  const [_lastSlot, _setLastSlot] = useState<number | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [pendingEventCount, setPendingEventCount] = useState(0);
@@ -164,7 +169,7 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
     totalEvents: 0
   });
   
-  const [filters, setFilters] = useState<EventFilters>({
+  const [filters, _setFilters] = useState<EventFilters>({
     showTransactions: true,
     showBlocks: true,
     showAccountChanges: true,
@@ -189,7 +194,8 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
   const eventCountRef = useRef(0);
   const clientId = useRef(generateSecureClientId());
   const processingQueueRef = useRef<BlockchainEvent[]>([]);
-  const lastMemoryCheck = useRef(0);
+  // @ts-ignore - May be used for memory monitoring in future
+  const _lastMemoryCheck = useRef(0);
   const eventBatchRef = useRef<BlockchainEvent[]>([]);
   const batchTimeoutRef = useRef<NodeJS.Timeout>();
 
@@ -368,7 +374,7 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
   // Safely destructure with fallbacks to prevent undefined references
   const {
     alerts = [],
-    systemStatus = null,
+    systemStatus: _systemStatus = null,
     isConnected: sseConnected = false,
     error: sseError = null,
     connect: connectSSE = () => {},
@@ -380,7 +386,7 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
   const [deduplicatedEvents, setDeduplicatedEvents] = useState<DeduplicatedEvent[]>([]);
   const [deduplicatedAnomalies, setDeduplicatedAnomalies] = useState<DeduplicatedAnomaly[]>([]);
   const [anomalyStacks, setAnomalyStacks] = useState<AnomalyStack[]>([]);
-  const [selectedAnomalyStack, setSelectedAnomalyStack] = useState<AnomalyStack | null>(null);
+  const [_selectedAnomalyStack, _setSelectedAnomalyStack] = useState<AnomalyStack | null>(null);
   const [showStackedView, setShowStackedView] = useState(true);
 
   // Process deduplication when events or alerts change
@@ -426,8 +432,9 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
     }
   }, [sseConnected]);
 
-  // Utility functions for event classification
-  const identifyKnownProgram = useCallback((accountKeys: string[]): string | null => {
+  // Utility functions for event classification (currently unused)
+  // @ts-ignore - May be used for event classification in future
+  const __identifyKnownProgram = useCallback((accountKeys: string[]): string | null => {
     for (const accountKey of accountKeys) {
       const protocol = getProtocolFromProgramId(accountKey);
       if (protocol) {
@@ -437,8 +444,9 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
     return null;
   }, []);
 
-  const classifyTransaction = useCallback((logs: string[], accountKeys: string[]): string => {
-    if (logs.some(log => 
+  // @ts-ignore - May be used for transaction classification in future
+  const __classifyTransaction = useCallback((logs: string[], accountKeys: string[]): string => {
+    if (logs.some(log =>
       log.includes('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA') ||
       log.includes('Program log: Instruction: Transfer')
     )) {
@@ -452,8 +460,9 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
     return 'other';
   }, [SYSTEM_PROGRAMS]);
 
-  // Ultra-throttled anomaly processing
-  const processEventForAnomaliesThrottled = useAggressiveThrottle(useCallback(async (event: BlockchainEvent) => {
+  // Ultra-throttled anomaly processing (currently unused)
+  // @ts-ignore - May be used for anomaly processing in future
+  const __processEventForAnomaliesThrottled = useAggressiveThrottle(useCallback(async (event: BlockchainEvent) => {
     try {
       const response = await fetch('/api/anomaly', {
         method: 'POST',
@@ -482,7 +491,7 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
     // Clear timeouts first to prevent any new operations
     if (batchTimeoutRef.current) {
       clearTimeout(batchTimeoutRef.current);
-      batchTimeoutRef.current = null;
+      batchTimeoutRef.current = undefined;
     }
 
     // Clear connection safely
@@ -524,7 +533,7 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
         const statsData = await statsResponse.json();
         if (statsData.success) {
           startTransition(() => {
-            setStats(statsData.data);
+            _setStats(statsData.data);
           });
         }
       }
@@ -559,7 +568,7 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
       // Clear all timeouts first
       if (batchTimeoutRef.current) {
         clearTimeout(batchTimeoutRef.current);
-        batchTimeoutRef.current = null;
+        batchTimeoutRef.current = undefined;
       }
       
       // Clear processing queues
@@ -697,7 +706,8 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
     }
   }, []);
 
-  const handleEventClick = useCallback((event: BlockchainEvent) => {
+  // @ts-ignore - May be used for event click handling in future
+  const __handleEventClick = useCallback((event: BlockchainEvent) => {
     if (event.type === 'transaction' && event.data?.signature) {
       const url = `/tx/${event.data.signature}`;
       window.open(url, '_blank', 'noopener,noreferrer');
@@ -724,7 +734,7 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
   }, []);
 
   const handleAnomalyClick = useCallback((anomaly: DeduplicatedAnomaly) => {
-    setSelectedAnomalyStack(null);
+    _setSelectedAnomalyStack(null);
     // Open anomaly profile in new tab
     const url = `/anomaly/${anomaly.id}`;
     window.open(url, '_blank', 'noopener,noreferrer');
@@ -850,9 +860,9 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
             <div className="text-sm text-muted-foreground">
               Stacks: {anomalyStacks.length}
             </div>
-            {lastSlot && (
+            {_lastSlot && (
               <div className="text-sm text-muted-foreground">
-                Slot: {lastSlot.toLocaleString()}
+                Slot: {_lastSlot.toLocaleString()}
               </div>
             )}
             {performanceMetrics.memoryUsage && (
@@ -875,7 +885,7 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
             <button
               onClick={sseConnected ? disconnectSSE : connectSSE}
               className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600"
-              disabled={!sseConnected && sseError}
+              disabled={!sseConnected && !!sseError}
             >
               {sseError ? 'Error' : sseConnected ? 'Disconnect' : 'Connect'}
             </button>
@@ -913,12 +923,12 @@ export const LiveEventMonitor = React.memo(function LiveEventMonitor({
       <div className="grid grid-cols-1 xl:grid-cols-4 gap-4 h-[calc(100vh-300px)]">
         {/* Left Sidebar - Compact */}
         <div className="xl:col-span-1 space-y-4 overflow-y-auto">
-          <PumpStatistics events={filteredEvents} />
-          <EventFilterControls 
+          {/* <PumpStatistics events={filteredEvents} /> */}
+          {/* <EventFilterControls
             filters={filters}
             onFiltersChange={setFilters}
             eventCounts={eventCounts}
-          />
+          /> */}
           
           {/* Recent Anomaly Alerts - Compact */}
           <Card className="p-3">

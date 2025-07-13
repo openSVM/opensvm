@@ -50,7 +50,7 @@ const formatActionResponse = (response: Message, action: AgentAction): Message =
     const { actionName, params } = response.metadata.data.result;
     if (actionName === 'wallet_path_finding') {
       return {
-        role: 'assistant',
+        role: 'assistant' as const,
         content: `I'll find the path between wallet ${params.walletA} and ${params.walletB} by tracking token transfers...`,
         metadata: response.metadata
       };
@@ -60,7 +60,7 @@ const formatActionResponse = (response: Message, action: AgentAction): Message =
   // Standard action response formatting
   if (response?.metadata?.data) {
     return {
-      role: 'assistant',
+      role: 'assistant' as const,
       content: `Action completed: ${action.description}\n\`\`\`json\n${JSON.stringify(response.metadata.data, null, 2)}\n\`\`\``,
       metadata: response.metadata
     };
@@ -269,7 +269,7 @@ export function useAIChatTabs({ agent }: UseAIChatTabsProps) {
       } catch (error) {
         console.error('Error in agent execution:', error);
         setAgentMessages(prev => [...prev, {
-          role: 'assistant',
+          role: 'assistant' as const,
           content: `**Error:** ${error instanceof Error ? error.message : String(error)}. Please try again with more specific information.`
         }]);
       }

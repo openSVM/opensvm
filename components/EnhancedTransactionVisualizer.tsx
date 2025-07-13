@@ -2,7 +2,7 @@
 
 import React from 'react';
 import type { DetailedTransactionInfo } from '@/lib/solana';
-import { useEffect, useRef, useMemo, useCallback } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import * as d3 from 'd3';
 
 interface ParsedInstruction {
@@ -53,8 +53,8 @@ function isValidAccount(account: any): account is TransactionAccount {
 // Memoize the component to prevent unnecessary re-renders
 const EnhancedTransactionVisualizer = function({ tx }: EnhancedTransactionVisualizerProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
   const simulationRef = useRef<d3.Simulation<Node, undefined> | null>(null);
-  const animationFrameRef = useRef<number | null>(null);
 
   // Memoize helper functions
   const getNodeRadius = useCallback((node: Node): number => {
@@ -214,14 +214,14 @@ const EnhancedTransactionVisualizer = function({ tx }: EnhancedTransactionVisual
       .force('charge', d3.forceManyBody().strength(-150))
       .force('center', d3.forceCenter(0, 0))
       // Add vertical positioning bias for top-to-bottom flow
-      .force('y', d3.forceY(d => {
+      .force('y', d3.forceY((d: any) => {
         // Position instructions at top, programs in middle, accounts at bottom
         if (d.type === 'instruction') return -height/4;
         if (d.type === 'program') return 0;
         return height/4;
       }).strength(0.3))
       .force('x', d3.forceX().strength(0.1)) // Weak horizontal centering
-      .force('collision', d3.forceCollide().radius(d => getNodeRadius(d) + 8))
+      .force('collision', d3.forceCollide().radius((d: any) => getNodeRadius(d) + 8))
       // Reduce alpha decay for faster stabilization
       .alphaDecay(0.05)
       .alphaMin(0.001);

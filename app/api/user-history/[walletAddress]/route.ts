@@ -15,7 +15,7 @@ import {
 } from '@/lib/qdrant';
 
 // Authentication check using session validation
-function isValidRequest(request: NextRequest, walletAddress: string): { isValid: boolean; session?: any } {
+function isValidRequest(_request: NextRequest, walletAddress: string): { isValid: boolean; session?: any } {
   try {
     const session = getSessionFromCookie();
     if (!session) return { isValid: false };

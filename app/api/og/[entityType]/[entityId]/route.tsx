@@ -4,7 +4,6 @@
  */
 
 import { ImageResponse } from 'next/og';
-import { NextRequest } from 'next/server';
 
 // Edge runtime for better performance
 export const runtime = 'edge';
@@ -15,7 +14,6 @@ interface Params {
 }
 
 export async function GET(
-  request: NextRequest,
   { params }: { params: Params }
 ) {
   try {

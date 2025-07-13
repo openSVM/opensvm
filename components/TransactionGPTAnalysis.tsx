@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { DetailedTransactionInfo } from '@/lib/solana';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import { useAbortableFetch } from '@/lib/hooks/useAbortableFetch';

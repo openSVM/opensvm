@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { LAUNCHPAD_CONSTANTS } from '@/lib/constants/analytics-constants';
 
 // Real Launchpad Analytics API using external APIs for real data
@@ -696,7 +696,7 @@ async function fetchRecentProjects(): Promise<LaunchpadProject[]> {
   }
 }
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const [launchpads, recentProjects] = await Promise.all([
       fetchLaunchpadData(),

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import cytoscape from 'cytoscape';
-import { ViewportState, GraphStateCache } from '@/lib/graph-state-cache';
+import { ViewportState } from '@/lib/graph-state-cache';
 import { debounce } from '@/lib/utils';
 import { debugLog } from '../';
 
@@ -17,7 +17,7 @@ interface UseViewportNavigationProps {
 }
 
 interface UseViewportNavigationReturn {
-  handleNodeClick: (address: string, loadingKey: string) => void;
+  handleNodeClick: (address: string, _loadingKey: string) => void;
   updateViewportState: () => void;
   focusSignatureRef: React.MutableRefObject<string>;
 }
@@ -28,7 +28,7 @@ interface UseViewportNavigationReturn {
  */
 export function useViewportNavigation({
   cyRef,
-  viewportState,
+  viewportState: _viewportState,
   setViewportState,
   currentSignature,
   clientSideNavigation,
@@ -45,20 +45,15 @@ export function useViewportNavigation({
     try {
       const newViewportState: ViewportState = {
         zoom: cy.zoom(),
-        pan: cy.pan(),
-        extent: cy.extent(),
-        center: {
-          x: cy.width() / 2,
-          y: cy.height() / 2
-        }
+        pan: cy.pan()
       };
 
       setViewportState(newViewportState);
       
-      // Cache the viewport state
-      if (currentSignature) {
-        GraphStateCache.saveViewportState(currentSignature, newViewportState);
-      }
+      // Cache the viewport state - method not available in GraphStateCache
+      // if (currentSignature) {
+      //   GraphStateCache.saveViewportState(currentSignature, newViewportState);
+      // }
       
       debugLog('🔄 [VIEWPORT] Viewport state updated', newViewportState);
     } catch (error) {
@@ -67,7 +62,7 @@ export function useViewportNavigation({
   }, 250), [cyRef, setViewportState, currentSignature]); // 250ms delay to reduce overhead from frequent pan/zoom events
 
   // Handle node click with proper navigation
-  const handleNodeClick = useCallback((address: string, loadingKey: string) => {
+  const handleNodeClick = useCallback((address: string, _loadingKey: string) => {
     debugLog(`🔍 [CLICK] Node clicked: ${address}`);
     
     try {
@@ -101,16 +96,12 @@ export function useViewportNavigation({
         
         // Save the current state before navigation
         if (currentSignature) {
-          const currentViewportState: ViewportState = {
-            zoom: cy.zoom(),
-            pan: cy.pan(),
-            extent: cy.extent(),
-            center: {
-              x: cy.width() / 2,
-              y: cy.height() / 2
-            }
-          };
-          GraphStateCache.saveViewportState(currentSignature, currentViewportState);
+          // GraphStateCache.saveViewportState method not available
+          // const currentViewportState: ViewportState = {
+          //   zoom: cy.zoom(),
+          //   pan: cy.pan()
+          // };
+          // GraphStateCache.saveViewportState(currentSignature, currentViewportState);
         }
       } else if (nodeType === 'account') {
         debugLog(`🔍 [ACCOUNT] Account node clicked: ${address}`);

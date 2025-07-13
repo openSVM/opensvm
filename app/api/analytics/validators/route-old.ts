@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getFixedValidatorAnalytics } from '@/lib/data-sources/fixed-validator-analytics';
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const validatorAnalytics = getFixedValidatorAnalytics();
     

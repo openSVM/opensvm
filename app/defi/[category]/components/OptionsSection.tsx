@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Target, TrendingUp, TrendingDown, DollarSign, Calendar, Users, RefreshCw, Calculator } from 'lucide-react';
+import { Target, DollarSign, Calendar, Users, RefreshCw, Calculator } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 

@@ -253,7 +253,7 @@ export const SearchSuggestions: React.FC<SearchSuggestionsProps> = ({
         <>
           {hasGroupedSections ? (
             // Render grouped sections with headers
-            Object.entries(groupedSuggestions).map(([sectionKey, section], sectionIndex) => (
+            Object.entries(groupedSuggestions).map(([sectionKey, section], _sectionIndex) => (
               <div key={sectionKey}>
                 {/* Section Header */}
                 <div className="px-4 py-3 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
@@ -273,8 +273,8 @@ export const SearchSuggestions: React.FC<SearchSuggestionsProps> = ({
                 </div>
                 
                 {/* Section Items */}
-                {section.suggestions.map((suggestion, index) => {
-                  const { primaryMetadata, secondaryMetadata, detailMetadata } = renderSuggestionMetadata(suggestion);
+                {section.suggestions.map((suggestion, _index) => {
+                  const { primaryMetadata, secondaryMetadata, detailMetadata: _detailMetadata } = renderSuggestionMetadata(suggestion);
                   const globalIndex = suggestion.originalIndex;
                   const isHovered = hoveredIndex === globalIndex;
 

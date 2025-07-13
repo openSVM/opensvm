@@ -1,14 +1,14 @@
 'use client';
 
-// Type-safe fullscreen API interface
-export interface FullscreenElement extends HTMLElement {
+// Type-safe fullscreen API interface - using intersection types instead of extending
+export interface FullscreenElement {
   requestFullscreen?: () => Promise<void>;
   mozRequestFullScreen?: () => void;
   webkitRequestFullscreen?: () => void;
   msRequestFullscreen?: () => void;
 }
 
-export interface FullscreenDocument extends Document {
+export interface FullscreenDocument {
   exitFullscreen?: () => Promise<void>;
   mozCancelFullScreen?: () => void;
   webkitExitFullscreen?: () => void;
@@ -93,14 +93,14 @@ export interface GPUGraphData {
 }
 
 // Type guards for runtime type checking
-export function isFullscreenElement(element: HTMLElement): element is FullscreenElement {
-  return 'requestFullscreen' in element || 
+export function isFullscreenElement(element: HTMLElement): boolean {
+  return 'requestFullscreen' in element ||
          'mozRequestFullScreen' in element ||
          'webkitRequestFullscreen' in element ||
          'msRequestFullscreen' in element;
 }
 
-export function isFullscreenDocument(doc: Document): doc is FullscreenDocument {
+export function isFullscreenDocument(doc: Document): boolean {
   return 'exitFullscreen' in doc ||
          'mozCancelFullScreen' in doc ||
          'webkitExitFullscreen' in doc ||
@@ -122,14 +122,15 @@ export function safeRequestFullscreen(element: HTMLElement): Promise<void> | voi
     return Promise.resolve();
   }
 
-  if (element.requestFullscreen) {
-    return element.requestFullscreen();
-  } else if (element.mozRequestFullScreen) {
-    return element.mozRequestFullScreen();
-  } else if (element.webkitRequestFullscreen) {
-    return element.webkitRequestFullscreen();
-  } else if (element.msRequestFullscreen) {
-    return element.msRequestFullscreen();
+  const fsElement = element as any;
+  if (fsElement.requestFullscreen) {
+    return fsElement.requestFullscreen();
+  } else if (fsElement.mozRequestFullScreen) {
+    return fsElement.mozRequestFullScreen();
+  } else if (fsElement.webkitRequestFullscreen) {
+    return fsElement.webkitRequestFullscreen();
+  } else if (fsElement.msRequestFullscreen) {
+    return fsElement.msRequestFullscreen();
   }
 }
 
@@ -139,14 +140,15 @@ export function safeExitFullscreen(doc: Document): Promise<void> | void {
     return Promise.resolve();
   }
 
-  if (doc.exitFullscreen) {
-    return doc.exitFullscreen();
-  } else if (doc.mozCancelFullScreen) {
-    return doc.mozCancelFullScreen();
-  } else if (doc.webkitExitFullscreen) {
-    return doc.webkitExitFullscreen();
-  } else if (doc.msExitFullscreen) {
-    return doc.msExitFullscreen();
+  const fsDoc = doc as any;
+  if (fsDoc.exitFullscreen) {
+    return fsDoc.exitFullscreen();
+  } else if (fsDoc.mozCancelFullScreen) {
+    return fsDoc.mozCancelFullScreen();
+  } else if (fsDoc.webkitExitFullscreen) {
+    return fsDoc.webkitExitFullscreen();
+  } else if (fsDoc.msExitFullscreen) {
+    return fsDoc.msExitFullscreen();
   }
 }
 
@@ -160,7 +162,7 @@ export function safeGetMemoryInfo(win: Window): PerformanceMemory | null {
 export function safeCallGarbageCollector(win: Window): void {
   if (hasGarbageCollector(win)) {
     try {
-      win.gc();
+      (win as any).gc?.();
     } catch (error) {
       console.warn('Failed to call garbage collector:', error);
     }

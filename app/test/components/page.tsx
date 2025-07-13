@@ -11,19 +11,28 @@ const mockTokenAccounts = [
     mint: 'So11111111111111111111111111111111111111112',
     symbol: 'WSOL',
     uiAmount: 10.5,
-    account: '4VvJHWPXf8bxQmM5vLNHUDzjfCrpCPiPCaVFQmrMjJdH'
+    account: '4VvJHWPXf8bxQmM5vLNHUDzjfCrpCPiPCaVFQmrMjJdH',
+    owner: '4VvJHWPXf8bxQmM5vLNHUDzjfCrpCPiPCaVFQmrMjJdH',
+    amount: 10500000000, // 10.5 SOL in lamports
+    decimals: 9
   },
   {
     mint: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
     symbol: 'USDC',
     uiAmount: 1250.75,
-    account: '7KqpRwzkkeweW5GT1CiRBGKdRhPKJYm2e7DjT9L5dTwz'
+    account: '7KqpRwzkkeweW5GT1CiRBGKdRhPKJYm2e7DjT9L5dTwz',
+    owner: '7KqpRwzkkeweW5GT1CiRBGKdRhPKJYm2e7DjT9L5dTwz',
+    amount: 1250750000, // 1250.75 USDC in microunits
+    decimals: 6
   },
   {
     mint: 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB',
     symbol: 'USDT',
     uiAmount: 500.25,
-    account: 'BkV8hmX2cGBbYwyR7NtFkgWc1e4bGmCjqH7JfDfwFKyq'
+    account: 'BkV8hmX2cGBbYwyR7NtFkgWc1e4bGmCjqH7JfDfwFKyq',
+    owner: 'BkV8hmX2cGBbYwyR7NtFkgWc1e4bGmCjqH7JfDfwFKyq',
+    amount: 500250000, // 500.25 USDT in microunits
+    decimals: 6
   }
 ];
 
@@ -125,7 +134,7 @@ function MockTransfersTable() {
             </tr>
           </thead>
           <tbody>
-            {filteredTransfers.map((transfer, index) => (
+            {filteredTransfers.map((transfer) => (
               <tr key={transfer.signature} className="border-t border-gray-600 hover:bg-gray-700">
                 <td className="px-4 py-3 text-gray-300">
                   {new Date(transfer.timestamp).toLocaleDateString()} {new Date(transfer.timestamp).toLocaleTimeString()}

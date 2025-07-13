@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { ArrowUpDown, TrendingUp, DollarSign, Users, Droplets, Percent, ExternalLink, RefreshCw } from 'lucide-react';
+import { ArrowUpDown, TrendingUp, DollarSign, Users, Droplets, ExternalLink, RefreshCw } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 
